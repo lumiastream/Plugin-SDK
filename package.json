@@ -1,0 +1,46 @@
+{
+  "name": "@lumiastream/plugin-sdk",
+  "version": "0.1.0",
+  "description": "Official Lumia Stream Plugin SDK for building Lumia Stream plugins.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "lumia",
+    "stream",
+    "plugin",
+    "sdk",
+    "automation"
+  ],
+  "author": "Lumia Stream",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc --noEmit",
+    "build:plugin": "node scripts/build-plugin.js",
+    "validate:plugin": "node scripts/validate-plugin.js",
+    "create:plugin": "node scripts/create-plugin.js"
+  },
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "scripts",
+    "examples/base-plugin",
+    "bin"
+  ],
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "jszip": "3.10.1"
+  },
+  "dependencies": {},
+  "bin": {
+    "create-lumiastream-plugin": "bin/create-lumiastream-plugin.js"
+  }
+}

@@ -1,0 +1,489 @@
+# Plugin Manifest Guide
+
+The `manifest.json` file is the heart of your Lumia Stream plugin. It defines metadata, configuration options, and capabilities.
+
+## Basic Structure
+
+```json
+{
+  "id": "unique-plugin-id",
+  "name": "Human Readable Name",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "description": "Brief description",
+  "lumiaVersion": "^9.0.0",
+  "category": "utilities",
+  "config": {
+    "settings": [],
+    "actions": [],
+    "variables": [],
+    "alerts": []
+  }
+}
+```
+
+## Required Fields
+
+### Basic Information
+
+- **`id`** (string): Unique identifier for your plugin. Use kebab-case.
+- **`name`** (string): Human-readable plugin name.
+- **`version`** (string): Semantic version (e.g., "1.0.0").
+- **`author`** (string): Plugin author name.
+- **`description`** (string): Brief description of what the plugin does.
+- **`lumiaVersion`** (string): Compatible Lumia Stream version (semver range).
+- **`category`** (string): Plugin category (see categories below).
+
+## Optional Fields
+
+### Extended Information
+
+- **`email`** (string): Author's email address.
+- **`website`** (string): Plugin or author website URL.
+- **`repository`** (string): Source code repository URL.
+- **`longDescription`** (string): Detailed description with formatting.
+- **`license`** (string): License type (e.g., "MIT", "GPL-3.0").
+- **`keywords`** (string[]): Array of keywords for search.
+- **`icon`** (string): Plugin icon filename (PNG recommended).
+- **`screenshots`** (string[]): Array of screenshot filenames.
+- **`changelog`** (string): Markdown changelog content.
+
+## Plugin Categories
+
+The Lumia marketplace recognises the following categories (strings are case-sensitive):
+
+- **`system`** – Core Lumia features and internal tooling
+- **`platforms`** – Streaming platform integrations (Twitch, YouTube, Kick, etc.)
+- **`apps`** – Third-party app integrations
+- **`lights`** – General lighting control providers
+- **`switch`** – Smart switch and relay integrations
+- **`deck`** – Control deck hardware and software
+- **`protocols`** – Network or automation protocols (OSC, MIDI, etc.)
+- **`keylight`** – Key light devices
+- **`devices`** – Miscellaneous hardware integrations
+- **`utilities`** – General purpose utilities and helpers
+- **`overlays`** – Overlay and visual experiences
+- **`audio`** – Audio processing and sound integrations
+- **`chat`** – Chat interaction tools
+- **`development`** – Development, testing, and debugging utilities
+
+## Configuration
+
+The `config` object defines your plugin's interactive elements:
+
+### Settings
+
+Settings create a configuration UI for users:
+
+```json
+{
+  "config": {
+    "settings": [
+      {
+        "key": "apiKey",
+        "label": "API Key",
+        "type": "password",
+        "placeholder": "Enter your API key",
+        "helperText": "Get this from your service dashboard",
+        "required": true
+      },
+      {
+        "key": "pollInterval",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 30,
+        "validation": {
+          "min": 5,
+          "max": 300
+        }
+      },
+      {
+        "key": "notifications",
+        "label": "Enable Notifications",
+        "type": "toggle",
+        "defaultValue": true
+      }
+    ]
+  }
+}
+```
+
+#### Setting Types
+
+- **`text`** - Single-line text input
+- **`password`** - Password input (hidden text)
+- **`number`** - Numeric input
+- **`email`** - Email address input
+- **`url`** - URL input
+- **`textarea`** - Multi-line text input
+- **`select`** - Dropdown selection
+- **`checkbox`** - Checkbox input
+- **`toggle`** - Toggle switch
+- **`color`** - Color picker
+- **`file`** - File upload
+
+#### Validation Options
+
+```json
+{
+  "validation": {
+    "pattern": "^[a-zA-Z0-9]+$",
+    "min": 1,
+    "max": 100,
+    "minLength": 5,
+    "maxLength": 50
+  }
+}
+```
+
+#### Select Options
+
+```json
+{
+  "key": "quality",
+  "label": "Stream Quality",
+  "type": "select",
+  "options": [
+    { "label": "Low (480p)", "value": "480p" },
+    { "label": "Medium (720p)", "value": "720p" },
+    { "label": "High (1080p)", "value": "1080p" }
+  ]
+}
+```
+
+### Actions
+
+Actions allow users to trigger plugin functionality manually:
+
+```json
+{
+  "config": {
+    "actions": [
+      {
+        "type": "manual_poll",
+        "label": "Poll Now",
+        "description": "Manually trigger an API poll",
+        "fields": []
+      },
+      {
+        "type": "send_message",
+        "label": "Send Custom Message",
+        "description": "Send a custom message to the service",
+        "fields": [
+          {
+            "key": "message",
+            "label": "Message",
+            "type": "textarea",
+            "required": true
+          },
+          {
+            "key": "channel",
+            "label": "Channel",
+            "type": "select",
+            "options": [
+              { "label": "General", "value": "general" },
+              { "label": "Alerts", "value": "alerts" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Variables
+
+Variables define data that your plugin provides to Lumia Stream:
+
+```json
+{
+  "config": {
+    "variables": [
+      {
+        "name": "follower_count",
+        "system": true,
+        "origin": "twitch",
+        "allowedPlaces": ["chat", "overlay"],
+        "description": "Current number of followers",
+        "value": 0,
+        "example": "twitch_follower_count"
+      },
+      {
+        "name": "last_follower",
+        "system": true,
+        "origin": "twitch",
+        "allowedPlaces": ["chat", "overlay", "alert"],
+        "description": "Username of the most recent follower",
+        "value": "",
+        "example": "twitch_last_follower"
+      }
+    ]
+  }
+}
+```
+
+### Alerts
+
+Alerts define events that your plugin can trigger:
+
+```json
+{
+  "config": {
+    "alerts": [
+      {
+        "title": "New Follower",
+        "alertValue": "twitch-follow",
+        "key": "follow",
+        "acceptedVariables": ["twitch_follower_count", "twitch_last_follower"],
+        "defaultMessage": "{{username}} just followed! Welcome!",
+        "withLoyalty": false,
+        "defaults": {
+          "on": true
+        },
+        "variationConditions": []
+      },
+      {
+        "title": "Stream Started",
+        "alertValue": "twitch-stream-start",
+        "key": "streamStart",
+        "acceptedVariables": ["twitch_stream_title", "twitch_game"],
+        "defaultMessage": "Stream is now live! Playing {{twitch_game}}",
+        "withLoyalty": false,
+        "defaults": {
+          "on": true
+        }
+      }
+    ]
+  }
+}
+```
+
+## Complete Example
+
+Here's a complete manifest for a hypothetical Discord integration plugin:
+
+```json
+{
+  "id": "discord-integration",
+  "name": "Discord Integration",
+  "version": "2.1.0",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com/plugins/discord",
+  "repository": "https://github.com/LumiaStream/discord-plugin",
+  "description": "Integrate your Discord server with Lumia Stream",
+  "longDescription": "Connect your Discord server to receive real-time notifications about messages, member joins, voice channel activity, and more. Perfect for streamers who want to stay connected with their Discord community while streaming.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "keywords": ["discord", "chat", "community", "notifications"],
+  "category": "platforms",
+  "icon": "discord-icon.png",
+  "screenshots": ["discord-setup.png", "discord-alerts.png"],
+  "changelog": "# Changelog\n\n## 2.1.0\n- Added voice channel activity tracking\n- Improved message filtering\n- Bug fixes for role mentions\n\n## 2.0.0\n- Complete rewrite with new Discord API\n- Added slash command support\n- Enhanced security",
+  "config": {
+    "settings": [
+      {
+        "key": "botToken",
+        "label": "Bot Token",
+        "type": "password",
+        "placeholder": "Your Discord bot token",
+        "helperText": "Create a bot application at https://discord.com/developers/applications",
+        "required": true
+      },
+      {
+        "key": "guildId",
+        "label": "Server ID",
+        "type": "text",
+        "placeholder": "Your Discord server ID",
+        "helperText": "Right-click your server name and select 'Copy Server ID'",
+        "required": true,
+        "validation": {
+          "pattern": "^[0-9]{17,19}$"
+        }
+      },
+      {
+        "key": "channels",
+        "label": "Monitored Channels",
+        "type": "textarea",
+        "placeholder": "Channel IDs, one per line",
+        "helperText": "Leave empty to monitor all channels",
+        "defaultValue": ""
+      },
+      {
+        "key": "messageFilter",
+        "label": "Message Filter",
+        "type": "select",
+        "defaultValue": "all",
+        "options": [
+          { "label": "All Messages", "value": "all" },
+          { "label": "Mentions Only", "value": "mentions" },
+          { "label": "Commands Only", "value": "commands" }
+        ]
+      },
+      {
+        "key": "enableVoiceTracking",
+        "label": "Track Voice Activity",
+        "type": "toggle",
+        "defaultValue": false,
+        "helperText": "Monitor voice channel joins/leaves"
+      }
+    ],
+    "actions": [
+      {
+        "type": "send_message",
+        "label": "Send Message",
+        "description": "Send a message to a Discord channel",
+        "fields": [
+          {
+            "key": "channelId",
+            "label": "Channel ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "key": "message",
+            "label": "Message",
+            "type": "textarea",
+            "required": true,
+            "validation": {
+              "maxLength": 2000
+            }
+          }
+        ]
+      },
+      {
+        "type": "update_status",
+        "label": "Update Bot Status",
+        "description": "Update the bot's activity status",
+        "fields": [
+          {
+            "key": "activity",
+            "label": "Activity Type",
+            "type": "select",
+            "options": [
+              { "label": "Playing", "value": "PLAYING" },
+              { "label": "Listening", "value": "LISTENING" },
+              { "label": "Watching", "value": "WATCHING" },
+              { "label": "Streaming", "value": "STREAMING" }
+            ]
+          },
+          {
+            "key": "text",
+            "label": "Status Text",
+            "type": "text",
+            "placeholder": "What is the bot doing?"
+          }
+        ]
+      }
+    ],
+    "variables": [
+      {
+        "name": "member_count",
+        "system": true,
+        "origin": "discord",
+        "allowedPlaces": ["chat", "overlay"],
+        "description": "Total number of server members",
+        "value": 0,
+        "example": "discord_member_count"
+      },
+      {
+        "name": "online_count",
+        "system": true,
+        "origin": "discord",
+        "allowedPlaces": ["chat", "overlay"],
+        "description": "Number of online members",
+        "value": 0,
+        "example": "discord_online_count"
+      },
+      {
+        "name": "voice_count",
+        "system": true,
+        "origin": "discord",
+        "allowedPlaces": ["chat", "overlay"],
+        "description": "Number of members in voice channels",
+        "value": 0,
+        "example": "discord_voice_count"
+      },
+      {
+        "name": "last_message",
+        "system": true,
+        "origin": "discord",
+        "allowedPlaces": ["chat", "overlay", "alert"],
+        "description": "Content of the most recent message",
+        "value": "",
+        "example": "discord_last_message"
+      },
+      {
+        "name": "last_user",
+        "system": true,
+        "origin": "discord",
+        "allowedPlaces": ["chat", "overlay", "alert"],
+        "description": "Username of the last message author",
+        "value": "",
+        "example": "discord_last_user"
+      }
+    ],
+    "alerts": [
+      {
+        "title": "New Message",
+        "alertValue": "discord-message",
+        "key": "message",
+        "acceptedVariables": ["discord_last_message", "discord_last_user"],
+        "defaultMessage": "{{discord_last_user}}: {{discord_last_message}}",
+        "withLoyalty": false,
+        "defaults": {
+          "on": false
+        }
+      },
+      {
+        "title": "Member Joined",
+        "alertValue": "discord-member-join",
+        "key": "memberJoin",
+        "acceptedVariables": ["discord_member_count", "discord_last_user"],
+        "defaultMessage": "{{discord_last_user}} joined the Discord! ({{discord_member_count}} total)",
+        "withLoyalty": false,
+        "defaults": {
+          "on": true
+        }
+      },
+      {
+        "title": "Voice Channel Activity",
+        "alertValue": "discord-voice-activity",
+        "key": "voiceActivity",
+        "acceptedVariables": ["discord_voice_count", "discord_last_user"],
+        "defaultMessage": "{{discord_last_user}} joined voice ({{discord_voice_count}} in voice)",
+        "withLoyalty": false,
+        "defaults": {
+          "on": false
+        }
+      }
+    ]
+  }
+}
+```
+
+## Validation
+
+The SDK includes manifest validation. Common validation errors:
+
+- **Invalid semver**: Version must follow semantic versioning
+- **Missing required fields**: All required fields must be present
+- **Invalid category**: Category must be one of the allowed values
+- **Duplicate keys**: Setting/action/variable keys must be unique
+- **Invalid types**: Field types must be valid
+- **Circular dependencies**: Alert conditions cannot create loops
+
+## Best Practices
+
+1. **Unique IDs**: Use your organization/username prefix (e.g., "mycompany-plugin-name")
+2. **Semantic Versioning**: Follow semver for version numbers
+3. **Clear Descriptions**: Write descriptive labels and help text
+4. **Sensible Defaults**: Provide good default values
+5. **Validation**: Use validation rules to prevent user errors
+6. **Documentation**: Include comprehensive descriptions and examples
+7. **Testing**: Test your manifest with the validation tools
+
+## Localization
+
+Currently, manifests support English only. Localization support is planned for future releases.

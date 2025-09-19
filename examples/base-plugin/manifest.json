@@ -1,0 +1,56 @@
+{
+	"id": "base-plugin",
+	"name": "Base Plugin",
+	"version": "1.0.0",
+	"author": "LumiaStream",
+	"email": "",
+	"website": "",
+	"repository": "",
+	"description": "Foundational plugin manifest with all optional fields present.",
+	"longDescription": "",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"keywords": [],
+	"category": "development",
+	"icon": "",
+	"screenshots": [],
+	"changelog": "",
+	"config": {
+		"settings": [
+			{
+				"key": "exampleSetting",
+				"label": "Example Setting",
+				"type": "text",
+				"defaultValue": "",
+				"helperText": "Demonstrates how to declare plugin settings."
+			}
+		],
+		"actions": [
+			{
+				"type": "example_action",
+				"label": "Example Action",
+				"description": "Triggers a log message in Lumia Stream.",
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "text",
+						"defaultValue": "Hello from Base Plugin"
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "example",
+				"system": false,
+				"origin": "base-plugin",
+				"allowedPlaces": [],
+				"description": "Example variable declared by the template.",
+				"value": 0,
+				"example": "base-plugin_example"
+			}
+		],
+		"alerts": []
+	}
+}

@@ -1,0 +1,119 @@
+# API Reference
+
+This document describes the public surface of the Lumia Stream Plugin SDK exported by `@lumiastream/plugin-sdk`.
+
+## Plugin Base Class
+
+### Constructor
+
+```ts
+constructor(manifest: PluginManifest, context: PluginContext)
+```
+
+Store any dependencies, initialise locals, and always pass the parameters to the parent constructor.
+
+### Lifecycle Methods
+
+- **`onload(): Promise<void>`** – called when the plugin is enabled. Initialise resources, timers, or external connections here.
+- **`onunload(): Promise<void>`** – invoked when the plugin is disabled. Clean up timers, close sockets, and release resources.
+- **`onupdate(oldVersion: string, newVersion: string): Promise<void>`** – triggered after a version upgrade. Optional.
+- **`onsettingsupdate(settings, previousSettings): Promise<void>`** – called after settings change. Optional.
+
+### Action Handling
+
+- **`actions(config: { actions: any[]; extraSettings?: any }): Promise<void>`** – process action executions defined in the manifest. Optional.
+
+### Convenience Properties
+
+- **`settings`** – getter/setter for all plugin settings. Setting this replaces the entire settings object.
+- **`manifest`** – read-only manifest supplied by Lumia Stream.
+- **`lumia`** – typed access to the Lumia Stream runtime API (`ILumiaAPI`).
+
+### Helper Methods
+
+- **`updateSettings(updates: Record<string, any>): void`** – merge new settings values with the existing ones.
+- **`validateAuth(data: any): Promise<boolean>`** – override to validate custom authentication flows.
+- **`refreshAuth<T>(data: T): Promise<T>`** – override to refresh credentials when required.
+
+## Lumia API (`ILumiaAPI`)
+
+### Connection
+
+- **`updateConnection(state: boolean): Promise<void>`** – notify Lumia Stream that the plugin connection has changed.
+- **`getConnectionState(): boolean`** – check the last reported connection state.
+
+### Settings
+
+- **`getSettings(): Record<string, any>`** – get the current settings object.
+- **`setSettings(settings: Record<string, any>): void`** – replace all settings.
+- **`updateSettings(updates: Record<string, any>): void`** – merge changes into the existing settings.
+
+### Variables
+
+- **`setVariable(name: string, value: any): Promise<void>`** – store a variable that other Lumia features can consume.
+- **`getVariable(name: string): any`** – read a stored variable value.
+
+### Commands
+
+- **`callCommand(name: string, variableValues?: any): Promise<any>`** – execute another Lumia command and optionally pass variable values.
+- **`getAllCommands(params?: { onlyOn?: boolean }): Promise<any>`** – fetch available commands.
+
+### Alerts & Chat
+
+- **`triggerAlert(options: PluginTriggerAlertOptions): Promise<boolean>`** – trigger an alert. Options include the alert identifier and optional payload.
+- **`displayChat(options: PluginDisplayChatOptions): void`** – display chat content inside Lumia Stream.
+- **`chatbot(options: { message: string; site?: string | string[]; color?: string; chatAsSelf?: boolean }): Promise<boolean>`** – send a message through the Lumia chatbot system.
+
+### Overlay & Visuals
+
+- **`overlaySendCustomContent(options: { layer: string; codeId: string; content: any }): Promise<boolean>`** – push custom overlay content.
+- **`sendColor(options: { lights?: string[]; color: string | any; power?: boolean; brightness?: number; transition?: number }): Promise<boolean>`** – control connected lighting devices.
+- **`getLights(): Promise<any>`** – retrieve current light information.
+
+### Audio & Speech
+
+- **`playAudio(options: { path: string; volume?: number; waitForAudioToStop?: boolean }): Promise<boolean>`** – play an audio file.
+- **`tts(options: { message: string; voice?: string; volume?: number }): Promise<boolean>`** – trigger text-to-speech playback.
+
+### Files & Persistence
+
+- **`writeFile(options: { path: string; message: string; append?: boolean; value?: string }): Promise<boolean>`** – write or append to a file.
+- **`readFile(path: string): Promise<string | boolean>`** – read a file's contents. Returns `false` on failure.
+
+### UX Helpers
+
+- **`showToast(options: { message: string; time?: number }): Promise<boolean>`** – display a toast notification within Lumia Stream.
+- **`addLog(message: string): Promise<boolean>`** – append a message to the Lumia Stream log panel.
+
+### Integration Helpers
+
+`ILumiaAPI.integration` exposes:
+
+- **`getId(): string`** – current integration identifier.
+- **`getConfig(): Record<string, any>`** – read integration configuration.
+- **`isConnected(): boolean`** – whether the integration reports a connected state.
+- **`isEnabled(): boolean`** – whether the integration is enabled.
+
+### Type Definitions
+
+```ts
+interface PluginTriggerAlertOptions {
+  alert: string;
+  dynamic?: { name: string; value: string | number | boolean };
+  extraSettings?: Record<string, any>;
+}
+
+interface PluginDisplayChatOptions {
+  platform?: string;
+  username: string;
+  displayname?: string;
+  message: string;
+  avatar?: string;
+  color?: string;
+  badges?: string[];
+  messageId?: string;
+  extraInfo?: Record<string, any>;
+}
+```
+
+Additional types such as `PluginManifest`, `PluginContext`, `PluginActionsConfig`, `PluginAuthConfig`, and the error classes `PluginError`, `PluginSecurityError`, and `PluginInstallError` are exported from the SDK entry point for convenience.

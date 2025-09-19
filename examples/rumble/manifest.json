@@ -1,0 +1,129 @@
+{
+  "id": "rumble",
+  "name": "Rumble Livestream",
+  "version": "1.0.0",
+  "author": "LumiaStream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "repository": "https://github.com/LumiaStream/rumble-plugin",
+  "description": "Monitor Rumble livestream status and trigger events based on stream activity.",
+  "longDescription": "Poll the Rumble livestream API to react instantly when your stream starts, ends, or experiences large viewer swings. Automatically keep Lumia Stream variables in sync so you can drive overlays, lights, and automation logic.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "keywords": [
+    "rumble",
+    "streaming",
+    "platform",
+    "api",
+    "polling",
+    "livestream",
+    "automation"
+  ],
+  "category": "platforms",
+  "icon": "assets/rumble-icon.png",
+  "screenshots": [
+    "assets/rumble-config.png",
+    "assets/rumble-actions.png"
+  ],
+  "changelog": "# Changelog\n\n## 1.0.0\n- Initial release\n- Rumble API polling\n- Stream start/end detection\n- Viewer count change tracking\n- Template variable updates\n- Manual action handlers",
+  "config": {
+    "settings": [
+      {
+        "key": "apiKey",
+        "label": "API Key",
+        "type": "text",
+        "placeholder": "Enter your Rumble livestream API key",
+        "helperText": "Copy the key parameter from your Rumble livestream API URL",
+        "required": true
+      },
+      {
+        "key": "pollInterval",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 30,
+        "helperText": "How often to check for stream updates (10-300 seconds)"
+      }
+    ],
+    "actions": [
+      {
+        "type": "manual_poll",
+        "label": "Manual Poll",
+        "description": "Manually trigger a single API poll",
+        "fields": []
+      },
+      {
+        "type": "manual_alert",
+        "label": "Manual Alert",
+        "description": "Manually trigger the stream started alert",
+        "fields": []
+      }
+    ],
+    "variables": [
+      {
+        "name": "live",
+        "system": true,
+        "origin": "rumble",
+        "allowedPlaces": [],
+        "description": "Whether the Rumble stream is currently live",
+        "value": false,
+        "example": "rumble_live"
+      },
+      {
+        "name": "viewers",
+        "system": true,
+        "origin": "rumble",
+        "allowedPlaces": [],
+        "description": "Current number of viewers watching the stream",
+        "value": 0,
+        "example": "rumble_viewers"
+      },
+      {
+        "name": "title",
+        "system": true,
+        "origin": "rumble",
+        "allowedPlaces": [],
+        "description": "Current stream title",
+        "value": "",
+        "example": "rumble_title"
+      }
+    ],
+    "alerts": [
+      {
+        "title": "Stream Started",
+        "alertValue": "rumble-streamStarted",
+        "key": "streamStarted",
+        "acceptedVariables": ["rumble_live", "rumble_viewers", "rumble_title"],
+        "defaultMessage": "{{username}} has started streaming on Rumble!",
+        "withLoyalty": false,
+        "defaults": {
+          "on": true
+        },
+        "variationConditions": []
+      },
+      {
+        "title": "Stream Ended",
+        "alertValue": "rumble-streamEnded",
+        "key": "streamEnded",
+        "acceptedVariables": ["rumble_live", "rumble_viewers", "rumble_title"],
+        "defaultMessage": "{{username}} has ended their Rumble stream.",
+        "withLoyalty": false,
+        "defaults": {
+          "on": true
+        },
+        "variationConditions": []
+      },
+      {
+        "title": "Viewer Count Changed",
+        "alertValue": "rumble-viewerCountChanged",
+        "key": "viewerCountChanged",
+        "acceptedVariables": ["rumble_viewers", "rumble_title"],
+        "defaultMessage": "Viewer count changed to {{rumble_viewers}}!",
+        "withLoyalty": false,
+        "defaults": {
+          "on": false
+        },
+        "variationConditions": []
+      }
+    ]
+  }
+}
