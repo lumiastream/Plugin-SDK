@@ -81,12 +81,11 @@ See the [API reference](./docs/api-reference.md) for the full surface area.
 
 ## CLI Helpers
 
-Run these utilities with `npm run <script> -- [options]` from the SDK repo.
+Use the CLI commands with `npx` (requires npm 7+).
 
-- `npm run create:plugin -- ./my-plugin` scaffold a fresh plugin folder with `manifest.json`, `main.js`, and README
-- `npx create-lumiastream-plugin my-plugin` same scaffold without cloning the repo (requires npm 7+)
-- `npm run validate:plugin -- ./path/to/plugin` check `manifest.json` and core files for common mistakes
-- `npm run build:plugin -- ./path/to/plugin --out ./dist` bundle the directory into a distributable `.lumiaplugin` archive
+- `npx create-lumiastream-plugin my-plugin` scaffold a fresh plugin folder (copied from `examples/base-plugin`) with `manifest.json`, `main.js`, and README
+- `npx validate-lumiastream-plugin ./path/to/plugin` check `manifest.json`, entry files, and config for common mistakes
+- `npx build-lumiastream-plugin ./path/to/plugin --out ./plugin.lumiaplugin` bundle the directory into a distributable archive
 
 ## Documentation
 

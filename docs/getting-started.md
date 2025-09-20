@@ -12,12 +12,9 @@ This guide walks you through creating your first Lumia Stream plugin from scratc
 
 The repository ships simple helpers so you can bootstrap and package plugins without writing scripts yourself:
 
-- `npm run create:plugin -- ./my-plugin` scaffolds a starter directory (copied from `examples/base-plugin`) with `manifest.json`, `main.js`, and a README.
-  * Modify `examples/base-plugin` if you want to change what the scaffolder outputs by default.
 - `npx create-lumiastream-plugin my-plugin` scaffolds the same template without cloning this repo (requires npm 7+).
-  * Modify `examples/base-plugin` if you want to change what the scaffolder outputs by default.
-- `npm run validate:plugin -- ./path/to/plugin` checks the manifest and required files for common mistakes.
-- `npm run build:plugin -- ./path/to/plugin --out ./dist` produces a `.lumiaplugin` archive ready to import into Lumia Stream.
+- `npx build-lumiastream-plugin ./path/to/plugin` runs the same build pipeline globally (optional `--out`).
+- `npx validate-lumiastream-plugin ./path/to/plugin` validates manifests without cloning the repo.
 
 ## 1. Project Setup
 
@@ -35,40 +32,40 @@ Create `manifest.json` with your plugin metadata and configuration options:
 
 ```json
 {
-  "id": "my-first-plugin",
-  "name": "My First Plugin",
-  "version": "1.0.0",
-  "author": "Your Name",
-  "email": "your.email@example.com",
-  "description": "My first Lumia Stream plugin",
-  "lumiaVersion": "^9.0.0",
-  "category": "utilities",
-  "config": {
-    "settings": [
-      {
-        "key": "message",
-        "label": "Custom Message",
-        "type": "text",
-        "defaultValue": "Hello from my plugin!",
-        "helperText": "This message is logged when the plugin loads"
-      }
-    ],
-    "actions": [
-      {
-        "type": "say_hello",
-        "label": "Say Hello",
-        "description": "Logs a hello message",
-        "fields": [
-          {
-            "key": "name",
-            "label": "Name",
-            "type": "text",
-            "defaultValue": "World"
-          }
-        ]
-      }
-    ]
-  }
+	"id": "my-first-plugin",
+	"name": "My First Plugin",
+	"version": "1.0.0",
+	"author": "Your Name",
+	"email": "your.email@example.com",
+	"description": "My first Lumia Stream plugin",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"config": {
+		"settings": [
+			{
+				"key": "message",
+				"label": "Custom Message",
+				"type": "text",
+				"defaultValue": "Hello from my plugin!",
+				"helperText": "This message is logged when the plugin loads"
+			}
+		],
+		"actions": [
+			{
+				"type": "say_hello",
+				"label": "Say Hello",
+				"description": "Logs a hello message",
+				"fields": [
+					{
+						"key": "name",
+						"label": "Name",
+						"type": "text",
+						"defaultValue": "World"
+					}
+				]
+			}
+		]
+	}
 }
 ```
 
@@ -77,52 +74,56 @@ Create `manifest.json` with your plugin metadata and configuration options:
 Create `src/main.ts`:
 
 ```ts
-import { Plugin, type PluginManifest, type PluginContext } from '@lumiastream/plugin-sdk';
+import {
+	Plugin,
+	type PluginManifest,
+	type PluginContext,
+} from "@lumiastream/plugin-sdk";
 
 export default class MyFirstPlugin extends Plugin {
-  private interval?: NodeJS.Timeout;
+	private interval?: NodeJS.Timeout;
 
-  constructor(manifest: PluginManifest, context: PluginContext) {
-    super(manifest, context);
-  }
+	constructor(manifest: PluginManifest, context: PluginContext) {
+		super(manifest, context);
+	}
 
-  async onload(): Promise<void> {
-    const message = this.settings.message ?? 'Hello from my plugin!';
-    await this.lumia.addLog(`Plugin loaded: ${message}`);
+	async onload(): Promise<void> {
+		const message = this.settings.message ?? "Hello from my plugin!";
+		await this.lumia.addLog(`Plugin loaded: ${message}`);
 
-    this.interval = setInterval(() => {
-      const timestamp = new Date().toISOString();
-      void this.lumia.setVariable('last_update', timestamp);
-    }, 10000);
-  }
+		this.interval = setInterval(() => {
+			const timestamp = new Date().toISOString();
+			void this.lumia.setVariable("last_update", timestamp);
+		}, 10000);
+	}
 
-  async onunload(): Promise<void> {
-    if (this.interval) {
-      clearInterval(this.interval);
-    }
-    await this.lumia.addLog('Plugin unloaded');
-  }
+	async onunload(): Promise<void> {
+		if (this.interval) {
+			clearInterval(this.interval);
+		}
+		await this.lumia.addLog("Plugin unloaded");
+	}
 
-  async actions(config: { actions: any[] }): Promise<void> {
-    for (const action of config.actions) {
-      if (action.type === 'say_hello') {
-        const name = action.data?.name ?? 'World';
-        await this.lumia.addLog(`Hello, ${name}!`);
+	async actions(config: { actions: any[] }): Promise<void> {
+		for (const action of config.actions) {
+			if (action.type === "say_hello") {
+				const name = action.data?.name ?? "World";
+				await this.lumia.addLog(`Hello, ${name}!`);
 
-        await this.lumia.triggerAlert({
-          alert: 'custom-hello',
-          extraSettings: {
-            username: name,
-            message: `Hello from ${this.manifest.name}!`
-          }
-        });
-      }
-    }
-  }
+				await this.lumia.triggerAlert({
+					alert: "custom-hello",
+					extraSettings: {
+						username: name,
+						message: `Hello from ${this.manifest.name}!`,
+					},
+				});
+			}
+		}
+	}
 
-  async onsettingsupdate(settings: Record<string, any>): Promise<void> {
-    await this.lumia.addLog(`Settings updated: ${JSON.stringify(settings)}`);
-  }
+	async onsettingsupdate(settings: Record<string, any>): Promise<void> {
+		await this.lumia.addLog(`Settings updated: ${JSON.stringify(settings)}`);
+	}
 }
 ```
 
@@ -132,18 +133,18 @@ Create `tsconfig.json`:
 
 ```json
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "CommonJS",
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "CommonJS",
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true
+	},
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist"]
 }
 ```
 
@@ -151,10 +152,10 @@ Add scripts to `package.json`:
 
 ```json
 {
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
-  }
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsc --watch"
+	}
 }
 ```
 
@@ -172,39 +173,42 @@ The compiled JavaScript will be in the `dist` folder. Your plugin is ready to lo
 
 ```ts
 // Set a variable
-await this.lumia.setVariable('my_variable', 'some value');
+await this.lumia.setVariable("my_variable", "some value");
 
 // Read a variable
-const value = this.lumia.getVariable('my_variable');
+const value = this.lumia.getVariable("my_variable");
 
 // Update a counter variable
-const current = Number(this.lumia.getVariable('counter') ?? 0);
-await this.lumia.setVariable('counter', current + 1);
+const current = Number(this.lumia.getVariable("counter") ?? 0);
+await this.lumia.setVariable("counter", current + 1);
 ```
 
 ### Alerts
 
 ```ts
 await this.lumia.triggerAlert({
-  alert: 'follow',
-  extraSettings: {
-    username: 'NewFollower',
-    message: 'Thanks for following!'
-  }
+	alert: "follow",
+	extraSettings: {
+		username: "NewFollower",
+		message: "Thanks for following!",
+	},
 });
 
 await this.lumia.triggerAlert({
-  alert: 'my-custom-alert',
-  dynamic: { name: 'username', value: 'Viewer123' }
+	alert: "my-custom-alert",
+	dynamic: { name: "username", value: "Viewer123" },
 });
 ```
 
 ### File Operations
 
 ```ts
-const content = await this.lumia.readFile('data.txt');
-if (typeof content === 'string') {
-  await this.lumia.writeFile({ path: 'output.txt', message: content.toUpperCase() });
+const content = await this.lumia.readFile("data.txt");
+if (typeof content === "string") {
+	await this.lumia.writeFile({
+		path: "output.txt",
+		message: content.toUpperCase(),
+	});
 }
 ```
 
@@ -213,9 +217,9 @@ if (typeof content === 'string') {
 Node.js 18+ ships with the global `fetch` API. Use it directly from your plugin when you need to talk to external services:
 
 ```ts
-const response = await fetch('https://api.example.com/data');
+const response = await fetch("https://api.example.com/data");
 const data = await response.json();
-await this.lumia.setVariable('api_data', JSON.stringify(data));
+await this.lumia.setVariable("api_data", JSON.stringify(data));
 ```
 
 ## Common Patterns
@@ -224,32 +228,32 @@ await this.lumia.setVariable('api_data', JSON.stringify(data));
 
 ```ts
 export default class ApiPollingPlugin extends Plugin {
-  private pollInterval?: NodeJS.Timeout;
+	private pollInterval?: NodeJS.Timeout;
 
-  async onload(): Promise<void> {
-    const interval = Number(this.settings.pollInterval ?? 30000);
-    this.pollInterval = setInterval(() => {
-      void this.pollApi();
-    }, interval);
-  }
+	async onload(): Promise<void> {
+		const interval = Number(this.settings.pollInterval ?? 30000);
+		this.pollInterval = setInterval(() => {
+			void this.pollApi();
+		}, interval);
+	}
 
-  async onunload(): Promise<void> {
-    if (this.pollInterval) {
-      clearInterval(this.pollInterval);
-    }
-  }
+	async onunload(): Promise<void> {
+		if (this.pollInterval) {
+			clearInterval(this.pollInterval);
+		}
+	}
 
-  private async pollApi(): Promise<void> {
-    try {
-      const response = await fetch('https://api.example.com/status');
-      const data = await response.json();
+	private async pollApi(): Promise<void> {
+		try {
+			const response = await fetch("https://api.example.com/status");
+			const data = await response.json();
 
-      await this.lumia.setVariable('api_status', data.status);
-      await this.lumia.setVariable('api_data', JSON.stringify(data));
-    } catch (error) {
-      await this.lumia.addLog(`API polling failed: ${String(error)}`);
-    }
-  }
+			await this.lumia.setVariable("api_status", data.status);
+			await this.lumia.setVariable("api_data", JSON.stringify(data));
+		} catch (error) {
+			await this.lumia.addLog(`API polling failed: ${String(error)}`);
+		}
+	}
 }
 ```
 
@@ -257,39 +261,39 @@ export default class ApiPollingPlugin extends Plugin {
 
 ```ts
 export default class EventPlugin extends Plugin {
-  async onload(): Promise<void> {
-    this.setupEventListeners();
-  }
+	async onload(): Promise<void> {
+		this.setupEventListeners();
+	}
 
-  private setupEventListeners(): void {
-    // Example: Listen for chat events, webhooks, etc.
-  }
+	private setupEventListeners(): void {
+		// Example: Listen for chat events, webhooks, etc.
+	}
 
-  async actions(config: { actions: any[] }): Promise<void> {
-    for (const action of config.actions) {
-      switch (action.type) {
-        case 'manual_trigger':
-          await this.handleManualTrigger(action.data);
-          break;
-        case 'reset_counters':
-          await this.resetCounters();
-          break;
-      }
-    }
-  }
+	async actions(config: { actions: any[] }): Promise<void> {
+		for (const action of config.actions) {
+			switch (action.type) {
+				case "manual_trigger":
+					await this.handleManualTrigger(action.data);
+					break;
+				case "reset_counters":
+					await this.resetCounters();
+					break;
+			}
+		}
+	}
 
-  private async handleManualTrigger(data: any): Promise<void> {
-    await this.lumia.addLog('Manual trigger executed');
-    await this.lumia.triggerAlert({
-      alert: 'manual-event',
-      extraSettings: { username: data?.username ?? 'Unknown' }
-    });
-  }
+	private async handleManualTrigger(data: any): Promise<void> {
+		await this.lumia.addLog("Manual trigger executed");
+		await this.lumia.triggerAlert({
+			alert: "manual-event",
+			extraSettings: { username: data?.username ?? "Unknown" },
+		});
+	}
 
-  private async resetCounters(): Promise<void> {
-    await this.lumia.setVariable('counter', 0);
-    await this.lumia.addLog('Counters reset');
-  }
+	private async resetCounters(): Promise<void> {
+		await this.lumia.setVariable("counter", 0);
+		await this.lumia.addLog("Counters reset");
+	}
 }
 ```
 
