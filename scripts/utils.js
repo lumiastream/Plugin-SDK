@@ -3,7 +3,6 @@ const path = require('path');
 const JSZip = require('jszip');
 
 const DEFAULT_IGNORE = new Set([
-  'node_modules',
   '.git',
   '.DS_Store',
   'Thumbs.db',
@@ -69,6 +68,11 @@ async function collectFiles(pluginDir, ignore = DEFAULT_IGNORE) {
       const absolute = path.join(currentDir, entry.name);
       const relative = path.relative(pluginDir, absolute);
       if (!relative || relative.startsWith('..')) continue;
+
+      // Skip @lumiastream/plugin-sdk in node_modules
+      if (relative === 'node_modules/@lumiastream' || relative.startsWith('node_modules/@lumiastream/plugin-sdk')) {
+        continue;
+      }
 
       if (entry.isDirectory()) {
         await walk(absolute);

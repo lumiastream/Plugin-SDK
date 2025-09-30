@@ -11,20 +11,24 @@ npm install @lumiastream/plugin-sdk
 ## Usage
 
 ```ts
-import { Plugin, type PluginManifest, type PluginContext } from '@lumiastream/plugin-sdk';
+import {
+	Plugin,
+	type PluginManifest,
+	type PluginContext,
+} from "@lumiastream/plugin-sdk";
 
 export default class MyPlugin extends Plugin {
-  constructor(manifest: PluginManifest, context: PluginContext) {
-    super(manifest, context);
-  }
+	constructor(manifest: PluginManifest, context: PluginContext) {
+		super(manifest, context);
+	}
 
-  async onload(): Promise<void> {
-    this.lumia.addLog('Plugin loaded successfully!');
-  }
+	async onload(): Promise<void> {
+		this.lumia.addLog("Plugin loaded successfully!");
+	}
 
-  async onunload(): Promise<void> {
-    this.lumia.addLog('Plugin unloaded');
-  }
+	async onunload(): Promise<void> {
+		this.lumia.addLog("Plugin unloaded");
+	}
 }
 ```
 
@@ -34,23 +38,23 @@ Every plugin requires a `manifest.json` file that describes your plugin, its met
 
 ```json
 {
-  "id": "my-awesome-plugin",
-  "name": "My Awesome Plugin",
-  "version": "1.0.0",
-  "author": "Your Name",
-  "description": "A brief description of what your plugin does",
-  "lumiaVersion": "^9.0.0",
-  "category": "utilities",
-  "config": {
-    "settings": [
-      {
-        "key": "apiKey",
-        "label": "API Key",
-        "type": "text",
-        "required": true
-      }
-    ]
-  }
+	"id": "my-awesome-plugin",
+	"name": "My Awesome Plugin",
+	"version": "1.0.0",
+	"author": "Your Name",
+	"description": "A brief description of what your plugin does",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "API Key",
+				"type": "text",
+				"required": true
+			}
+		]
+	}
 }
 ```
 
@@ -67,9 +71,12 @@ Every plugin requires a `manifest.json` file that describes your plugin, its met
 Interact with Lumia Stream using the strongly typed `ILumiaAPI` helper on the plugin context:
 
 ```ts
-await this.lumia.triggerAlert({ alert: 'follow', extraSettings: { username: 'StreamerFan' } });
-await this.lumia.playAudio({ path: 'alert.mp3', volume: 0.7 });
-this.lumia.setVariable('follower_count', 1337);
+await this.lumia.triggerAlert({
+	alert: "follow",
+	extraSettings: { username: "StreamerFan" },
+});
+await this.lumia.playAudio({ path: "alert.mp3", volume: 0.7 });
+this.lumia.setVariable("follower_count", 1337);
 ```
 
 See the [API reference](./docs/api-reference.md) for the full surface area.
@@ -83,9 +90,9 @@ See the [API reference](./docs/api-reference.md) for the full surface area.
 
 Use the CLI commands with `npx` (requires npm 7+).
 
-- `npx create-lumiastream-plugin my-plugin` scaffold a fresh plugin folder (copied from `examples/base-plugin`) with `manifest.json`, `main.js`, and README
-- `npx validate-lumiastream-plugin ./path/to/plugin` check `manifest.json`, entry files, and config for common mistakes
-- `npx build-lumiastream-plugin ./path/to/plugin --out ./plugin.lumiaplugin` bundle the directory into a distributable archive
+- `npx @lumiastream/plugin-sdk create my-plugin` scaffold a fresh plugin folder (copied from `examples/base-plugin`) with `manifest.json`, `main.js`, and README
+- `npx @lumiastream/plugin-sdk validate ./path/to/plugin` check `manifest.json`, entry files, and config for common mistakes
+- `npx @lumiastream/plugin-sdk build ./path/to/plugin --out ./plugin.lumiaplugin` bundle the directory into a distributable archive
 
 ## Documentation
 

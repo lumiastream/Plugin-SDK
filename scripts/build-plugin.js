@@ -43,7 +43,7 @@ function parseArgs() {
 function printHelp() {
 	console.log(`Build a .lumiaplugin archive for distribution.
 
-Usage: npx build-lumiastream-plugin [options]
+Usage: npx @lumiastream/plugin-sdk build [options]
 
 Options:
   --dir, -d   Plugin directory (defaults to cwd)

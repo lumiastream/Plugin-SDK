@@ -1,4 +1,4 @@
-const { Plugin } = require('@lumiastream/plugin-sdk');
+const { Plugin } = require("@lumiastream/plugin-sdk");
 
 const DEFAULT_POLL_INTERVAL = 30; // seconds
 const MIN_POLL_INTERVAL = 10;
@@ -7,361 +7,385 @@ const VIEWER_CHANGE_THRESHOLD = 10;
 const VIEWER_MILESTONES = [50, 100, 250, 500, 1000];
 
 const ALERT_TYPES = {
-  STREAM_STARTED: 'rumble-streamStarted',
-  STREAM_ENDED: 'rumble-streamEnded',
-  VIEWER_COUNT_CHANGED: 'rumble-viewerCountChanged',
+	STREAM_STARTED: "rumble-streamStarted",
+	STREAM_ENDED: "rumble-streamEnded",
+	VIEWER_COUNT_CHANGED: "rumble-viewerCountChanged",
 };
 
 class RumblePlugin extends Plugin {
-  constructor(manifest, context) {
-    super(manifest, context);
+	constructor(manifest, context) {
+		super(manifest, context);
 
-    this.pollIntervalId = null;
-    this.lastKnownState = {
-      live: false,
-      viewers: 0,
-      title: '',
-      thumbnail: '',
-    };
+		this.pollIntervalId = null;
+		this.lastKnownState = {
+			live: false,
+			viewers: 0,
+			title: "",
+			thumbnail: "",
+		};
 
-    this.sessionData = {
-      streamStartTime: null,
-      totalStreams: 0,
-      peakViewers: 0,
-      milestonesReached: new Set(),
-      lastMilestoneReached: 0,
-    };
-  }
+		this.sessionData = {
+			streamStartTime: null,
+			totalStreams: 0,
+			peakViewers: 0,
+			milestonesReached: new Set(),
+			lastMilestoneReached: 0,
+		};
+	}
 
-  get currentSettings() {
-    return this.settings || {};
-  }
+	get currentSettings() {
+		return this.settings || {};
+	}
 
-  get apiKey() {
-    return this.extractApiKey(this.currentSettings.apiKey);
-  }
+	get apiKey() {
+		return this.extractApiKey(this.currentSettings.apiKey);
+	}
 
-  async onload() {
-    await this.lumia.addLog('[Rumble] Plugin loading...');
+	async onload() {
+		await this.lumia.addLog("[Rumble] Plugin loading...");
 
-    if (this.apiKey) {
-      await this.startPolling({ showToast: false });
-    }
+		if (this.apiKey) {
+			await this.startPolling({ showToast: false });
+		}
 
-    await this.lumia.addLog('[Rumble] Plugin loaded');
-  }
+		await this.lumia.addLog("[Rumble] Plugin loaded");
+	}
 
-  async onunload() {
-    await this.lumia.addLog('[Rumble] Plugin unloading...');
-    await this.stopPolling(false);
-    await this.lumia.addLog('[Rumble] Plugin unloaded');
-  }
+	async onunload() {
+		await this.lumia.addLog("[Rumble] Plugin unloading...");
+		await this.stopPolling(false);
+		await this.lumia.addLog("[Rumble] Plugin unloaded");
+	}
 
-  async onsettingsupdate(settings, previousSettings) {
-    const next = settings || {};
-    const previous = previousSettings || {};
+	async onsettingsupdate(settings, previousSettings) {
+		const next = settings || {};
+		const previous = previousSettings || {};
 
-    const nextApiKey = this.extractApiKey(next.apiKey);
-    const prevApiKey = this.extractApiKey(previous.apiKey);
+		const nextApiKey = this.extractApiKey(next.apiKey);
+		const prevApiKey = this.extractApiKey(previous.apiKey);
 
-    const nextInterval = this.normalizePollInterval(next.pollInterval);
-    const prevInterval = this.normalizePollInterval(previous.pollInterval);
+		const nextInterval = this.normalizePollInterval(next.pollInterval);
+		const prevInterval = this.normalizePollInterval(previous.pollInterval);
 
-    const apiKeyChanged = nextApiKey !== prevApiKey;
-    const intervalChanged = nextInterval !== prevInterval;
+		const apiKeyChanged = nextApiKey !== prevApiKey;
+		const intervalChanged = nextInterval !== prevInterval;
 
-    if (!nextApiKey) {
-      await this.stopPolling(false);
-      return;
-    }
+		if (!nextApiKey) {
+			await this.stopPolling(false);
+			return;
+		}
 
-    if (!this.pollIntervalId) {
-      await this.startPolling({ showToast: false });
-      return;
-    }
+		if (!this.pollIntervalId) {
+			await this.startPolling({ showToast: false });
+			return;
+		}
 
-    if (apiKeyChanged || intervalChanged) {
-      await this.stopPolling(false);
-      await this.startPolling({ showToast: false });
-    }
-  }
+		if (apiKeyChanged || intervalChanged) {
+			await this.stopPolling(false);
+			await this.startPolling({ showToast: false });
+		}
+	}
 
-  async actions(config = {}) {
-    const actionList = Array.isArray(config.actions) ? config.actions : [];
+	async actions(config = {}) {
+		const actionList = Array.isArray(config.actions) ? config.actions : [];
 
-    if (!actionList.length) {
-      return;
-    }
+		if (!actionList.length) {
+			return;
+		}
 
-    for (const action of actionList) {
-      try {
-        await this.handleAction(action);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        await this.lumia.addLog(`[Rumble] Action failed: ${message}`);
-      }
-    }
-  }
+		for (const action of actionList) {
+			try {
+				switch (action.type) {
+					case "manual_poll": {
+						await this.pollAPI();
+						await this.lumia.addLog("[Rumble] Manual poll triggered");
+						break;
+					}
 
-  async validateAuth(data = {}) {
-    try {
-      const apiKey = this.extractApiKey(data.apiKey);
-      if (!apiKey) {
-        return false;
-      }
+					case "manual_alert": {
+						await this.lumia.triggerAlert({
+							alert: ALERT_TYPES.STREAM_STARTED,
+							extraSettings: {
+								title: this.lastKnownState.title,
+								thumbnail: this.lastKnownState.thumbnail || "",
+								viewers: this.lastKnownState.viewers,
+								streamNumber: this.sessionData.totalStreams,
+							},
+						});
+						await this.lumia.addLog("[Rumble] Manual alert triggered");
+						break;
+					}
 
-      await this.fetchStreamData(apiKey);
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.lumia.addLog(`[Rumble] Auth validation failed: ${message}`);
-      return false;
-    }
-  }
+					default: {
+						await this.lumia.addLog(
+							`[Rumble] Unknown action type: ${action.type}`
+						);
+					}
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await this.lumia.addLog(`[Rumble] Action failed: ${message}`);
+			}
+		}
+	}
 
-  extractApiKey(value) {
-    if (typeof value !== 'string') {
-      return undefined;
-    }
-    const trimmed = value.trim();
-    return trimmed.length ? trimmed : undefined;
-  }
+	async validateAuth(data = {}) {
+		try {
+			const apiKey = this.extractApiKey(data.apiKey);
+			if (!apiKey) {
+				return false;
+			}
 
-  async startPolling(options = {}) {
-    const { showToast = true } = options;
+			await this.fetchStreamData(apiKey);
+			return true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(`[Rumble] Auth validation failed: ${message}`);
+			return false;
+		}
+	}
 
-    if (!this.apiKey) {
-      await this.lumia.addLog('[Rumble] Missing API key, cannot start polling');
-      if (showToast) {
-        await this.lumia.showToast({ message: 'Rumble API key required to poll' });
-      }
-      return;
-    }
+	extractApiKey(value) {
+		if (typeof value !== "string") {
+			return undefined;
+		}
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : undefined;
+	}
 
-    if (this.pollIntervalId) {
-      return;
-    }
+	async startPolling(options = {}) {
+		const { showToast = true } = options;
 
-    const normalizedInterval = this.normalizePollInterval(this.currentSettings.pollInterval);
+		if (!this.apiKey) {
+			await this.lumia.addLog("[Rumble] Missing API key, cannot start polling");
+			if (showToast) {
+				await this.lumia.showToast({
+					message: "Rumble API key required to poll",
+				});
+			}
+			return;
+		}
 
-    if (normalizedInterval !== this.currentSettings.pollInterval) {
-      this.updateSettings({ pollInterval: normalizedInterval });
-    }
+		if (this.pollIntervalId) {
+			return;
+		}
 
-    await this.pollAPI();
+		const normalizedInterval = this.normalizePollInterval(
+			this.currentSettings.pollInterval
+		);
 
-    this.pollIntervalId = setInterval(() => {
-      void this.pollAPI();
-    }, normalizedInterval * 1000);
+		if (normalizedInterval !== this.currentSettings.pollInterval) {
+			this.updateSettings({ pollInterval: normalizedInterval });
+		}
 
-    if (showToast) {
-      await this.lumia.showToast({ message: `Started polling Rumble API (${normalizedInterval}s)` });
-    }
+		await this.pollAPI();
 
-    await this.lumia.updateConnection(true);
-  }
+		this.pollIntervalId = setInterval(() => {
+			void this.pollAPI();
+		}, normalizedInterval * 1000);
 
-  async stopPolling(showToast = true) {
-    if (this.pollIntervalId) {
-      clearInterval(this.pollIntervalId);
-      this.pollIntervalId = null;
-    }
+		if (showToast) {
+			await this.lumia.showToast({
+				message: `Started polling Rumble API (${normalizedInterval}s)`,
+			});
+		}
 
-    if (showToast) {
-      await this.lumia.showToast({ message: 'Stopped polling Rumble API' });
-    }
+		await this.lumia.updateConnection(true);
+	}
 
-    await this.lumia.updateConnection(false);
-  }
+	async stopPolling(showToast = true) {
+		if (this.pollIntervalId) {
+			clearInterval(this.pollIntervalId);
+			this.pollIntervalId = null;
+		}
 
-  async pollAPI() {
-    try {
-      const apiKey = this.apiKey;
-      if (!apiKey) {
-        await this.lumia.addLog('[Rumble] Poll skipped: API key not configured');
-        return;
-      }
+		if (showToast) {
+			await this.lumia.showToast({ message: "Stopped polling Rumble API" });
+		}
 
-      const data = await this.fetchStreamData(apiKey);
-      await this.processStreamData(data);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.lumia.addLog(`[Rumble] Error polling API: ${message}`);
-    }
-  }
+		await this.lumia.updateConnection(false);
+	}
 
-  async processStreamData(data = {}) {
-    const currentLive = Boolean(data.live);
-    const currentViewers = Number.isFinite(Number(data.viewers)) ? Number(data.viewers) : 0;
-    const currentTitle = typeof data.title === 'string' ? data.title : '';
-    const currentThumbnail = typeof data.thumbnail === 'string' ? data.thumbnail : '';
+	async pollAPI() {
+		try {
+			const apiKey = this.apiKey;
+			if (!apiKey) {
+				await this.lumia.addLog(
+					"[Rumble] Poll skipped: API key not configured"
+				);
+				return;
+			}
 
-    if (currentLive !== this.lastKnownState.live) {
-      if (currentLive) {
-        await this.handleStreamStart({ ...data, thumbnail: currentThumbnail }, currentViewers);
-      } else {
-        await this.handleStreamEnd(currentViewers);
-      }
-    }
+			const data = await this.fetchStreamData(apiKey);
+			await this.processStreamData(data);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(`[Rumble] Error polling API: ${message}`);
+		}
+	}
 
-    if (currentLive) {
-      if (currentViewers > this.sessionData.peakViewers) {
-        this.sessionData.peakViewers = currentViewers;
-      }
+	async processStreamData(data = {}) {
+		const currentLive = Boolean(data.live);
+		const currentViewers = Number.isFinite(Number(data.viewers))
+			? Number(data.viewers)
+			: 0;
+		const currentTitle = typeof data.title === "string" ? data.title : "";
+		const currentThumbnail =
+			typeof data.thumbnail === "string" ? data.thumbnail : "";
 
-      await this.checkViewerMilestones(currentViewers);
-      await this.checkViewerChanges(currentViewers);
-    }
+		if (currentLive !== this.lastKnownState.live) {
+			if (currentLive) {
+				await this.handleStreamStart(
+					{ ...data, thumbnail: currentThumbnail },
+					currentViewers
+				);
+			} else {
+				await this.handleStreamEnd(currentViewers);
+			}
+		}
 
-    this.lastKnownState = {
-      live: currentLive,
-      viewers: currentViewers,
-      title: currentTitle,
-      thumbnail: currentThumbnail,
-    };
+		if (currentLive) {
+			if (currentViewers > this.sessionData.peakViewers) {
+				this.sessionData.peakViewers = currentViewers;
+			}
 
-    await this.lumia.setVariable('rumble_live', currentLive);
-    await this.lumia.setVariable('rumble_viewers', currentViewers);
-    await this.lumia.setVariable('rumble_title', currentTitle);
-  }
+			await this.checkViewerMilestones(currentViewers);
+			await this.checkViewerChanges(currentViewers);
+		}
 
-  async handleStreamStart(data, currentViewers) {
-    this.sessionData.streamStartTime = new Date();
-    this.sessionData.totalStreams += 1;
-    this.sessionData.peakViewers = currentViewers;
-    this.sessionData.milestonesReached.clear();
-    this.sessionData.lastMilestoneReached = 0;
+		this.lastKnownState = {
+			live: currentLive,
+			viewers: currentViewers,
+			title: currentTitle,
+			thumbnail: currentThumbnail,
+		};
 
-    await this.lumia.triggerAlert({
-      alert: ALERT_TYPES.STREAM_STARTED,
-      extraSettings: {
-        title: data?.title || '',
-        thumbnail: data?.thumbnail || '',
-        viewers: currentViewers,
-        streamNumber: this.sessionData.totalStreams,
-      },
-    });
-  }
+		await this.lumia.setVariable("rumble_live", currentLive);
+		await this.lumia.setVariable("rumble_viewers", currentViewers);
+		await this.lumia.setVariable("rumble_title", currentTitle);
+	}
 
-  async handleStreamEnd(finalViewers) {
-    const durationMs = this.sessionData.streamStartTime
-      ? Date.now() - this.sessionData.streamStartTime.getTime()
-      : 0;
+	async handleStreamStart(data, currentViewers) {
+		this.sessionData.streamStartTime = new Date();
+		this.sessionData.totalStreams += 1;
+		this.sessionData.peakViewers = currentViewers;
+		this.sessionData.milestonesReached.clear();
+		this.sessionData.lastMilestoneReached = 0;
 
-    await this.lumia.triggerAlert({
-      alert: ALERT_TYPES.STREAM_ENDED,
-      extraSettings: {
-        finalViewers,
-        peakViewers: this.sessionData.peakViewers,
-        durationMinutes: Math.floor(durationMs / (1000 * 60)),
-        milestonesReached: Array.from(this.sessionData.milestonesReached),
-      },
-    });
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.STREAM_STARTED,
+			extraSettings: {
+				title: data?.title || "",
+				thumbnail: data?.thumbnail || "",
+				viewers: currentViewers,
+				streamNumber: this.sessionData.totalStreams,
+			},
+		});
+	}
 
-    this.sessionData.streamStartTime = null;
-    this.sessionData.peakViewers = 0;
-    this.sessionData.milestonesReached.clear();
-  }
+	async handleStreamEnd(finalViewers) {
+		const durationMs = this.sessionData.streamStartTime
+			? Date.now() - this.sessionData.streamStartTime.getTime()
+			: 0;
 
-  async checkViewerMilestones(currentViewers) {
-    for (const milestone of VIEWER_MILESTONES) {
-      if (currentViewers >= milestone && !this.sessionData.milestonesReached.has(milestone)) {
-        this.sessionData.milestonesReached.add(milestone);
-        this.sessionData.lastMilestoneReached = milestone;
-        await this.lumia.addLog(`[Rumble] Viewer milestone reached: ${milestone}`);
-      }
-    }
-  }
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.STREAM_ENDED,
+			extraSettings: {
+				finalViewers,
+				peakViewers: this.sessionData.peakViewers,
+				durationMinutes: Math.floor(durationMs / (1000 * 60)),
+				milestonesReached: Array.from(this.sessionData.milestonesReached),
+			},
+		});
 
-  async checkViewerChanges(currentViewers) {
-    const previousViewers = this.lastKnownState.viewers;
-    const change = currentViewers - previousViewers;
+		this.sessionData.streamStartTime = null;
+		this.sessionData.peakViewers = 0;
+		this.sessionData.milestonesReached.clear();
+	}
 
-    if (Math.abs(change) < VIEWER_CHANGE_THRESHOLD) {
-      return;
-    }
+	async checkViewerMilestones(currentViewers) {
+		for (const milestone of VIEWER_MILESTONES) {
+			if (
+				currentViewers >= milestone &&
+				!this.sessionData.milestonesReached.has(milestone)
+			) {
+				this.sessionData.milestonesReached.add(milestone);
+				this.sessionData.lastMilestoneReached = milestone;
+				await this.lumia.addLog(
+					`[Rumble] Viewer milestone reached: ${milestone}`
+				);
+			}
+		}
+	}
 
-    await this.lumia.triggerAlert({
-      alert: ALERT_TYPES.VIEWER_COUNT_CHANGED,
-      dynamic: {
-        name: 'rumble_viewers',
-        value: currentViewers,
-      },
-      extraSettings: {
-        previousViewers,
-        currentViewers,
-        change,
-        changeType: change > 0 ? 'increase' : 'decrease',
-        isSpike: Math.abs(change) >= VIEWER_CHANGE_THRESHOLD * 3,
-      },
-    });
-  }
+	async checkViewerChanges(currentViewers) {
+		const previousViewers = this.lastKnownState.viewers;
+		const change = currentViewers - previousViewers;
 
-  async handleAction(action = {}) {
-    switch (action.type) {
-      case 'manual_poll': {
-        await this.pollAPI();
-        await this.lumia.addLog('[Rumble] Manual poll triggered');
-        break;
-      }
+		if (Math.abs(change) < VIEWER_CHANGE_THRESHOLD) {
+			return;
+		}
 
-      case 'manual_alert': {
-        await this.lumia.triggerAlert({
-          alert: ALERT_TYPES.STREAM_STARTED,
-          extraSettings: {
-            title: this.lastKnownState.title,
-            thumbnail: this.lastKnownState.thumbnail || '',
-            viewers: this.lastKnownState.viewers,
-            streamNumber: this.sessionData.totalStreams,
-          },
-        });
-        await this.lumia.addLog('[Rumble] Manual alert triggered');
-        break;
-      }
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.VIEWER_COUNT_CHANGED,
+			dynamic: {
+				name: "rumble_viewers",
+				value: currentViewers,
+			},
+			extraSettings: {
+				previousViewers,
+				currentViewers,
+				change,
+				changeType: change > 0 ? "increase" : "decrease",
+				isSpike: Math.abs(change) >= VIEWER_CHANGE_THRESHOLD * 3,
+			},
+		});
+	}
 
-      default: {
-        await this.lumia.addLog(`[Rumble] Unknown action type: ${action.type}`);
-      }
-    }
-  }
+	async fetchStreamData(apiKey) {
+		const url = `https://rumble.com/-livestream-api/get-data?key=${encodeURIComponent(
+			apiKey
+		)}`;
+		const response = await fetch(url);
 
-  async fetchStreamData(apiKey) {
-    const url = `https://rumble.com/-livestream-api/get-data?key=${encodeURIComponent(apiKey)}`;
-    const response = await fetch(url);
+		if (!response.ok) {
+			throw new Error(
+				`HTTP ${response.status}: ${response.statusText || "Request failed"}`
+			);
+		}
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText || 'Request failed'}`);
-    }
+		const payload = await response.json();
+		if (payload && typeof payload === "object") {
+			if ("data" in payload && payload.data) {
+				return payload.data;
+			}
+			return payload;
+		}
 
-    const payload = await response.json();
-    if (payload && typeof payload === 'object') {
-      if ('data' in payload && payload.data) {
-        return payload.data;
-      }
-      return payload;
-    }
+		throw new Error("Invalid response from Rumble API");
+	}
 
-    throw new Error('Invalid response from Rumble API');
-  }
+	normalizePollInterval(value) {
+		if (typeof value === "number" && Number.isFinite(value)) {
+			return this.clampInterval(value);
+		}
 
-  normalizePollInterval(value) {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return this.clampInterval(value);
-    }
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return this.clampInterval(parsed);
+		}
 
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return this.clampInterval(parsed);
-    }
+		return DEFAULT_POLL_INTERVAL;
+	}
 
-    return DEFAULT_POLL_INTERVAL;
-  }
-
-  clampInterval(value) {
-    const interpreted = value > MAX_POLL_INTERVAL && value >= MIN_POLL_INTERVAL * 1000 ? value / 1000 : value;
-    const rounded = Math.round(interpreted);
-    return Math.min(Math.max(rounded, MIN_POLL_INTERVAL), MAX_POLL_INTERVAL);
-  }
+	clampInterval(value) {
+		const interpreted =
+			value > MAX_POLL_INTERVAL && value >= MIN_POLL_INTERVAL * 1000
+				? value / 1000
+				: value;
+		const rounded = Math.round(interpreted);
+		return Math.min(Math.max(rounded, MIN_POLL_INTERVAL), MAX_POLL_INTERVAL);
+	}
 }
 
 module.exports = RumblePlugin;
