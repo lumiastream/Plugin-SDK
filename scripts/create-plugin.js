@@ -25,10 +25,11 @@ function toDisplayName(id) {
 function printHelp() {
 	console.log(`Scaffold a new Lumia Stream plugin directory using the base-plugin template.
 
-Usage: npx create-lumiastream-plugin [target-directory]
+Usage: npx @lumiastream/plugin-sdk create [target-directory]
 
 Examples:
-  npx create-lumiastream-plugin ./plugins/my-plugin
+  npx @lumiastream/plugin-sdk create ./plugins/my-plugin
+  npx @lumiastream/plugin-sdk create my-awesome-plugin
 `);
 }
 
