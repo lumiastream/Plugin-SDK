@@ -30,4 +30,4 @@ export {
   validatePluginManifest,
   validateManifest,
 } from './manifest-validation';
-export default Plugin;
+export { Plugin as default } from './plugin';

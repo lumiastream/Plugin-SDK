@@ -5,19 +5,31 @@ const JSZip = require("jszip");
 function loadSharedValidator() {
 	try {
 		const shared = require("@lumiastream/plugin");
-		return (
-			shared.validatePluginManifest ||
-			shared.validateManifest
-		);
+		const validator =
+			shared && (shared.validatePluginManifest || shared.validateManifest);
+		if (typeof validator === "function") {
+			return validator;
+		}
+		throw new Error("@lumiastream/plugin does not expose a manifest validator");
 	} catch (error) {
-		if (error.code !== "MODULE_NOT_FOUND") {
-			throw error;
+		if (error.code === "MODULE_NOT_FOUND") {
+			// ignore and fall back to bundled validators
+		} else {
+			console.warn(
+				`Falling back to bundled manifest validator: ${error.message}`
+			);
 		}
 	}
 
 	try {
 		const fallback = require("../../dist/manifest-validation");
-		return fallback.validatePluginManifest || fallback.validateManifest;
+		const validator =
+			fallback &&
+			(fallback.validatePluginManifest || fallback.validateManifest);
+		if (typeof validator === "function") {
+			return validator;
+		}
+		throw new Error("Bundled manifest validators are missing or invalid");
 	} catch (error) {
 		if (error.code !== "MODULE_NOT_FOUND") {
 			throw error;
