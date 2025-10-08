@@ -26,4 +26,8 @@ export {
   PluginStatus,
   PluginCategory,
 } from './types';
+export {
+  validatePluginManifest,
+  validateManifest,
+} from './manifest-validation';
 export default Plugin;

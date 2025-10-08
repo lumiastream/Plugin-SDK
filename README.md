@@ -2,6 +2,8 @@
 
 Official TypeScript/JavaScript SDK for developing plugins for [Lumia Stream](https://lumiastream.com).
 
+![Lumia Stream Plugin](docs/lumiaplugin-banner.png)
+
 ## Installation
 
 ```bash
@@ -99,6 +101,7 @@ The CLI is distributed separately via `lumia-plugin`. Use it with `npx` (require
 - [Getting Started](./docs/getting-started.md)
 - [API Reference](./docs/api-reference.md)
 - [Manifest Guide](./docs/manifest-guide.md)
+- [Field Types Reference](./docs/field-types-reference.md)
 
 ## Examples
 

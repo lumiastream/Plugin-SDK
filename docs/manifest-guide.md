@@ -192,6 +192,129 @@ Actions allow users to trigger plugin functionality manually:
 }
 ```
 
+#### Action Field Types
+
+Action fields support the following input types:
+
+- **`text`** - Single-line text input. Supports variables.
+- **`email`** - Email address input with validation. Supports variables.
+- **`url`** - URL input with validation. Supports variables.
+- **`number`** - Numeric input with optional min/max constraints.
+- **`textarea`** - Multi-line text input. Supports variables and configurable rows.
+- **`color`** - Color picker that outputs hex color values (e.g., `#FF0000`).
+- **`select`** - Dropdown selection from predefined options.
+- **`checkbox`** - Boolean checkbox input.
+- **`switch`** - Toggle switch for boolean values.
+- **`slider`** - Numeric slider with min, max, and step values.
+- **`file`** - File path input with file browser dialog.
+
+#### Field Configuration Examples
+
+**Text Input with Variables**
+```json
+{
+  "key": "username",
+  "label": "Username",
+  "type": "text",
+  "placeholder": "Enter username",
+  "helperText": "Supports variables like {{username}}"
+}
+```
+
+**Textarea with Custom Rows**
+```json
+{
+  "key": "message",
+  "label": "Message",
+  "type": "textarea",
+  "placeholder": "Enter your message",
+  "rows": 6,
+  "helperText": "Multi-line text with variable support"
+}
+```
+
+**Number with Constraints**
+```json
+{
+  "key": "volume",
+  "label": "Volume",
+  "type": "number",
+  "defaultValue": 50,
+  "min": 0,
+  "max": 100
+}
+```
+
+**Slider Input**
+```json
+{
+  "key": "brightness",
+  "label": "Brightness",
+  "type": "slider",
+  "defaultValue": 100,
+  "min": 0,
+  "max": 255,
+  "step": 5
+}
+```
+
+**Color Picker**
+```json
+{
+  "key": "backgroundColor",
+  "label": "Background Color",
+  "type": "color",
+  "defaultValue": "#000000",
+  "helperText": "Choose a background color"
+}
+```
+
+**Select Dropdown**
+```json
+{
+  "key": "mode",
+  "label": "Mode",
+  "type": "select",
+  "defaultValue": "normal",
+  "options": [
+    { "label": "Normal", "value": "normal" },
+    { "label": "Fast", "value": "fast" },
+    { "label": "Slow", "value": "slow" }
+  ]
+}
+```
+
+**Checkbox**
+```json
+{
+  "key": "enableNotifications",
+  "label": "Enable Notifications",
+  "type": "checkbox",
+  "defaultValue": true
+}
+```
+
+**Switch Toggle**
+```json
+{
+  "key": "autoStart",
+  "label": "Auto Start",
+  "type": "switch",
+  "defaultValue": false,
+  "helperText": "Automatically start on load"
+}
+```
+
+**File Input**
+```json
+{
+  "key": "audioFile",
+  "label": "Audio File",
+  "type": "file",
+  "helperText": "Select an audio file to play"
+}
+```
+
 ### Variables
 
 Variables define data that your plugin provides to Lumia Stream:

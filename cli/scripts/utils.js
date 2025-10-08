@@ -2,6 +2,35 @@ const fs = require("fs");
 const path = require("path");
 const JSZip = require("jszip");
 
+function loadSharedValidator() {
+	try {
+		const shared = require("@lumiastream/plugin");
+		return (
+			shared.validatePluginManifest ||
+			shared.validateManifest
+		);
+	} catch (error) {
+		if (error.code !== "MODULE_NOT_FOUND") {
+			throw error;
+		}
+	}
+
+	try {
+		const fallback = require("../../dist/manifest-validation");
+		return fallback.validatePluginManifest || fallback.validateManifest;
+	} catch (error) {
+		if (error.code !== "MODULE_NOT_FOUND") {
+			throw error;
+		}
+	}
+
+	throw new Error(
+		"Unable to locate manifest validation helpers. Ensure @lumiastream/plugin is installed."
+	);
+}
+
+const validateManifest = loadSharedValidator();
+
 const DEFAULT_IGNORE = new Set([
 	".git",
 	".DS_Store",
@@ -20,56 +49,6 @@ async function readManifest(pluginDir) {
 	const manifestPath = path.join(pluginDir, "manifest.json");
 	const raw = await fs.promises.readFile(manifestPath, "utf8");
 	return { manifest: JSON.parse(raw), manifestPath };
-}
-
-function validateManifest(manifest) {
-	const errors = [];
-	const requiredStringFields = [
-		"id",
-		"name",
-		"version",
-		"author",
-		"description",
-		"license",
-		"lumiaVersion",
-	];
-	for (const field of requiredStringFields) {
-		const value = manifest[field];
-		if (typeof value !== "string" || value.trim().length === 0) {
-			errors.push(`Missing or invalid manifest field: ${field}`);
-		}
-	}
-
-	if (
-		!manifest.category ||
-		(typeof manifest.category !== "string" && !Array.isArray(manifest.category))
-	) {
-		errors.push("Manifest must declare a category string");
-	}
-
-	if (!manifest.config || typeof manifest.config !== "object") {
-		errors.push("Manifest config must be an object");
-	}
-
-	if (manifest.config) {
-		if (manifest.config.settings && !Array.isArray(manifest.config.settings)) {
-			errors.push("config.settings must be an array when provided");
-		}
-		if (manifest.config.actions && !Array.isArray(manifest.config.actions)) {
-			errors.push("config.actions must be an array when provided");
-		}
-		if (
-			manifest.config.variables &&
-			!Array.isArray(manifest.config.variables)
-		) {
-			errors.push("config.variables must be an array when provided");
-		}
-		if (manifest.config.alerts && !Array.isArray(manifest.config.alerts)) {
-			errors.push("config.alerts must be an array when provided");
-		}
-	}
-
-	return errors;
 }
 
 async function collectFiles(pluginDir, ignore = DEFAULT_IGNORE) {

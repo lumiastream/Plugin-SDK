@@ -105,6 +105,7 @@ export interface PluginSetting {
 	helperText?: string;
 	required?: boolean;
 	options?: Array<{ label: string; value: string | number | boolean }>;
+	rows?: number;
 	defaultValue?: string | number | boolean;
 	validation?: {
 		pattern?: string;
@@ -129,7 +130,8 @@ export interface PluginActionField {
 		| "email"
 		| "url"
 		| "password"
-		| "textarea";
+		| "textarea"
+		| "color";
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
@@ -137,6 +139,7 @@ export interface PluginActionField {
 	min?: number;
 	max?: number;
 	step?: number;
+	rows?: number;
 	defaultValue?: any;
 	validation?: {
 		min?: number;
@@ -338,11 +341,16 @@ export interface PluginFormField {
 		| "checkbox"
 		| "toggle"
 		| "color"
+		| "slider"
 		| "file";
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
 	defaultValue?: any;
+	rows?: number;
+	min?: number;
+	max?: number;
+	step?: number;
 	validation?: {
 		pattern?: string;
 		min?: number;
