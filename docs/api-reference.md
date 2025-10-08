@@ -1,6 +1,6 @@
 # API Reference
 
-This document describes the public surface of the Lumia Stream Plugin SDK exported by `@lumiastream/plugin-sdk`.
+This document describes the public surface of the Lumia Stream Plugin SDK exported by `@lumiastream/plugin`.
 
 ## Plugin Base Class
 
@@ -98,21 +98,21 @@ Store any dependencies, initialise locals, and always pass the parameters to the
 
 ```ts
 interface PluginTriggerAlertOptions {
-  alert: string;
-  dynamic?: { name: string; value: string | number | boolean };
-  extraSettings?: Record<string, any>;
+	alert: string;
+	dynamic?: { name: string; value: string | number | boolean };
+	extraSettings?: Record<string, any>;
 }
 
 interface PluginDisplayChatOptions {
-  platform?: string;
-  username: string;
-  displayname?: string;
-  message: string;
-  avatar?: string;
-  color?: string;
-  badges?: string[];
-  messageId?: string;
-  extraInfo?: Record<string, any>;
+	platform?: string;
+	username: string;
+	displayname?: string;
+	message: string;
+	avatar?: string;
+	color?: string;
+	badges?: string[];
+	messageId?: string;
+	extraInfo?: Record<string, any>;
 }
 ```
 

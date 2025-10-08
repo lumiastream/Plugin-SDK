@@ -19,7 +19,7 @@ examples/rumble/
 
 1. Create a new folder for your plugin (for example `~/Documents/LumiaStream/Plugins/rumble`).
 2. Copy `manifest.json`, `main.js`, and the `assets/` directory from this example into that folder.
-3. (Optional) copy `package.json` if you want to track dependencies – then run `npm install` to pull in `@lumiastream/plugin-sdk`.
+3. (Optional) copy `package.json` if you want to track dependencies – then run `npm install` to pull in `@lumiastream/plugin`.
 4. Launch Lumia Stream and load the plugin from the directory (or restart if you copied into the plugins folder).
 5. Open the plugin settings and paste your Rumble livestream API key. A valid key looks like `https://rumble.com/-livestream-api/get-data?key=YOUR_KEY` (copy the value after `key=`).
 
@@ -27,7 +27,7 @@ The plugin will begin polling every 30 seconds by default and will log activity 
 
 ## Highlights
 
-- Uses the `@lumiastream/plugin-sdk` runtime `Plugin` base class
+- Uses the `@lumiastream/plugin` runtime `Plugin` base class
 - Keeps three variables in sync: `rumble_live`, `rumble_viewers`, `rumble_title`
 - Raises alerts for stream start, stream end, and big viewer-count deltas
 - Demonstrates manual actions (`manual_poll`, `manual_alert`) that can be triggered from the Lumia UI
@@ -44,16 +44,16 @@ If you prefer TypeScript, start from this JavaScript version and rename `main.js
 
 ```json
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "outDir": "dist",
-    "rootDir": "."
-  },
-  "include": ["main.ts"]
+	"compilerOptions": {
+		"target": "ES2020",
+		"module": "CommonJS",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"outDir": "dist",
+		"rootDir": "."
+	},
+	"include": ["main.ts"]
 }
 ```
 

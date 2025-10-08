@@ -11,7 +11,7 @@ This template demonstrates a handful of common Lumia Stream plugin capabilities:
 Use the CLI to copy and customise the template:
 
 ```
-npx @lumiastream/plugin-cli create my-plugin
+npx lumia-plugin create my-plugin
 ```
 
 After scaffolding you can tailor the manifest, code, and README to match your idea.

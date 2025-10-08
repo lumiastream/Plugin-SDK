@@ -5,7 +5,7 @@ Official TypeScript/JavaScript SDK for developing plugins for [Lumia Stream](htt
 ## Installation
 
 ```bash
-npm install @lumiastream/plugin-sdk
+npm install @lumiastream/plugin
 ```
 
 ## Usage
@@ -15,7 +15,7 @@ import {
 	Plugin,
 	type PluginManifest,
 	type PluginContext,
-} from "@lumiastream/plugin-sdk";
+} from "@lumiastream/plugin";
 
 export default class MyPlugin extends Plugin {
 	constructor(manifest: PluginManifest, context: PluginContext) {
@@ -88,11 +88,11 @@ See the [API reference](./docs/api-reference.md) for the full surface area.
 
 ## CLI Helpers
 
-The CLI is distributed separately via `@lumiastream/plugin-cli`. Use it with `npx` (requires npm 7+).
+The CLI is distributed separately via `lumia-plugin`. Use it with `npx` (requires npm 7+).
 
-- `npx @lumiastream/plugin-cli create my-plugin` scaffold a feature-rich sample plugin showing logging, variables, and alerts
-- `npx @lumiastream/plugin-cli validate ./path/to/plugin` check `manifest.json`, entry files, and config for common mistakes
-- `npx @lumiastream/plugin-cli build ./path/to/plugin --out ./plugin.lumiaplugin` bundle the directory into a distributable archive
+- `npx lumia-plugin create my-plugin` scaffold a feature-rich sample plugin showing logging, variables, and alerts
+- `npx lumia-plugin validate ./path/to/plugin` check `manifest.json`, entry files, and config for common mistakes
+- `npx lumia-plugin build ./path/to/plugin --out ./plugin.lumiaplugin` bundle the directory into a distributable archive
 
 ## Documentation
 

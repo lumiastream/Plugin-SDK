@@ -11,12 +11,10 @@ const commands = {
 	validate: "validate-plugin.js",
 };
 
-const scriptArgs = args.slice(1);
-
 if (!command || !commands[command]) {
-	console.log(`Lumia Stream Plugin CLI
+	console.log(`Lumia Stream Plugin SDK
 
-Usage: lumia-plugin <command> [options]
+Usage: npx lumia-plugin <command> [options]
 
 Commands:
   create [directory]     Create a new plugin from template
@@ -24,14 +22,15 @@ Commands:
   validate [file]        Validate a .lumiaplugin package
 
 Examples:
-  lumia-plugin create my-plugin
-  lumia-plugin build ./my-plugin
-  lumia-plugin validate my-plugin.lumiaplugin
+  npx lumia-plugin create my-plugin
+  npx lumia-plugin build ./my-plugin
+  npx lumia-plugin validate my-plugin.lumiaplugin
 `);
 	process.exit(command ? 1 : 0);
 }
 
 const scriptPath = path.join(__dirname, commands[command]);
+const scriptArgs = args.slice(1);
 
 const child = spawn("node", [scriptPath, ...scriptArgs], {
 	stdio: "inherit",

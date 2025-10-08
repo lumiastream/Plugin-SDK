@@ -23,7 +23,7 @@ function toDisplayName(id) {
 }
 
 function printHelp() {
-  console.log(`Scaffold a new Lumia Stream plugin directory using the showcase template.\n\nUsage: npx @lumiastream/plugin-cli create [target-directory]\n\nExamples:\n  npx @lumiastream/plugin-cli create ./plugins/my-plugin\n  npx @lumiastream/plugin-cli create my-awesome-plugin\n`);
+  console.log(`Scaffold a new Lumia Stream plugin directory using the showcase template.\n\nUsage: npx lumia-plugin create [target-directory]\n\nExamples:\n  npx lumia-plugin create ./plugins/my-plugin\n  npx lumia-plugin create my-awesome-plugin\n`);
 }
 
 async function ensureEmptyDir(targetDir) {

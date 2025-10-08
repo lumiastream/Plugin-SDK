@@ -1,10 +1,10 @@
 {
-  "name": "lumia-example-basic-logger",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Minimal Lumia Stream plugin example.",
-  "main": "main.js",
-  "dependencies": {
-    "@lumiastream/plugin-sdk": "^0.1.0"
-  }
+	"name": "lumia-example-basic-logger",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Minimal Lumia Stream plugin example.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.1.0"
+	}
 }

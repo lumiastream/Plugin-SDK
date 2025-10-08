@@ -1,4 +1,4 @@
-const { Plugin } = require("@lumiastream/plugin-sdk");
+const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULT_POLL_INTERVAL = 30; // seconds
 const MIN_POLL_INTERVAL = 10;

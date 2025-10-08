@@ -1,4 +1,4 @@
-const { Plugin } = require("@lumiastream/plugin-sdk");
+const { Plugin } = require("@lumiastream/plugin");
 
 class VariableCounter extends Plugin {
 	async onload() {

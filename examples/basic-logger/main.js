@@ -1,4 +1,4 @@
-const { Plugin } = require("@lumiastream/plugin-sdk");
+const { Plugin } = require("@lumiastream/plugin");
 
 class BasicLoggerPlugin extends Plugin {
 	async onload() {

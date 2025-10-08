@@ -6,12 +6,12 @@ const VARIABLE_NAMES = {
 };
 
 const DEFAULTS = {
-	welcomeMessage: "Hello from Showcase Plugin!",
+	welcomeMessage: "Hello from Build!",
 	color: "#00c2ff",
 	alertDuration: 5,
 };
 
-class ShowcasePluginTemplate extends Plugin {
+class Build extends Plugin {
 	async onload() {
 		const message = this._currentMessage();
 		await this._log("Plugin loaded");
@@ -66,13 +66,13 @@ class ShowcasePluginTemplate extends Plugin {
 	}
 
 	_tag() {
-		return `[${this.manifest?.id ?? "showcase-plugin"}]`;
+		return `[${this.manifest?.id ?? "build"}]`;
 	}
 
 	_currentMessage() {
 		return (
 			this.settings?.welcomeMessage ||
-			`Hello from ${this.manifest?.name ?? "Showcase Plugin"}!`
+			`Hello from ${this.manifest?.name ?? "Build"}!`
 		);
 	}
 
@@ -147,4 +147,4 @@ class ShowcasePluginTemplate extends Plugin {
 	}
 }
 
-module.exports = ShowcasePluginTemplate;
+module.exports = Build;

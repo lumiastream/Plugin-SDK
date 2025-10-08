@@ -1,4 +1,4 @@
-const { Plugin } = require("@lumiastream/plugin-sdk");
+const { Plugin } = require("@lumiastream/plugin");
 const axios = require("axios");
 const Color = require("color");
 const { DateTime } = require("luxon");

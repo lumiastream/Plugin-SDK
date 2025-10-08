@@ -1,25 +1,25 @@
 {
-  "name": "@lumiastream/plugin-cli",
-  "version": "0.1.0",
-  "description": "Command-line tools for creating, building, and validating Lumia Stream plugins.",
-  "bin": {
-    "plugin-sdk": "scripts/cli.js"
-  },
-  "files": [
-    "scripts",
-    "examples/base-plugin",
-    "README.md",
-    "LICENSE"
-  ],
-  "keywords": [
-    "lumia",
-    "stream",
-    "plugin",
-    "cli"
-  ],
-  "author": "Lumia Stream",
-  "license": "MIT",
-  "dependencies": {
-    "jszip": "3.10.1"
-  }
+	"name": "lumia-plugin",
+	"version": "0.1.5",
+	"description": "Command-line tools for creating, building, and validating Lumia Stream plugins.",
+	"bin": {
+		"lumia-plugin": "scripts/cli.js"
+	},
+	"files": [
+		"scripts",
+		"examples/base-plugin",
+		"README.md",
+		"LICENSE"
+	],
+	"keywords": [
+		"lumia",
+		"stream",
+		"plugin",
+		"cli"
+	],
+	"author": "Lumia Stream",
+	"license": "MIT",
+	"dependencies": {
+		"jszip": "3.10.1"
+	}
 }

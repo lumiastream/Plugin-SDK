@@ -1,5 +1,5 @@
 {
-	"name": "lumia-showcase-plugin-template",
+	"name": "lumia-plugin-build",
 	"version": "1.0.0",
 	"private": true,
 	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
