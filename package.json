@@ -1,42 +1,36 @@
 {
-	"name": "@lumiastream/plugin-sdk",
-	"version": "0.1.7",
-	"description": "Official Lumia Stream Plugin SDK for building Lumia Stream plugins.",
-	"main": "dist/index.js",
-	"types": "dist/index.d.ts",
-	"keywords": [
-		"lumia",
-		"stream",
-		"plugin",
-		"sdk",
-		"automation"
-	],
-	"author": "Lumia Stream",
-	"license": "MIT",
-	"scripts": {
-		"build": "tsc -p tsconfig.json",
-		"lint": "tsc --noEmit"
-	},
-	"exports": {
-		".": {
-			"require": "./dist/index.js",
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"files": [
-		"dist",
-		"README.md",
-		"LICENSE",
-		"scripts",
-		"examples/base-plugin"
-	],
-	"devDependencies": {
-		"typescript": "^5.3.3",
-		"jszip": "3.10.1"
-	},
-	"dependencies": {},
-	"bin": {
-		"plugin-sdk": "scripts/cli.js"
-	}
+  "name": "@lumiastream/plugin-sdk",
+  "version": "0.1.7",
+  "description": "Official Lumia Stream Plugin SDK for building Lumia Stream plugins.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "lumia",
+    "stream",
+    "plugin",
+    "sdk",
+    "automation"
+  ],
+  "author": "Lumia Stream",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc --noEmit"
+  },
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {}
 }

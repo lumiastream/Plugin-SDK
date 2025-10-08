@@ -12,9 +12,9 @@ This guide walks you through creating your first Lumia Stream plugin from scratc
 
 The repository ships simple helpers so you can bootstrap and package plugins without writing scripts yourself:
 
-- `npx @lumiastream/plugin-sdk create my-plugin` scaffolds the same template without cloning this repo (requires npm 7+).
-- `npx @lumiastream/plugin-sdk build ./path/to/plugin` runs the same build pipeline globally (optional `--out`).
-- `npx @lumiastream/plugin-sdk validate ./path/to/plugin` validates manifests without cloning the repo.
+- `npx @lumiastream/plugin-cli create my-plugin` scaffolds the showcase template without cloning this repo (requires npm 7+).
+- `npx @lumiastream/plugin-cli build ./path/to/plugin` runs the same build pipeline globally (optional `--out`).
+- `npx @lumiastream/plugin-cli validate ./path/to/plugin` validates manifests without cloning the repo.
 
 ## 1. Project Setup
 
@@ -300,6 +300,6 @@ export default class EventPlugin extends Plugin {
 ## Next Steps
 
 - Review the [API Reference](./api-reference.md) for the full SDK surface area
-- Explore the [examples](../examples/) for implementation ideas (e.g., `basic-logger`, `toast-notifier`, `variable-counter`, and the more advanced `rumble` sample)
+- Explore the [examples](../examples/) for implementation ideas (e.g., `basic-logger`, and the more advanced `rumble` sample)
 - Dive into the [manifest guide](./manifest-guide.md) for advanced configuration options
 - Join the [Lumia Stream community](https://discord.gg/lumiastream) for support and feedback

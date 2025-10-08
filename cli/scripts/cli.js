@@ -12,9 +12,9 @@ const commands = {
 };
 
 if (!command || !commands[command]) {
-  console.log(`Lumia Stream Plugin SDK
+  console.log(`Lumia Stream Plugin CLI
 
-Usage: npx @lumiastream/plugin-sdk <command> [options]
+Usage: npx @lumiastream/plugin-cli <command> [options]
 
 Commands:
   create [directory]     Create a new plugin from template
@@ -22,9 +22,9 @@ Commands:
   validate [file]        Validate a .lumiaplugin package
 
 Examples:
-  npx @lumiastream/plugin-sdk create my-plugin
-  npx @lumiastream/plugin-sdk build ./my-plugin
-  npx @lumiastream/plugin-sdk validate my-plugin.lumiaplugin
+  npx @lumiastream/plugin-cli create my-plugin
+  npx @lumiastream/plugin-cli build ./my-plugin
+  npx @lumiastream/plugin-cli validate my-plugin.lumiaplugin
 `);
   process.exit(command ? 1 : 0);
 }

@@ -69,8 +69,10 @@ async function collectFiles(pluginDir, ignore = DEFAULT_IGNORE) {
       const relative = path.relative(pluginDir, absolute);
       if (!relative || relative.startsWith('..')) continue;
 
-      // Skip @lumiastream/plugin-sdk in node_modules
-      if (relative === 'node_modules/@lumiastream' || relative.startsWith('node_modules/@lumiastream/plugin-sdk')) {
+      // Skip bundled Lumia packages in node_modules
+      if (relative === 'node_modules/@lumiastream'
+          || relative.startsWith('node_modules/@lumiastream/plugin-sdk')
+          || relative.startsWith('node_modules/@lumiastream/plugin-cli')) {
         continue;
       }
 

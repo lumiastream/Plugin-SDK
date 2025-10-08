@@ -88,11 +88,11 @@ See the [API reference](./docs/api-reference.md) for the full surface area.
 
 ## CLI Helpers
 
-Use the CLI commands with `npx` (requires npm 7+).
+The CLI is distributed separately via `@lumiastream/plugin-cli`. Use it with `npx` (requires npm 7+).
 
-- `npx @lumiastream/plugin-sdk create my-plugin` scaffold a fresh plugin folder (copied from `examples/base-plugin`) with `manifest.json`, `main.js`, and README
-- `npx @lumiastream/plugin-sdk validate ./path/to/plugin` check `manifest.json`, entry files, and config for common mistakes
-- `npx @lumiastream/plugin-sdk build ./path/to/plugin --out ./plugin.lumiaplugin` bundle the directory into a distributable archive
+- `npx @lumiastream/plugin-cli create my-plugin` scaffold a feature-rich sample plugin showing logging, variables, and alerts
+- `npx @lumiastream/plugin-cli validate ./path/to/plugin` check `manifest.json`, entry files, and config for common mistakes
+- `npx @lumiastream/plugin-cli build ./path/to/plugin --out ./plugin.lumiaplugin` bundle the directory into a distributable archive
 
 ## Documentation
 
