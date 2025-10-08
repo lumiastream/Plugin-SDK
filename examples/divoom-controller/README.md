@@ -45,7 +45,7 @@ You can find valid ids by using the official Divoom app and monitoring network t
 Sends a `Draw/SendHttpText` payload. Fields:
 
 - `message` – text to render (required)
-- `color` – hex colour (defaults to `#FFFFFF`)
+- `color` – hex colour (defaults to `#FFFFFF`, converted to an `[r, g, b]` array)
 - `scrollSpeed` – 1–100 (maps to `TextSpeed`)
 - `direction` – left/right/up/down (converted to `ScrollDirection` 0–3)
 - `repeat` – number of loops (1–10)

@@ -158,14 +158,19 @@ class DivoomControllerPlugin extends Plugin {
     const result = await this.sendCommand("Draw/SendHttpText", {
       TextId: 0,
       TextString: trimmed,
-      ScrollDirection: scrollDirection,
-      TextSpeed: speed,
       TextWidth: width,
       TextHeight: height,
-      TextColor: this.parseColor(color),
       TextAlign: 1,
+      TextVAlign: 0,
+      TextSpace: 0,
+      FontId: 0,
+      TextSpeed: speed,
+      ScrollDirection: scrollDirection,
+      TextDirection: scrollDirection,
       Repeat: repeatCount,
-      TextFont: 0,
+      TextMode: 0,
+      TextSound: 0,
+      TextColor: this.parseColor(color),
     });
 
     if (result.success) {
@@ -290,19 +295,19 @@ class DivoomControllerPlugin extends Plugin {
 
   parseColor(input) {
     if (typeof input !== "string") {
-      return 0xffffff;
+      return [255, 255, 255];
     }
 
     const match = input.trim().match(/^#?([a-fA-F0-9]{6})$/);
     if (!match) {
-      return 0xffffff;
+      return [255, 255, 255];
     }
 
     const value = parseInt(match[1], 16);
     const r = (value >> 16) & 0xff;
     const g = (value >> 8) & 0xff;
     const b = value & 0xff;
-    return (r << 16) | (g << 8) | b;
+    return [r, g, b];
   }
 }
 

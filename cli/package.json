@@ -20,7 +20,7 @@
 	"author": "Lumia Stream",
 	"license": "MIT",
 	"dependencies": {
-		"@lumiastream/plugin": "latest",
+		"@lumiastream/plugin": "^0.1.9",
 		"jszip": "3.10.1"
 	}
 }
