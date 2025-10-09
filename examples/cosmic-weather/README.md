@@ -1,4 +1,4 @@
-# Cosmic Synthwave Weather
+# Weather
 
 A sample Lumia Stream plugin bundled with the SDK examples. It demonstrates how to require multiple npm packages from inside a plugin:
 
@@ -12,14 +12,14 @@ The plugin fetches live weather data from the free [Open-Meteo](https://open-met
 ## Getting Started
 
 ```bash
-cd plugins/examples/cosmic-synthwave-weather
+cd plugins/examples/weather
 npm install
-zip -r cosmic-synthwave-weather.lumiaplugin .
+zip -r weather.lumiaplugin .
 ```
 
-Install the resulting `cosmic-synthwave-weather.lumiaplugin` with the Lumia Stream plugin manager. After installation, open the **Cosmic Synthwave Weather** connection, enter a city, and optionally enable the recurring interval.
+Install the resulting `weather.lumiaplugin` with the Lumia Stream plugin manager. After installation, open the **Weather** connection, enter a city, optionally add the state/region to disambiguate, and enable the recurring interval if you want automatic updates.
 
-Trigger the included "Trigger Forecast" action to broadcast a fresh neon forecast on demand.
+Trigger the included "Trigger Forecast" action to broadcast a fresh neon forecast on demand—the action accepts both city and state inputs as well.
 
 ## Notes
 

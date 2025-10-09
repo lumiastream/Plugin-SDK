@@ -1,23 +1,32 @@
 {
-	"id": "cosmic-synthwave-weather",
-	"name": "Cosmic Synthwave Weather",
+	"id": "cosmic-weather",
+	"name": "Cosmic Weather",
 	"version": "1.0.0",
 	"author": "Lumia Stream",
-	"description": "Streams neon-drenched weather reports with shimmering animations and lo-fi beats.",
+	"description": "Streams neon-drenched weather reports with shimmering animations.",
 	"longDescription": "A playful sample plugin that pulls real weather data, remixes it with synthwave flair, and demonstrates how to bundle third-party npm packages inside a Lumia plugin.",
 	"license": "MIT",
 	"lumiaVersion": ">=8.9.0",
 	"category": "utilities",
-	"icon": "assets/icon.png",
+	"icon": "cosmic-weather.png",
+	"screenshots": ["cosmic-weather.png", "weather.png"],
 	"config": {
 		"settings": [
 			{
 				"key": "city",
 				"label": "City",
 				"type": "text",
-				"placeholder": "Neo Tokyo",
-				"defaultValue": "Neo Tokyo",
+				"placeholder": "San Francisco",
+				"defaultValue": "San Francisco",
 				"required": true
+			},
+			{
+				"key": "state",
+				"label": "State / Region",
+				"type": "text",
+				"placeholder": "California",
+				"defaultValue": "",
+				"helperText": "Optional: narrow the geocoding to a specific state or region."
 			},
 			{
 				"key": "units",
@@ -53,7 +62,13 @@
 						"key": "city",
 						"label": "City",
 						"type": "text",
-						"placeholder": "Mars Colony One"
+						"placeholder": "San Francisco"
+					},
+					{
+						"key": "state",
+						"label": "State / Region",
+						"type": "text",
+						"placeholder": "California"
 					}
 				]
 			}
@@ -61,33 +76,35 @@
 		"alerts": [
 			{
 				"title": "Synthwave Forecast",
-				"alertValue": "cosmic-synthwave-weather-forecast",
+				"alertValue": "cosmic-weather-forecast",
 				"key": "forecast",
-				"info": "Plays when a neon forecast is generated",
-				"defaults": {
-					"message": "{{city}} is glowing at {{temperature}}° with {{summary}} vibes"
-				},
+				"info": "Plays when a a major weather change is detected. For example, from sunny to cloudy, or from clear to rain.",
+				"defaultMessage": "{{city}} is glowing at {{temperature}}° with {{summary}} vibes",
 				"acceptedVariables": [
-					"{{city}}",
-					"{{temperature}}",
-					"{{summary}}",
-					"{{trend}}"
+					"city",
+					"temperature",
+					"summary",
+					"trend",
+					"palette",
+					"timestamp",
+					"weatherType",
+					"previousWeatherType"
 				]
 			}
 		],
 		"variables": [
 			{
-				"name": "cosmic-synthwave-weather_city",
+				"name": "cosmic-weather_city",
 				"system": false,
-				"origin": "cosmic-synthwave-weather",
+				"origin": "cosmic-weather",
 				"allowedPlaces": ["overlays", "commands"],
 				"description": "City last forecasted",
 				"value": ""
 			},
 			{
-				"name": "cosmic-synthwave-weather_temperature",
+				"name": "cosmic-weather_temperature",
 				"system": false,
-				"origin": "cosmic-synthwave-weather",
+				"origin": "cosmic-weather",
 				"allowedPlaces": ["overlays", "commands"],
 				"description": "Last temperature reading",
 				"value": ""

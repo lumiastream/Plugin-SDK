@@ -105,10 +105,8 @@ The CLI is distributed separately via `lumia-plugin`. Use it with `npx` (require
 
 ## Examples
 
-- `examples/basic-logger` – Smallest possible plugin: logs lifecycle events and handles a single action.
-- `examples/toast-notifier` – Demonstrates settings + actions to trigger Lumia toast notifications.
-- `examples/variable-counter` – Shows how to persist state via Lumia variables and support multiple actions.
 - `examples/rumble` – Plain JavaScript Rumble livestream plugin that polls the API, updates variables, and fires alerts.
+<!-- TODO: add more from examples -->
 
 ## License
 

@@ -8,6 +8,8 @@
 	"license": "MIT",
 	"category": "devices",
 	"keywords": ["divoom", "pixoo", "display"],
+	"icon": "divoom.png",
+	"screenshots": ["divoom.png"],
 	"config": {
 		"settings": [
 			{
