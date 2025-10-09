@@ -1,5 +1,5 @@
 {
-	"id": "ble-messenger",
+	"id": "ble_messenger",
 	"name": "BLE Messenger",
 	"version": "1.0.0",
 	"author": "LumiaStream Community",
@@ -194,7 +194,7 @@
 			{
 				"name": "ble_status",
 				"system": false,
-				"origin": "ble-messenger",
+				"origin": "ble_messenger",
 				"allowedPlaces": ["automations", "overlays"],
 				"description": "Current BLE connection state reported by the plugin.",
 				"value": "disconnected",
@@ -203,7 +203,7 @@
 			{
 				"name": "ble_last_message",
 				"system": false,
-				"origin": "ble-messenger",
+				"origin": "ble_messenger",
 				"allowedPlaces": ["automations", "overlays"],
 				"description": "Most recent payload successfully sent to the BLE device.",
 				"value": "",

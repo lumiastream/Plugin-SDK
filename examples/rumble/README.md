@@ -2,7 +2,7 @@
 
 A minimal Lumia Stream plugin that polls the Rumble livestream API, updates Lumia variables, and fires alerts when your stream starts, ends, or sees large viewer swings.
 
-The example is written in plain JavaScript so you can copy the files directly into `~/Documents/LumiaStream/Plugins/<your-plugin-id>` (or use **Load from Directory** inside Lumia Stream) without running a build step.
+The example is written in plain JavaScript so you can copy the files directly into `~/Documents/LumiaStream/Plugins/<your_plugin_id>` (or use **Load from Directory** inside Lumia Stream) without running a build step.
 
 ## Files
 

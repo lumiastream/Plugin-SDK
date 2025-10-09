@@ -12,15 +12,15 @@ This guide walks you through creating your first Lumia Stream plugin from scratc
 
 The repository ships simple helpers so you can bootstrap and package plugins without writing scripts yourself:
 
-- `npx lumia-plugin create my-plugin` scaffolds the showcase template without cloning this repo (requires npm 7+).
+- `npx lumia-plugin create my_plugin` scaffolds the showcase template without cloning this repo (requires npm 7+).
 - `npx lumia-plugin build ./path/to/plugin` runs the same build pipeline globally (optional `--out`).
 - `npx lumia-plugin validate ./path/to/plugin` validates manifests without cloning the repo.
 
 ## 1. Project Setup
 
 ```bash
-mkdir my-first-plugin
-cd my-first-plugin
+mkdir my_first_plugin
+cd my_first_plugin
 npm init -y
 npm install @lumiastream/plugin
 npm install -D typescript @types/node
@@ -32,7 +32,7 @@ Create `manifest.json` with your plugin metadata and configuration options:
 
 ```json
 {
-	"id": "my-first-plugin",
+	"id": "my_first_plugin",
 	"name": "My First Plugin",
 	"version": "1.0.0",
 	"author": "Your Name",

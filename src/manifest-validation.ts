@@ -48,6 +48,15 @@ export function validatePluginManifest(manifest: PartialManifest | null | undefi
     }
   }
 
+  const id = manifest.id;
+  if (typeof id === "string") {
+    if (/[-\s]/.test(id)) {
+      errors.push("Manifest id must not contain spaces or hyphens");
+    } else if (!/^[_a-zA-Z0-9]+$/.test(id)) {
+      errors.push("Manifest id may only contain alphanumeric characters and underscores");
+    }
+  }
+
   const category = manifest.category;
   if (!category || (typeof category !== "string" && !Array.isArray(category))) {
     errors.push("Manifest must declare a category string");

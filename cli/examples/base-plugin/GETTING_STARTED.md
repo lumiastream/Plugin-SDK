@@ -18,7 +18,7 @@ your-plugin/
 
 This file defines your plugin's metadata and capabilities:
 
-- **id**: Unique identifier (kebab-case, e.g., "my-awesome-plugin")
+- **id**: Unique identifier using letters, numbers, or underscores (e.g., "my_awesome_plugin")
 - **name**: Display name shown to users
 - **description**: Short description for the plugin marketplace
 - **main**: Entry point file (usually "main.js")
@@ -116,7 +116,7 @@ Variables let other Lumia features access your plugin's data:
 {
   "name": "my_variable",
   "key": "myVariable",
-  "origin": "your-plugin-id",
+  "origin": "your_plugin_id",
   "type": "string",
   "example": "Sample value"
 }

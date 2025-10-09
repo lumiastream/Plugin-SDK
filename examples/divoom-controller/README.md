@@ -75,7 +75,7 @@ If a command fails (HTTP errors, timeouts, invalid JSON), the plugin logs the re
 
 ```
 npm install
-npx lumia-plugin build ./examples/divoom-controller --out ./divoom-controller-1.0.0.lumiaplugin
+npx lumia-plugin build ./examples/divoom-controller --out ./divoom_controller-1.0.0.lumiaplugin
 ```
 
 You can then load the generated `.lumiaplugin` file in the Lumia Stream desktop app.

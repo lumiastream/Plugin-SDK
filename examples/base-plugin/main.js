@@ -66,7 +66,7 @@ class ShowcasePluginTemplate extends Plugin {
 	}
 
 	_tag() {
-		return `[${this.manifest?.id ?? "showcase-plugin"}]`;
+		return `[${this.manifest?.id ?? "showcase_plugin"}]`;
 	}
 
 	_currentMessage() {

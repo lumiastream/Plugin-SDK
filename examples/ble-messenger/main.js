@@ -1,6 +1,6 @@
 const { Plugin } = require("@lumiastream/plugin");
 
-const LOG_TAG = "[ble-messenger]";
+const LOG_TAG = "[ble_messenger]";
 const VARIABLES = {
   status: "ble_status",
   lastMessage: "ble_last_message",

@@ -6,7 +6,7 @@ The `manifest.json` file is the heart of your Lumia Stream plugin. It defines me
 
 ```json
 {
-  "id": "unique-plugin-id",
+  "id": "unique_plugin_id",
   "name": "Human Readable Name",
   "version": "1.0.0",
   "author": "Your Name",
@@ -26,7 +26,7 @@ The `manifest.json` file is the heart of your Lumia Stream plugin. It defines me
 
 ### Basic Information
 
-- **`id`** (string): Unique identifier for your plugin. Use kebab-case.
+- **`id`** (string): Unique identifier for your plugin. Use letters, numbers, or underscores—no spaces or hyphens.
 - **`name`** (string): Human-readable plugin name.
 - **`version`** (string): Semantic version (e.g., "1.0.0").
 - **`author`** (string): Plugin author name.
@@ -388,7 +388,7 @@ Here's a complete manifest for a hypothetical Discord integration plugin:
 
 ```json
 {
-  "id": "discord-integration",
+  "id": "discord_integration",
   "name": "Discord Integration",
   "version": "2.1.0",
   "author": "Lumia Stream",

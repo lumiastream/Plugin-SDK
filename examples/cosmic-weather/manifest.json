@@ -1,5 +1,5 @@
 {
-	"id": "cosmic-weather",
+	"id": "cosmic_weather",
 	"name": "Cosmic Weather",
 	"version": "1.0.0",
 	"author": "Lumia Stream",
@@ -96,7 +96,7 @@
 			{
 				"name": "cosmic-weather_city",
 				"system": false,
-				"origin": "cosmic-weather",
+				"origin": "cosmic_weather",
 				"allowedPlaces": ["overlays", "commands"],
 				"description": "City last forecasted",
 				"value": ""
@@ -104,7 +104,7 @@
 			{
 				"name": "cosmic-weather_temperature",
 				"system": false,
-				"origin": "cosmic-weather",
+				"origin": "cosmic_weather",
 				"allowedPlaces": ["overlays", "commands"],
 				"description": "Last temperature reading",
 				"value": ""

@@ -24,9 +24,9 @@ Commands:
   validate [file]        Validate a .lumiaplugin package
 
 Examples:
-  lumia-plugin create my-plugin
-  lumia-plugin build ./my-plugin
-  lumia-plugin validate my-plugin.lumiaplugin
+  lumia-plugin create my_plugin
+  lumia-plugin build ./my_plugin
+  lumia-plugin validate my_plugin.lumiaplugin
 `);
 	process.exit(command ? 1 : 0);
 }

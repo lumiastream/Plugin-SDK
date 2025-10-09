@@ -1,5 +1,5 @@
 {
-	"id": "showcase-plugin",
+	"id": "showcase_plugin",
 	"name": "Showcase Plugin",
 	"version": "1.0.0",
 	"author": "LumiaStream",
@@ -108,7 +108,7 @@
 			{
 				"name": "last_message",
 				"system": false,
-				"origin": "showcase-plugin",
+				"origin": "showcase_plugin",
 				"allowedPlaces": ["automations", "overlays"],
 				"description": "Stores the most recent message handled by the plugin.",
 				"value": "",
@@ -117,7 +117,7 @@
 			{
 				"name": "last_alert_color",
 				"system": false,
-				"origin": "showcase-plugin",
+				"origin": "showcase_plugin",
 				"allowedPlaces": ["automations", "overlays"],
 				"description": "Tracks the color used by the latest sample alert.",
 				"value": "",

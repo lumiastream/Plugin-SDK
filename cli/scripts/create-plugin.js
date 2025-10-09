@@ -4,19 +4,19 @@ const fs = require("fs");
 
 const TEMPLATE_DIR = path.resolve(__dirname, "..", "examples", "base-plugin");
 
-function toKebabCase(value) {
-	return (
-		value
-			.trim()
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "") || "my-plugin"
-	);
+function toSafeId(value) {
+	const cleaned = value
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "_")
+		.replace(/^_+|_+$/g, "");
+	const safe = cleaned.replace(/__+/g, "_");
+	return safe || "my_plugin";
 }
 
 function toDisplayName(id) {
 	return id
-		.split("-")
+		.split(/[_-]+/)
 		.filter(Boolean)
 		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
 		.join(" ");
@@ -24,7 +24,7 @@ function toDisplayName(id) {
 
 function printHelp() {
 	console.log(
-		`Scaffold a new Lumia Stream plugin directory using the showcase template.\n\nUsage: npx lumia-plugin create [target-directory]\n\nExamples:\n  npx lumia-plugin create ./plugins/my-plugin\n  npx lumia-plugin create my-awesome-plugin\n`
+		`Scaffold a new Lumia Stream plugin directory using the showcase template.\n\nUsage: npx lumia-plugin create [target-directory]\n\nExamples:\n  npx lumia-plugin create ./plugins/my_plugin\n  npx lumia-plugin create my_awesome_plugin\n`
 	);
 }
 
@@ -149,7 +149,7 @@ async function updateMain(mainPath, pluginId, className, displayName) {
 		`Hello from ${displayName}!`
 	);
 	source = source.replace(/Showcase Plugin/g, displayName);
-	source = source.replace(/showcase-plugin/g, pluginId);
+	source = source.replace(/showcase[-_]plugin/g, pluginId);
 	await fs.promises.writeFile(mainPath, source);
 }
 
@@ -192,8 +192,8 @@ async function main() {
 		process.exit(1);
 	}
 
-	const targetDir = path.resolve(args[0] || "my-plugin");
-	const pluginId = toKebabCase(path.basename(targetDir));
+	const targetDir = path.resolve(args[0] || "my_plugin");
+	const pluginId = toSafeId(path.basename(targetDir));
 	const displayName = toDisplayName(pluginId) || "My Plugin";
 	const className = displayName.replace(/[^a-zA-Z0-9]/g, "") || "MyPlugin";
 

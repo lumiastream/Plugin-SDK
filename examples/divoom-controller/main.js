@@ -3,11 +3,11 @@ const http = require("node:http");
 
 class DivoomControllerPlugin extends Plugin {
   async onload() {
-    await this.lumia.addLog("[divoom-controller] Plugin loaded");
+    await this.lumia.addLog("[divoom_controller] Plugin loaded");
   }
 
   async onunload() {
-    await this.lumia.addLog("[divoom-controller] Plugin unloaded");
+    await this.lumia.addLog("[divoom_controller] Plugin unloaded");
   }
 
   async actions(config = {}) {
@@ -52,7 +52,7 @@ class DivoomControllerPlugin extends Plugin {
         }
         default:
           await this.lumia.addLog(
-            `[divoom-controller] Unknown action type: ${String(action.type)}`
+            `[divoom_controller] Unknown action type: ${String(action.type)}`
           );
       }
     }
@@ -98,11 +98,11 @@ class DivoomControllerPlugin extends Plugin {
 
     if (result.success) {
       await this.lumia.addLog(
-        `[divoom-controller] Brightness set to ${value}`
+        `[divoom_controller] Brightness set to ${value}`
       );
     } else {
       await this.lumia.addLog(
-        `[divoom-controller] Failed to set brightness: ${result.error}`
+        `[divoom_controller] Failed to set brightness: ${result.error}`
       );
     }
   }
@@ -126,11 +126,11 @@ class DivoomControllerPlugin extends Plugin {
 
     if (result.success) {
       await this.lumia.addLog(
-        `[divoom-controller] Switched channel (${entry.command}) with ${entry.key}=${payload[entry.key]}`
+        `[divoom_controller] Switched channel (${entry.command}) with ${entry.key}=${payload[entry.key]}`
       );
     } else {
       await this.lumia.addLog(
-        `[divoom-controller] Failed to switch channel: ${result.error}`
+        `[divoom_controller] Failed to switch channel: ${result.error}`
       );
     }
   }
@@ -139,7 +139,7 @@ class DivoomControllerPlugin extends Plugin {
     const trimmed = message.trim();
     if (!trimmed) {
       await this.lumia.addLog(
-        "[divoom-controller] Text message cannot be empty"
+        "[divoom_controller] Text message cannot be empty"
       );
       return;
     }
@@ -175,11 +175,11 @@ class DivoomControllerPlugin extends Plugin {
 
     if (result.success) {
       await this.lumia.addLog(
-        `[divoom-controller] Sent scrolling text (${trimmed})`
+        `[divoom_controller] Sent scrolling text (${trimmed})`
       );
     } else {
       await this.lumia.addLog(
-        `[divoom-controller] Failed to send scrolling text: ${result.error}`
+        `[divoom_controller] Failed to send scrolling text: ${result.error}`
       );
     }
   }
@@ -188,7 +188,7 @@ class DivoomControllerPlugin extends Plugin {
     const trimmed = command.trim();
     if (!trimmed) {
       await this.lumia.addLog(
-        "[divoom-controller] Raw command requires a command string"
+        "[divoom_controller] Raw command requires a command string"
       );
       return;
     }
@@ -198,11 +198,11 @@ class DivoomControllerPlugin extends Plugin {
 
     if (result.success) {
       await this.lumia.addLog(
-        `[divoom-controller] Sent raw command ${trimmed}`
+        `[divoom_controller] Sent raw command ${trimmed}`
       );
     } else {
       await this.lumia.addLog(
-        `[divoom-controller] Failed raw command ${trimmed}: ${result.error}`
+        `[divoom_controller] Failed raw command ${trimmed}: ${result.error}`
       );
     }
   }
@@ -287,7 +287,7 @@ class DivoomControllerPlugin extends Plugin {
       return JSON.parse(value);
     } catch (error) {
       void this.lumia.addLog(
-        `[divoom-controller] Failed to parse JSON payload: ${error.message}`
+        `[divoom_controller] Failed to parse JSON payload: ${error.message}`
       );
       return undefined;
     }
