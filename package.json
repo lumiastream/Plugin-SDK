@@ -1,6 +1,6 @@
 {
 	"name": "@lumiastream/plugin",
-	"version": "0.1.12",
+	"version": "0.1.15",
 	"description": "Official Lumia Stream Plugin SDK for building Lumia Stream plugins.",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -15,7 +15,11 @@
 	"license": "MIT",
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
-		"lint": "tsc --noEmit"
+		"lint": "tsc --noEmit",
+		"sync-cli-version": "node scripts/sync-cli-version.js",
+		"publish-cli": "node scripts/publish-cli.js",
+		"prepublishOnly": "npm run sync-cli-version",
+		"postpublish": "npm run publish-cli"
 	},
 	"exports": {
 		".": {
