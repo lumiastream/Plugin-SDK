@@ -1,181 +1,168 @@
 {
-  "id": "build",
-  "name": "Build",
-  "version": "1.0.0",
-  "author": "LumiaStream",
-  "email": "",
-  "website": "",
-  "repository": "",
-  "description": "Sample plugin that demonstrates Lumia Stream logging, variables, alerts, and settings.",
-  "longDescription": "",
-  "license": "MIT",
-  "lumiaVersion": "^9.0.0",
-  "keywords": [
-    "sample",
-    "demo",
-    "lumia",
-    "build"
-  ],
-  "category": "examples",
-  "icon": "",
-  "screenshots": [],
-  "changelog": "",
-  "config": {
-    "settings": [
-      {
-        "key": "welcomeMessage",
-        "label": "Welcome Message",
-        "type": "text",
-        "defaultValue": "Hello from Build!",
-        "helperText": "Shown when the plugin loads and stored in the sample variable."
-      },
-      {
-        "key": "favoriteColor",
-        "label": "Favorite Color",
-        "type": "color",
-        "defaultValue": "#00c2ff",
-        "helperText": "Used when triggering the sample light alert."
-      },
-      {
-        "key": "autoAlert",
-        "label": "Trigger Sample Alert",
-        "type": "select",
-        "defaultValue": "never",
-        "options": [
-          {
-            "label": "Never",
-            "value": "never"
-          },
-          {
-            "label": "On Load",
-            "value": "load"
-          },
-          {
-            "label": "After Log Action",
-            "value": "after-log"
-          }
-        ],
-        "helperText": "Automatically fire the sample alert at different times."
-      }
-    ],
-    "actions": [
-      {
-        "type": "log_message",
-        "label": "Log Message",
-        "description": "Write a formatted message to the Lumia log panel and optionally trigger the sample alert.",
-        "fields": [
-          {
-            "key": "message",
-            "label": "Message",
-            "type": "text",
-            "defaultValue": "Hello from Build!"
-          },
-          {
-            "key": "severity",
-            "label": "Severity",
-            "type": "select",
-            "defaultValue": "info",
-            "options": [
-              {
-                "label": "Info",
-                "value": "info"
-              },
-              {
-                "label": "Warning",
-                "value": "warn"
-              },
-              {
-                "label": "Error",
-                "value": "error"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "type": "update_variable",
-        "label": "Update Variable",
-        "description": "Persist a value into the sample Lumia variable.",
-        "fields": [
-          {
-            "key": "value",
-            "label": "Value",
-            "type": "text",
-            "defaultValue": "Triggered from an action"
-          }
-        ]
-      },
-      {
-        "type": "trigger_alert",
-        "label": "Trigger Sample Alert",
-        "description": "Fire the sample alert with optional overrides.",
-        "fields": [
-          {
-            "key": "color",
-            "label": "Color",
-            "type": "color",
-            "defaultValue": "#ff5f5f"
-          },
-          {
-            "key": "duration",
-            "label": "Duration (seconds)",
-            "type": "number",
-            "defaultValue": 5,
-            "min": 1,
-            "max": 60
-          }
-        ]
-      }
-    ],
-    "variables": [
-      {
-        "name": "last_message",
-        "system": false,
-        "origin": "build",
-        "allowedPlaces": [
-          "automations",
-          "overlays"
-        ],
-        "description": "Stores the most recent message handled by the plugin.",
-        "value": "",
-        "example": "Hello from Build!"
-      },
-      {
-        "name": "last_alert_color",
-        "system": false,
-        "origin": "build",
-        "allowedPlaces": [
-          "automations",
-          "overlays"
-        ],
-        "description": "Tracks the color used by the latest sample alert.",
-        "value": "",
-        "example": "#00c2ff"
-      }
-    ],
-    "alerts": [
-      {
-        "id": "sample_light",
-        "label": "Sample Light Alert",
-        "description": "Change lights to the selected color for a few seconds.",
-        "fields": [
-          {
-            "key": "color",
-            "label": "Color",
-            "type": "color",
-            "defaultValue": "#00c2ff"
-          },
-          {
-            "key": "duration",
-            "label": "Duration (seconds)",
-            "type": "number",
-            "defaultValue": 5,
-            "min": 1,
-            "max": 60
-          }
-        ]
-      }
-    ]
-  },
-  "main": "main.js"
+	"id": "build",
+	"name": "Build",
+	"version": "1.0.0",
+	"author": "LumiaStream",
+	"email": "",
+	"website": "",
+	"repository": "",
+	"description": "Sample plugin that demonstrates Lumia Stream logging, variables, alerts, and settings.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"keywords": "sample, demo, lumia, build",
+	"category": "examples",
+	"icon": "",
+	"changelog": "",
+	"config": {
+		"settings": [
+			{
+				"key": "welcomeMessage",
+				"label": "Welcome Message",
+				"type": "text",
+				"defaultValue": "Hello from Build!",
+				"helperText": "Shown when the plugin loads and stored in the sample variable."
+			},
+			{
+				"key": "favoriteColor",
+				"label": "Favorite Color",
+				"type": "color",
+				"defaultValue": "#00c2ff",
+				"helperText": "Used when triggering the sample light alert."
+			},
+			{
+				"key": "autoAlert",
+				"label": "Trigger Sample Alert",
+				"type": "select",
+				"defaultValue": "never",
+				"options": [
+					{
+						"label": "Never",
+						"value": "never"
+					},
+					{
+						"label": "On Load",
+						"value": "load"
+					},
+					{
+						"label": "After Log Action",
+						"value": "after-log"
+					}
+				],
+				"helperText": "Automatically fire the sample alert at different times."
+			}
+		],
+		"actions": [
+			{
+				"type": "log_message",
+				"label": "Log Message",
+				"description": "Write a formatted message to the Lumia log panel and optionally trigger the sample alert.",
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "text",
+						"defaultValue": "Hello from Build!"
+					},
+					{
+						"key": "severity",
+						"label": "Severity",
+						"type": "select",
+						"defaultValue": "info",
+						"options": [
+							{
+								"label": "Info",
+								"value": "info"
+							},
+							{
+								"label": "Warning",
+								"value": "warn"
+							},
+							{
+								"label": "Error",
+								"value": "error"
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "update_variable",
+				"label": "Update Variable",
+				"description": "Persist a value into the sample Lumia variable.",
+				"fields": [
+					{
+						"key": "value",
+						"label": "Value",
+						"type": "text",
+						"defaultValue": "Triggered from an action"
+					}
+				]
+			},
+			{
+				"type": "trigger_alert",
+				"label": "Trigger Sample Alert",
+				"description": "Fire the sample alert with optional overrides.",
+				"fields": [
+					{
+						"key": "color",
+						"label": "Color",
+						"type": "color",
+						"defaultValue": "#ff5f5f"
+					},
+					{
+						"key": "duration",
+						"label": "Duration (seconds)",
+						"type": "number",
+						"defaultValue": 5,
+						"min": 1,
+						"max": 60
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "last_message",
+				"system": false,
+				"origin": "build",
+				"allowedPlaces": ["automations", "overlays"],
+				"description": "Stores the most recent message handled by the plugin.",
+				"value": "",
+				"example": "Hello from Build!"
+			},
+			{
+				"name": "last_alert_color",
+				"system": false,
+				"origin": "build",
+				"allowedPlaces": ["automations", "overlays"],
+				"description": "Tracks the color used by the latest sample alert.",
+				"value": "",
+				"example": "#00c2ff"
+			}
+		],
+		"alerts": [
+			{
+				"id": "sample_light",
+				"label": "Sample Light Alert",
+				"description": "Change lights to the selected color for a few seconds.",
+				"fields": [
+					{
+						"key": "color",
+						"label": "Color",
+						"type": "color",
+						"defaultValue": "#00c2ff"
+					},
+					{
+						"key": "duration",
+						"label": "Duration (seconds)",
+						"type": "number",
+						"defaultValue": 5,
+						"min": 1,
+						"max": 60
+					}
+				]
+			}
+		]
+	},
+	"main": "main.js"
 }

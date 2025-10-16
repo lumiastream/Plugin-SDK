@@ -81,18 +81,12 @@ async function updateManifest(manifestPath, pluginId, displayName) {
 	manifest.description = manifest.description?.trim()
 		? manifest.description
 		: `Describe what ${displayName} does.`;
-	manifest.longDescription = manifest.longDescription || "";
 	manifest.repository = manifest.repository || "";
 	manifest.website = manifest.website || "";
 	manifest.email = manifest.email || "";
 	manifest.icon = manifest.icon || "";
-	manifest.screenshots = ensureArray(manifest.screenshots);
 	manifest.changelog = manifest.changelog || "";
-	manifest.keywords = ensureArray(manifest.keywords);
-
-	if (!manifest.keywords.includes(pluginId)) {
-		manifest.keywords.push(pluginId);
-	}
+	manifest.keywords = manifest.keywords || "";
 
 	if (!manifest.main) {
 		manifest.main = "main.js";

@@ -200,6 +200,8 @@ await this.lumia.triggerAlert({
 });
 ```
 
+When you declare `variationConditions` in your manifest, populate the `dynamic` payload with the fields those conditions expect—for example `value` (for tier/number checks), `currency`, `giftAmount`, or `subMonths`. The comparison logic is defined in `LumiaVariationConditions`, so make sure the runtime data lines up with the chosen condition.
+
 ### File Operations
 
 ```ts

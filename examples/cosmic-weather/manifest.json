@@ -4,12 +4,10 @@
 	"version": "1.0.0",
 	"author": "Lumia Stream",
 	"description": "Streams neon-drenched weather reports with shimmering animations.",
-	"longDescription": "A playful sample plugin that pulls real weather data, remixes it with synthwave flair, and demonstrates how to bundle third-party npm packages inside a Lumia plugin.",
 	"license": "MIT",
 	"lumiaVersion": ">=8.9.0",
 	"category": "utilities",
 	"icon": "cosmic-weather.png",
-	"screenshots": ["cosmic-weather.png", "weather.png"],
 	"config": {
 		"settings": [
 			{

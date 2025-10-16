@@ -7,13 +7,11 @@
 	"website": "",
 	"repository": "",
 	"description": "Sample plugin that demonstrates Lumia Stream logging, variables, alerts, and settings.",
-	"longDescription": "",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"keywords": ["sample", "demo", "lumia"],
+	"keywords": "sample, demo, lumia",
 	"category": "examples",
 	"icon": "",
-	"screenshots": [],
 	"changelog": "",
 	"config": {
 		"settings": [

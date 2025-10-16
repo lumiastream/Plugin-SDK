@@ -7,13 +7,11 @@
 	"website": "",
 	"repository": "",
 	"description": "Connect to a Bluetooth Low Energy peripheral and send messages to it from Lumia actions.",
-	"longDescription": "",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"keywords": ["bluetooth", "ble", "hardware"],
+	"keywords": "bluetooth, ble, hardware",
 	"category": "hardware",
 	"icon": "ble-messenger.png",
-	"screenshots": ["ble-messenger.png"],
 	"changelog": "",
 	"config": {
 		"settings": [

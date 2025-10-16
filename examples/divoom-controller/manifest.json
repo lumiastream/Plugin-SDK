@@ -7,9 +7,8 @@
 	"lumiaVersion": "^9.0.0",
 	"license": "MIT",
 	"category": "devices",
-	"keywords": ["divoom", "pixoo", "display"],
+	"keywords": "divoom, pixoo, display",
 	"icon": "divoom.png",
-	"screenshots": ["divoom.png"],
 	"config": {
 		"settings": [
 			{

@@ -274,6 +274,10 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.STREAM_STARTED,
+			dynamic: {
+				name: data?.title ? data.title : "",
+				value: this.sessionData.totalStreams,
+			},
 			extraSettings: {
 				title: data?.title || "",
 				thumbnail: data?.thumbnail || "",
@@ -290,6 +294,9 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.STREAM_ENDED,
+			dynamic: {
+				value: finalViewers,
+			},
 			extraSettings: {
 				finalViewers,
 				peakViewers: this.sessionData.peakViewers,
@@ -329,8 +336,10 @@ class RumblePlugin extends Plugin {
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.VIEWER_COUNT_CHANGED,
 			dynamic: {
-				name: "rumble_viewers",
+				name: change > 0 ? "increase" : "decrease",
 				value: currentViewers,
+				total: currentViewers,
+				previousTotal: previousViewers,
 			},
 			extraSettings: {
 				previousViewers,

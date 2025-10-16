@@ -174,13 +174,11 @@ export interface PluginManifest {
 	website?: string;
 	repository?: string;
 	description: string;
-	longDescription?: string;
 	license: string;
 	lumiaVersion: string;
-	keywords?: string[];
+	keywords?: string;
 	category: PluginCategory | string;
 	icon?: string;
-	screenshots?: string[];
 	changelog?: string;
 	config: PluginIntegrationConfig;
 }

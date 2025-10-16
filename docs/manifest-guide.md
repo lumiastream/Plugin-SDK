@@ -6,19 +6,19 @@ The `manifest.json` file is the heart of your Lumia Stream plugin. It defines me
 
 ```json
 {
-  "id": "unique_plugin_id",
-  "name": "Human Readable Name",
-  "version": "1.0.0",
-  "author": "Your Name",
-  "description": "Brief description",
-  "lumiaVersion": "^9.0.0",
-  "category": "utilities",
-  "config": {
-    "settings": [],
-    "actions": [],
-    "variables": [],
-    "alerts": []
-  }
+	"id": "unique_plugin_id",
+	"name": "Human Readable Name",
+	"version": "1.0.0",
+	"author": "Your Name",
+	"description": "Brief description",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"config": {
+		"settings": [],
+		"actions": [],
+		"variables": [],
+		"alerts": []
+	}
 }
 ```
 
@@ -41,11 +41,9 @@ The `manifest.json` file is the heart of your Lumia Stream plugin. It defines me
 - **`email`** (string): Author's email address.
 - **`website`** (string): Plugin or author website URL.
 - **`repository`** (string): Source code repository URL.
-- **`longDescription`** (string): Detailed description with formatting.
 - **`license`** (string): License type (e.g., "MIT", "GPL-3.0").
-- **`keywords`** (string[]): Array of keywords for search.
+- **`keywords`** (string): Comma separated list of keywords for search.
 - **`icon`** (string): Plugin icon filename (PNG recommended).
-- **`screenshots`** (string[]): Array of screenshot filenames.
 - **`changelog`** (string): Markdown changelog content.
 
 ## Plugin Categories
@@ -77,34 +75,34 @@ Settings create a configuration UI for users:
 
 ```json
 {
-  "config": {
-    "settings": [
-      {
-        "key": "apiKey",
-        "label": "API Key",
-        "type": "password",
-        "placeholder": "Enter your API key",
-        "helperText": "Get this from your service dashboard",
-        "required": true
-      },
-      {
-        "key": "pollInterval",
-        "label": "Poll Interval (seconds)",
-        "type": "number",
-        "defaultValue": 30,
-        "validation": {
-          "min": 5,
-          "max": 300
-        }
-      },
-      {
-        "key": "notifications",
-        "label": "Enable Notifications",
-        "type": "toggle",
-        "defaultValue": true
-      }
-    ]
-  }
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "API Key",
+				"type": "password",
+				"placeholder": "Enter your API key",
+				"helperText": "Get this from your service dashboard",
+				"required": true
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 30,
+				"validation": {
+					"min": 5,
+					"max": 300
+				}
+			},
+			{
+				"key": "notifications",
+				"label": "Enable Notifications",
+				"type": "toggle",
+				"defaultValue": true
+			}
+		]
+	}
 }
 ```
 
@@ -126,13 +124,13 @@ Settings create a configuration UI for users:
 
 ```json
 {
-  "validation": {
-    "pattern": "^[a-zA-Z0-9]+$",
-    "min": 1,
-    "max": 100,
-    "minLength": 5,
-    "maxLength": 50
-  }
+	"validation": {
+		"pattern": "^[a-zA-Z0-9]+$",
+		"min": 1,
+		"max": 100,
+		"minLength": 5,
+		"maxLength": 50
+	}
 }
 ```
 
@@ -140,14 +138,14 @@ Settings create a configuration UI for users:
 
 ```json
 {
-  "key": "quality",
-  "label": "Stream Quality",
-  "type": "select",
-  "options": [
-    { "label": "Low (480p)", "value": "480p" },
-    { "label": "Medium (720p)", "value": "720p" },
-    { "label": "High (1080p)", "value": "1080p" }
-  ]
+	"key": "quality",
+	"label": "Stream Quality",
+	"type": "select",
+	"options": [
+		{ "label": "Low (480p)", "value": "480p" },
+		{ "label": "Medium (720p)", "value": "720p" },
+		{ "label": "High (1080p)", "value": "1080p" }
+	]
 }
 ```
 
@@ -157,38 +155,38 @@ Actions allow users to trigger plugin functionality manually:
 
 ```json
 {
-  "config": {
-    "actions": [
-      {
-        "type": "manual_poll",
-        "label": "Poll Now",
-        "description": "Manually trigger an API poll",
-        "fields": []
-      },
-      {
-        "type": "send_message",
-        "label": "Send Custom Message",
-        "description": "Send a custom message to the service",
-        "fields": [
-          {
-            "key": "message",
-            "label": "Message",
-            "type": "textarea",
-            "required": true
-          },
-          {
-            "key": "channel",
-            "label": "Channel",
-            "type": "select",
-            "options": [
-              { "label": "General", "value": "general" },
-              { "label": "Alerts", "value": "alerts" }
-            ]
-          }
-        ]
-      }
-    ]
-  }
+	"config": {
+		"actions": [
+			{
+				"type": "manual_poll",
+				"label": "Poll Now",
+				"description": "Manually trigger an API poll",
+				"fields": []
+			},
+			{
+				"type": "send_message",
+				"label": "Send Custom Message",
+				"description": "Send a custom message to the service",
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "textarea",
+						"required": true
+					},
+					{
+						"key": "channel",
+						"label": "Channel",
+						"type": "select",
+						"options": [
+							{ "label": "General", "value": "general" },
+							{ "label": "Alerts", "value": "alerts" }
+						]
+					}
+				]
+			}
+		]
+	}
 }
 ```
 
@@ -211,107 +209,116 @@ Action fields support the following input types:
 #### Field Configuration Examples
 
 **Text Input with Variables**
+
 ```json
 {
-  "key": "username",
-  "label": "Username",
-  "type": "text",
-  "placeholder": "Enter username",
-  "helperText": "Supports variables like {{username}}"
+	"key": "username",
+	"label": "Username",
+	"type": "text",
+	"placeholder": "Enter username",
+	"helperText": "Supports variables like {{username}}"
 }
 ```
 
 **Textarea with Custom Rows**
+
 ```json
 {
-  "key": "message",
-  "label": "Message",
-  "type": "textarea",
-  "placeholder": "Enter your message",
-  "rows": 6,
-  "helperText": "Multi-line text with variable support"
+	"key": "message",
+	"label": "Message",
+	"type": "textarea",
+	"placeholder": "Enter your message",
+	"rows": 6,
+	"helperText": "Multi-line text with variable support"
 }
 ```
 
 **Number with Constraints**
+
 ```json
 {
-  "key": "volume",
-  "label": "Volume",
-  "type": "number",
-  "defaultValue": 50,
-  "min": 0,
-  "max": 100
+	"key": "volume",
+	"label": "Volume",
+	"type": "number",
+	"defaultValue": 50,
+	"min": 0,
+	"max": 100
 }
 ```
 
 **Slider Input**
+
 ```json
 {
-  "key": "brightness",
-  "label": "Brightness",
-  "type": "slider",
-  "defaultValue": 100,
-  "min": 0,
-  "max": 255,
-  "step": 5
+	"key": "brightness",
+	"label": "Brightness",
+	"type": "slider",
+	"defaultValue": 100,
+	"min": 0,
+	"max": 255,
+	"step": 5
 }
 ```
 
 **Color Picker**
+
 ```json
 {
-  "key": "backgroundColor",
-  "label": "Background Color",
-  "type": "color",
-  "defaultValue": "#000000",
-  "helperText": "Choose a background color"
+	"key": "backgroundColor",
+	"label": "Background Color",
+	"type": "color",
+	"defaultValue": "#000000",
+	"helperText": "Choose a background color"
 }
 ```
 
 **Select Dropdown**
+
 ```json
 {
-  "key": "mode",
-  "label": "Mode",
-  "type": "select",
-  "defaultValue": "normal",
-  "options": [
-    { "label": "Normal", "value": "normal" },
-    { "label": "Fast", "value": "fast" },
-    { "label": "Slow", "value": "slow" }
-  ]
+	"key": "mode",
+	"label": "Mode",
+	"type": "select",
+	"defaultValue": "normal",
+	"options": [
+		{ "label": "Normal", "value": "normal" },
+		{ "label": "Fast", "value": "fast" },
+		{ "label": "Slow", "value": "slow" }
+	]
 }
 ```
 
 **Checkbox**
+
 ```json
 {
-  "key": "enableNotifications",
-  "label": "Enable Notifications",
-  "type": "checkbox",
-  "defaultValue": true
+	"key": "enableNotifications",
+	"label": "Enable Notifications",
+	"type": "checkbox",
+	"defaultValue": true
 }
 ```
 
 **Switch Toggle**
+
 ```json
 {
-  "key": "autoStart",
-  "label": "Auto Start",
-  "type": "switch",
-  "defaultValue": false,
-  "helperText": "Automatically start on load"
+	"key": "autoStart",
+	"label": "Auto Start",
+	"type": "switch",
+	"defaultValue": false,
+	"helperText": "Automatically start on load"
 }
 ```
 
 **File Input**
+
 ```json
 {
-  "key": "audioFile",
-  "label": "Audio File",
-  "type": "file",
-  "helperText": "Select an audio file to play"
+	"key": "audioFile",
+	"label": "Audio File",
+	"type": "file",
+	"helperText": "Select an audio file to play"
 }
 ```
 
@@ -321,28 +328,28 @@ Variables define data that your plugin provides to Lumia Stream:
 
 ```json
 {
-  "config": {
-    "variables": [
-      {
-        "name": "follower_count",
-        "system": true,
-        "origin": "twitch",
-        "allowedPlaces": ["chat", "overlay"],
-        "description": "Current number of followers",
-        "value": 0,
-        "example": "twitch_follower_count"
-      },
-      {
-        "name": "last_follower",
-        "system": true,
-        "origin": "twitch",
-        "allowedPlaces": ["chat", "overlay", "alert"],
-        "description": "Username of the most recent follower",
-        "value": "",
-        "example": "twitch_last_follower"
-      }
-    ]
-  }
+	"config": {
+		"variables": [
+			{
+				"name": "follower_count",
+				"system": true,
+				"origin": "twitch",
+				"allowedPlaces": ["chat", "overlay"],
+				"description": "Current number of followers",
+				"value": 0,
+				"example": "twitch_follower_count"
+			},
+			{
+				"name": "last_follower",
+				"system": true,
+				"origin": "twitch",
+				"allowedPlaces": ["chat", "overlay", "alert"],
+				"description": "Username of the most recent follower",
+				"value": "",
+				"example": "twitch_last_follower"
+			}
+		]
+	}
 }
 ```
 
@@ -352,35 +359,132 @@ Alerts define events that your plugin can trigger:
 
 ```json
 {
-  "config": {
-    "alerts": [
-      {
-        "title": "New Follower",
-        "alertValue": "twitch-follow",
-        "key": "follow",
-        "acceptedVariables": ["twitch_follower_count", "twitch_last_follower"],
-        "defaultMessage": "{{username}} just followed! Welcome!",
-        "withLoyalty": false,
-        "defaults": {
-          "on": true
-        },
-        "variationConditions": []
-      },
-      {
-        "title": "Stream Started",
-        "alertValue": "twitch-stream-start",
-        "key": "streamStart",
-        "acceptedVariables": ["twitch_stream_title", "twitch_game"],
-        "defaultMessage": "Stream is now live! Playing {{twitch_game}}",
-        "withLoyalty": false,
-        "defaults": {
-          "on": true
-        }
-      }
-    ]
-  }
+	"config": {
+		"alerts": [
+			{
+				"title": "New Follower",
+				"alertValue": "twitch-follow",
+				"key": "follow",
+				"acceptedVariables": ["twitch_follower_count", "twitch_last_follower"],
+				"defaultMessage": "{{username}} just followed! Welcome!",
+				"withLoyalty": false,
+				"defaults": {
+					"on": true
+				},
+				"variationConditions": []
+			},
+			{
+				"title": "Stream Started",
+				"alertValue": "twitch-stream-start",
+				"key": "streamStart",
+				"acceptedVariables": ["twitch_stream_title", "twitch_game"],
+				"defaultMessage": "Stream is now live! Playing {{twitch_game}}",
+				"withLoyalty": false,
+				"defaults": {
+					"on": true
+				}
+			}
+		]
+	}
 }
 ```
+
+#### Alert Variations (`variationConditions`)
+
+Use `variationConditions` when an alert can fire with multiple sub-types (for example, different tiers of a subscription or thresholds of a donation) and you want creators to configure each variation independently.
+
+- **`type`** – One of the condition identifiers exposed by `LumiaVariationConditions` (see `lumia-types/src/alert.types.ts:6`). Examples: `EQUAL_SELECTION`, `GIFT_SUB_EQUAL`, `GREATER_NUMBER`, `RANDOM`.
+- **`description`** *(optional)* – Helper text shown in the Lumia UI.
+- **`selections`** *(optional)* – Only used with `EQUAL_SELECTION`; supplies the dropdown values the creator can pick from.
+	- **`label`** – How the option appears in the Lumia UI.
+	- **`value`** – The literal tier/value you expect to receive at runtime (compared against `dynamic.value`).
+	- **`message`** *(optional)* – Override for `defaultMessage` when this variation is active.
+
+Example manifest entry with variations:
+
+```json
+{
+	"title": "Gifted Membership",
+	"alertValue": "myservice-gifted-membership",
+	"key": "giftedMembership",
+	"defaultMessage": "{{gifter}} gifted a membership!",
+	"acceptedVariables": ["gifter", "recipient", "gift_count"],
+	"variationConditions": [
+		{
+			"type": "EQUAL_SELECTION",
+			"description": "Tier level (compares against dynamic.value).",
+			"selections": [
+				{
+					"label": "Single gift",
+					"value": "Tier1"
+				},
+				{
+					"label": "Premium tier",
+					"value": "Tier2",
+					"message": "{{gifter}} just unlocked the premium tier!"
+				}
+			]
+		},
+		{
+			"type": "GIFT_SUB_EQUAL",
+			"description": "Exact gift bundle size (compares dynamic.giftAmount)."
+		},
+		{
+			"type": "GIFT_SUB_GREATER",
+			"description": "Gift bundle size or larger (compares dynamic.giftAmount)."
+		}
+	]
+}
+```
+
+At runtime, trigger the alert with the fields expected by the selected condition types:
+
+```ts
+await this.lumia.triggerAlert({
+	alert: "giftedMembership",
+	dynamic: {
+		value: "Tier2",      // checked by EQUAL_SELECTION
+		isGift: true,
+		giftAmount: 5        // checked by GIFT_SUB_EQUAL / GIFT_SUB_GREATER
+	},
+	extraSettings: {
+		gifter: "StreamerFan42",
+		recipient: "LuckyViewer",
+		gift_count: 5
+	}
+});
+```
+
+If no matching selection is found for the provided condition values (or no `dynamic` payload is supplied), Lumia falls back to the base alert configuration and `defaultMessage`.
+
+Tip: `LumiaDynamicCondition` in `lumia-types/src/alert.types.ts:99` lists every property (`value`, `currency`, `subMonths`, `giftAmount`, etc.) that variation checkers use.
+				},
+				{
+					"label": "10-pack",
+					"value": 10,
+					"message": "{{gifter}} unleashed 10 memberships! Show some love!"
+				}
+			]
+		}
+	]
+}
+```
+
+At runtime, trigger the alert with the variation value that matches one of the configured selections:
+
+```ts
+await this.lumia.triggerAlert({
+	alert: "giftedMembership",
+	dynamic: { name: "giftCount", value: 5 },
+	extraSettings: {
+		gifter: "StreamerFan42",
+		recipient: "LuckyViewer",
+		gift_count: 5
+	}
+});
+```
+
+If no matching selection is found for the provided value (or `dynamic` is omitted), Lumia defaults to the base alert configuration and `defaultMessage`.
 
 ## Complete Example
 
@@ -388,201 +492,199 @@ Here's a complete manifest for a hypothetical Discord integration plugin:
 
 ```json
 {
-  "id": "discord_integration",
-  "name": "Discord Integration",
-  "version": "2.1.0",
-  "author": "Lumia Stream",
-  "email": "dev@lumiastream.com",
-  "website": "https://lumiastream.com/plugins/discord",
-  "repository": "https://github.com/LumiaStream/discord-plugin",
-  "description": "Integrate your Discord server with Lumia Stream",
-  "longDescription": "Connect your Discord server to receive real-time notifications about messages, member joins, voice channel activity, and more. Perfect for streamers who want to stay connected with their Discord community while streaming.",
-  "license": "MIT",
-  "lumiaVersion": "^9.0.0",
-  "keywords": ["discord", "chat", "community", "notifications"],
-  "category": "platforms",
-  "icon": "discord-icon.png",
-  "screenshots": ["discord-setup.png", "discord-alerts.png"],
-  "changelog": "# Changelog\n\n## 2.1.0\n- Added voice channel activity tracking\n- Improved message filtering\n- Bug fixes for role mentions\n\n## 2.0.0\n- Complete rewrite with new Discord API\n- Added slash command support\n- Enhanced security",
-  "config": {
-    "settings": [
-      {
-        "key": "botToken",
-        "label": "Bot Token",
-        "type": "password",
-        "placeholder": "Your Discord bot token",
-        "helperText": "Create a bot application at https://discord.com/developers/applications",
-        "required": true
-      },
-      {
-        "key": "guildId",
-        "label": "Server ID",
-        "type": "text",
-        "placeholder": "Your Discord server ID",
-        "helperText": "Right-click your server name and select 'Copy Server ID'",
-        "required": true,
-        "validation": {
-          "pattern": "^[0-9]{17,19}$"
-        }
-      },
-      {
-        "key": "channels",
-        "label": "Monitored Channels",
-        "type": "textarea",
-        "placeholder": "Channel IDs, one per line",
-        "helperText": "Leave empty to monitor all channels",
-        "defaultValue": ""
-      },
-      {
-        "key": "messageFilter",
-        "label": "Message Filter",
-        "type": "select",
-        "defaultValue": "all",
-        "options": [
-          { "label": "All Messages", "value": "all" },
-          { "label": "Mentions Only", "value": "mentions" },
-          { "label": "Commands Only", "value": "commands" }
-        ]
-      },
-      {
-        "key": "enableVoiceTracking",
-        "label": "Track Voice Activity",
-        "type": "toggle",
-        "defaultValue": false,
-        "helperText": "Monitor voice channel joins/leaves"
-      }
-    ],
-    "actions": [
-      {
-        "type": "send_message",
-        "label": "Send Message",
-        "description": "Send a message to a Discord channel",
-        "fields": [
-          {
-            "key": "channelId",
-            "label": "Channel ID",
-            "type": "text",
-            "required": true
-          },
-          {
-            "key": "message",
-            "label": "Message",
-            "type": "textarea",
-            "required": true,
-            "validation": {
-              "maxLength": 2000
-            }
-          }
-        ]
-      },
-      {
-        "type": "update_status",
-        "label": "Update Bot Status",
-        "description": "Update the bot's activity status",
-        "fields": [
-          {
-            "key": "activity",
-            "label": "Activity Type",
-            "type": "select",
-            "options": [
-              { "label": "Playing", "value": "PLAYING" },
-              { "label": "Listening", "value": "LISTENING" },
-              { "label": "Watching", "value": "WATCHING" },
-              { "label": "Streaming", "value": "STREAMING" }
-            ]
-          },
-          {
-            "key": "text",
-            "label": "Status Text",
-            "type": "text",
-            "placeholder": "What is the bot doing?"
-          }
-        ]
-      }
-    ],
-    "variables": [
-      {
-        "name": "member_count",
-        "system": true,
-        "origin": "discord",
-        "allowedPlaces": ["chat", "overlay"],
-        "description": "Total number of server members",
-        "value": 0,
-        "example": "discord_member_count"
-      },
-      {
-        "name": "online_count",
-        "system": true,
-        "origin": "discord",
-        "allowedPlaces": ["chat", "overlay"],
-        "description": "Number of online members",
-        "value": 0,
-        "example": "discord_online_count"
-      },
-      {
-        "name": "voice_count",
-        "system": true,
-        "origin": "discord",
-        "allowedPlaces": ["chat", "overlay"],
-        "description": "Number of members in voice channels",
-        "value": 0,
-        "example": "discord_voice_count"
-      },
-      {
-        "name": "last_message",
-        "system": true,
-        "origin": "discord",
-        "allowedPlaces": ["chat", "overlay", "alert"],
-        "description": "Content of the most recent message",
-        "value": "",
-        "example": "discord_last_message"
-      },
-      {
-        "name": "last_user",
-        "system": true,
-        "origin": "discord",
-        "allowedPlaces": ["chat", "overlay", "alert"],
-        "description": "Username of the last message author",
-        "value": "",
-        "example": "discord_last_user"
-      }
-    ],
-    "alerts": [
-      {
-        "title": "New Message",
-        "alertValue": "discord-message",
-        "key": "message",
-        "acceptedVariables": ["discord_last_message", "discord_last_user"],
-        "defaultMessage": "{{discord_last_user}}: {{discord_last_message}}",
-        "withLoyalty": false,
-        "defaults": {
-          "on": false
-        }
-      },
-      {
-        "title": "Member Joined",
-        "alertValue": "discord-member-join",
-        "key": "memberJoin",
-        "acceptedVariables": ["discord_member_count", "discord_last_user"],
-        "defaultMessage": "{{discord_last_user}} joined the Discord! ({{discord_member_count}} total)",
-        "withLoyalty": false,
-        "defaults": {
-          "on": true
-        }
-      },
-      {
-        "title": "Voice Channel Activity",
-        "alertValue": "discord-voice-activity",
-        "key": "voiceActivity",
-        "acceptedVariables": ["discord_voice_count", "discord_last_user"],
-        "defaultMessage": "{{discord_last_user}} joined voice ({{discord_voice_count}} in voice)",
-        "withLoyalty": false,
-        "defaults": {
-          "on": false
-        }
-      }
-    ]
-  }
+	"id": "discord_integration",
+	"name": "Discord Integration",
+	"version": "2.1.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com/plugins/discord",
+	"repository": "https://github.com/LumiaStream/discord-plugin",
+	"description": "Integrate your Discord server with Lumia Stream",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"keywords": "discord, chat, community, notifications",
+	"category": "platforms",
+	"icon": "discord-icon.png",
+	"changelog": "# Changelog\n\n## 2.1.0\n- Added voice channel activity tracking\n- Improved message filtering\n- Bug fixes for role mentions\n\n## 2.0.0\n- Complete rewrite with new Discord API\n- Added slash command support\n- Enhanced security",
+	"config": {
+		"settings": [
+			{
+				"key": "botToken",
+				"label": "Bot Token",
+				"type": "password",
+				"placeholder": "Your Discord bot token",
+				"helperText": "Create a bot application at https://discord.com/developers/applications",
+				"required": true
+			},
+			{
+				"key": "guildId",
+				"label": "Server ID",
+				"type": "text",
+				"placeholder": "Your Discord server ID",
+				"helperText": "Right-click your server name and select 'Copy Server ID'",
+				"required": true,
+				"validation": {
+					"pattern": "^[0-9]{17,19}$"
+				}
+			},
+			{
+				"key": "channels",
+				"label": "Monitored Channels",
+				"type": "textarea",
+				"placeholder": "Channel IDs, one per line",
+				"helperText": "Leave empty to monitor all channels",
+				"defaultValue": ""
+			},
+			{
+				"key": "messageFilter",
+				"label": "Message Filter",
+				"type": "select",
+				"defaultValue": "all",
+				"options": [
+					{ "label": "All Messages", "value": "all" },
+					{ "label": "Mentions Only", "value": "mentions" },
+					{ "label": "Commands Only", "value": "commands" }
+				]
+			},
+			{
+				"key": "enableVoiceTracking",
+				"label": "Track Voice Activity",
+				"type": "toggle",
+				"defaultValue": false,
+				"helperText": "Monitor voice channel joins/leaves"
+			}
+		],
+		"actions": [
+			{
+				"type": "send_message",
+				"label": "Send Message",
+				"description": "Send a message to a Discord channel",
+				"fields": [
+					{
+						"key": "channelId",
+						"label": "Channel ID",
+						"type": "text",
+						"required": true
+					},
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "textarea",
+						"required": true,
+						"validation": {
+							"maxLength": 2000
+						}
+					}
+				]
+			},
+			{
+				"type": "update_status",
+				"label": "Update Bot Status",
+				"description": "Update the bot's activity status",
+				"fields": [
+					{
+						"key": "activity",
+						"label": "Activity Type",
+						"type": "select",
+						"options": [
+							{ "label": "Playing", "value": "PLAYING" },
+							{ "label": "Listening", "value": "LISTENING" },
+							{ "label": "Watching", "value": "WATCHING" },
+							{ "label": "Streaming", "value": "STREAMING" }
+						]
+					},
+					{
+						"key": "text",
+						"label": "Status Text",
+						"type": "text",
+						"placeholder": "What is the bot doing?"
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "member_count",
+				"system": true,
+				"origin": "discord",
+				"allowedPlaces": ["chat", "overlay"],
+				"description": "Total number of server members",
+				"value": 0,
+				"example": "discord_member_count"
+			},
+			{
+				"name": "online_count",
+				"system": true,
+				"origin": "discord",
+				"allowedPlaces": ["chat", "overlay"],
+				"description": "Number of online members",
+				"value": 0,
+				"example": "discord_online_count"
+			},
+			{
+				"name": "voice_count",
+				"system": true,
+				"origin": "discord",
+				"allowedPlaces": ["chat", "overlay"],
+				"description": "Number of members in voice channels",
+				"value": 0,
+				"example": "discord_voice_count"
+			},
+			{
+				"name": "last_message",
+				"system": true,
+				"origin": "discord",
+				"allowedPlaces": ["chat", "overlay", "alert"],
+				"description": "Content of the most recent message",
+				"value": "",
+				"example": "discord_last_message"
+			},
+			{
+				"name": "last_user",
+				"system": true,
+				"origin": "discord",
+				"allowedPlaces": ["chat", "overlay", "alert"],
+				"description": "Username of the last message author",
+				"value": "",
+				"example": "discord_last_user"
+			}
+		],
+		"alerts": [
+			{
+				"title": "New Message",
+				"alertValue": "discord-message",
+				"key": "message",
+				"acceptedVariables": ["discord_last_message", "discord_last_user"],
+				"defaultMessage": "{{discord_last_user}}: {{discord_last_message}}",
+				"withLoyalty": false,
+				"defaults": {
+					"on": false
+				}
+			},
+			{
+				"title": "Member Joined",
+				"alertValue": "discord-member-join",
+				"key": "memberJoin",
+				"acceptedVariables": ["discord_member_count", "discord_last_user"],
+				"defaultMessage": "{{discord_last_user}} joined the Discord! ({{discord_member_count}} total)",
+				"withLoyalty": false,
+				"defaults": {
+					"on": true
+				}
+			},
+			{
+				"title": "Voice Channel Activity",
+				"alertValue": "discord-voice-activity",
+				"key": "voiceActivity",
+				"acceptedVariables": ["discord_voice_count", "discord_last_user"],
+				"defaultMessage": "{{discord_last_user}} joined voice ({{discord_voice_count}} in voice)",
+				"withLoyalty": false,
+				"defaults": {
+					"on": false
+				}
+			}
+		]
+	}
 }
 ```
 
