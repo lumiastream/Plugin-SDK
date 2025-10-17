@@ -100,9 +100,7 @@ class CosmicWeather extends Plugin {
 			return true;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
-				`[CosmicWeather] Validation failed: ${message}`
-			);
+			await this.lumia.addLog(`[CosmicWeather] Validation failed: ${message}`);
 			return false;
 		}
 	}
@@ -137,8 +135,6 @@ class CosmicWeather extends Plugin {
 			const forecast = await this._createForecast(city, state, units);
 
 			await this.lumia.updateSettings({
-				city: forecast.city,
-				state: forecast.state,
 				lastUpdated: forecast.renderedAt,
 				temperature: forecast.displayTemperature,
 			});
@@ -337,7 +333,7 @@ class CosmicWeather extends Plugin {
 			const previousType = this._lastWeatherType || "none";
 
 			await this.lumia.triggerAlert({
-				alert: "cosmic-weather-forecast",
+				alert: "weatherChange",
 				dynamic: {
 					city: forecast.city,
 					temperature: forecast.displayTemperature,

@@ -13,13 +13,13 @@ A Lumia Stream example plugin that sends commands to Divoom Pixoo devices. The p
 
 ## Settings
 
-| Key | Description |
-| --- | --- |
-| `deviceAddress` | Required IPv4/hostname of the Pixoo (e.g. `192.168.1.42`). |
-| `devicePort` | API port (default `80`). |
-| `requestTimeout` | Timeout in milliseconds for each request (default `5000`). |
-| `defaultTextWidth` | Canvas width used by scrolling text (default `64`). |
-| `defaultTextHeight` | Canvas height used by scrolling text (default `64`). |
+| Key                 | Description                                                |
+| ------------------- | ---------------------------------------------------------- |
+| `deviceAddress`     | Required IPv4/hostname of the Pixoo (e.g. `192.168.1.42`). |
+| `devicePort`        | API port (default `80`).                                   |
+| `requestTimeout`    | Timeout in milliseconds for each request (default `5000`). |
+| `defaultTextWidth`  | Canvas width used by scrolling text (default `64`).        |
+| `defaultTextHeight` | Canvas height used by scrolling text (default `64`).       |
 
 ## Actions
 
@@ -31,12 +31,12 @@ Sets the global panel brightness via `Channel/SetBrightness`. Accepts a number b
 
 Routes to one of the channel commands listed below and sends the selected identifier:
 
-| Option | Command | Payload key |
-| --- | --- | --- |
-| Clock | `Channel/SetClock` | `ClockId` |
-| Visualizer | `Channel/SetVisualizer` | `VisualizerId` |
-| Scene | `Channel/SetScene` | `SceneId` |
-| Custom Page Index | `Channel/SetCustomPageIndex` | `Index` |
+| Option            | Command                      | Payload key    |
+| ----------------- | ---------------------------- | -------------- |
+| Clock             | `Channel/SetClock`           | `ClockId`      |
+| Visualizer        | `Channel/SetVisualizer`      | `VisualizerId` |
+| Scene             | `Channel/SetScene`           | `SceneId`      |
+| Custom Page Index | `Channel/SetCustomPageIndex` | `Index`        |
 
 You can find valid ids by using the official Divoom app and monitoring network traffic or browsing community lists. For example, `ClockId` `46` is a minimal digital clock on Pixoo 64.
 
@@ -58,8 +58,8 @@ Allows power users to send any payload that the local API understands. The `comm
 
 ```json
 {
-  "command": "Device/SetRTC",
-  "payload": "{ \"RtcHour\": 12, \"RtcMin\": 34, \"RtcSec\": 56 }"
+	"command": "Device/SetRTC",
+	"payload": "{ \"RtcHour\": 12, \"RtcMin\": 34, \"RtcSec\": 56 }"
 }
 ```
 
@@ -75,7 +75,7 @@ If a command fails (HTTP errors, timeouts, invalid JSON), the plugin logs the re
 
 ```
 npm install
-npx lumia-plugin build ./examples/divoom-controller --out ./divoom_controller-1.0.0.lumiaplugin
+npx lumia-plugin build ./examples/divoom_controller --out ./divoom_controller-1.0.0.lumiaplugin
 ```
 
 You can then load the generated `.lumiaplugin` file in the Lumia Stream desktop app.

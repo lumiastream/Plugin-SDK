@@ -3,7 +3,7 @@
 	"name": "Cosmic Weather",
 	"version": "1.0.0",
 	"author": "Lumia Stream",
-	"description": "Streams neon-drenched weather reports with shimmering animations.",
+	"description": "Streams weather reports and alerts when the weather changes.",
 	"license": "MIT",
 	"lumiaVersion": ">=8.9.0",
 	"category": "utilities",
@@ -73,9 +73,8 @@
 		],
 		"alerts": [
 			{
-				"title": "Synthwave Forecast",
-				"alertValue": "cosmic-weather-forecast",
-				"key": "forecast",
+				"title": "Weather Change",
+				"key": "weatherChange",
 				"info": "Plays when a a major weather change is detected. For example, from sunny to cloudy, or from clear to rain.",
 				"defaultMessage": "{{city}} is glowing at {{temperature}}° with {{summary}} vibes",
 				"acceptedVariables": [
@@ -92,18 +91,12 @@
 		],
 		"variables": [
 			{
-				"name": "cosmic-weather_city",
-				"system": false,
-				"origin": "cosmic_weather",
-				"allowedPlaces": ["overlays", "commands"],
+				"name": "cosmic_weather_city",
 				"description": "City last forecasted",
 				"value": ""
 			},
 			{
-				"name": "cosmic-weather_temperature",
-				"system": false,
-				"origin": "cosmic_weather",
-				"allowedPlaces": ["overlays", "commands"],
+				"name": "cosmic_weather_temperature",
 				"description": "Last temperature reading",
 				"value": ""
 			}

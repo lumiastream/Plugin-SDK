@@ -2,7 +2,7 @@
 const path = require("path");
 const fs = require("fs");
 
-const TEMPLATE_DIR = path.resolve(__dirname, "..", "examples", "base-plugin");
+const TEMPLATE_DIR = path.resolve(__dirname, "..", "examples", "base_plugin");
 
 function toSafeId(value) {
 	const cleaned = value

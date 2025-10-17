@@ -2,14 +2,13 @@
 	"id": "showcase_plugin",
 	"name": "Showcase Plugin",
 	"version": "1.0.0",
-	"author": "LumiaStream",
+	"author": "Lumia Stream",
 	"email": "",
 	"website": "",
 	"repository": "",
 	"description": "Sample plugin that demonstrates Lumia Stream logging, variables, alerts, and settings.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"keywords": "sample, demo, lumia",
 	"category": "examples",
 	"icon": "",
 	"changelog": "",
@@ -105,42 +104,25 @@
 		"variables": [
 			{
 				"name": "last_message",
-				"system": false,
-				"origin": "showcase_plugin",
-				"allowedPlaces": ["automations", "overlays"],
 				"description": "Stores the most recent message handled by the plugin.",
-				"value": "",
-				"example": "Hello from Showcase Plugin!"
+				"value": ""
 			},
 			{
 				"name": "last_alert_color",
-				"system": false,
-				"origin": "showcase_plugin",
-				"allowedPlaces": ["automations", "overlays"],
 				"description": "Tracks the color used by the latest sample alert.",
-				"value": "",
-				"example": "#00c2ff"
+				"value": ""
 			}
 		],
 		"alerts": [
 			{
-				"id": "sample_light",
-				"label": "Sample Light Alert",
-				"description": "Change lights to the selected color for a few seconds.",
-				"fields": [
+				"title": "Sample Light Alert",
+				"key": "sample_light",
+				"acceptedVariables": ["last_alert_color"],
+				"defaultMessage": "Changing lights to {{last_alert_color}}.",
+				"variationConditions": [
 					{
-						"key": "color",
-						"label": "Color",
-						"type": "color",
-						"defaultValue": "#00c2ff"
-					},
-					{
-						"key": "duration",
-						"label": "Duration (seconds)",
-						"type": "number",
-						"defaultValue": 5,
-						"min": 1,
-						"max": 60
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
 					}
 				]
 			}
