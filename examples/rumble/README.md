@@ -1,6 +1,6 @@
 # Rumble Livestream Plugin (Example)
 
-A minimal Lumia Stream plugin that polls the Rumble livestream API, updates Lumia variables, and fires alerts when your stream starts, ends, or sees large viewer swings.
+An opinionated Lumia Stream plugin that polls the Rumble livestream API and surfaces live viewers, chat activity, rumbles, rants, followers, likes, dislikes, subs, and stream metadata directly into Lumia variables and alerts.
 
 The example is written in plain JavaScript so you can copy the files directly into `~/Documents/LumiaStream/Plugins/<your_plugin_id>` (or use **Load from Directory** inside Lumia Stream) without running a build step.
 
@@ -27,16 +27,37 @@ The plugin will begin polling every 30 seconds by default and will log activity 
 
 ## Highlights
 
-- Uses the `@lumiastream/plugin` runtime `Plugin` base class
-- Keeps three variables in sync: `rumble_live`, `rumble_viewers`, `rumble_title`
-- Raises alerts for stream start, stream end, and big viewer-count deltas
+- Built with the `@lumiastream/plugin` runtime `Plugin` base class
+- Tracks a rich set of variables including viewers, chat members, followers, likes, dislikes, subs, rumbles, rants, thumbnails, URLs, and timestamps
+- Raises alerts for stream lifecycle events plus follower, rant, like/dislike, sub, and sub gift changes
 - Demonstrates manual actions (`manual_poll`, `manual_alert`) that can be triggered from the Lumia UI
+
+## Variables at a Glance
+
+The plugin keeps the following Lumia variables updated (see `manifest.json` for full descriptions):
+
+- `rumble_live`, `rumble_viewers`, `rumble_joined`
+- `rumble_rumbles`, `rumble_rants`, `rumble_rant_amount`
+- `rumble_chat_members`, `rumble_followers`, `rumble_likes`, `rumble_dislikes`, `rumble_subs`, `rumble_sub_gifts`
+- `rumble_title`, `rumble_thumbnail`, `rumble_stream_url`, `rumble_video_id`
+- `rumble_channel_name`, `rumble_channel_image`, `rumble_category`, `rumble_language`
+- `rumble_started_at`, `rumble_scheduled_start`, `rumble_last_polled`
+
+## Alert Triggers
+
+Alerts fire automatically for:
+
+- Stream start / end (`rumble-streamStarted`, `rumble-streamEnded`)
+- Follower gains (`rumble-follower`)
+- Rants (with amount raised) (`rumble-rant`)
+- Likes (`rumble-like`) and dislikes (`rumble-dislike`)
+- New subs (`rumble-sub`) and gifted subs (`rumble-subGift`)
 
 ## Customising
 
-- Adjust the `VIEWER_MILESTONES` array in `main.js` to celebrate your own thresholds.
-- Change the polling cadence via the `pollInterval` setting (10–300 seconds). The plugin normalises milliseconds as well.
-- Extend the alert payloads by editing `handleStreamStart`, `handleStreamEnd`, or `checkViewerChanges`.
+- Tweak the polling cadence via the `pollInterval` setting (10–300 seconds). The plugin normalises milliseconds as well.
+- Adjust detection details (for example `RANT_AMOUNT_EPSILON`) or extend alert payloads by editing `check*` helpers in `main.js`.
+- Add more custom variables or alerts to match your channel’s workflow—the code is intentionally straightforward to modify.
 
 ## TypeScript Version?
 

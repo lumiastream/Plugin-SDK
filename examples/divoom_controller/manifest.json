@@ -2,12 +2,11 @@
 	"id": "divoom_controller",
 	"name": "Divoom Controller",
 	"version": "1.0.0",
-	"author": "LumiaStream",
+	"author": "Lumia Stream",
 	"description": "Control Divoom Pixoo displays via Lumia Stream actions.",
 	"lumiaVersion": "^9.0.0",
 	"license": "MIT",
 	"category": "devices",
-	"keywords": "divoom, pixoo, display",
 	"icon": "divoom.png",
 	"config": {
 		"settings": [
@@ -198,7 +197,6 @@
 					}
 				]
 			}
-		],
-		"variables": []
+		]
 	}
 }

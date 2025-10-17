@@ -33,13 +33,8 @@ export enum PluginCategory {
 
 export interface PluginVariableDefinition {
 	name: string;
-	system: boolean;
-	origin: string;
-	allowedPlaces: string[];
 	description?: string;
 	value: string | number | boolean | null;
-	isFunction?: boolean;
-	example?: string;
 }
 
 export interface PluginAlertVariationSelection {
@@ -65,18 +60,10 @@ export interface PluginAlertExtraOption {
 
 export interface PluginAlertDefinition {
 	title: string;
-	untranslated?: boolean;
-	alertValue: string;
 	key: string;
-	info?: string;
-	preferences?: string[];
-	preferenceDefaultIgnore?: boolean;
 	acceptedVariables?: string[];
-	defaults?: Record<string, any>;
 	defaultMessage?: string;
 	variationConditions?: PluginAlertVariationCondition[];
-	extraOptions?: PluginAlertExtraOption[];
-	withLoyalty?: boolean;
 }
 
 export interface PluginDependency {
@@ -154,7 +141,6 @@ export interface PluginActionDefinition {
 	description?: string;
 	icon?: string;
 	fields: PluginActionField[];
-	preview?: boolean;
 }
 
 export interface PluginIntegrationConfig {
@@ -176,7 +162,6 @@ export interface PluginManifest {
 	description: string;
 	license: string;
 	lumiaVersion: string;
-	keywords?: string;
 	category: PluginCategory | string;
 	icon?: string;
 	changelog?: string;

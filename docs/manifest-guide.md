@@ -363,26 +363,16 @@ Alerts define events that your plugin can trigger:
 		"alerts": [
 			{
 				"title": "New Follower",
-				"alertValue": "twitch-follow",
 				"key": "follow",
 				"acceptedVariables": ["twitch_follower_count", "twitch_last_follower"],
 				"defaultMessage": "{{username}} just followed! Welcome!",
-				"withLoyalty": false,
-				"defaults": {
-					"on": true
-				},
 				"variationConditions": []
 			},
 			{
 				"title": "Stream Started",
-				"alertValue": "twitch-stream-start",
 				"key": "streamStart",
 				"acceptedVariables": ["twitch_stream_title", "twitch_game"],
-				"defaultMessage": "Stream is now live! Playing {{twitch_game}}",
-				"withLoyalty": false,
-				"defaults": {
-					"on": true
-				}
+				"defaultMessage": "Stream is now live! Playing {{twitch_game}}"
 			}
 		]
 	}
@@ -394,18 +384,17 @@ Alerts define events that your plugin can trigger:
 Use `variationConditions` when an alert can fire with multiple sub-types (for example, different tiers of a subscription or thresholds of a donation) and you want creators to configure each variation independently.
 
 - **`type`** – One of the condition identifiers exposed by `LumiaVariationConditions` (see `lumia-types/src/alert.types.ts:6`). Examples: `EQUAL_SELECTION`, `GIFT_SUB_EQUAL`, `GREATER_NUMBER`, `RANDOM`.
-- **`description`** *(optional)* – Helper text shown in the Lumia UI.
-- **`selections`** *(optional)* – Only used with `EQUAL_SELECTION`; supplies the dropdown values the creator can pick from.
-	- **`label`** – How the option appears in the Lumia UI.
-	- **`value`** – The literal tier/value you expect to receive at runtime (compared against `dynamic.value`).
-	- **`message`** *(optional)* – Override for `defaultMessage` when this variation is active.
+- **`description`** _(optional)_ – Helper text shown in the Lumia UI.
+- **`selections`** _(optional)_ – Only used with `EQUAL_SELECTION`; supplies the dropdown values the creator can pick from.
+  - **`label`** – How the option appears in the Lumia UI.
+  - **`value`** – The literal tier/value you expect to receive at runtime (compared against `dynamic.value`).
+  - **`message`** _(optional)_ – Override for `defaultMessage` when this variation is active.
 
 Example manifest entry with variations:
 
 ```json
 {
 	"title": "Gifted Membership",
-	"alertValue": "myservice-gifted-membership",
 	"key": "giftedMembership",
 	"defaultMessage": "{{gifter}} gifted a membership!",
 	"acceptedVariables": ["gifter", "recipient", "gift_count"],
@@ -443,32 +432,33 @@ At runtime, trigger the alert with the fields expected by the selected condition
 await this.lumia.triggerAlert({
 	alert: "giftedMembership",
 	dynamic: {
-		value: "Tier2",      // checked by EQUAL_SELECTION
+		value: "Tier2", // checked by EQUAL_SELECTION
 		isGift: true,
-		giftAmount: 5        // checked by GIFT_SUB_EQUAL / GIFT_SUB_GREATER
+		giftAmount: 5, // checked by GIFT_SUB_EQUAL / GIFT_SUB_GREATER
 	},
 	extraSettings: {
 		gifter: "StreamerFan42",
 		recipient: "LuckyViewer",
-		gift_count: 5
-	}
+		gift_count: 5,
+	},
 });
 ```
 
 If no matching selection is found for the provided condition values (or no `dynamic` payload is supplied), Lumia falls back to the base alert configuration and `defaultMessage`.
 
 Tip: `LumiaDynamicCondition` in `lumia-types/src/alert.types.ts:99` lists every property (`value`, `currency`, `subMonths`, `giftAmount`, etc.) that variation checkers use.
-				},
-				{
-					"label": "10-pack",
-					"value": 10,
-					"message": "{{gifter}} unleashed 10 memberships! Show some love!"
-				}
-			]
-		}
-	]
+},
+{
+"label": "10-pack",
+"value": 10,
+"message": "{{gifter}} unleashed 10 memberships! Show some love!"
 }
-```
+]
+}
+]
+}
+
+````
 
 At runtime, trigger the alert with the variation value that matches one of the configured selections:
 
@@ -482,7 +472,7 @@ await this.lumia.triggerAlert({
 		gift_count: 5
 	}
 });
-```
+````
 
 If no matching selection is found for the provided value (or `dynamic` is omitted), Lumia defaults to the base alert configuration and `defaultMessage`.
 
@@ -652,36 +642,21 @@ Here's a complete manifest for a hypothetical Discord integration plugin:
 		"alerts": [
 			{
 				"title": "New Message",
-				"alertValue": "discord-message",
 				"key": "message",
 				"acceptedVariables": ["discord_last_message", "discord_last_user"],
-				"defaultMessage": "{{discord_last_user}}: {{discord_last_message}}",
-				"withLoyalty": false,
-				"defaults": {
-					"on": false
-				}
+				"defaultMessage": "{{discord_last_user}}: {{discord_last_message}}"
 			},
 			{
 				"title": "Member Joined",
-				"alertValue": "discord-member-join",
 				"key": "memberJoin",
 				"acceptedVariables": ["discord_member_count", "discord_last_user"],
-				"defaultMessage": "{{discord_last_user}} joined the Discord! ({{discord_member_count}} total)",
-				"withLoyalty": false,
-				"defaults": {
-					"on": true
-				}
+				"defaultMessage": "{{discord_last_user}} joined the Discord! ({{discord_member_count}} total)"
 			},
 			{
 				"title": "Voice Channel Activity",
-				"alertValue": "discord-voice-activity",
 				"key": "voiceActivity",
 				"acceptedVariables": ["discord_voice_count", "discord_last_user"],
-				"defaultMessage": "{{discord_last_user}} joined voice ({{discord_voice_count}} in voice)",
-				"withLoyalty": false,
-				"defaults": {
-					"on": false
-				}
+				"defaultMessage": "{{discord_last_user}} joined voice ({{discord_voice_count}} in voice)"
 			}
 		]
 	}

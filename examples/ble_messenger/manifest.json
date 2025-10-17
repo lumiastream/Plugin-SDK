@@ -2,14 +2,10 @@
 	"id": "ble_messenger",
 	"name": "BLE Messenger",
 	"version": "1.0.1",
-	"author": "LumiaStream Community",
-	"email": "",
-	"website": "",
-	"repository": "",
+	"author": "Lumia Stream",
 	"description": "Connect to a Bluetooth Low Energy peripheral and send messages to it from Lumia actions.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"keywords": "bluetooth, ble, hardware",
 	"category": "hardware",
 	"icon": "ble-messenger.png",
 	"changelog": "",
@@ -191,21 +187,13 @@
 		"variables": [
 			{
 				"name": "ble_status",
-				"system": false,
-				"origin": "ble_messenger",
-				"allowedPlaces": ["automations", "overlays"],
 				"description": "Current BLE connection state reported by the plugin.",
-				"value": "disconnected",
-				"example": "connected"
+				"value": "disconnected"
 			},
 			{
 				"name": "ble_last_message",
-				"system": false,
-				"origin": "ble_messenger",
-				"allowedPlaces": ["automations", "overlays"],
 				"description": "Most recent payload successfully sent to the BLE device.",
-				"value": "",
-				"example": "Hello from Lumia Stream!"
+				"value": ""
 			}
 		]
 	}
