@@ -1,0 +1,11 @@
+{
+  "name": "lumia-example-hot-news",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Example Lumia Stream plugin that polls NewsAPI.org for the latest headlines and mirrors them into Lumia variables.",
+  "main": "main.js",
+  "scripts": {},
+  "dependencies": {
+    "@lumiastream/plugin": "^0.1.16"
+  }
+}
