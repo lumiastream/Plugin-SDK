@@ -10,6 +10,7 @@
   "lumiaVersion": "^9.0.0",
   "category": "utilities",
   "icon": "hot_news.png",
+  "externalHelpLink": "https://lumiastream.com/contact",
   "config": {
     "settings": [
       {
