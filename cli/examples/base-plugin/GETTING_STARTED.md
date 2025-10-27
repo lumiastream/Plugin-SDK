@@ -22,10 +22,13 @@ This file defines your plugin's metadata and capabilities:
 - **name**: Display name shown to users
 - **description**: Short description for the plugin marketplace
 - **main**: Entry point file (usually "main.js")
+- **externalHelpLink**: This will be the link that shows on the auth page on bottom right when the user need help
 - **config**: Defines settings, actions, and variables
 
 **Key sections:**
+
 - `settings`: User-configurable options for your plugin
+- `settings_tutorial`: Markdown format tutorial on how to use the plugin, it is rendered on the right side of the plugin auth page
 - `actions`: Functions users can trigger (e.g., send a message, change color)
 - `variables`: Data your plugin exposes to Lumia Stream
 
@@ -73,7 +76,7 @@ class YourPlugin extends Plugin {
 2. Access in `main.js`:
 
 ```javascript
-const value = this.getSetting('myNewSetting');
+const value = this.getSetting("myNewSetting");
 ```
 
 ### Adding a New Action
@@ -125,17 +128,19 @@ Variables let other Lumia features access your plugin's data:
 2. Update in `main.js`:
 
 ```javascript
-this.setVariable('myVariable', 'new value');
+this.setVariable("myVariable", "new value");
 ```
 
 ## Testing Your Plugin
 
 1. **Install dependencies** (if using package.json):
+
    ```bash
    npm install
    ```
 
 2. **Load in Lumia Stream**:
+
    - Open Lumia Stream
    - Go to Plugins section
    - Load your plugin directory
@@ -143,8 +148,8 @@ this.setVariable('myVariable', 'new value');
 
 3. **Check logs**:
    ```javascript
-   this.log('Debug message');
-   this.error('Error message');
+   this.log("Debug message");
+   this.error("Error message");
    ```
 
 ## Next Steps
@@ -179,7 +184,7 @@ this.setVariable('myVariable', 'new value');
 ### Making HTTP Requests
 
 ```javascript
-const response = await fetch('https://api.example.com/data');
+const response = await fetch("https://api.example.com/data");
 const data = await response.json();
 ```
 
@@ -212,15 +217,18 @@ try {
 ## Troubleshooting
 
 **Plugin not loading?**
+
 - Check manifest.json syntax (use a JSON validator)
 - Ensure the `main` field points to the correct file
 - Check Lumia Stream logs for errors
 
 **Settings not showing?**
+
 - Verify the `settings` array in manifest.json
 - Ensure required fields are filled
 
 **Actions not working?**
+
 - Check the action type matches your handler
 - Verify field keys match what you're accessing
 

@@ -1,0 +1,234 @@
+{
+  "id": "hot_news",
+  "name": "Hot News",
+  "version": "1.0.3",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "description": "Fetch breaking headlines from NewsAPI.org, expose them as Lumia variables, and trigger alerts when fresh stories land on your chosen topic.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "utilities",
+  "icon": "hot_news.png",
+  "externalHelpLink": "https://lumiastream.com/contact",
+  "config": {
+    "settings": [
+      {
+        "key": "apiKey",
+        "label": "NewsAPI Key",
+        "type": "password",
+        "placeholder": "Enter your NewsAPI.org key",
+        "helperText": "Generate a key at https://newsapi.org/ to authenticate requests.",
+        "required": true
+      },
+      {
+        "key": "country",
+        "label": "Country",
+        "type": "select",
+        "defaultValue": "us",
+        "options": [
+          { "label": "Argentina", "value": "ar" },
+          { "label": "Australia", "value": "au" },
+          { "label": "Austria", "value": "at" },
+          { "label": "Algeria", "value": "dz" },
+          { "label": "Belgium", "value": "be" },
+          { "label": "Brazil", "value": "br" },
+          { "label": "Bulgaria", "value": "bg" },
+          { "label": "Canada", "value": "ca" },
+          { "label": "China", "value": "cn" },
+          { "label": "Colombia", "value": "co" },
+          { "label": "Czechia", "value": "cz" },
+          { "label": "Egypt", "value": "eg" },
+          { "label": "France", "value": "fr" },
+          { "label": "Germany", "value": "de" },
+          { "label": "Greece", "value": "gr" },
+          { "label": "Hong Kong", "value": "hk" },
+          { "label": "Hungary", "value": "hu" },
+          { "label": "India", "value": "in" },
+          { "label": "Indonesia", "value": "id" },
+          { "label": "Ireland", "value": "ie" },
+          { "label": "Italy", "value": "it" },
+          { "label": "Japan", "value": "jp" },
+          { "label": "Latvia", "value": "lv" },
+          { "label": "Lithuania", "value": "lt" },
+          { "label": "Malaysia", "value": "my" },
+          { "label": "Mexico", "value": "mx" },
+          { "label": "Morocco", "value": "ma" },
+          { "label": "Netherlands", "value": "nl" },
+          { "label": "New Zealand", "value": "nz" },
+          { "label": "Nigeria", "value": "ng" },
+          { "label": "Norway", "value": "no" },
+          { "label": "Philippines", "value": "ph" },
+          { "label": "Poland", "value": "pl" },
+          { "label": "Portugal", "value": "pt" },
+          { "label": "Romania", "value": "ro" },
+          { "label": "Russia", "value": "ru" },
+          { "label": "Saudi Arabia", "value": "sa" },
+          { "label": "Serbia", "value": "rs" },
+          { "label": "Singapore", "value": "sg" },
+          { "label": "Slovakia", "value": "sk" },
+          { "label": "Slovenia", "value": "si" },
+          { "label": "South Africa", "value": "za" },
+          { "label": "South Korea", "value": "kr" },
+          { "label": "Sweden", "value": "se" },
+          { "label": "Switzerland", "value": "ch" },
+          { "label": "Taiwan", "value": "tw" },
+          { "label": "Thailand", "value": "th" },
+          { "label": "Turkey", "value": "tr" },
+          { "label": "Ukraine", "value": "ua" },
+          { "label": "United Arab Emirates", "value": "ae" },
+          { "label": "United Kingdom", "value": "gb" },
+          { "label": "United States", "value": "us" },
+          { "label": "Venezuela", "value": "ve" }
+        ],
+        "helperText": "Restrict headlines to a specific country (defaults to US)."
+      },
+      {
+        "key": "category",
+        "label": "Category",
+        "type": "select",
+        "defaultValue": "",
+        "options": [
+          { "label": "Any", "value": "" },
+          { "label": "Business", "value": "business" },
+          { "label": "Entertainment", "value": "entertainment" },
+          { "label": "General", "value": "general" },
+          { "label": "Health", "value": "health" },
+          { "label": "Science", "value": "science" },
+          { "label": "Sports", "value": "sports" },
+          { "label": "Technology", "value": "technology" }
+        ],
+        "helperText": "Optional NewsAPI category filter."
+      },
+      {
+        "key": "query",
+        "label": "Keyword Filter",
+        "type": "text",
+        "placeholder": "e.g. spaceX, esports, climate",
+        "helperText": "Only return articles matching this keyword or phrase (optional)."
+      },
+      {
+        "key": "pollInterval",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 300,
+        "min": 60,
+        "max": 1800,
+        "helperText": "How often to refresh headlines (1-30 minutes)."
+      },
+      {
+        "key": "resultsLimit",
+        "label": "Results Limit",
+        "type": "number",
+        "defaultValue": 5,
+        "min": 1,
+        "max": 20,
+        "helperText": "How many headlines to pull each refresh (max 20)."
+      },
+      {
+        "key": "enableAlerts",
+        "label": "Enable New Headline Alerts",
+        "type": "toggle",
+        "defaultValue": true,
+        "helperText": "Trigger the alert whenever a headline appears that has not been seen before."
+      }
+    ],
+    "settings_tutorial": "---  ### 🔑 Get Your API Key  Sign up at [https://newsapi.org/](https://newsapi.org/) and copy your API key into the NewsAPI Key field.  ---  ### ⚙️ Choose Coverage  Pick a country, optional category, and keyword filter to focus on the stories you care about.  ---  ### ⏱️ Set Poll Interval  Adjust how often the plugin checks NewsAPI (defaults to every 5 minutes).  ---  ### 🚨 Enable Alerts  Leave alerts enabled to have Lumia announce fresh headlines as they arrive.  ---  ### 🪄 Manual Search with Lumia Actions  You can also use Lumia Actions to trigger a manual NewsAPI search whenever you want.  ---",
+    "actions": [
+      {
+        "type": "hotnews_manual_refresh",
+        "label": "Refresh Headlines",
+        "description": "Fetch the latest headlines immediately.",
+        "fields": []
+      },
+      {
+        "type": "hotnews_search_topic",
+        "label": "Search Topic",
+        "description": "Run a one-off search for a different keyword and update variables.",
+        "fields": [
+          {
+            "key": "query",
+            "label": "Keyword or Phrase",
+            "type": "text",
+            "placeholder": "e.g. electric vehicles",
+            "required": true
+          },
+          {
+            "key": "limit",
+            "label": "Results Limit",
+            "type": "number",
+            "defaultValue": 5,
+            "min": 1,
+            "max": 20
+          }
+        ]
+      }
+    ],
+    "alerts": [
+      {
+        "title": "New Headline",
+        "key": "hotnews_new_headline",
+        "defaultMessage": "🔥 {{hotnews_latest_title}} ({{hotnews_latest_source}})",
+        "acceptedVariables": [
+          "hotnews_latest_title",
+          "hotnews_latest_source",
+          "hotnews_latest_url",
+          "hotnews_latest_published",
+          "hotnews_keyword"
+        ]
+      }
+    ],
+    "variables": [
+      {
+        "name": "hotnews_latest_title",
+        "description": "Headline from the most recent article.",
+        "value": ""
+      },
+      {
+        "name": "hotnews_latest_description",
+        "description": "Summary of the most recent article.",
+        "value": ""
+      },
+      {
+        "name": "hotnews_latest_url",
+        "description": "Direct link to the latest article.",
+        "value": ""
+      },
+      {
+        "name": "hotnews_latest_source",
+        "description": "Source/publisher of the latest article.",
+        "value": ""
+      },
+      {
+        "name": "hotnews_latest_image",
+        "description": "URL to the lead image for the latest article.",
+        "value": ""
+      },
+      {
+        "name": "hotnews_latest_published",
+        "description": "ISO timestamp of when the latest article was published.",
+        "value": ""
+      },
+      {
+        "name": "hotnews_article_count",
+        "description": "Number of articles returned in the latest refresh.",
+        "value": 0
+      },
+      {
+        "name": "hotnews_recent_articles",
+        "description": "JSON payload containing the most recent headlines.",
+        "value": ""
+      },
+      {
+        "name": "hotnews_keyword",
+        "description": "Keyword used for the latest refresh.",
+        "value": ""
+      },
+      {
+        "name": "hotnews_last_updated",
+        "description": "ISO timestamp of the last successful NewsAPI sync.",
+        "value": ""
+      }
+    ]
+  }
+}
