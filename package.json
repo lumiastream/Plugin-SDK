@@ -16,6 +16,7 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"lint": "tsc --noEmit",
+		"package-docs": "node scripts/package-knowledge-pack.js",
 		"sync-cli-version": "node scripts/sync-cli-version.js",
 		"publish-cli": "node scripts/publish-cli.js",
 		"prepublishOnly": "npm run sync-cli-version",
