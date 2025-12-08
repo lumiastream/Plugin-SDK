@@ -7,6 +7,6 @@
   "keywords": ["lumia", "plugin", "bluetooth", "ble"],
   "dependencies": {
     "@abandonware/noble": "^1.9.2-15",
-    "@lumiastream/plugin": "^0.1.16"
+    "@lumiastream/plugin": "^0.1.17"
   }
 }

@@ -73,6 +73,29 @@ export abstract class Plugin {
   async refreshAuth<TData>(data: TData): Promise<TData> {
     return data;
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async searchLights(_query?: Record<string, any>): Promise<any> {
+    return [];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async addLight(_data: Record<string, any>): Promise<any> {
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onLightChange(_config: {
+    brand: string;
+    lights: any[];
+    color?: { r: number; g: number; b: number };
+    power?: boolean;
+    brightness?: number;
+    transition?: number;
+    rawConfig?: any;
+  }): Promise<void> {
+    return;
+  }
 }
 
 export default Plugin;

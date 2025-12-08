@@ -1,0 +1,41 @@
+{
+  "id": "mock_lights_plugin",
+  "name": "Mock Lights Plugin",
+  "version": "1.0.0",
+  "author": "Lumia Stream",
+  "email": "",
+  "website": "",
+  "repository": "",
+  "description": "Creates fake lights and logs when Lumia sends color/brightness updates.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "lights",
+  "icon": "",
+  "changelog": "",
+  "config": {
+    "settings": [],
+    "actions": [],
+    "variables": [],
+    "alerts": [],
+    "lights": {
+      "search": {
+        "buttonLabel": "Discover mock lights",
+        "helperText": "Generates a new fake light each time."
+      },
+      "manualAdd": {
+        "buttonLabel": "Add mock light",
+        "helperText": "Supply whatever identifiers you want to test manual entry.",
+        "fields": [
+          { "key": "name", "label": "Name", "type": "text", "required": true },
+          { "key": "id", "label": "Light ID (optional)", "type": "text" },
+          { "key": "ip", "label": "IP (optional)", "type": "text" }
+        ]
+      },
+      "displayFields": [
+        { "key": "name", "label": "Name" },
+        { "key": "ip", "label": "IP", "fallback": "No IP" }
+      ],
+      "emptyStateText": "No mock lights yet. Discover or add one."
+    }
+  }
+}

@@ -328,7 +328,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.16"
+		"@lumiastream/plugin": "^0.1.17"
 	}
 }
 
@@ -3392,7 +3392,7 @@ module.exports = BLEMessengerPlugin;
   "keywords": ["lumia", "plugin", "bluetooth", "ble"],
   "dependencies": {
     "@abandonware/noble": "^1.9.2-15",
-    "@lumiastream/plugin": "^0.1.16"
+    "@lumiastream/plugin": "^0.1.17"
   }
 }
 
@@ -4964,7 +4964,7 @@ module.exports = DivoomControllerPlugin;
   "description": "Control Divoom Pixoo devices from Lumia Stream actions.",
   "main": "main.js",
   "dependencies": {
-    "@lumiastream/plugin": "^0.1.16"
+    "@lumiastream/plugin": "^0.1.17"
   }
 }
 
@@ -5804,7 +5804,148 @@ module.exports = HotNewsPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.1.16"
+    "@lumiastream/plugin": "^0.1.17"
+  }
+}
+
+```
+
+## mock_lights_plugin/main.js
+
+```
+const { Plugin } = require('@lumiastream/plugin');
+
+const DEFAULT_LIGHTS = [
+	{ id: 'mock-1', name: 'Mock Panel A', ip: '10.0.0.11' },
+	{ id: 'mock-2', name: 'Mock Strip B', ip: '10.0.0.12' },
+];
+
+class MockLightsPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._lights = [...DEFAULT_LIGHTS];
+		this._idCounter = DEFAULT_LIGHTS.length + 1;
+	}
+
+	async onload() {
+		await this._log('Mock lights plugin loaded');
+		await this.lumia.updateConnection(true);
+	}
+
+	async onunload() {
+		await this._log('Mock lights plugin unloaded');
+		await this.lumia.updateConnection(false);
+	}
+
+	async searchLights() {
+		const newLight = {
+			id: `mock-${this._idCounter}`,
+			name: `Discovered Mock ${this._idCounter}`,
+			ip: `10.0.0.${10 + this._idCounter}`,
+		};
+		this._idCounter++;
+		this._mergeLights([newLight]);
+		await this._log(`Discovered ${newLight.name} (${newLight.id})`);
+		return this._lights;
+	}
+
+	async addLight(data = {}) {
+		const newLight = {
+			id: data.id || `manual-${Date.now()}`,
+			name: data.name || `Manual Mock ${this._idCounter++}`,
+			ip: data.ip,
+		};
+		this._mergeLights([newLight]);
+		await this._log(`Manually added ${newLight.name} (${newLight.id})`);
+		return this._lights;
+	}
+
+	async onLightChange(config = {}) {
+		const ids = Array.isArray(config.lights) ? config.lights.map((l) => l?.id || l).join(', ') : 'unknown';
+		const color = config.color ? `rgb(${config.color.r},${config.color.g},${config.color.b})` : 'no color';
+		const brightness = typeof config.brightness === 'number' ? `${config.brightness}%` : 'unchanged';
+		const power = typeof config.power === 'boolean' ? (config.power ? 'on' : 'off') : 'unchanged';
+
+		await this._log(`onLightChange -> brand=${config.brand} lights=[${ids}] color=${color} brightness=${brightness} power=${power}`);
+	}
+
+	_mergeLights(newOnes = []) {
+		const existing = new Map(this._lights.map((l) => [l.id, l]));
+		newOnes.forEach((light) => {
+			if (!existing.has(light.id)) {
+				existing.set(light.id, light);
+			}
+		});
+		this._lights = Array.from(existing.values());
+	}
+
+	async _log(message) {
+		await this.lumia.addLog(`[${this.manifest.id}] ${message}`);
+	}
+}
+
+module.exports = MockLightsPlugin;
+
+```
+
+## mock_lights_plugin/manifest.json
+
+```
+{
+  "id": "mock_lights_plugin",
+  "name": "Mock Lights Plugin",
+  "version": "1.0.0",
+  "author": "Lumia Stream",
+  "email": "",
+  "website": "",
+  "repository": "",
+  "description": "Creates fake lights and logs when Lumia sends color/brightness updates.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "lights",
+  "icon": "",
+  "changelog": "",
+  "config": {
+    "settings": [],
+    "actions": [],
+    "variables": [],
+    "alerts": [],
+    "lights": {
+      "search": {
+        "buttonLabel": "Discover mock lights",
+        "helperText": "Generates a new fake light each time."
+      },
+      "manualAdd": {
+        "buttonLabel": "Add mock light",
+        "helperText": "Supply whatever identifiers you want to test manual entry.",
+        "fields": [
+          { "key": "name", "label": "Name", "type": "text", "required": true },
+          { "key": "id", "label": "Light ID (optional)", "type": "text" },
+          { "key": "ip", "label": "IP (optional)", "type": "text" }
+        ]
+      },
+      "displayFields": [
+        { "key": "name", "label": "Name" },
+        { "key": "ip", "label": "IP", "fallback": "No IP" }
+      ],
+      "emptyStateText": "No mock lights yet. Discover or add one."
+    }
+  }
+}
+
+```
+
+## mock_lights_plugin/package.json
+
+```
+{
+  "name": "lumia-mock-lights-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
+  "main": "main.js",
+  "dependencies": {
+    "@lumiastream/plugin": "^0.1.17"
   }
 }
 
@@ -7180,7 +7321,7 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.16"
+		"@lumiastream/plugin": "^0.1.17"
 	}
 }
 
