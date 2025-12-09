@@ -148,6 +148,7 @@ export interface PluginIntegrationConfig {
 	variables?: PluginVariableDefinition[];
 	alerts?: PluginAlertDefinition[];
 	actions?: PluginActionDefinition[];
+	lights?: PluginLightsConfig;
 	[key: string]: any;
 }
 
@@ -300,6 +301,17 @@ export interface PluginRuntime {
 	onunload(): Promise<void>;
 	onupdate?(oldVersion: string, newVersion: string): Promise<void>;
 	actions?(config: { actions: any[]; extraSettings?: any }): Promise<void>;
+	searchLights?(config?: Record<string, any>): Promise<any>;
+	addLight?(config: Record<string, any>): Promise<any>;
+	onLightChange?(config: {
+		brand: string;
+		lights: PluginLight[];
+		color?: { r: number; g: number; b: number };
+		power?: boolean;
+		brightness?: number;
+		transition?: number;
+		rawConfig?: any;
+	}): Promise<void>;
 	settings: Record<string, any>;
 	onsettingsupdate?(
 		settings: Record<string, any>,
@@ -345,6 +357,38 @@ export interface PluginFormField {
 	options?: Array<{ label: string; value: any }>;
 	disabled?: boolean;
 	visible?: boolean;
+}
+
+export interface PluginLight {
+	id: string;
+	name?: string;
+	alias?: string;
+	[key: string]: any;
+}
+
+export interface PluginLightDisplayField {
+	key: string;
+	label: string;
+	fallback?: string;
+}
+
+export interface PluginLightSearchConfig {
+	label?: string;
+	helperText?: string;
+	buttonLabel?: string;
+}
+
+export interface PluginLightManualAddConfig {
+	fields: PluginFormField[];
+	buttonLabel?: string;
+	helperText?: string;
+}
+
+export interface PluginLightsConfig {
+	search?: PluginLightSearchConfig;
+	manualAdd?: PluginLightManualAddConfig;
+	displayFields?: PluginLightDisplayField[];
+	emptyStateText?: string;
 }
 
 export interface PluginAuthConfig {

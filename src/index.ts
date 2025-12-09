@@ -21,6 +21,11 @@ export type {
   PluginDisplayChatOptions,
   PluginRuntime,
   ILumiaAPI,
+  PluginLight,
+  PluginLightsConfig,
+  PluginLightDisplayField,
+  PluginLightSearchConfig,
+  PluginLightManualAddConfig,
 } from './types';
 export {
   PluginStatus,

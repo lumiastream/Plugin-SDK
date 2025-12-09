@@ -65,6 +65,48 @@ The Lumia marketplace recognises the following categories (strings are case-sens
 - **`chat`** – Chat interaction tools
 - **`development`** – Development, testing, and debugging utilities
 
+### Lights configuration (for lights category)
+
+If your plugin provides lights, add a `config.lights` block so the PluginAuth UI can render discovery/manual-add controls and a selection list. Lights are saved by the Lumia UI—plugins should not mutate light state directly.
+
+```json
+{
+	"id": "my_lights_plugin",
+	"name": "My Lights",
+	"category": "lights",
+	"config": {
+		"settings": [],
+		"lights": {
+			"search": {
+				"buttonLabel": "Discover lights",
+				"helperText": "Runs your searchLights hook"
+			},
+			"manualAdd": {
+				"buttonLabel": "Add light",
+				"helperText": "Enter details for a device",
+				"fields": [
+					{ "key": "name", "label": "Name", "type": "text", "required": true },
+					{ "key": "id", "label": "ID (optional)", "type": "text" },
+					{ "key": "ip", "label": "IP (optional)", "type": "text" }
+				]
+			},
+			"displayFields": [
+				{ "key": "name", "label": "Name" },
+				{ "key": "ip", "label": "IP", "fallback": "No IP" }
+			],
+			"emptyStateText": "No lights yet. Discover or add one."
+		}
+	}
+}
+```
+
+Runtime hooks for lights plugins:
+- Implement `searchLights` to return an array of discovered lights for the UI to save.
+- Implement `addLight` to handle manual-add requests and return the updated array.
+- Implement `onLightChange` to receive color/brightness/power updates for your lights.
+
+Note: Selection and persistence are handled by the PluginAuth UI; plugins should not call `registerLights`/`updateChosenLights`.
+
 ## Configuration
 
 The `config` object defines your plugin's interactive elements:

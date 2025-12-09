@@ -18,6 +18,7 @@ Store any dependencies, initialise locals, and always pass the parameters to the
 - **`onunload(): Promise<void>`** – invoked when the plugin is disabled. Clean up timers, close sockets, and release resources.
 - **`onupdate(oldVersion: string, newVersion: string): Promise<void>`** – triggered after a version upgrade. Optional.
 - **`onsettingsupdate(settings, previousSettings): Promise<void>`** – called after settings change. Optional.
+- **`onLightChange(config): Promise<void>`** – optional hook fired when Lumia sends a color/brightness update for lights owned by your plugin (`config` includes `brand`, `lights`, `color`, `brightness`, `power`, `transition`, `rawConfig`).
 
 ### Action Handling
 

@@ -1,8 +1,8 @@
 {
-  "name": "lumia-example-divoom-controller",
+  "name": "lumia-mock-lights-plugin",
   "version": "1.0.0",
   "private": true,
-  "description": "Control Divoom Pixoo devices from Lumia Stream actions.",
+  "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
   "main": "main.js",
   "dependencies": {
     "@lumiastream/plugin": "^0.1.17"
