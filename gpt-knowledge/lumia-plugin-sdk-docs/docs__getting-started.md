@@ -202,6 +202,38 @@ await this.lumia.triggerAlert({
 
 When you declare `variationConditions` in your manifest, populate the `dynamic` payload with the fields those conditions expect—for example `value` (for tier/number checks), `currency`, `giftAmount`, or `subMonths`. The comparison logic is defined in `LumiaVariationConditions`, so make sure the runtime data lines up with the chosen condition.
 
+If you want a plugin alert to appear in the Event List, opt in explicitly:
+
+```ts
+await this.lumia.triggerAlert({
+	alert: "my-custom-alert",
+	showInEventList: true,
+	extraSettings: {
+		username: "Viewer123",
+	},
+});
+```
+
+### Chat Messages
+
+```ts
+this.lumia.displayChat({
+	platform: "my_plugin",
+	username: "Viewer123",
+	displayname: "Viewer123",
+	message: "Hello from the plugin!",
+	avatar: "https://example.com/avatar.png",
+	user: {
+		mod: true,
+	},
+	emotesPack: {
+		"12345": { locations: ["6-10"], type: "emote" },
+	},
+});
+```
+
+`displayChat` posts a message to Lumia Stream chatboxes and overlay chat widgets. The `platform` value should match your integration key so the correct icon is displayed; unknown platforms fall back to the Lumia icon.
+
 ### File Operations
 
 ```ts
