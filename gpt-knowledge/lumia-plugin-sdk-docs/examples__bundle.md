@@ -5602,10 +5602,10 @@ module.exports = ElevenLabsTTSPlugin;
 
 ```
 {
-	"name": "lumia-elevenlabs-tts-example",
+	"name": "lumia-elevenlabs-tts",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Example ElevenLabs TTS plugin for Lumia Stream.",
+	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
 		"@lumiastream/plugin": "^0.1.18"
@@ -8214,10 +8214,1478 @@ module.exports = RumblePlugin;
 
 ```
 {
-	"name": "lumia-example-rumble",
+	"name": "lumia-rumble",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Example Lumia Stream plugin that monitors a Rumble livestream and surfaces follower, rant, reaction, and subscription activity.",
+	"description": "Lumia Stream plugin that monitors a Rumble livestream and surfaces follower, rant, reaction, and subscription activity.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.1.18"
+	}
+}
+
+```
+
+## tikfinity/README.md
+
+```
+# Tikfinity TikTok LIVE Plugin (Example)
+
+A Lumia Stream plugin that connects to TikTok LIVE streams via the Tikfinity WebSocket service. Receive real-time events including chat messages, gifts, follows, shares, likes, and stream status directly in Lumia Stream.
+
+This example is written in plain JavaScript so you can copy the files directly into `~/Documents/LumiaStream/Plugins/<your_plugin_id>` (or use **Load from Directory** inside Lumia Stream) without running a build step.
+
+## Features
+
+- **Real-time WebSocket Connection**: Live event streaming from TikTok LIVE via Tikfinity
+- **Comprehensive Event Support**:
+  - Stream start/end detection
+  - Live viewer count tracking
+  - Chat messages with avatar display
+  - Gift tracking with streak support (combo gifts)
+  - Follow notifications
+  - Share notifications
+  - Like events
+  - Subscribe events
+- **Automatic Reconnection**: Built-in reconnect logic if connection drops
+- **Gift Streak Management**: Properly handles TikTok's combo gift system
+- **Template Variables**: All data exposed as Lumia variables for use in automations and overlays
+
+## Files
+
+```
+examples/tikfinity/
+├── main.js                 # Plugin implementation (CommonJS module)
+├── manifest.json           # Plugin metadata and configuration definition
+├── package.json            # Declares the SDK dependency
+└── README.md               # This file
+```
+
+## Quick Setup Instructions
+
+### 1. Copy Files
+
+Create a new folder for your plugin (e.g., `~/Documents/LumiaStream/Plugins/tikfinity`):
+
+```bash
+mkdir -p ~/Documents/LumiaStream/Plugins/tikfinity
+```
+
+Copy the following files from this example into that folder:
+- `manifest.json`
+- `main.js`
+- `package.json`
+
+### 2. Install Dependencies (Optional)
+
+If you want to use `npm` to manage dependencies:
+
+```bash
+cd ~/Documents/LumiaStream/Plugins/tikfinity
+npm install
+```
+
+### 3. Load in Lumia Stream
+
+1. Launch Lumia Stream
+2. Go to **Settings** → **Plugins**
+3. Click **Load from Directory** and select your plugin folder
+4. Or restart Lumia Stream if you copied files into the plugins folder
+
+### 4. Configure the Plugin
+
+1. Open the plugin settings in Lumia Stream
+2. Enter your **TikTok username** (without the @ symbol)
+3. (Optional) Add your **Tikfinity API Key** for Pro features
+   - Get your API key from [https://tikfinity.zerody.one](https://tikfinity.zerody.one)
+4. Click **Save**
+5. The plugin will automatically connect when you go LIVE on TikTok
+
+## How It Works
+
+### Connection
+
+The plugin uses WebSocket to connect to Tikfinity's service:
+
+```
+wss://tikfinity-cws-1.zerody.one/?uniqueId=YOUR_USERNAME
+```
+
+When you provide an API key, it's appended:
+
+```
+wss://tikfinity-cws-1.zerody.one/?uniqueId=YOUR_USERNAME&apiKey=YOUR_API_KEY
+```
+
+### Event Processing
+
+The plugin listens for various TikTok LIVE events and processes them:
+
+1. **Stream Events**: Connected (stream start), disconnected, stream end
+2. **Viewer Events**: Room user updates (viewer count), member joins
+3. **Chat Events**: Real-time chat messages displayed in Lumia
+4. **Gift Events**: Gifts with proper streak/combo handling
+5. **Social Events**: Follows, shares, likes, subscribes
+
+### Gift Streak Handling
+
+TikTok has a combo gift system where viewers can send the same gift multiple times rapidly. The plugin handles this by:
+
+1. Detecting repeatable gifts (giftType === 1)
+2. Accumulating the repeat count
+3. Waiting 5 seconds after the last increment
+4. Triggering a single alert with the final count
+
+This prevents alert spam and shows the actual total gift amount.
+
+## Variables
+
+The plugin exposes the following Lumia variables:
+
+| Variable | Description |
+|----------|-------------|
+| `tikfinity_connected` | Whether the WebSocket connection is active |
+| `tikfinity_live` | Whether the TikTok stream is currently live |
+| `tikfinity_viewers` | Current number of concurrent viewers |
+| `tikfinity_total_viewers` | Total viewers that have joined the session |
+| `tikfinity_title` | Current stream title |
+| `tikfinity_likes` | Total likes received during the stream |
+| `tikfinity_diamonds` | Total diamonds received during the stream |
+| `tikfinity_followers` | Session follower count |
+| `tikfinity_shares` | Number of shares during the stream |
+| `tikfinity_last_chatter` | Username of the last person to chat |
+| `tikfinity_last_gifter` | Username of the last person to send a gift |
+| `tikfinity_last_follower` | Username of the last person to follow |
+
+## Alerts
+
+The plugin triggers the following alerts:
+
+### streamStarted
+Triggered when the stream goes live.
+
+**Variables**: `tikfinity_live`, `tikfinity_viewers`, `tikfinity_title`
+
+### streamEnded
+Triggered when the stream ends.
+
+**Variables**: `tikfinity_viewers`, `tikfinity_likes`, `tikfinity_diamonds`, `tikfinity_followers`, `tikfinity_shares`
+
+### chat
+Triggered for each chat message (optional, currently disabled in code to reduce alert spam).
+
+**Variables**: `tikfinity_last_chatter`
+
+### gift
+Triggered when a gift is received (after streak finalization).
+
+**Variables**: `tikfinity_last_gifter`, `tikfinity_diamonds`
+
+**Variation Conditions**:
+- Greater than (diamond value threshold)
+- Random (percent chance)
+
+### follow
+Triggered when someone follows.
+
+**Variables**: `tikfinity_last_follower`, `tikfinity_followers`
+
+### share
+Triggered when someone shares the stream.
+
+**Variables**: `tikfinity_shares`
+
+### like
+Triggered when someone likes.
+
+**Variables**: `tikfinity_likes`
+
+**Variation Conditions**:
+- Greater than (like count threshold)
+- Random (percent chance)
+
+### subscribe
+Triggered when someone subscribes.
+
+## Actions
+
+### Manual Connect
+Manually initiate connection to Tikfinity WebSocket service.
+
+### Manual Disconnect
+Manually disconnect from Tikfinity.
+
+### Test Alert
+Trigger a test stream started alert to verify your setup.
+
+## Settings
+
+### TikTok Username (Required)
+Your TikTok username without the @ symbol. This is the username you use to go LIVE.
+
+### Tikfinity API Key (Optional)
+Your Tikfinity Pro API key for enhanced features. Get it from [https://tikfinity.zerody.one](https://tikfinity.zerody.one).
+
+### Reconnect Interval (Default: 30 seconds)
+How long to wait before attempting reconnection after a disconnect. Range: 10-300 seconds.
+
+## Architecture Notes
+
+### WebSocket Management
+- Automatic reconnection on disconnect (unless manually disconnected)
+- Proper cleanup of timers and event handlers
+- Connection state tracking
+
+### Gift Streak System
+The plugin maintains a Map of active gift streaks:
+
+```javascript
+{
+  "username_giftId": {
+    timer: setTimeout,
+    lastCount: number,
+    data: originalEventData
+  }
+}
+```
+
+When a repeatable gift event comes in:
+1. Clear existing timer if present
+2. Update last count
+3. Set new 5-second finalization timer
+4. If `repeatEnd` is received, finalize immediately
+
+### Session Management
+Session data resets on stream end:
+- Viewer counts
+- Like/diamond totals
+- Follower tracking (Set)
+- Last user tracking
+
+## Customization
+
+### Adjust Gift Finalization Timeout
+
+In `main.js`, line ~92:
+
+```javascript
+this.GIFT_FINALIZE_TIMEOUT = 5000; // Change to your preference (milliseconds)
+```
+
+### Enable Chat Alerts
+
+In the `handleChatEvent` method (line ~578), uncomment:
+
+```javascript
+await this.lumia.triggerAlert({
+	alert: ALERT_TYPES.CHAT,
+	extraSettings: {
+		...this.buildAlertVariables(),
+		username,
+		displayname,
+		message,
+		avatar,
+	},
+});
+```
+
+### Add Custom Variables
+
+1. Add to `manifest.json` under `config.variables`
+2. Update session data structure in `createEmptySession()`
+3. Set values in appropriate event handlers
+4. Include in `buildAlertVariables()`
+
+### Modify WebSocket URL
+
+Change the `buildWebSocketUrl()` method to use different instances or endpoints.
+
+## Comparison to Other Integrations
+
+### vs. Built-in TikTok Integration
+The built-in TikTok integration in Lumia Stream uses the `tiktok-live-connector` library and connects directly to TikTok. This plugin uses Tikfinity as a proxy service, which may provide:
+
+- More stability (if TikTok changes their API)
+- Additional features from Tikfinity
+- Potential rate limit advantages
+
+### vs. Rumble Plugin
+- **Rumble**: Polling-based (REST API every N seconds)
+- **Tikfinity**: WebSocket-based (real-time events)
+
+Tikfinity provides instant notifications, while Rumble requires periodic polling. However, Tikfinity requires an active WebSocket connection.
+
+## Troubleshooting
+
+### Connection Fails
+1. Verify your TikTok username is correct
+2. Make sure you're going LIVE on TikTok
+3. Check if you need a Tikfinity Pro API key
+4. Check Lumia logs for specific error messages
+
+### Reconnection Loop
+1. Check your reconnect interval setting
+2. Verify Tikfinity service status
+3. Ensure your API key is valid (if using Pro)
+
+### Missing Events
+1. Verify alerts are enabled in Lumia
+2. Check that the stream is actually live
+3. Review Lumia logs for processing errors
+
+### Gift Alerts Delayed
+This is expected behavior due to gift streak handling. The plugin waits 5 seconds after the last gift in a combo before triggering the alert with the total count.
+
+## TypeScript Version
+
+To convert to TypeScript:
+
+1. Rename `main.js` to `main.ts`
+2. Add type definitions for the Plugin SDK
+3. Create a `tsconfig.json`:
+
+```json
+{
+	"compilerOptions": {
+		"target": "ES2020",
+		"module": "CommonJS",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"outDir": "dist",
+		"rootDir": "."
+	},
+	"include": ["main.ts"]
+}
+```
+
+4. Compile with `npx tsc`
+5. Update `manifest.json` to point to `dist/main.js`
+
+## Contributing
+
+This is an example plugin. Feel free to modify and enhance it for your needs. If you add useful features, consider sharing them with the Lumia Stream community!
+
+## License
+
+MIT License
+
+## Support
+
+- **Tikfinity**: [https://tikfinity.zerody.one](https://tikfinity.zerody.one)
+- **Lumia Stream**: [https://lumiastream.com](https://lumiastream.com)
+- **Lumia Discord**: [Join Discord](https://discord.gg/lumiastream)
+
+## Credits
+
+Created based on the Lumia Stream Plugin SDK and inspired by the built-in TikTok integration and Rumble plugin example.
+
+```
+
+## tikfinity/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+// Alert identifiers aligned with Lumia's built-in conventions
+const ALERT_TYPES = {
+	STREAM_START: "streamStarted",
+	STREAM_END: "streamEnded",
+	CHAT: "chat",
+	GIFT: "gift",
+	FOLLOW: "follow",
+	SHARE: "share",
+	LIKE: "like",
+	SUBSCRIBE: "subscribe",
+};
+
+// Tikfinity WebSocket event types (based on TikTok LIVE events)
+const EVENT_TYPES = {
+	CONNECTED: "connected",
+	DISCONNECTED: "disconnected",
+	STREAM_END: "streamEnd",
+	ROOM_USER: "roomUser",
+	MEMBER: "member",
+	CHAT: "chat",
+	GIFT: "gift",
+	FOLLOW: "follow",
+	SHARE: "share",
+	LIKE: "like",
+	SUBSCRIBE: "subscribe",
+	ERROR: "error",
+};
+
+// Default reconnect settings
+const DEFAULT_RECONNECT_INTERVAL = 30;
+const MIN_RECONNECT_INTERVAL = 10;
+const MAX_RECONNECT_INTERVAL = 300;
+
+// Helper functions for data normalization
+function coerceString(value, fallback = "") {
+	if (typeof value === "string") {
+		return value;
+	}
+	if (value === null || value === undefined) {
+		return fallback;
+	}
+	return String(value);
+}
+
+function coerceNumber(value, fallback = 0) {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : fallback;
+	}
+	if (typeof value === "boolean") {
+		return value ? 1 : 0;
+	}
+	return fallback;
+}
+
+function coerceBoolean(value, fallback = false) {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (typeof value === "number") {
+		return value !== 0;
+	}
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (normalized === "true" || normalized === "yes" || normalized === "1") {
+			return true;
+		}
+		if (normalized === "false" || normalized === "no" || normalized === "0") {
+			return false;
+		}
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return parsed !== 0;
+		}
+	}
+	return fallback;
+}
+
+function normalizeAvatar(value) {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : "";
+	}
+
+	if (value && typeof value === "object") {
+		return (
+			coerceString(value.url, "") ||
+			coerceString(value.avatar, "") ||
+			coerceString(value.profilePictureUrl, "") ||
+			coerceString(value.image, "")
+		);
+	}
+
+	return "";
+}
+
+class TikfinityPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+
+		this.ws = null;
+		this.reconnectTimeoutId = null;
+		this.isConnecting = false;
+		this.isManuallyDisconnected = false;
+
+		this.sessionData = this.createEmptySession();
+		this.seenFollowers = new Set();
+		this.giftStreaks = new Map();
+		this.GIFT_FINALIZE_TIMEOUT = 5000; // 5 seconds
+	}
+
+	createEmptySession() {
+		return {
+			live: false,
+			viewers: 0,
+			totalViewers: 0,
+			title: "",
+			likes: 0,
+			diamonds: 0,
+			followers: 0,
+			shares: 0,
+			lastChatter: "",
+			lastGifter: "",
+			lastFollower: "",
+		};
+	}
+
+	get currentSettings() {
+		return this.settings || {};
+	}
+
+	get username() {
+		return this.extractUsername(this.currentSettings.username);
+	}
+
+	get apiKey() {
+		return this.extractApiKey(this.currentSettings.apiKey);
+	}
+
+	extractUsername(value) {
+		if (typeof value !== "string") {
+			return undefined;
+		}
+		const trimmed = value.trim().replace(/^@/, "");
+		return trimmed.length ? trimmed : undefined;
+	}
+
+	extractApiKey(value) {
+		if (typeof value !== "string") {
+			return undefined;
+		}
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : undefined;
+	}
+
+	async onload() {
+		await this.lumia.addLog("[Tikfinity] Plugin loading...");
+
+		if (this.username) {
+			await this.connect({ showToast: false });
+		}
+
+		await this.lumia.addLog("[Tikfinity] Plugin loaded");
+	}
+
+	async onunload() {
+		await this.lumia.addLog("[Tikfinity] Plugin unloading...");
+		this.isManuallyDisconnected = true;
+		await this.disconnect(false);
+		await this.lumia.addLog("[Tikfinity] Plugin unloaded");
+	}
+
+	async onsettingsupdate(settings, previousSettings) {
+		const next = settings || {};
+		const previous = previousSettings || {};
+
+		const nextUsername = this.extractUsername(next.username);
+		const prevUsername = this.extractUsername(previous.username);
+
+		const nextApiKey = this.extractApiKey(next.apiKey);
+		const prevApiKey = this.extractApiKey(previous.apiKey);
+
+		const usernameChanged = nextUsername !== prevUsername;
+		const apiKeyChanged = nextApiKey !== prevApiKey;
+
+		if (!nextUsername) {
+			await this.disconnect(false);
+			return;
+		}
+
+		if (!this.ws || this.ws.readyState !== 1) {
+			await this.connect({ showToast: false });
+			return;
+		}
+
+		if (usernameChanged || apiKeyChanged) {
+			await this.disconnect(false);
+			await this.connect({ showToast: false });
+		}
+	}
+
+	async actions(config = {}) {
+		const actionList = Array.isArray(config.actions) ? config.actions : [];
+
+		if (!actionList.length) {
+			return;
+		}
+
+		for (const action of actionList) {
+			try {
+				switch (action.type) {
+					case "manual_connect": {
+						await this.connect({ showToast: true });
+						await this.lumia.addLog("[Tikfinity] Manual connect triggered");
+						break;
+					}
+
+					case "manual_disconnect": {
+						this.isManuallyDisconnected = true;
+						await this.disconnect(true);
+						await this.lumia.addLog("[Tikfinity] Manual disconnect triggered");
+						break;
+					}
+
+					case "test_alert": {
+						await this.lumia.triggerAlert({
+							alert: ALERT_TYPES.STREAM_START,
+							extraSettings: {
+								...this.buildAlertVariables(),
+								title: this.sessionData.title || "Test Stream",
+								viewers: this.sessionData.viewers,
+							},
+						});
+						await this.lumia.addLog("[Tikfinity] Test alert triggered");
+						break;
+					}
+
+					default: {
+						await this.lumia.addLog(
+							`[Tikfinity] Unknown action type: ${action.type}`,
+						);
+					}
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await this.lumia.addLog(`[Tikfinity] Action failed: ${message}`);
+			}
+		}
+	}
+
+	async validateAuth(data = {}) {
+		try {
+			const username = this.extractUsername(data.username);
+			if (!username) {
+				return false;
+			}
+			// For now, we just validate that the username exists
+			// In the future, we could ping Tikfinity API to verify
+			return true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(`[Tikfinity] Auth validation failed: ${message}`);
+			return false;
+		}
+	}
+
+	buildWebSocketUrl() {
+		const username = this.username;
+		if (!username) {
+			throw new Error("Username is required to connect");
+		}
+
+		// Tikfinity WebSocket endpoint format based on the documentation
+		// Using instance "1" as default, can be configurable if needed
+		const instance = "1";
+		const baseUrl = `wss://tikfinity-cws-${instance}.zerody.one`;
+
+		// Add API key if provided
+		const apiKey = this.apiKey;
+		if (apiKey) {
+			return `${baseUrl}/?uniqueId=${encodeURIComponent(username)}&apiKey=${encodeURIComponent(apiKey)}`;
+		}
+
+		return `${baseUrl}/?uniqueId=${encodeURIComponent(username)}`;
+	}
+
+	async connect(options = {}) {
+		const { showToast = true } = options;
+
+		if (this.isConnecting) {
+			await this.lumia.addLog("[Tikfinity] Connection already in progress");
+			return;
+		}
+
+		if (!this.username) {
+			await this.lumia.addLog("[Tikfinity] Missing username, cannot connect");
+			if (showToast) {
+				await this.lumia.showToast({
+					message: "TikTok username required to connect",
+				});
+			}
+			return;
+		}
+
+		if (this.ws && this.ws.readyState === 1) {
+			await this.lumia.addLog("[Tikfinity] Already connected");
+			return;
+		}
+
+		try {
+			this.isConnecting = true;
+			this.isManuallyDisconnected = false;
+
+			const wsUrl = this.buildWebSocketUrl();
+			await this.lumia.addLog(`[Tikfinity] Connecting to ${wsUrl}`);
+
+			this.ws = new WebSocket(wsUrl);
+
+			this.ws.onopen = () => {
+				void this.handleOpen(showToast);
+			};
+
+			this.ws.onmessage = (event) => {
+				void this.handleMessage(event);
+			};
+
+			this.ws.onerror = (error) => {
+				void this.handleError(error);
+			};
+
+			this.ws.onclose = () => {
+				void this.handleClose();
+			};
+		} catch (error) {
+			this.isConnecting = false;
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(`[Tikfinity] Connection error: ${message}`);
+			if (showToast) {
+				await this.lumia.showToast({
+					message: `Failed to connect: ${message}`,
+				});
+			}
+		}
+	}
+
+	async disconnect(showToast = true) {
+		if (this.reconnectTimeoutId) {
+			clearTimeout(this.reconnectTimeoutId);
+			this.reconnectTimeoutId = null;
+		}
+
+		if (this.ws) {
+			this.ws.onclose = null; // Prevent reconnection
+			this.ws.close();
+			this.ws = null;
+		}
+
+		// Clear all gift streak timers
+		for (const streak of this.giftStreaks.values()) {
+			clearTimeout(streak.timer);
+		}
+		this.giftStreaks.clear();
+
+		this.isConnecting = false;
+
+		if (showToast) {
+			await this.lumia.showToast({ message: "Disconnected from Tikfinity" });
+		}
+
+		await this.lumia.updateConnection(false);
+		await this.updateVariable("tikfinity_connected", false);
+	}
+
+	async handleOpen(showToast = true) {
+		this.isConnecting = false;
+		await this.lumia.addLog("[Tikfinity] WebSocket connected");
+
+		if (showToast) {
+			await this.lumia.showToast({
+				message: `Connected to Tikfinity for @${this.username}`,
+			});
+		}
+
+		await this.lumia.updateConnection(true);
+		await this.updateVariable("tikfinity_connected", true);
+	}
+
+	async handleMessage(event) {
+		try {
+			const data = JSON.parse(event.data);
+			await this.processEvent(data);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(`[Tikfinity] Error processing message: ${message}`);
+		}
+	}
+
+	async handleError(error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await this.lumia.addLog(`[Tikfinity] WebSocket error: ${message}`);
+	}
+
+	async handleClose() {
+		await this.lumia.addLog("[Tikfinity] WebSocket disconnected");
+		await this.lumia.updateConnection(false);
+		await this.updateVariable("tikfinity_connected", false);
+
+		// Only attempt reconnection if not manually disconnected
+		if (!this.isManuallyDisconnected) {
+			await this.scheduleReconnect();
+		}
+	}
+
+	async scheduleReconnect() {
+		if (this.reconnectTimeoutId) {
+			return;
+		}
+
+		const interval = this.normalizeReconnectInterval(
+			this.currentSettings.reconnectInterval,
+		);
+
+		await this.lumia.addLog(
+			`[Tikfinity] Scheduling reconnect in ${interval} seconds`,
+		);
+
+		this.reconnectTimeoutId = setTimeout(() => {
+			this.reconnectTimeoutId = null;
+			void this.connect({ showToast: false });
+		}, interval * 1000);
+	}
+
+	normalizeReconnectInterval(value) {
+		if (typeof value === "number" && Number.isFinite(value)) {
+			return this.clampInterval(value);
+		}
+
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return this.clampInterval(parsed);
+		}
+
+		return DEFAULT_RECONNECT_INTERVAL;
+	}
+
+	clampInterval(value) {
+		const rounded = Math.round(value);
+		return Math.min(
+			Math.max(rounded, MIN_RECONNECT_INTERVAL),
+			MAX_RECONNECT_INTERVAL,
+		);
+	}
+
+	async processEvent(data) {
+		const eventType = data.event || data.type;
+
+		if (!eventType) {
+			return;
+		}
+
+		switch (eventType) {
+			case EVENT_TYPES.CONNECTED:
+				await this.handleConnectedEvent(data);
+				break;
+
+			case EVENT_TYPES.STREAM_END:
+				await this.handleStreamEndEvent(data);
+				break;
+
+			case EVENT_TYPES.ROOM_USER:
+				await this.handleRoomUserEvent(data);
+				break;
+
+			case EVENT_TYPES.MEMBER:
+				await this.handleMemberEvent(data);
+				break;
+
+			case EVENT_TYPES.CHAT:
+				await this.handleChatEvent(data);
+				break;
+
+			case EVENT_TYPES.GIFT:
+				await this.handleGiftEvent(data);
+				break;
+
+			case EVENT_TYPES.FOLLOW:
+				await this.handleFollowEvent(data);
+				break;
+
+			case EVENT_TYPES.SHARE:
+				await this.handleShareEvent(data);
+				break;
+
+			case EVENT_TYPES.LIKE:
+				await this.handleLikeEvent(data);
+				break;
+
+			case EVENT_TYPES.SUBSCRIBE:
+				await this.handleSubscribeEvent(data);
+				break;
+
+			case EVENT_TYPES.ERROR:
+				await this.handleErrorEvent(data);
+				break;
+
+			default:
+				await this.lumia.addLog(
+					`[Tikfinity] Unknown event type: ${eventType}`,
+				);
+		}
+	}
+
+	async handleConnectedEvent(data) {
+		// Stream has started
+		if (!this.sessionData.live) {
+			this.sessionData.live = true;
+			this.sessionData.title = coerceString(data.title || data.roomTitle, "");
+
+			await this.updateVariable("tikfinity_live", true);
+			await this.updateVariable("tikfinity_title", this.sessionData.title);
+
+			await this.lumia.triggerAlert({
+				alert: ALERT_TYPES.STREAM_START,
+				dynamic: {
+					name: this.sessionData.title,
+				},
+				extraSettings: {
+					...this.buildAlertVariables(),
+					title: this.sessionData.title,
+				},
+			});
+		}
+	}
+
+	async handleStreamEndEvent(data) {
+		if (this.sessionData.live) {
+			this.sessionData.live = false;
+
+			await this.updateVariable("tikfinity_live", false);
+
+			await this.lumia.triggerAlert({
+				alert: ALERT_TYPES.STREAM_END,
+				extraSettings: {
+					...this.buildAlertVariables(),
+					viewers: this.sessionData.viewers,
+					likes: this.sessionData.likes,
+					diamonds: this.sessionData.diamonds,
+					followers: this.sessionData.followers,
+					shares: this.sessionData.shares,
+				},
+			});
+
+			// Reset session data
+			this.sessionData = this.createEmptySession();
+			this.seenFollowers.clear();
+		}
+	}
+
+	async handleRoomUserEvent(data) {
+		const viewers = coerceNumber(data.viewerCount || data.viewers, 0);
+		this.sessionData.viewers = viewers;
+		await this.updateVariable("tikfinity_viewers", viewers);
+	}
+
+	async handleMemberEvent(data) {
+		const totalViewers = this.sessionData.totalViewers + 1;
+		this.sessionData.totalViewers = totalViewers;
+		await this.updateVariable("tikfinity_total_viewers", totalViewers);
+	}
+
+	async handleChatEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+		const message = coerceString(data.comment || data.message, "");
+		const displayname = coerceString(data.nickname || data.displayName || username, "");
+		const avatar = normalizeAvatar(
+			data.profilePictureUrl || data.avatar || data.profilePicture,
+		);
+
+		if (!username || !message) {
+			return;
+		}
+
+		this.sessionData.lastChatter = username;
+		await this.updateVariable("tikfinity_last_chatter", username);
+
+		// Display chat in Lumia
+		await this.lumia.displayChat({
+			platform: "tikfinity",
+			username,
+			displayname,
+			message,
+			avatar: avatar || undefined,
+			messageId: `tikfinity-${Date.now()}-${username}`,
+		});
+
+		// Optionally trigger chat alert
+		// await this.lumia.triggerAlert({
+		// 	alert: ALERT_TYPES.CHAT,
+		// 	extraSettings: {
+		// 		...this.buildAlertVariables(),
+		// 		username,
+		// 		displayname,
+		// 		message,
+		// 		avatar,
+		// 	},
+		// });
+	}
+
+	finalizeGiftStreak = (giftKey) => {
+		const streak = this.giftStreaks.get(giftKey);
+		if (!streak) return;
+
+		const { data } = streak;
+		const username = coerceString(data.uniqueId || data.username, "");
+		const giftName = coerceString(data.giftName, "Gift");
+		const diamondCount = coerceNumber(data.diamondCount || data.diamonds, 1);
+		const finalRepeatCount = streak.lastCount || coerceNumber(data.repeatCount, 1);
+		const totalDiamonds = diamondCount * finalRepeatCount;
+
+		this.sessionData.diamonds += totalDiamonds;
+		this.sessionData.lastGifter = username;
+
+		void this.updateVariable("tikfinity_diamonds", this.sessionData.diamonds);
+		void this.updateVariable("tikfinity_last_gifter", username);
+
+		void this.lumia.triggerAlert({
+			alert: ALERT_TYPES.GIFT,
+			dynamic: {
+				value: totalDiamonds,
+				name: giftName,
+			},
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+				giftName,
+				giftAmount: finalRepeatCount,
+				diamonds: totalDiamonds,
+				diamondCount,
+			},
+		});
+
+		clearTimeout(streak.timer);
+		this.giftStreaks.delete(giftKey);
+	};
+
+	async handleGiftEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+		const giftId = coerceString(data.giftId, "");
+		const giftName = coerceString(data.giftName, "Gift");
+		const diamondCount = coerceNumber(data.diamondCount || data.diamonds, 1);
+		const repeatCount = coerceNumber(data.repeatCount, 1);
+		const repeatEnd = coerceBoolean(data.repeatEnd, false);
+		const giftType = coerceNumber(data.giftType, 0);
+
+		if (!username) {
+			return;
+		}
+
+		const giftKey = `${username}_${giftId}`;
+
+		// Handle repeatable gifts with streak management (giftType 1)
+		if (giftType === 1 && !repeatEnd) {
+			const existingStreak = this.giftStreaks.get(giftKey);
+
+			if (existingStreak) {
+				clearTimeout(existingStreak.timer);
+			}
+
+			const timer = setTimeout(() => {
+				this.finalizeGiftStreak(giftKey);
+			}, this.GIFT_FINALIZE_TIMEOUT);
+
+			this.giftStreaks.set(giftKey, {
+				timer,
+				lastCount: repeatCount,
+				data,
+			});
+
+			return;
+		}
+
+		// Handle end of streak or non-repeatable gifts
+		if (giftType === 1 && repeatEnd) {
+			const existingStreak = this.giftStreaks.get(giftKey);
+			if (existingStreak) {
+				clearTimeout(existingStreak.timer);
+				this.giftStreaks.delete(giftKey);
+			}
+		}
+
+		// Process non-repeatable gifts or final gift in streak
+		if (giftType !== 1 || repeatEnd) {
+			const totalDiamonds = diamondCount * repeatCount;
+
+			this.sessionData.diamonds += totalDiamonds;
+			this.sessionData.lastGifter = username;
+
+			await this.updateVariable("tikfinity_diamonds", this.sessionData.diamonds);
+			await this.updateVariable("tikfinity_last_gifter", username);
+
+			await this.lumia.triggerAlert({
+				alert: ALERT_TYPES.GIFT,
+				dynamic: {
+					value: totalDiamonds,
+					name: giftName,
+				},
+				extraSettings: {
+					...this.buildAlertVariables(),
+					username,
+					giftName,
+					giftAmount: repeatCount,
+					diamonds: totalDiamonds,
+					diamondCount,
+				},
+			});
+		}
+	}
+
+	async handleFollowEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+
+		if (!username || this.seenFollowers.has(username)) {
+			return;
+		}
+
+		this.seenFollowers.add(username);
+		this.sessionData.followers++;
+		this.sessionData.lastFollower = username;
+
+		await this.updateVariable("tikfinity_followers", this.sessionData.followers);
+		await this.updateVariable("tikfinity_last_follower", username);
+
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.FOLLOW,
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+			},
+		});
+	}
+
+	async handleShareEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+
+		if (!username) {
+			return;
+		}
+
+		this.sessionData.shares++;
+
+		await this.updateVariable("tikfinity_shares", this.sessionData.shares);
+
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.SHARE,
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+			},
+		});
+	}
+
+	async handleLikeEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+		const likeCount = coerceNumber(data.likeCount, 1);
+		const totalLikeCount = coerceNumber(data.totalLikeCount, 0);
+
+		this.sessionData.likes = totalLikeCount || this.sessionData.likes + likeCount;
+
+		await this.updateVariable("tikfinity_likes", this.sessionData.likes);
+
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.LIKE,
+			dynamic: {
+				value: likeCount,
+				total: this.sessionData.likes,
+			},
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+				likeCount,
+				totalLikes: this.sessionData.likes,
+			},
+		});
+	}
+
+	async handleSubscribeEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+
+		if (!username) {
+			return;
+		}
+
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.SUBSCRIBE,
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+			},
+		});
+	}
+
+	async handleErrorEvent(data) {
+		const message = coerceString(data.message || data.error, "Unknown error");
+		await this.lumia.addLog(`[Tikfinity] Server error: ${message}`);
+	}
+
+	buildAlertVariables() {
+		return {
+			tikfinity_connected: this.ws?.readyState === 1,
+			tikfinity_live: this.sessionData.live,
+			tikfinity_viewers: this.sessionData.viewers,
+			tikfinity_total_viewers: this.sessionData.totalViewers,
+			tikfinity_title: this.sessionData.title,
+			tikfinity_likes: this.sessionData.likes,
+			tikfinity_diamonds: this.sessionData.diamonds,
+			tikfinity_followers: this.sessionData.followers,
+			tikfinity_shares: this.sessionData.shares,
+			tikfinity_last_chatter: this.sessionData.lastChatter,
+			tikfinity_last_gifter: this.sessionData.lastGifter,
+			tikfinity_last_follower: this.sessionData.lastFollower,
+		};
+	}
+
+	async updateVariable(name, value) {
+		try {
+			await this.lumia.setVariable(name, value);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`[Tikfinity] Error updating variable ${name}: ${message}`,
+			);
+		}
+	}
+}
+
+module.exports = TikfinityPlugin;
+
+```
+
+## tikfinity/manifest.json
+
+```
+{
+	"id": "tikfinity",
+	"name": "Tikfinity TikTok LIVE",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "https://github.com/LumiaStream/tikfinity-plugin",
+	"description": "Connect to TikTok LIVE streams via Tikfinity Desktop WebSocket service to receive real-time events like chat, gifts, follows, shares, likes, and more.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "platforms",
+	"icon": "tikfinity-icon.png",
+	"changelog": "# Changelog\n\n## 1.0.0\n- Initial release\n- WebSocket connection to Tikfinity API\n- Real-time event processing for chat, gifts, follows, shares, likes\n- Stream start/end detection\n- Viewer count tracking\n- Template variable updates\n- Manual connection/disconnection handlers",
+	"config": {
+		"settings": [
+			{
+				"key": "username",
+				"label": "TikTok Username",
+				"type": "text",
+				"placeholder": "Enter your TikTok username (without @)",
+				"helperText": "Your TikTok username to monitor for LIVE events",
+				"required": true
+			},
+			{
+				"key": "apiKey",
+				"label": "Tikfinity API Key (Optional)",
+				"type": "text",
+				"placeholder": "Enter your Tikfinity API key for Pro features",
+				"helperText": "Optional: Get your API key from https://tikfinity.zerody.one for Pro features",
+				"required": false
+			},
+			{
+				"key": "reconnectInterval",
+				"label": "Reconnect Interval (seconds)",
+				"type": "number",
+				"defaultValue": 30,
+				"helperText": "How long to wait before attempting reconnection (10-300 seconds)"
+			}
+		],
+		"settings_tutorial": "---\n### 🔑 Setup Your Tikfinity Connection\n1) Enter your TikTok username (the one you use to go LIVE).\n2) (Optional) Get a Pro API key from https://tikfinity.zerody.one for enhanced features.\n3) Click **Save** to establish the connection.\n---\n### ✅ Verify Connection\nThe plugin will attempt to connect when you go LIVE on TikTok.\n---\n### ⏱️ Adjust Reconnection\nSet a reconnect interval for automatic reconnection attempts (10–300 seconds).\n---",
+		"actions_tutorial": "---\n### 🔗 Manual Connect\nUse this to manually establish a connection to Tikfinity.\n---\n### ❌ Manual Disconnect\nUse this to manually disconnect from Tikfinity.\n---\n### 🚨 Test Alert\nFire a test alert to verify your alert/overlay setup.\n---",
+		"actions": [
+			{
+				"type": "manual_connect",
+				"label": "Manual Connect",
+				"description": "Manually connect to Tikfinity WebSocket",
+				"fields": []
+			},
+			{
+				"type": "manual_disconnect",
+				"label": "Manual Disconnect",
+				"description": "Manually disconnect from Tikfinity",
+				"fields": []
+			},
+			{
+				"type": "test_alert",
+				"label": "Test Alert",
+				"description": "Trigger a test alert",
+				"fields": []
+			}
+		],
+		"variables": [
+			{
+				"name": "tikfinity_connected",
+				"description": "Whether the Tikfinity connection is active",
+				"value": false
+			},
+			{
+				"name": "tikfinity_live",
+				"description": "Whether the TikTok stream is currently live",
+				"value": false
+			},
+			{
+				"name": "tikfinity_viewers",
+				"description": "Current number of viewers watching the stream",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_title",
+				"description": "Current stream title",
+				"value": ""
+			},
+			{
+				"name": "tikfinity_total_viewers",
+				"description": "Total viewers that have joined the stream session",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_likes",
+				"description": "Total likes received during the stream",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_diamonds",
+				"description": "Total diamonds received during the stream",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_followers",
+				"description": "Session follower count",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_shares",
+				"description": "Number of shares during the stream",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_last_chatter",
+				"description": "Username of the last person to chat",
+				"value": ""
+			},
+			{
+				"name": "tikfinity_last_gifter",
+				"description": "Username of the last person to send a gift",
+				"value": ""
+			},
+			{
+				"name": "tikfinity_last_follower",
+				"description": "Username of the last person to follow",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Stream Started",
+				"key": "streamStarted",
+				"acceptedVariables": [
+					"tikfinity_live",
+					"tikfinity_viewers",
+					"tikfinity_title"
+				],
+				"defaultMessage": "{{username}} has started streaming on TikTok!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Stream Ended",
+				"key": "streamEnded",
+				"acceptedVariables": [
+					"tikfinity_viewers",
+					"tikfinity_likes",
+					"tikfinity_diamonds",
+					"tikfinity_followers",
+					"tikfinity_shares"
+				],
+				"defaultMessage": "{{username}} has ended their TikTok stream.",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Chat Message",
+				"key": "chat",
+				"acceptedVariables": ["tikfinity_last_chatter"],
+				"defaultMessage": "{{username}}: {{message}}",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Gift",
+				"key": "gift",
+				"acceptedVariables": ["tikfinity_last_gifter", "tikfinity_diamonds"],
+				"defaultMessage": "{{username}} sent {{giftName}} x{{giftAmount}}!",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Gift diamond value is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Follow",
+				"key": "follow",
+				"acceptedVariables": ["tikfinity_last_follower", "tikfinity_followers"],
+				"defaultMessage": "{{username}} followed!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Share",
+				"key": "share",
+				"acceptedVariables": ["tikfinity_shares"],
+				"defaultMessage": "{{username}} shared the stream!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Like",
+				"key": "like",
+				"acceptedVariables": ["tikfinity_likes"],
+				"defaultMessage": "{{username}} liked the stream!",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Like count is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Subscribe",
+				"key": "subscribe",
+				"acceptedVariables": [],
+				"defaultMessage": "{{username}} subscribed!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			}
+		]
+	}
+}
+
+```
+
+## tikfinity/package.json
+
+```
+{
+	"name": "lumia-tikfinity",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that connects to TikTok LIVE streams via Tikfinity WebSocket service to receive real-time events.",
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {

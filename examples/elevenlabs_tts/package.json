@@ -1,8 +1,8 @@
 {
-	"name": "lumia-elevenlabs-tts-example",
+	"name": "lumia-elevenlabs-tts",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Example ElevenLabs TTS plugin for Lumia Stream.",
+	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
 		"@lumiastream/plugin": "^0.1.18"

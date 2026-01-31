@@ -1,8 +1,8 @@
 {
-	"name": "lumia-example-rumble",
+	"name": "lumia-rumble",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Example Lumia Stream plugin that monitors a Rumble livestream and surfaces follower, rant, reaction, and subscription activity.",
+	"description": "Lumia Stream plugin that monitors a Rumble livestream and surfaces follower, rant, reaction, and subscription activity.",
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
