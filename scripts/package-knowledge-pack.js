@@ -16,7 +16,6 @@ const defaultEntries = [
 	"docs/manifest-guide.md",
 	"docs/api-reference.md",
 	"docs/field-types-reference.md",
-	"docs/custom-gpt-plugin-guide.md",
 	"examples",
 ];
 
