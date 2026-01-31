@@ -4970,6 +4970,650 @@ module.exports = DivoomControllerPlugin;
 
 ```
 
+## elevenlabs_tts/README.md
+
+```
+# ElevenLabs TTS Example
+
+This example plugin generates ElevenLabs text-to-speech audio and plays it in Lumia Stream using `playAudio`.
+
+## Setup
+
+1. Create an ElevenLabs API key in your account dashboard.
+2. Copy a Voice ID from your Voices list.
+3. Paste the API key into settings and provide the Voice ID when you trigger **Speak**.
+
+## Usage
+
+- Trigger the **Speak** action and provide a message.
+- Trigger **Stream Music** to generate a music clip from a prompt (or composition plan JSON).
+- Optional action fields let you override voice/model/output format and tweak voice settings.
+
+## Notes
+
+- Audio is downloaded from the ElevenLabs streaming endpoints, kept in memory as a blob URL, then played via `playAudio`.
+- Playback is always awaited so the blob URL can be revoked immediately after audio finishes.
+
+```
+
+## elevenlabs_tts/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+const fs = require("fs/promises");
+const path = require("path");
+const os = require("os");
+
+const DEFAULTS = {
+	modelId: "eleven_multilingual_v2",
+	outputFormat: "mp3_44100_128",
+	stability: 0.5,
+	similarityBoost: 0.5,
+	style: 0.0,
+	speakerBoost: true,
+	volume: 100,
+};
+
+const MODEL_CHAR_LIMITS = {
+	eleven_v3: 5000,
+	eleven_flash_v2_5: 40000,
+	eleven_flash_v2: 30000,
+	eleven_turbo_v2_5: 40000,
+	eleven_turbo_v2: 30000,
+	eleven_multilingual_v2: 10000,
+	eleven_multilingual_v1: 10000,
+	eleven_english_sts_v2: 10000,
+	eleven_english_sts_v1: 10000,
+};
+
+const toNumber = (value, fallback) => {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : fallback;
+	}
+	return fallback;
+};
+
+const toBoolean = (value, fallback) => {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (["true", "yes", "1", "on"].includes(normalized)) {
+			return true;
+		}
+		if (["false", "no", "0", "off"].includes(normalized)) {
+			return false;
+		}
+	}
+	return fallback;
+};
+
+const trimString = (value, fallback = "") => {
+	if (typeof value !== "string") {
+		return fallback;
+	}
+	const trimmed = value.trim();
+	return trimmed.length ? trimmed : fallback;
+};
+
+const getCharLimitForModel = (modelId) => {
+	if (typeof modelId !== "string") {
+		return null;
+	}
+	const normalized = modelId.trim().toLowerCase();
+	return MODEL_CHAR_LIMITS[normalized] ?? null;
+};
+
+const getOptionalLimit = (value) => {
+	const limit = toNumber(value, 0);
+	return Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : null;
+};
+
+const truncateText = (text, limit) => {
+	if (!limit || typeof text !== "string") {
+		return { text, truncated: false, limit: null };
+	}
+	if (text.length <= limit) {
+		return { text, truncated: false, limit };
+	}
+	return { text: text.slice(0, limit), truncated: true, limit };
+};
+
+const parseJson = (value) => {
+	if (typeof value !== "string" || !value.trim().length) {
+		return null;
+	}
+	try {
+		return JSON.parse(value);
+	} catch (_err) {
+		return null;
+	}
+};
+
+const buildVoiceSettings = ({
+	stability,
+	similarityBoost,
+	style,
+	speakerBoost,
+}) => {
+	const settings = {};
+	if (Number.isFinite(stability)) settings.stability = stability;
+	if (Number.isFinite(similarityBoost))
+		settings.similarity_boost = similarityBoost;
+	if (Number.isFinite(style)) settings.style = style;
+	if (typeof speakerBoost === "boolean")
+		settings.use_speaker_boost = speakerBoost;
+	return settings;
+};
+
+const getAudioMimeType = (outputFormat) => {
+	if (typeof outputFormat !== "string") {
+		return "audio/mpeg";
+	}
+	const normalized = outputFormat.toLowerCase();
+	if (normalized.includes("wav")) {
+		return "audio/wav";
+	}
+	return "audio/mpeg";
+};
+
+const getAudioExtension = (outputFormat) => {
+	if (typeof outputFormat !== "string") {
+		return "mp3";
+	}
+	const normalized = outputFormat.toLowerCase();
+	if (normalized.includes("wav")) {
+		return "wav";
+	}
+	return "mp3";
+};
+
+const getDesktopPath = () => {
+	const homeDir = os.homedir?.();
+	if (!homeDir) {
+		return null;
+	}
+	return path.join(homeDir, "Desktop");
+};
+
+const buildMusicFilename = (outputFormat) => {
+	const extension = getAudioExtension(outputFormat);
+	const now = new Date();
+	const stamp = [
+		now.getFullYear(),
+		String(now.getMonth() + 1).padStart(2, "0"),
+		String(now.getDate()).padStart(2, "0"),
+		"_",
+		String(now.getHours()).padStart(2, "0"),
+		String(now.getMinutes()).padStart(2, "0"),
+		String(now.getSeconds()).padStart(2, "0"),
+	].join("");
+	return `elevenlabs_music_${stamp}.${extension}`;
+};
+
+class ElevenLabsTTSPlugin extends Plugin {
+	async onload() {
+		await this.lumia.addLog("[ElevenLabs] Plugin loaded");
+	}
+
+	async onunload() {
+		await this.lumia.addLog("[ElevenLabs] Plugin unloaded");
+	}
+
+	getSettingsSnapshot() {
+		const raw = this.settings || {};
+		return {
+			apiKey: trimString(raw.apiKey),
+		};
+	}
+
+	async actions(config = {}) {
+		const actionList = Array.isArray(config.actions) ? config.actions : [];
+		if (!actionList.length) {
+			return;
+		}
+
+		for (const action of actionList) {
+			try {
+				const actionData =
+					action?.value ?? action?.data ?? action?.params ?? {};
+				if (action.type === "speak") {
+					await this.handleSpeak(actionData);
+				} else if (action.type === "stream_music") {
+					await this.handleStreamMusic(actionData);
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await this.lumia.addLog(`[ElevenLabs] Action failed: ${message}`);
+			}
+		}
+	}
+
+	async handleSpeak(data = {}) {
+		const settings = this.getSettingsSnapshot();
+		let message = trimString(data.message || data.text, "");
+		if (!message) {
+			await this.lumia.addLog("[ElevenLabs] Missing message text");
+			return;
+		}
+
+		const apiKey = settings.apiKey;
+		if (!apiKey) {
+			await this.lumia.addLog("[ElevenLabs] Missing API key");
+			return;
+		}
+
+		const voiceId = trimString(data.voiceId, "");
+		if (!voiceId) {
+			await this.lumia.addLog("[ElevenLabs] Missing Voice ID");
+			return;
+		}
+		const modelId = trimString(data.modelId, DEFAULTS.modelId);
+		const modelLimit = getCharLimitForModel(modelId);
+		const userLimit = getOptionalLimit(data.maxChars);
+		const effectiveLimit =
+			modelLimit && userLimit
+				? Math.min(modelLimit, userLimit)
+				: (modelLimit ?? userLimit);
+		const truncatedMessage = truncateText(message, effectiveLimit);
+		message = truncatedMessage.text;
+		if (truncatedMessage.truncated) {
+			const limitLabel =
+				modelLimit && userLimit
+					? `${effectiveLimit} (min of model ${modelLimit} and user ${userLimit})`
+					: `${effectiveLimit}`;
+			await this.lumia.addLog(
+				`[ElevenLabs] Message exceeded ${limitLabel} characters; truncated.`,
+			);
+		}
+		const outputFormat = DEFAULTS.outputFormat;
+		const stability = Number.isFinite(toNumber(data.stability, NaN))
+			? toNumber(data.stability, NaN)
+			: DEFAULTS.stability;
+		const similarityBoost = Number.isFinite(toNumber(data.similarityBoost, NaN))
+			? toNumber(data.similarityBoost, NaN)
+			: DEFAULTS.similarityBoost;
+		const style = Number.isFinite(toNumber(data.style, NaN))
+			? toNumber(data.style, NaN)
+			: DEFAULTS.style;
+		const speakerBoost = DEFAULTS.speakerBoost;
+		const volume = Number.isFinite(toNumber(data.volume, NaN))
+			? toNumber(data.volume, NaN)
+			: DEFAULTS.volume;
+		const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream`;
+		const voiceSettings = buildVoiceSettings({
+			stability,
+			similarityBoost,
+			style,
+			speakerBoost,
+		});
+
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime");
+		}
+		if (
+			typeof Blob === "undefined" ||
+			typeof URL === "undefined" ||
+			typeof URL.createObjectURL !== "function"
+		) {
+			throw new Error("Blob/URL APIs are not available in this runtime");
+		}
+
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"xi-api-key": apiKey,
+			},
+			body: JSON.stringify({
+				text: message,
+				model_id: modelId,
+				voice_settings: voiceSettings,
+			}),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(
+				`ElevenLabs error ${response.status}: ${errorText || response.statusText}`,
+			);
+		}
+
+		const audioBuffer = await response.arrayBuffer();
+		const audioBlob = new Blob([audioBuffer], {
+			type: getAudioMimeType(outputFormat),
+		});
+		const audioUrl = URL.createObjectURL(audioBlob);
+
+		await this.lumia.playAudio({
+			path: audioUrl,
+			volume,
+			waitForAudioToStop: true,
+		});
+		URL.revokeObjectURL(audioUrl);
+	}
+
+	async handleStreamMusic(data = {}) {
+		const settings = this.getSettingsSnapshot();
+		const apiKey = settings.apiKey;
+		if (!apiKey) {
+			await this.lumia.addLog("[ElevenLabs] Missing API key");
+			return;
+		}
+
+		let prompt = trimString(data.prompt || data.text, "");
+		const compositionPlan = parseJson(
+			data.compositionPlanJson || data.composition_plan || "",
+		);
+		if (!prompt && !compositionPlan) {
+			await this.lumia.addLog(
+				"[ElevenLabs] Provide a prompt or composition plan",
+			);
+			return;
+		}
+
+		const modelId = trimString(data.modelId, "music_v1");
+		const promptLimit = getOptionalLimit(data.maxPromptChars);
+		if (promptLimit && prompt) {
+			const truncatedPrompt = truncateText(prompt, promptLimit);
+			prompt = truncatedPrompt.text;
+			if (truncatedPrompt.truncated) {
+				await this.lumia.addLog(
+					`[ElevenLabs] Prompt exceeded ${promptLimit} characters; truncated.`,
+				);
+			}
+		}
+		const outputFormat = DEFAULTS.outputFormat;
+		const musicLengthMs = toNumber(
+			data.musicLengthMs ?? data.music_length_ms,
+			15000,
+		);
+		const forceInstrumental = toBoolean(
+			data.forceInstrumental ?? data.force_instrumental,
+			true,
+		);
+		const volume = Number.isFinite(toNumber(data.volume, NaN))
+			? toNumber(data.volume, NaN)
+			: DEFAULTS.volume;
+		const saveToDesktop = toBoolean(data.saveToDesktop, false);
+		// Always wait for playback to finish so we can safely revoke the blob URL.
+
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime");
+		}
+		if (
+			typeof Blob === "undefined" ||
+			typeof URL === "undefined" ||
+			typeof URL.createObjectURL !== "function"
+		) {
+			throw new Error("Blob/URL APIs are not available in this runtime");
+		}
+
+		const endpoint = `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
+		const body = {
+			model_id: modelId,
+			music_length_ms: musicLengthMs,
+			force_instrumental: forceInstrumental,
+			...(prompt ? { prompt } : {}),
+			...(compositionPlan ? { composition_plan: compositionPlan } : {}),
+		};
+
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"xi-api-key": apiKey,
+			},
+			body: JSON.stringify(body),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(
+				`ElevenLabs music error ${response.status}: ${errorText || response.statusText}`,
+			);
+		}
+
+		const audioBuffer = await response.arrayBuffer();
+		const audioBlob = new Blob([audioBuffer], {
+			type: getAudioMimeType(outputFormat),
+		});
+		const audioUrl = URL.createObjectURL(audioBlob);
+
+		await this.lumia.playAudio({
+			path: audioUrl,
+			volume,
+			waitForAudioToStop: true,
+		});
+		URL.revokeObjectURL(audioUrl);
+
+		if (saveToDesktop) {
+			const desktopPath = getDesktopPath();
+			if (!desktopPath) {
+				await this.lumia.addLog("[ElevenLabs] Could not resolve Desktop path");
+				return;
+			}
+			const filename = buildMusicFilename(outputFormat);
+			const filePath = path.join(desktopPath, filename);
+			await fs.writeFile(filePath, Buffer.from(audioBuffer));
+			await this.lumia.addLog(`[ElevenLabs] Saved music to ${filePath}`);
+		}
+	}
+}
+
+module.exports = ElevenLabsTTSPlugin;
+
+```
+
+## elevenlabs_tts/manifest.json
+
+```
+{
+	"id": "elevenlabs_tts",
+	"name": "ElevenLabs TTS",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://elevenlabs.io",
+	"repository": "",
+	"description": "Generate ElevenLabs text-to-speech audio and play it inside Lumia Stream.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "examples",
+	"icon": "elevenlabs_icon.jpg",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Key ID (API Key)",
+				"type": "password",
+				"helperText": "Create an API key in your ElevenLabs dashboard.",
+				"required": true
+			}
+		],
+		"settings_tutorial": "---\n### \ud83d\udd10 Get Your ElevenLabs API Key\n1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key. Then copy the Key ID and paste it here.\n---\n### \ud83c\udf9b\ufe0f Voice Tuning (used in Actions)\n- **Stability**: Higher values make speech more consistent/predictable; lower values sound more dynamic.\n- **Similarity Boost**: Higher values keep output closer to the original voice; lower values allow more variation.\n- **Style**: Adds expressiveness/character; higher values can sound more dramatic.\n---",
+		"actions_tutorial": "---\n### \ud83d\udce2 Speak Action\n1) Enter the **Message** you want spoken.\n2) Paste the **Voice ID** you copied from ElevenLabs (find it at https://elevenlabs.io/app/voice-lab).\n3) Choose a **Model ID** (view model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n4) Adjust **Stability**, **Similarity Boost**, and **Style** if desired.\n---\n### \ud83c\udfb5 Stream Music Action\n1) Enter a **Prompt** (or provide a Composition Plan JSON).\n2) Choose the **Model ID** (see music model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n3) Set **Music Length** and **Volume**.\n---",
+		"actions": [
+			{
+				"type": "speak",
+				"label": "Speak",
+				"description": "Generate ElevenLabs TTS audio and play it in Lumia.",
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "text",
+						"defaultValue": "Hello from Lumia!",
+						"helperText": "Text to synthesize. Character limits vary per model; long messages will be truncated."
+					},
+					{
+						"key": "maxChars",
+						"label": "Max Characters (optional)",
+						"type": "number",
+						"helperText": "Leave empty to use the model limit; if set, the smaller limit is used.",
+						"min": 0,
+						"max": 100000
+					},
+					{
+						"key": "voiceId",
+						"label": "Voice ID",
+						"type": "text",
+						"defaultValue": "JBFqnCBsd6RMkjVDRZzb",
+						"helperText": "Find this in ElevenLabs Voice Lab or your Voices page."
+					},
+					{
+						"key": "modelId",
+						"label": "Model ID",
+						"type": "select",
+						"allowTyping": true,
+						"defaultValue": "eleven_multilingual_v2",
+						"helperText": "Choose a speech model or type a custom model ID.",
+						"options": [
+							{ "label": "Eleven v3", "value": "eleven_v3" },
+							{ "label": "Multilingual v2", "value": "eleven_multilingual_v2" },
+							{ "label": "Multilingual v1", "value": "eleven_multilingual_v1" },
+							{ "label": "Turbo v2.5", "value": "eleven_turbo_v2_5" },
+							{ "label": "Turbo v2", "value": "eleven_turbo_v2" },
+							{ "label": "Flash v2.5", "value": "eleven_flash_v2_5" },
+							{ "label": "Flash v2", "value": "eleven_flash_v2" }
+						]
+					},
+					{
+						"key": "stability",
+						"label": "Stability (0-1)",
+						"type": "number",
+						"defaultValue": 0.5,
+						"helperText": "Higher is more consistent; lower is more expressive.",
+						"min": 0,
+						"max": 1
+					},
+					{
+						"key": "similarityBoost",
+						"label": "Similarity Boost (0-1)",
+						"type": "number",
+						"defaultValue": 0.5,
+						"helperText": "Higher keeps closer to the original voice.",
+						"min": 0,
+						"max": 1
+					},
+					{
+						"key": "style",
+						"label": "Style (0-1)",
+						"type": "number",
+						"defaultValue": 0,
+						"helperText": "Higher adds more stylistic variation.",
+						"min": 0,
+						"max": 1
+					},
+					{
+						"key": "volume",
+						"label": "Volume",
+						"type": "number",
+						"defaultValue": 100,
+						"helperText": "Output volume in Lumia (0-100).",
+						"min": 0,
+						"max": 100
+					}
+				]
+			},
+			{
+				"type": "stream_music",
+				"label": "Stream Music",
+				"description": "Generate ElevenLabs music and play it in Lumia.",
+				"fields": [
+					{
+						"key": "prompt",
+						"label": "Prompt",
+						"type": "textarea",
+						"defaultValue": "Warm lo-fi beats with soft piano and vinyl crackle.",
+						"helperText": "Describe the music you want. Prompts can be long; use Max Characters to cap the length."
+					},
+					{
+						"key": "maxPromptChars",
+						"label": "Max Prompt Characters (optional)",
+						"type": "number",
+						"helperText": "Optional cap for prompt length.",
+						"min": 0,
+						"max": 100000
+					},
+					{
+						"key": "compositionPlanJson",
+						"label": "Composition Plan JSON (optional)",
+						"type": "textarea",
+						"placeholder": "{\"sections\":[{\"time\":0,\"notes\":\"intro\"}]}",
+						"defaultValue": "",
+						"helperText": "Advanced structure. Leave empty to use prompt only."
+					},
+					{
+						"key": "musicLengthMs",
+						"label": "Music Length (ms)",
+						"type": "number",
+						"defaultValue": 15000,
+						"helperText": "Length of the generated clip in milliseconds.",
+						"min": 1000,
+						"max": 300000
+					},
+					{
+						"key": "modelId",
+						"label": "Model ID",
+						"type": "select",
+						"allowTyping": true,
+						"defaultValue": "music_v1",
+						"helperText": "Choose a music model or type a custom model ID.",
+						"options": [{ "label": "Music v1", "value": "music_v1" }]
+					},
+					{
+						"key": "forceInstrumental",
+						"label": "Force Instrumental",
+						"type": "toggle",
+						"defaultValue": true,
+						"helperText": "If enabled, vocals are removed."
+					},
+					{
+						"key": "volume",
+						"label": "Volume",
+						"type": "number",
+						"defaultValue": 100,
+						"helperText": "Output volume in Lumia (0-100).",
+						"min": 0,
+						"max": 100
+					},
+					{
+						"key": "saveToDesktop",
+						"label": "Save Music File to Desktop",
+						"type": "checkbox",
+						"defaultValue": false,
+						"helperText": "Saves the generated audio to your Desktop."
+					}
+				]
+			}
+		]
+	}
+}
+
+```
+
+## elevenlabs_tts/package.json
+
+```
+{
+	"name": "lumia-elevenlabs-tts-example",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Example ElevenLabs TTS plugin for Lumia Stream.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.1.18"
+	}
+}
+
+```
+
 ## hot_news/README.md
 
 ```
@@ -7228,7 +7872,7 @@ module.exports = RumblePlugin;
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "platforms",
-	"icon": "assets/rumble-icon.png",
+	"icon": "rumble-icon.png",
 	"changelog": "# Changelog\n\n## 1.0.0\n- Simplified alerts to focus on followers, rants, likes, dislikes, subs, and sub gifts\n- Added variables for subs, sub gifts, likes, dislikes, and follower deltas\n- Removed milestone and peak-based alerts\n- Aligned alert identifiers with Lumia defaults (for example `rumble-follower`, `rumble-sub`)\n\n## 1.1.0\n- Added variables for chat members, followers, rumbles, rants, and scheduling info\n- New alerts for viewer milestones, new peak viewers, rumbles, rants, follower milestones, and chat spikes\n- Improved stream session tracking and alert payloads\n\n## 1.0.0\n- Initial release\n- Rumble API polling\n- Stream start/end detection\n- Viewer count change tracking\n- Template variable updates\n- Manual action handlers",
 	"config": {
 		"settings": [
@@ -7248,7 +7892,8 @@ module.exports = RumblePlugin;
 				"helperText": "How often to check for stream updates (10-300 seconds)"
 			}
 		],
-		"settings_tutorial": "---  ### 🔑 Get Your Rumble Livestream API URL  1) Open [https://rumble.com/account/livestream-api](https://rumble.com/account/livestream-api) while logged in.  2) Copy the full Livestream API URL shown on that page.  3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).  ---  ### ✅ Verify Access  Click **Save**, then trigger **Manual Poll** to confirm data is flowing.  ---  ### ⏱️ Adjust Polling  Set a poll interval that balances freshness with API limits (10–300 seconds).  ---",
+		"settings_tutorial": "---\n### 🔑 Get Your Rumble Livestream API URL\n1) Open https://rumble.com/account/livestream-api while logged in.\n2) Copy the full Livestream API URL shown on that page.\n3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).\n---\n### ✅ Verify Access\nClick **Save**, then trigger **Manual Poll** to confirm data is flowing.\n---\n### ⏱️ Adjust Polling\nSet a poll interval that balances freshness with API limits (10–300 seconds).\n---",
+		"actions_tutorial": "---\n### 🔁 Manual Poll\nUse this to fetch the latest livestream stats without waiting for the next scheduled poll.\n---\n### 🚨 Manual Alert\nFire the “Stream Started” alert for testing your alert/overlay setup.\n---",
 		"actions": [
 			{
 				"type": "manual_poll",

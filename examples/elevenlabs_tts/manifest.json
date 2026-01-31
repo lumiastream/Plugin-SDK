@@ -1,0 +1,182 @@
+{
+	"id": "elevenlabs_tts",
+	"name": "ElevenLabs TTS",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://elevenlabs.io",
+	"repository": "",
+	"description": "Generate ElevenLabs text-to-speech audio and play it inside Lumia Stream.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "examples",
+	"icon": "elevenlabs_icon.jpg",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Key ID (API Key)",
+				"type": "password",
+				"helperText": "Create an API key in your ElevenLabs dashboard.",
+				"required": true
+			}
+		],
+		"settings_tutorial": "---\n### \ud83d\udd10 Get Your ElevenLabs API Key\n1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key. Then copy the Key ID and paste it here.\n---\n### \ud83c\udf9b\ufe0f Voice Tuning (used in Actions)\n- **Stability**: Higher values make speech more consistent/predictable; lower values sound more dynamic.\n- **Similarity Boost**: Higher values keep output closer to the original voice; lower values allow more variation.\n- **Style**: Adds expressiveness/character; higher values can sound more dramatic.\n---",
+		"actions_tutorial": "---\n### \ud83d\udce2 Speak Action\n1) Enter the **Message** you want spoken.\n2) Paste the **Voice ID** you copied from ElevenLabs (find it at https://elevenlabs.io/app/voice-lab).\n3) Choose a **Model ID** (view model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n4) Adjust **Stability**, **Similarity Boost**, and **Style** if desired.\n---\n### \ud83c\udfb5 Stream Music Action\n1) Enter a **Prompt** (or provide a Composition Plan JSON).\n2) Choose the **Model ID** (see music model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n3) Set **Music Length** and **Volume**.\n---",
+		"actions": [
+			{
+				"type": "speak",
+				"label": "Speak",
+				"description": "Generate ElevenLabs TTS audio and play it in Lumia.",
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "text",
+						"defaultValue": "Hello from Lumia!",
+						"helperText": "Text to synthesize. Character limits vary per model; long messages will be truncated."
+					},
+					{
+						"key": "maxChars",
+						"label": "Max Characters (optional)",
+						"type": "number",
+						"helperText": "Leave empty to use the model limit; if set, the smaller limit is used.",
+						"min": 0,
+						"max": 100000
+					},
+					{
+						"key": "voiceId",
+						"label": "Voice ID",
+						"type": "text",
+						"defaultValue": "JBFqnCBsd6RMkjVDRZzb",
+						"helperText": "Find this in ElevenLabs Voice Lab or your Voices page."
+					},
+					{
+						"key": "modelId",
+						"label": "Model ID",
+						"type": "select",
+						"allowTyping": true,
+						"defaultValue": "eleven_multilingual_v2",
+						"helperText": "Choose a speech model or type a custom model ID.",
+						"options": [
+							{ "label": "Eleven v3", "value": "eleven_v3" },
+							{ "label": "Multilingual v2", "value": "eleven_multilingual_v2" },
+							{ "label": "Multilingual v1", "value": "eleven_multilingual_v1" },
+							{ "label": "Turbo v2.5", "value": "eleven_turbo_v2_5" },
+							{ "label": "Turbo v2", "value": "eleven_turbo_v2" },
+							{ "label": "Flash v2.5", "value": "eleven_flash_v2_5" },
+							{ "label": "Flash v2", "value": "eleven_flash_v2" }
+						]
+					},
+					{
+						"key": "stability",
+						"label": "Stability (0-1)",
+						"type": "number",
+						"defaultValue": 0.5,
+						"helperText": "Higher is more consistent; lower is more expressive.",
+						"min": 0,
+						"max": 1
+					},
+					{
+						"key": "similarityBoost",
+						"label": "Similarity Boost (0-1)",
+						"type": "number",
+						"defaultValue": 0.5,
+						"helperText": "Higher keeps closer to the original voice.",
+						"min": 0,
+						"max": 1
+					},
+					{
+						"key": "style",
+						"label": "Style (0-1)",
+						"type": "number",
+						"defaultValue": 0,
+						"helperText": "Higher adds more stylistic variation.",
+						"min": 0,
+						"max": 1
+					},
+					{
+						"key": "volume",
+						"label": "Volume",
+						"type": "number",
+						"defaultValue": 100,
+						"helperText": "Output volume in Lumia (0-100).",
+						"min": 0,
+						"max": 100
+					}
+				]
+			},
+			{
+				"type": "stream_music",
+				"label": "Stream Music",
+				"description": "Generate ElevenLabs music and play it in Lumia.",
+				"fields": [
+					{
+						"key": "prompt",
+						"label": "Prompt",
+						"type": "textarea",
+						"defaultValue": "Warm lo-fi beats with soft piano and vinyl crackle.",
+						"helperText": "Describe the music you want. Prompts can be long; use Max Characters to cap the length."
+					},
+					{
+						"key": "maxPromptChars",
+						"label": "Max Prompt Characters (optional)",
+						"type": "number",
+						"helperText": "Optional cap for prompt length.",
+						"min": 0,
+						"max": 100000
+					},
+					{
+						"key": "compositionPlanJson",
+						"label": "Composition Plan JSON (optional)",
+						"type": "textarea",
+						"placeholder": "{\"sections\":[{\"time\":0,\"notes\":\"intro\"}]}",
+						"defaultValue": "",
+						"helperText": "Advanced structure. Leave empty to use prompt only."
+					},
+					{
+						"key": "musicLengthMs",
+						"label": "Music Length (ms)",
+						"type": "number",
+						"defaultValue": 15000,
+						"helperText": "Length of the generated clip in milliseconds.",
+						"min": 1000,
+						"max": 300000
+					},
+					{
+						"key": "modelId",
+						"label": "Model ID",
+						"type": "select",
+						"allowTyping": true,
+						"defaultValue": "music_v1",
+						"helperText": "Choose a music model or type a custom model ID.",
+						"options": [{ "label": "Music v1", "value": "music_v1" }]
+					},
+					{
+						"key": "forceInstrumental",
+						"label": "Force Instrumental",
+						"type": "toggle",
+						"defaultValue": true,
+						"helperText": "If enabled, vocals are removed."
+					},
+					{
+						"key": "volume",
+						"label": "Volume",
+						"type": "number",
+						"defaultValue": 100,
+						"helperText": "Output volume in Lumia (0-100).",
+						"min": 0,
+						"max": 100
+					},
+					{
+						"key": "saveToDesktop",
+						"label": "Save Music File to Desktop",
+						"type": "checkbox",
+						"defaultValue": false,
+						"helperText": "Saves the generated audio to your Desktop."
+					}
+				]
+			}
+		]
+	}
+}

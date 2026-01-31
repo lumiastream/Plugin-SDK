@@ -10,7 +10,7 @@
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "platforms",
-	"icon": "assets/rumble-icon.png",
+	"icon": "rumble-icon.png",
 	"changelog": "# Changelog\n\n## 1.0.0\n- Simplified alerts to focus on followers, rants, likes, dislikes, subs, and sub gifts\n- Added variables for subs, sub gifts, likes, dislikes, and follower deltas\n- Removed milestone and peak-based alerts\n- Aligned alert identifiers with Lumia defaults (for example `rumble-follower`, `rumble-sub`)\n\n## 1.1.0\n- Added variables for chat members, followers, rumbles, rants, and scheduling info\n- New alerts for viewer milestones, new peak viewers, rumbles, rants, follower milestones, and chat spikes\n- Improved stream session tracking and alert payloads\n\n## 1.0.0\n- Initial release\n- Rumble API polling\n- Stream start/end detection\n- Viewer count change tracking\n- Template variable updates\n- Manual action handlers",
 	"config": {
 		"settings": [
@@ -30,7 +30,8 @@
 				"helperText": "How often to check for stream updates (10-300 seconds)"
 			}
 		],
-		"settings_tutorial": "---  ### 🔑 Get Your Rumble Livestream API URL  1) Open [https://rumble.com/account/livestream-api](https://rumble.com/account/livestream-api) while logged in.  2) Copy the full Livestream API URL shown on that page.  3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).  ---  ### ✅ Verify Access  Click **Save**, then trigger **Manual Poll** to confirm data is flowing.  ---  ### ⏱️ Adjust Polling  Set a poll interval that balances freshness with API limits (10–300 seconds).  ---",
+		"settings_tutorial": "---\n### 🔑 Get Your Rumble Livestream API URL\n1) Open https://rumble.com/account/livestream-api while logged in.\n2) Copy the full Livestream API URL shown on that page.\n3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).\n---\n### ✅ Verify Access\nClick **Save**, then trigger **Manual Poll** to confirm data is flowing.\n---\n### ⏱️ Adjust Polling\nSet a poll interval that balances freshness with API limits (10–300 seconds).\n---",
+		"actions_tutorial": "---\n### 🔁 Manual Poll\nUse this to fetch the latest livestream stats without waiting for the next scheduled poll.\n---\n### 🚨 Manual Alert\nFire the “Stream Started” alert for testing your alert/overlay setup.\n---",
 		"actions": [
 			{
 				"type": "manual_poll",

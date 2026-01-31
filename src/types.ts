@@ -92,6 +92,7 @@ export interface PluginSetting {
 	helperText?: string;
 	required?: boolean;
 	options?: Array<{ label: string; value: string | number | boolean }>;
+	allowTyping?: boolean;
 	rows?: number;
 	defaultValue?: string | number | boolean;
 	validation?: {
@@ -127,6 +128,7 @@ export interface PluginActionField {
 	max?: number;
 	step?: number;
 	rows?: number;
+	allowTyping?: boolean;
 	defaultValue?: any;
 	validation?: {
 		min?: number;
@@ -145,6 +147,8 @@ export interface PluginActionDefinition {
 
 export interface PluginIntegrationConfig {
 	settings?: PluginSetting[];
+	settings_tutorial?: string;
+	actions_tutorial?: string;
 	variables?: PluginVariableDefinition[];
 	alerts?: PluginAlertDefinition[];
 	actions?: PluginActionDefinition[];
