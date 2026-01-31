@@ -218,6 +218,7 @@ export interface PluginTriggerAlertOptions {
 	alert: string;
 	dynamic?: { name: string; value: string | number | boolean };
 	extraSettings?: Record<string, any>;
+	showInEventList?: boolean;
 }
 
 export interface PluginDisplayChatOptions {
@@ -229,6 +230,25 @@ export interface PluginDisplayChatOptions {
 	color?: string;
 	badges?: string[];
 	messageId?: string;
+	channel?: string;
+	user?: {
+		isSelf?: boolean;
+		broadcaster?: boolean;
+		mod?: boolean;
+		vip?: boolean;
+		subscriber?: boolean;
+		member?: boolean;
+		tier1?: boolean;
+		tier2?: boolean;
+		tier3?: boolean;
+		follower?: boolean;
+		regular?: boolean;
+		badges?: Record<string, any> | string[];
+		userId?: string;
+	};
+	emotesRaw?: string;
+	emotesPack?: Record<string, any> | any[];
+	isCheer?: boolean;
 	extraInfo?: Record<string, any>;
 }
 

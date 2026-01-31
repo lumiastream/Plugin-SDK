@@ -1,17 +1,17 @@
 {
 	"id": "rumble",
 	"name": "Rumble Livestream",
-	"version": "1.2.0",
+	"version": "1.0.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "https://github.com/LumiaStream/rumble-plugin",
-	"description": "Monitor Rumble livestream status and surface follower, rant, reaction, and subscription activity inside Lumia.",
+	"description": "Monitor Rumble livestream status, surface follower/rant/reaction/subscription activity, and display chat messages inside Lumia.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "platforms",
 	"icon": "assets/rumble-icon.png",
-	"changelog": "# Changelog\n\n## 1.2.0\n- Simplified alerts to focus on followers, rants, likes, dislikes, subs, and sub gifts\n- Added variables for subs, sub gifts, likes, dislikes, and follower deltas\n- Removed milestone and peak-based alerts\n- Aligned alert identifiers with Lumia defaults (for example `rumble-follower`, `rumble-sub`)\n\n## 1.1.0\n- Added variables for chat members, followers, rumbles, rants, and scheduling info\n- New alerts for viewer milestones, new peak viewers, rumbles, rants, follower milestones, and chat spikes\n- Improved stream session tracking and alert payloads\n\n## 1.0.0\n- Initial release\n- Rumble API polling\n- Stream start/end detection\n- Viewer count change tracking\n- Template variable updates\n- Manual action handlers",
+	"changelog": "# Changelog\n\n## 1.0.0\n- Simplified alerts to focus on followers, rants, likes, dislikes, subs, and sub gifts\n- Added variables for subs, sub gifts, likes, dislikes, and follower deltas\n- Removed milestone and peak-based alerts\n- Aligned alert identifiers with Lumia defaults (for example `rumble-follower`, `rumble-sub`)\n\n## 1.1.0\n- Added variables for chat members, followers, rumbles, rants, and scheduling info\n- New alerts for viewer milestones, new peak viewers, rumbles, rants, follower milestones, and chat spikes\n- Improved stream session tracking and alert payloads\n\n## 1.0.0\n- Initial release\n- Rumble API polling\n- Stream start/end detection\n- Viewer count change tracking\n- Template variable updates\n- Manual action handlers",
 	"config": {
 		"settings": [
 			{
@@ -30,6 +30,7 @@
 				"helperText": "How often to check for stream updates (10-300 seconds)"
 			}
 		],
+		"settings_tutorial": "---  ### 🔑 Get Your Rumble Livestream API URL  1) Open [https://rumble.com/account/livestream-api](https://rumble.com/account/livestream-api) while logged in.  2) Copy the full Livestream API URL shown on that page.  3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).  ---  ### ✅ Verify Access  Click **Save**, then trigger **Manual Poll** to confirm data is flowing.  ---  ### ⏱️ Adjust Polling  Set a poll interval that balances freshness with API limits (10–300 seconds).  ---",
 		"actions": [
 			{
 				"type": "manual_poll",

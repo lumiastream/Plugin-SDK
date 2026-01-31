@@ -1,4 +1,4 @@
-import { type PluginManifest, type PluginContext, type ILumiaAPI } from './types';
+import { type PluginManifest, type PluginContext, type ILumiaAPI, type PluginDisplayChatOptions } from './types';
 
 /**
  * Base Plugin Class - every Lumia Stream plugin should extend this class.
@@ -63,6 +63,10 @@ export abstract class Plugin {
 
   get lumia(): ILumiaAPI {
     return this.context.lumia;
+  }
+
+  displayChat(options: PluginDisplayChatOptions): void {
+    this.lumia.displayChat(options);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

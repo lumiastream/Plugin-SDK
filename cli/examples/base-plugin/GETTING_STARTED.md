@@ -38,22 +38,22 @@ Your plugin's logic lives here. The main class extends the `Plugin` base class:
 
 ```javascript
 class YourPlugin extends Plugin {
-  constructor(props) {
-    super(props);
-    // Initialize your plugin
-  }
+	constructor(props) {
+		super(props);
+		// Initialize your plugin
+	}
 
-  async onload() {
-    // Called when plugin is loaded
-  }
+	async onload() {
+		// Called when plugin is loaded
+	}
 
-  async onsettingsupdate() {
-    // Called when settings change
-  }
+	async onsettingsupdate() {
+		// Called when settings change
+	}
 
-  async onunload() {
-    // Called when plugin is unloaded
-  }
+	async onunload() {
+		// Called when plugin is unloaded
+	}
 }
 ```
 
@@ -65,11 +65,11 @@ class YourPlugin extends Plugin {
 
 ```json
 {
-  "key": "myNewSetting",
-  "label": "My New Setting",
-  "type": "text",
-  "defaultValue": "default value",
-  "required": false
+	"key": "myNewSetting",
+	"label": "My New Setting",
+	"type": "text",
+	"defaultValue": "default value",
+	"required": false
 }
 ```
 
@@ -85,16 +85,16 @@ const value = this.getSetting("myNewSetting");
 
 ```json
 {
-  "type": "my_custom_action",
-  "label": "Do Something Cool",
-  "fields": [
-    {
-      "key": "message",
-      "label": "Message",
-      "type": "text",
-      "required": true
-    }
-  ]
+	"type": "my_custom_action",
+	"label": "Do Something Cool",
+	"fields": [
+		{
+			"key": "message",
+			"label": "Message",
+			"type": "text",
+			"required": true
+		}
+	]
 }
 ```
 
@@ -117,11 +117,11 @@ Variables let other Lumia features access your plugin's data:
 
 ```json
 {
-  "name": "my_variable",
-  "key": "myVariable",
-  "origin": "your_plugin_id",
-  "type": "string",
-  "example": "Sample value"
+	"name": "my_variable",
+	"key": "myVariable",
+	"origin": "your_plugin_id",
+	"type": "string",
+	"example": "Sample value"
 }
 ```
 
@@ -140,7 +140,6 @@ this.setVariable("myVariable", "new value");
    ```
 
 2. **Load in Lumia Stream**:
-
    - Open Lumia Stream
    - Go to Plugins section
    - Load your plugin directory
@@ -208,9 +207,9 @@ async onunload() {
 
 ```javascript
 try {
-  // Your code
+	// Your code
 } catch (error) {
-  this.error(`Something went wrong: ${error.message}`);
+	this.error(`Something went wrong: ${error.message}`);
 }
 ```
 
@@ -237,7 +236,7 @@ try {
 - [Lumia Stream Documentation](https://docs.lumiastream.com)
 - [Plugin API Reference](https://docs.lumiastream.com/plugins/api)
 - [Example Plugins](https://github.com/lumiastream/plugins)
-- [Community Discord](https://discord.gg/lumiastream)
+- [Community Discord](https://lumiastream.com/discord)
 
 ## Need Help?
 

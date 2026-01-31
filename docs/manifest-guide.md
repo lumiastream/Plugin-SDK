@@ -488,6 +488,20 @@ await this.lumia.triggerAlert({
 
 If no matching selection is found for the provided condition values (or no `dynamic` payload is supplied), Lumia falls back to the base alert configuration and `defaultMessage`.
 
+To also show a plugin-triggered alert inside the Event List, opt in explicitly:
+
+```ts
+await this.lumia.triggerAlert({
+	alert: "giftedMembership",
+	showInEventList: true,
+	extraSettings: {
+		gifter: "StreamerFan42",
+		recipient: "LuckyViewer",
+		gift_count: 5,
+	},
+});
+```
+
 Tip: `LumiaDynamicCondition` in `lumia-types/src/alert.types.ts:99` lists every property (`value`, `currency`, `subMonths`, `giftAmount`, etc.) that variation checkers use.
 },
 {
