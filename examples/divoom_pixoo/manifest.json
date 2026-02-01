@@ -10,7 +10,7 @@
 	"lumiaVersion": "^9.0.0",
 	"license": "MIT",
 	"category": "devices",
-	"icon": "divoom.png",
+	"icon": "divoom.jpeg",
 	"config": {
 		"settings": [
 			{
