@@ -16,7 +16,6 @@ const defaultEntries = [
 	"docs/manifest-guide.md",
 	"docs/api-reference.md",
 	"docs/field-types-reference.md",
-	"docs/custom-gpt-plugin-guide.md",
 	"examples",
 ];
 
@@ -88,12 +87,16 @@ async function ensureEntry(entryPath) {
 	await fsp.access(absolutePath);
 
 	if (hasBannedSegment(entryPath)) {
-		console.warn(`Skipping "${entryPath}" because node_modules content is not allowed.`);
+		console.warn(
+			`Skipping "${entryPath}" because node_modules content is not allowed.`,
+		);
 		return null;
 	}
 
 	if (hasBannedExtension(entryPath)) {
-		console.warn(`Skipping "${entryPath}" because ${path.extname(entryPath)} files are not allowed.`);
+		console.warn(
+			`Skipping "${entryPath}" because ${path.extname(entryPath)} files are not allowed.`,
+		);
 		return null;
 	}
 

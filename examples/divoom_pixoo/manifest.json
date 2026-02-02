@@ -1,0 +1,251 @@
+{
+	"id": "divoom_pixoo",
+	"name": "Divoom Pixoo",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "https://github.com/LumiaStream/divoom-pixoo-plugin",
+	"description": "Control Divoom Pixoo WIFI LED matrix displays with reliable communication. Supports text, GIFs, drawing, and more. Includes automatic connection refresh to prevent device freezing.",
+	"lumiaVersion": "^9.0.0",
+	"license": "MIT",
+	"category": "devices",
+	"icon": "divoom.jpeg",
+	"config": {
+		"settings": [
+			{
+				"key": "deviceAddress",
+				"label": "Pixoo IP Address",
+				"type": "text",
+				"placeholder": "192.168.1.42",
+				"helperText": "Your Pixoo device IP address on the local network",
+				"required": true
+			},
+			{
+				"key": "devicePort",
+				"label": "Port",
+				"type": "number",
+				"defaultValue": 80,
+				"helperText": "HTTP port (usually 80)",
+				"validation": {
+					"min": 1,
+					"max": 65535
+				}
+			},
+			{
+				"key": "defaultTextWidth",
+				"label": "Screen Width",
+				"type": "number",
+				"defaultValue": 64,
+				"helperText": "64 for Pixoo 64, 16 for Pixoo 16",
+				"validation": {
+					"min": 16,
+					"max": 128
+				}
+			},
+			{
+				"key": "defaultTextHeight",
+				"label": "Screen Height",
+				"type": "number",
+				"defaultValue": 64,
+				"helperText": "64 for Pixoo 64, 16 for Pixoo 16",
+				"validation": {
+					"min": 16,
+					"max": 128
+				}
+			}
+		],
+		"settings_tutorial": "---\n### 🎨 Setup Your Divoom Pixoo\n\n1. **Find Your Pixoo's IP Address**:\n   - Use your router's device list\n   - Or use the Divoom app → Device Settings\n   - Example: `192.168.1.42`\n\n2. **Set Static IP (Recommended)**:\n   - Reserve IP in your router's DHCP settings\n   - Prevents IP from changing\n\n3. **Enter Settings**:\n   - IP Address (required)\n   - Port: 80 (default)\n   - Screen size: 64x64 (or 16x16 for Pixoo 16)\n\n4. **Click Save**\n   - Plugin auto-tests connection\n   - Look for ✅ success message\n---",
+		"actions_tutorial": "---\n### 🔧 Available Commands\n\n**Basic Control**:\n- Test Connection - Verify device is reachable\n- Set Brightness - Adjust display brightness (0-100)\n- Set Channel - Switch to clock/visualizer/scene\n- Screen On/Off - Power screen on or off\n- Reset Display - Clear and reset to default\n\n**Display Content**:\n- Send Scrolling Text - Display text messages\n- Clear Screen - Clear all content\n- Display Image - Show image from URL\n- Play GIF - Play animated GIF from URL\n\n**Drawing**:\n- Draw Pixel - Draw individual pixels\n- Draw Rectangle - Draw colored rectangles\n\n**Sound**:\n- Play Buzzer - Play buzzer sound\n\n**Advanced**:\n- Send Raw Command - Send custom API commands\n\n---\n### 💡 Tips\n- Commands are rate-limited to 1 per second (prevents crashes)\n- Connection auto-refreshes every 250 commands\n---",
+		"actions": [
+			{
+				"type": "set_screen_on",
+				"label": "Screen On",
+				"description": "Turn the screen on",
+				"fields": []
+			},
+			{
+				"type": "set_screen_off",
+				"label": "Screen Off",
+				"description": "Turn the screen off",
+				"fields": []
+			},
+			{
+				"type": "set_brightness",
+				"label": "Set Brightness",
+				"description": "Set device brightness (0-100%)",
+				"fields": [
+					{
+						"key": "brightness",
+						"label": "Brightness",
+						"type": "number",
+						"required": true,
+						"defaultValue": 50,
+						"validation": {
+							"min": 0,
+							"max": 100
+						}
+					}
+				]
+			},
+			{
+				"type": "play_buzzer",
+				"label": "Play Buzzer",
+				"description": "Play the built-in buzzer sound",
+				"fields": [
+					{
+						"key": "duration",
+						"label": "Duration (ms)",
+						"type": "number",
+						"required": true,
+						"defaultValue": 500,
+						"validation": {
+							"min": 100,
+							"max": 5000
+						},
+						"helperText": "How long to play the buzzer (100-5000ms)"
+					}
+				]
+			},
+			{
+				"type": "send_text",
+				"label": "Send Scrolling Text",
+				"description": "Display scrolling text message (max 512 characters)",
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "textarea",
+						"required": true,
+						"placeholder": "Enter your message (max 512 chars)..."
+					},
+					{
+						"key": "color",
+						"label": "Text Color",
+						"type": "color",
+						"defaultValue": "#FFFFFF"
+					},
+					{
+						"key": "scrollSpeed",
+						"label": "Scroll Speed (ms per step)",
+						"type": "number",
+						"defaultValue": 10,
+						"helperText": "Time in milliseconds per step (lower = faster)",
+						"validation": {
+							"min": 1,
+							"max": 100
+						}
+					},
+					{
+						"key": "direction",
+						"label": "Scroll Direction",
+						"type": "select",
+						"defaultValue": "left",
+						"options": [
+							{ "label": "Left", "value": "left" },
+							{ "label": "Right", "value": "right" }
+						]
+					},
+					{
+						"key": "align",
+						"label": "Text Alignment",
+						"type": "select",
+						"defaultValue": "center",
+						"options": [
+							{ "label": "Left", "value": "left" },
+							{ "label": "Center", "value": "center" },
+							{ "label": "Right", "value": "right" }
+						]
+					}
+				]
+			},
+			{
+				"type": "draw_pixel",
+				"label": "Draw Pixels",
+				"description": "Draw multiple pixels (one per line or semicolon-separated)",
+				"fields": [
+					{
+						"key": "pixels",
+						"label": "Pixels",
+						"type": "textarea",
+						"required": true,
+						"placeholder": "10,10,#FF0000\n20,20,#00FF00\n30,30,#0000FF",
+						"helperText": "Format: x,y,color (one per line or use ; separator). Example: 10,10,#FF0000;20,20,#00FF00"
+					}
+				]
+			},
+			{
+				"type": "draw_filled_rectangle",
+				"label": "Draw Filled Rectangles",
+				"description": "Draw multiple filled rectangles (one per line or semicolon-separated)",
+				"fields": [
+					{
+						"key": "rectangles",
+						"label": "Rectangles",
+						"type": "textarea",
+						"required": true,
+						"placeholder": "10,10,20,20,#FF0000\n35,35,15,15,#00FF00",
+						"helperText": "Format: x,y,width,height,color (one per line or use ; separator). Example: 10,10,20,20,#FF0000;30,30,15,15,#00FF00"
+					}
+				]
+			},
+			{
+				"type": "play_gif_url",
+				"label": "Play GIF from URL",
+				"description": "Play an animated GIF from the internet (must be 16x16, 32x32, or 64x64 pixels)",
+				"fields": [
+					{
+						"key": "url",
+						"label": "GIF URL",
+						"type": "text",
+						"required": true,
+						"placeholder": "https://example.com/animation.gif",
+						"helperText": "Direct link to animated GIF. Must be exactly 16x16, 32x32, or 64x64 pixels."
+					}
+				]
+			},
+			{
+				"type": "clear_screen",
+				"label": "Clear Screen",
+				"description": "Clear all content from the display",
+				"fields": [
+					{
+						"key": "color",
+						"label": "Background Color",
+						"type": "color",
+						"defaultValue": "#000000",
+						"helperText": "Color to fill screen after clearing"
+					}
+				]
+			},
+			{
+				"type": "reset_display",
+				"label": "Reset Display",
+				"description": "Clear everything and reset to default state (clock)",
+				"fields": []
+			},
+			{
+				"type": "send_raw_command",
+				"label": "Send Raw Command",
+				"description": "Send a custom command directly to the device API",
+				"fields": [
+					{
+						"key": "command",
+						"label": "Command",
+						"type": "text",
+						"required": true,
+						"placeholder": "Device/SetRTC",
+						"helperText": "API command path (e.g., Channel/SetClock)"
+					},
+					{
+						"key": "payload",
+						"label": "Payload JSON",
+						"type": "textarea",
+						"placeholder": "{\"ClockId\": 182}",
+						"helperText": "Additional command parameters as JSON"
+					}
+				]
+			}
+		]
+	}
+}

@@ -61,8 +61,8 @@ Store any dependencies, initialise locals, and always pass the parameters to the
 
 ### Alerts & Chat
 
-- **`triggerAlert(options: PluginTriggerAlertOptions): Promise<boolean>`** – trigger an alert. Options include the alert identifier and optional payload.
-- **`displayChat(options: PluginDisplayChatOptions): void`** – display chat content inside Lumia Stream.
+- **`triggerAlert(options: PluginTriggerAlertOptions): Promise<boolean>`** – trigger an alert. Options include the alert identifier and optional payload. Set `showInEventList: true` to also record the alert in the Event List (default is `false`).
+- **`displayChat(options: PluginDisplayChatOptions): void`** – display chat content inside Lumia Stream chatboxes and overlays. Provide `platform` to match your integration key so the correct icon can render (unknown platforms fall back to the Lumia icon).
 - **`chatbot(options: { message: string; site?: string | string[]; color?: string; chatAsSelf?: boolean }): Promise<boolean>`** – send a message through the Lumia chatbot system.
 
 ### Overlay & Visuals
@@ -70,10 +70,11 @@ Store any dependencies, initialise locals, and always pass the parameters to the
 - **`overlaySendCustomContent(options: { layer: string; codeId: string; content: any }): Promise<boolean>`** – push custom overlay content.
 - **`sendColor(options: { lights?: string[]; color: string | any; power?: boolean; brightness?: number; transition?: number }): Promise<boolean>`** – control connected lighting devices.
 - **`getLights(): Promise<any>`** – retrieve current light information.
+- *Light management note*: Lights are saved via the PluginAuth UI. Implement `searchLights`/`addLight` to return discovered devices for the UI, and handle runtime updates in `onLightChange`; plugins should not mutate light state directly.
 
 ### Audio & Speech
 
-- **`playAudio(options: { path: string; volume?: number; waitForAudioToStop?: boolean }): Promise<boolean>`** – play an audio file.
+- **`playAudio(options: { path: string; volume?: number; waitForAudioToStop?: boolean }): Promise<boolean>`** – play an audio file. Await the promise if you need to wait for playback to finish.
 - **`tts(options: { message: string; voice?: string; volume?: number }): Promise<boolean>`** – trigger text-to-speech playback.
 
 ### Files & Persistence
@@ -102,6 +103,7 @@ interface PluginTriggerAlertOptions {
 	alert: string;
 	dynamic?: { name: string; value: string | number | boolean };
 	extraSettings?: Record<string, any>;
+	showInEventList?: boolean;
 }
 
 interface PluginDisplayChatOptions {
@@ -113,10 +115,35 @@ interface PluginDisplayChatOptions {
 	color?: string;
 	badges?: string[];
 	messageId?: string;
+	channel?: string;
+	user?: {
+		isSelf?: boolean;
+		broadcaster?: boolean;
+		mod?: boolean;
+		vip?: boolean;
+		subscriber?: boolean;
+		member?: boolean;
+		tier1?: boolean;
+		tier2?: boolean;
+		tier3?: boolean;
+		follower?: boolean;
+		regular?: boolean;
+		badges?: Record<string, any> | string[];
+		userId?: string;
+	};
+	emotesRaw?: string;
+	emotesPack?: Record<string, any> | any[];
+	isCheer?: boolean;
 	extraInfo?: Record<string, any>;
 }
 ```
 
-`dynamic` is the link between runtime alerts and the manifest's `variationConditions`. Provide the fields that the active condition needs—commonly `value` (for equality/greater checks), and optionally `currency`, `giftAmount`, `subMonths`, `isPrime`, etc.—so Lumia Stream can resolve the correct variation.
+`PluginActionField` supports `allowTyping` on `select` fields. When true, the UI allows entering custom values while still showing the dropdown options as suggestions.
+
+`dynamic` is the link between runtime alerts and the manifest's `variationConditions`. Provide the fields that the active condition needs—commonly `value` (for equality/greater checks), and optionally `currency`, `giftAmount`, `subMonths`, `isPrime`, etc.—so Lumia Stream can resolve the correct variation. `showInEventList` defaults to `false` and only records the alert in the Event List when set to `true`.
+
+For `displayChat`, `user` flags (e.g., `mod`, `subscriber`, `vip`) are used when evaluating chat command permissions. `emotesRaw` uses the Twitch-style emote index format, while `emotesPack` follows the Kick/Discord style payload used by the chat UI.
+
+`PluginIntegrationConfig` supports `actions_tutorial` (markdown) to display a guide alongside the Actions editor.
 
 Additional types such as `PluginManifest`, `PluginContext`, `PluginActionsConfig`, `PluginAuthConfig`, and the error classes `PluginError`, `PluginSecurityError`, and `PluginInstallError` are exported from the SDK entry point for convenience.

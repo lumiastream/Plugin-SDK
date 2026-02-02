@@ -328,4433 +328,805 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.17"
+		"@lumiastream/plugin": "^0.1.18"
 	}
 }
 
 ```
 
-## ble_messenger/README.md
-
-```
-# BLE Messenger Plugin
-
-A Lumia Stream plugin that connects to a Bluetooth Low Energy (BLE) peripheral and writes payloads to a configurable characteristic.
-
-## Requirements
-
-- Node.js 18+
-- [`@abandonware/noble`](https://www.npmjs.com/package/@abandonware/noble) installed locally (native drivers/services for your platform may also be required)
-- The BLE peripheral must expose a writable characteristic
-
-Install dependencies inside the plugin folder:
-
-```bash
-npm install
-```
-
-On macOS you may also need to grant Bluetooth permissions to the Lumia Stream app.
-
-## Configuration
-
-1. Enter the **Service UUID** and **Characteristic UUID** that should be used when connecting.
-2. Provide either the **Device Name** or **Device Address (MAC)** so the plugin can match the correct peripheral.
-3. Choose the default payload encoding (`UTF-8`, `Hex`, or `Base64`) and optional line ending handling.
-4. Enable **Auto Connect** / **Auto Reconnect** if you want the plugin to maintain the connection automatically.
-5. Adjust scan timeout, retry delay, and queue size to fit your setup.
-
-The plugin keeps two Lumia variables updated:
-
-- `ble_status` – text description of the current connection state.
-- `ble_last_message` – the last successfully transmitted message (raw text before encoding).
-
-## Available Actions
-
-- **Connect** – start scanning using the configured filters.
-- **Disconnect** – stop scanning and close the active connection.
-- **Send Message** – transmit a payload to the BLE characteristic. The action fields can override encoding, apply a specific line ending, and choose whether to queue the payload when the device is offline.
-
-Queued payloads are flushed automatically once the BLE device reconnects. Set the queue size to `0` if you prefer actions to fail immediately when the device is offline.
-
-## Notes
-
-- The plugin falls back to write-without-response when the target characteristic does not support the requested write mode.
-- Scanning and reconnect attempts automatically stop when the plugin is disabled.
-- For debugging, enable **Verbose Logging** in the settings to print additional adapter state transitions.
-
-
-```
-
-## ble_messenger/main.js
+## divoom_pixoo/main.js
 
 ```
 const { Plugin } = require("@lumiastream/plugin");
+const http = require("node:http");
+const https = require("node:https");
 
-const LOG_TAG = "[ble_messenger]";
-const VARIABLES = {
-  status: "ble_status",
-  lastMessage: "ble_last_message",
-};
-const VALID_ENCODINGS = ["utf8", "hex", "base64"];
-const VALID_LINE_ENDINGS = ["none", "lf", "crlf"];
-
-class BLEMessengerPlugin extends Plugin {
-  constructor(manifest, context) {
-    super(manifest, context);
-
-    this.noble = null;
-    this.peripheral = null;
-    this.writeCharacteristic = null;
-    this.writeMode = "with"; // "with" -> response, "without" -> write without response
-    this.pendingMessages = [];
-    this.isScanning = false;
-    this.connecting = false;
-    this.connected = false;
-    this.scanTimer = null;
-    this.retryTimer = null;
-
-    this._handleStateChange = (state) => {
-      void this._handleStateChangeAsync(state);
-    };
-    this._handleDiscover = (peripheral) => {
-      void this._handleDiscoverAsync(peripheral);
-    };
-    this._handleDisconnect = (error) => {
-      void this._handleDisconnectAsync(error);
-    };
-  }
-
-  async onload() {
-    await this._log("Plugin loaded");
-
-    await this.lumia.setVariable(VARIABLES.status, "initialising");
-    await this._updateConnectionState(false, "idle");
-
-    try {
-      // Lazy load to surface friendly errors when dependency is missing.
-      // eslint-disable-next-line global-require
-      this.noble = require("@abandonware/noble");
-    } catch (error) {
-      await this._log(
-        `Failed to load @abandonware/noble: ${error?.message ?? error}`,
-        "error"
-      );
-      await this.lumia.setVariable(
-        VARIABLES.status,
-        "missing @abandonware/noble dependency"
-      );
-      return;
-    }
-
-    this.noble.on("stateChange", this._handleStateChange);
-    this.noble.on("discover", this._handleDiscover);
-
-    if (!this._hasRequiredConnectionFields()) {
-      await this._log(
-        "Service and characteristic UUIDs must be configured before connecting.",
-        "warn"
-      );
-      return;
-    }
-
-    if (this.noble.state === "poweredOn") {
-      if (this._autoConnectEnabled()) {
-        await this._startScanning();
-      }
-    } else if (this._autoConnectEnabled()) {
-      await this._log(
-        `Bluetooth adapter state is '${this.noble.state}'. Waiting for power on.`,
-        "warn"
-      );
-    }
-  }
-
-  async onunload() {
-    await this._log("Plugin unloading");
-    this._clearScanTimer();
-    this._clearRetryTimer();
-
-    await this._stopScanning();
-    await this._teardownPeripheral();
-
-    if (this.noble) {
-      try {
-        this.noble.removeListener("stateChange", this._handleStateChange);
-        this.noble.removeListener("discover", this._handleDiscover);
-        this.noble.stopScanning();
-      } catch (error) {
-        await this._log(
-          `Error while detaching noble listeners: ${error?.message ?? error}`,
-          "warn"
-        );
-      }
-      this.noble = null;
-    }
-
-    await this._updateConnectionState(false, "unloaded");
-    await this.lumia.setVariable(VARIABLES.status, "unloaded");
-    await this._log("Plugin unloaded");
-  }
-
-  async onsettingsupdate(settings, previous = {}) {
-    await this._log("Settings updated");
-
-    if (this._connectionSettingsChanged(settings, previous)) {
-      await this._log(
-        "Connection-related settings changed. Restarting BLE connection.",
-        "warn"
-      );
-      await this._restartConnection();
-    }
-  }
-
-  async actions(config = {}) {
-    const list = Array.isArray(config.actions) ? config.actions : [];
-
-    for (const action of list) {
-      const type = action?.type;
-      const data = action?.data ?? action?.value ?? {};
-
-      switch (type) {
-        case "connect":
-          await this._log("Connect action triggered");
-          await this._startScanning(true);
-          break;
-        case "disconnect":
-          await this._log("Disconnect action triggered");
-          await this._disconnectRequested();
-          break;
-        case "send_message":
-          await this._handleSendMessage(data);
-          break;
-        default:
-          await this._log(`Unknown action type: ${String(type)}`, "warn");
-      }
-    }
-  }
-
-  async _handleStateChangeAsync(state) {
-    if (this._verbose()) {
-      await this._log(`Adapter state changed: ${state}`);
-    }
-
-    if (state === "poweredOn") {
-      if (this._autoConnectEnabled()) {
-        await this._startScanning(true);
-      }
-    } else {
-      await this._log(`Adapter state '${state}' – tearing down connection.`, "warn");
-      await this._stopScanning();
-      await this._teardownPeripheral();
-      await this._updateConnectionState(false, `adapter ${state}`);
-    }
-  }
-
-  async _handleDiscoverAsync(peripheral) {
-    if (!peripheral || this.connecting || this.connected) {
-      return;
-    }
-
-    if (!this._matchesTarget(peripheral)) {
-      return;
-    }
-
-    this.connecting = true;
-    this.peripheral = peripheral;
-
-    await this._log(
-      `Connecting to ${peripheral.advertisement?.localName ?? peripheral.id}`
-    );
-
-    peripheral.removeListener("disconnect", this._handleDisconnect);
-    peripheral.once("disconnect", this._handleDisconnect);
-
-    this._clearScanTimer();
-    this.isScanning = false;
-
-    try {
-      await this._connectPeripheral(peripheral);
-      await this._updateConnectionState(true);
-      await this.lumia.setVariable(
-        VARIABLES.status,
-        `connected to ${this._peripheralLabel(peripheral)}`
-      );
-      await this._flushPendingMessages();
-    } catch (error) {
-      await this._log(
-        `Failed to connect: ${error?.message ?? error}`,
-        "error"
-      );
-      await this._updateConnectionState(false, error?.message ?? "connect error");
-      await this._teardownPeripheral();
-      await this._scheduleRetry("connection failure");
-    } finally {
-      this.connecting = false;
-    }
-  }
-
-  async _handleDisconnectAsync(error) {
-    const reason = error?.message ?? error ?? "peripheral disconnected";
-    await this._log(`Device disconnected: ${reason}`, "warn");
-    await this._teardownPeripheral();
-    await this._updateConnectionState(false, reason);
-    await this._scheduleRetry("device disconnected");
-  }
-
-  async _disconnectRequested() {
-    this._clearRetryTimer();
-    await this._stopScanning();
-    await this._teardownPeripheral();
-    await this._updateConnectionState(false, "manual disconnect");
-    await this.lumia.setVariable(VARIABLES.status, "manually disconnected");
-  }
-
-  async _handleSendMessage(data = {}) {
-    const rawMessage = typeof data.message === "string" ? data.message : "";
-    if (!rawMessage) {
-      await this._log("Send Message action requires a message payload.", "warn");
-      return;
-    }
-
-    const encoding = this._resolveEncoding(data.encoding);
-    const lineEnding = this._resolveLineEnding(data.lineEnding);
-
-    let buffer;
-    try {
-      buffer = this._buildBuffer(rawMessage, encoding, lineEnding);
-    } catch (error) {
-      await this._log(
-        `Failed to build payload: ${error?.message ?? error}`,
-        "error"
-      );
-      return;
-    }
-
-    const queueAllowed = this._shouldQueue(data);
-
-    if (this._canSend()) {
-      try {
-        await this._performWrite(buffer);
-        await this._log(
-          `Sent ${buffer.length} bytes using ${this.writeMode === "with" ? "write with response" : "write without response"}.`
-        );
-        await this.lumia.setVariable(VARIABLES.lastMessage, rawMessage);
-      } catch (error) {
-        await this._log(
-          `Failed to write payload: ${error?.message ?? error}`,
-          "error"
-        );
-        await this._scheduleRetry("write failure");
-      }
-      return;
-    }
-
-    if (!queueAllowed || this._maxQueueLength() === 0) {
-      await this._log(
-        "BLE device offline and queueing disabled. Payload dropped.",
-        "warn"
-      );
-      return;
-    }
-
-    if (this.pendingMessages.length >= this._maxQueueLength()) {
-      this.pendingMessages.shift();
-      await this._log("Pending queue full. Dropped oldest payload.", "warn");
-    }
-
-    this.pendingMessages.push({ buffer, rawMessage });
-    await this._log("Queued payload until BLE device reconnects.");
-
-    if (!this.connecting && !this.isScanning && this._autoConnectEnabled()) {
-      await this._startScanning();
-    }
-  }
-
-  async _performWrite(buffer) {
-    if (!this.writeCharacteristic) {
-      throw new Error("No writable characteristic selected");
-    }
-
-    const withoutResponse = this.writeMode !== "with";
-    await new Promise((resolve, reject) => {
-      this.writeCharacteristic.write(buffer, withoutResponse, (error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
-    });
-  }
-
-  async _flushPendingMessages() {
-    if (!this._canSend() || this.pendingMessages.length === 0) {
-      return;
-    }
-
-    const queue = [...this.pendingMessages];
-    this.pendingMessages.length = 0;
-
-    for (const entry of queue) {
-      try {
-        await this._performWrite(entry.buffer);
-        await this._log(
-          `Flushed queued payload (${entry.buffer.length} bytes).`
-        );
-        if (entry.rawMessage) {
-          await this.lumia.setVariable(VARIABLES.lastMessage, entry.rawMessage);
-        }
-      } catch (error) {
-        await this._log(
-          `Failed to flush queued payload: ${error?.message ?? error}`,
-          "error"
-        );
-        this.pendingMessages.unshift(entry);
-        await this._scheduleRetry("flush failure");
-        break;
-      }
-    }
-  }
-
-  async _connectPeripheral(peripheral) {
-    await new Promise((resolve, reject) => {
-      peripheral.connect((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
-    });
-
-    const serviceUuids = this._serviceUuidList();
-    const characteristicUuids = this._characteristicUuidList();
-
-    const { characteristic, properties } = await new Promise(
-      (resolve, reject) => {
-        peripheral.discoverSomeServicesAndCharacteristics(
-          serviceUuids,
-          characteristicUuids,
-          (error, services, characteristics) => {
-            if (error) {
-              reject(error);
-              return;
-            }
-            const targetUuid = characteristicUuids[0];
-            const found = Array.isArray(characteristics)
-              ? characteristics.find((item) =>
-                  this._uuidEquals(item.uuid, targetUuid)
-                ) || characteristics[0]
-              : null;
-
-            if (!found) {
-              reject(new Error("Writable characteristic not found"));
-              return;
-            }
-
-            resolve({ characteristic: found, properties: found.properties || [] });
-          }
-        );
-      }
-    );
-
-    const supportsWithResponse = properties.includes("write");
-    const supportsWithoutResponse = properties.includes("writeWithoutResponse");
-
-    if (!supportsWithResponse && !supportsWithoutResponse) {
-      throw new Error("Characteristic is not writable");
-    }
-
-    const wantsResponse = this._writeWithResponse();
-    if (wantsResponse && supportsWithResponse) {
-      this.writeMode = "with";
-    } else if (supportsWithoutResponse) {
-      if (wantsResponse && !supportsWithResponse) {
-        await this._log(
-          "Characteristic does not support write with response. Using write without response.",
-          "warn"
-        );
-      }
-      this.writeMode = "without";
-    } else {
-      this.writeMode = "with";
-    }
-
-    this.writeCharacteristic = characteristic;
-    await this._log(
-      `Connected. Using ${
-        this.writeMode === "with" ? "write with response" : "write without response"
-      } on ${characteristic.uuid}.`
-    );
-  }
-
-  async _stopScanning() {
-    if (!this.noble || !this.isScanning) {
-      return;
-    }
-
-    this._clearScanTimer();
-    this.isScanning = false;
-
-    await new Promise((resolve) => {
-      let finished = false;
-      const done = () => {
-        if (finished) {
-          return;
-        }
-        finished = true;
-        resolve();
-      };
-      try {
-        this.noble.stopScanning(done);
-      } catch (_error) {
-        done();
-        return;
-      }
-      setTimeout(done, 50);
-    });
-  }
-
-  async _startScanning(force = false) {
-    if (!this.noble) {
-      await this._log("BLE library not initialised", "error");
-      return;
-    }
-
-    if (!this._hasRequiredConnectionFields()) {
-      await this._log(
-        "Service and characteristic UUIDs must be configured before scanning.",
-        "warn"
-      );
-      return;
-    }
-
-    if (!force && this.isScanning) {
-      if (this._verbose()) {
-        await this._log("Scan already in progress");
-      }
-      return;
-    }
-
-    if (this.noble.state !== "poweredOn") {
-      await this._log(
-        `Cannot start scan. Adapter state: ${this.noble.state}`,
-        "warn"
-      );
-      return;
-    }
-
-    const serviceUuids = this._serviceUuidList();
-    if (!this._targetName() && !this._targetAddress()) {
-      await this._log(
-        "Consider configuring a device name or address to avoid connecting to unintended peripherals.",
-        "warn"
-      );
-    }
-
-    this.isScanning = true;
-    await this.lumia.setVariable(VARIABLES.status, "scanning");
-    await this._log(
-      `Scanning for target device (${serviceUuids.length || "any"} service filter)`
-    );
-
-    try {
-      await new Promise((resolve, reject) => {
-        this.noble.startScanning(serviceUuids, false, (error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-      });
-    } catch (error) {
-      this.isScanning = false;
-      await this._log(
-        `Failed to start BLE scan: ${error?.message ?? error}`,
-        "error"
-      );
-      await this._scheduleRetry("scan failure");
-      return;
-    }
-
-    const scanTimeout = this._scanTimeoutMs();
-    if (scanTimeout > 0) {
-      this._clearScanTimer();
-      this.scanTimer = setTimeout(() => {
-        this.scanTimer = null;
-        void this._log("Scan timed out without finding the device.", "warn");
-        void this._stopScanning();
-        void this._scheduleRetry("scan timeout");
-      }, scanTimeout);
-    }
-  }
-
-  async _teardownPeripheral() {
-    if (!this.peripheral) {
-      this.writeCharacteristic = null;
-      return;
-    }
-
-    try {
-      this.peripheral.removeListener("disconnect", this._handleDisconnect);
-    } catch (_error) {
-      // Ignore removal errors during teardown.
-    }
-
-    if (this.peripheral.state === "connected" || this.peripheral.state === "connecting") {
-      await new Promise((resolve) => {
-        this.peripheral.disconnect(() => resolve());
-      });
-    }
-
-    this.peripheral = null;
-    this.writeCharacteristic = null;
-    this.writeMode = this._writeWithResponse() ? "with" : "without";
-  }
-
-  async _restartConnection() {
-    this._clearRetryTimer();
-    await this._stopScanning();
-    await this._teardownPeripheral();
-    this.pendingMessages.length = 0;
-
-    if (this._autoConnectEnabled()) {
-      await this._startScanning(true);
-    }
-  }
-
-  async _scheduleRetry(reason) {
-    if (!this._autoReconnectEnabled()) {
-      return;
-    }
-
-    const delay = this._retryDelayMs();
-    if (delay <= 0) {
-      return;
-    }
-
-    this._clearRetryTimer();
-    await this.lumia.setVariable(
-      VARIABLES.status,
-      `reconnecting in ${Math.round(delay / 1000)}s`
-    );
-
-    if (reason) {
-      await this._log(`Retry scheduled (${reason}) in ${Math.round(delay / 1000)}s.`);
-    } else {
-      await this._log(`Retry scheduled in ${Math.round(delay / 1000)}s.`);
-    }
-
-    this.retryTimer = setTimeout(() => {
-      this.retryTimer = null;
-      if (!this.noble || !this._autoConnectEnabled()) {
-        return;
-      }
-      void this._startScanning(true);
-    }, delay);
-  }
-
-  _clearScanTimer() {
-    if (this.scanTimer) {
-      clearTimeout(this.scanTimer);
-      this.scanTimer = null;
-    }
-  }
-
-  _clearRetryTimer() {
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
-      this.retryTimer = null;
-    }
-  }
-
-  async _updateConnectionState(connected, reason = "") {
-    this.connected = Boolean(connected);
-    try {
-      await this.lumia.updateConnection(this.connected);
-    } catch (_error) {
-      // Silently ignore update errors to prevent cascading failures.
-    }
-
-    if (!connected) {
-      const detail = reason ? `disconnected (${reason})` : "disconnected";
-      await this.lumia.setVariable(VARIABLES.status, detail);
-    }
-  }
-
-  _connectionSettingsChanged(next = {}, previous = {}) {
-    const keys = [
-      "deviceName",
-      "deviceAddress",
-      "serviceUuid",
-      "characteristicUuid",
-      "writeWithResponse",
-    ];
-
-    return keys.some(
-      (key) => (next?.[key] ?? null) !== (previous?.[key] ?? null)
-    );
-  }
-
-  _resolveEncoding(value) {
-    if (VALID_ENCODINGS.includes(value)) {
-      return value;
-    }
-
-    const fallback = this.settings?.defaultEncoding;
-    if (VALID_ENCODINGS.includes(fallback)) {
-      return fallback;
-    }
-
-    return "utf8";
-  }
-
-  _resolveLineEnding(value) {
-    if (VALID_LINE_ENDINGS.includes(value)) {
-      return value;
-    }
-
-    const fallback = this.settings?.defaultLineEnding;
-    if (VALID_LINE_ENDINGS.includes(fallback)) {
-      return fallback;
-    }
-
-    return "none";
-  }
-
-  _buildBuffer(message, encoding, lineEnding) {
-    if (encoding === "hex") {
-      const sanitized = message.replace(/[^0-9a-fA-F]/g, "");
-      if (sanitized.length === 0) {
-        throw new Error("Hex payload is empty");
-      }
-      if (sanitized.length % 2 !== 0) {
-        throw new Error("Hex payload must contain an even number of characters");
-      }
-      let buffer = Buffer.from(sanitized, "hex");
-      const suffix = this._lineEndingBuffer(lineEnding, encoding);
-      if (suffix?.length) {
-        buffer = Buffer.concat([buffer, suffix]);
-      }
-      return buffer;
-    }
-
-    if (encoding === "base64") {
-      let buffer;
-      try {
-        buffer = Buffer.from(message, "base64");
-      } catch (error) {
-        throw new Error("Invalid base64 payload");
-      }
-      if (buffer.length === 0) {
-        throw new Error("Base64 payload decoded to an empty buffer");
-      }
-      const suffix = this._lineEndingBuffer(lineEnding, encoding);
-      if (suffix?.length) {
-        buffer = Buffer.concat([buffer, suffix]);
-      }
-      return buffer;
-    }
-
-    const suffix = this._lineEndingString(lineEnding);
-    const text = suffix ? `${message}${suffix}` : message;
-    return Buffer.from(text, "utf8");
-  }
-
-  _lineEndingString(lineEnding) {
-    switch (lineEnding) {
-      case "lf":
-        return "\n";
-      case "crlf":
-        return "\r\n";
-      default:
-        return "";
-    }
-  }
-
-  _lineEndingBuffer(lineEnding, encoding) {
-    if (lineEnding === "none" || !lineEnding) {
-      return null;
-    }
-
-    if (encoding === "hex") {
-      const hex = lineEnding === "crlf" ? "0d0a" : "0a";
-      return Buffer.from(hex, "hex");
-    }
-
-    return Buffer.from(this._lineEndingString(lineEnding), "utf8");
-  }
-
-  _shouldQueue(data = {}) {
-    if (typeof data.queueWhenDisconnected === "boolean") {
-      return data.queueWhenDisconnected;
-    }
-    return this._maxQueueLength() > 0;
-  }
-
-  _maxQueueLength() {
-    const value = Number(this.settings?.maxQueueLength);
-    if (!Number.isFinite(value) || value < 0) {
-      return 10;
-    }
-    return value;
-  }
-
-  _writeWithResponse() {
-    return this.settings?.writeWithResponse !== false;
-  }
-
-  _autoConnectEnabled() {
-    return this.settings?.autoConnect !== false;
-  }
-
-  _autoReconnectEnabled() {
-    return this.settings?.autoReconnect !== false;
-  }
-
-  _retryDelayMs() {
-    const value = Number(this.settings?.retryDelay);
-    if (!Number.isFinite(value) || value <= 0) {
-      return 5000;
-    }
-    return Math.min(Math.max(value, 1), 300) * 1000;
-  }
-
-  _scanTimeoutMs() {
-    const value = Number(this.settings?.scanTimeout);
-    if (!Number.isFinite(value) || value <= 0) {
-      return 0;
-    }
-    return Math.min(Math.max(value, 0), 3600) * 1000;
-  }
-
-  _serviceUuidList() {
-    const raw = this.settings?.serviceUuid;
-    if (!raw || typeof raw !== "string") {
-      return [];
-    }
-
-    return raw
-      .split(",")
-      .map((entry) => this._normaliseUuid(entry))
-      .filter(Boolean);
-  }
-
-  _characteristicUuidList() {
-    const raw = this.settings?.characteristicUuid;
-    if (!raw || typeof raw !== "string") {
-      return [];
-    }
-
-    return [this._normaliseUuid(raw)].filter(Boolean);
-  }
-
-  _normaliseUuid(value) {
-    if (typeof value !== "string") {
-      return "";
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return "";
-    }
-
-    return trimmed.replace(/[^0-9a-fA-F]/g, "").toLowerCase();
-  }
-
-  _targetName() {
-    const name = this.settings?.deviceName;
-    return typeof name === "string" && name.trim() ? name.trim() : "";
-  }
-
-  _targetAddress() {
-    const address = this.settings?.deviceAddress;
-    if (typeof address !== "string") {
-      return "";
-    }
-
-    return address.replace(/[^0-9a-fA-F]/g, "").toLowerCase();
-  }
-
-  _matchesTarget(peripheral) {
-    const targetAddress = this._targetAddress();
-    const peripheralAddress = (peripheral.address || "").replace(
-      /[^0-9a-fA-F]/g,
-      ""
-    ).toLowerCase();
-
-    if (targetAddress && targetAddress !== peripheralAddress) {
-      return false;
-    }
-
-    const targetName = this._targetName();
-    if (targetName) {
-      const advName = peripheral.advertisement?.localName;
-      if (!advName || advName.trim() !== targetName) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  _hasRequiredConnectionFields() {
-    const hasService = Boolean(this._serviceUuidList().length);
-    const hasCharacteristic = Boolean(this._characteristicUuidList().length);
-    return hasService && hasCharacteristic;
-  }
-
-  _peripheralLabel(peripheral) {
-    return (
-      peripheral.advertisement?.localName ||
-      peripheral?.id ||
-      peripheral?.uuid ||
-      "unknown"
-    );
-  }
-
-  _uuidEquals(a, b) {
-    if (!a || !b) {
-      return false;
-    }
-    return String(a).toLowerCase() === String(b).toLowerCase();
-  }
-
-  _canSend() {
-    return Boolean(this.writeCharacteristic && this.connected);
-  }
-
-  _verbose() {
-    return this.settings?.verboseLogging === true;
-  }
-
-  async _log(message, severity = "info") {
-    let decorated = `${LOG_TAG} ${message}`;
-    if (severity === "warn") {
-      decorated = `${LOG_TAG} [warn] ${message}`;
-    } else if (severity === "error") {
-      decorated = `${LOG_TAG} [error] ${message}`;
-    }
-    await this.lumia.addLog(decorated);
-  }
-}
-
-module.exports = BLEMessengerPlugin;
-
-```
-
-## ble_messenger/manifest.json
-
-```
-{
-	"id": "ble_messenger",
-	"name": "BLE Messenger",
-	"version": "1.0.1",
-	"author": "Lumia Stream",
-	"description": "Connect to a Bluetooth Low Energy peripheral and send messages to it from Lumia actions.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "hardware",
-	"icon": "ble-messenger.png",
-	"changelog": "",
-	"config": {
-		"settings": [
-			{
-				"key": "deviceName",
-				"label": "Device Name",
-				"type": "text",
-				"placeholder": "BLE Peripheral Name",
-				"helperText": "Exact advertised name used to match the target peripheral. Leave blank to match by address only."
-			},
-			{
-				"key": "deviceAddress",
-				"label": "Device Address (MAC)",
-				"type": "text",
-				"placeholder": "AA:BB:CC:DD:EE:FF",
-				"helperText": "Optional. Colons and dashes are ignored when matching the peripheral."
-			},
-			{
-				"key": "serviceUuid",
-				"label": "Service UUID",
-				"type": "text",
-				"placeholder": "FFF0",
-				"helperText": "Single UUID or comma separated list used while scanning.",
-				"required": true
-			},
-			{
-				"key": "characteristicUuid",
-				"label": "Characteristic UUID",
-				"type": "text",
-				"placeholder": "FFF1",
-				"helperText": "Writable characteristic used when sending messages.",
-				"required": true
-			},
-			{
-				"key": "defaultEncoding",
-				"label": "Default Encoding",
-				"type": "select",
-				"defaultValue": "utf8",
-				"options": [
-					{ "label": "UTF-8 Text", "value": "utf8" },
-					{ "label": "Hexadecimal", "value": "hex" },
-					{ "label": "Base64", "value": "base64" }
-				],
-				"helperText": "Used when an action does not override the encoding."
-			},
-			{
-				"key": "defaultLineEnding",
-				"label": "Default Line Ending",
-				"type": "select",
-				"defaultValue": "none",
-				"options": [
-					{ "label": "None", "value": "none" },
-					{ "label": "LF (\\n)", "value": "lf" },
-					{ "label": "CRLF (\\r\\n)", "value": "crlf" }
-				],
-				"helperText": "Automatically appended for UTF-8 messages."
-			},
-			{
-				"key": "autoConnect",
-				"label": "Auto Connect on Load",
-				"type": "toggle",
-				"defaultValue": true
-			},
-			{
-				"key": "autoReconnect",
-				"label": "Auto Reconnect on Drop",
-				"type": "toggle",
-				"defaultValue": true
-			},
-			{
-				"key": "retryDelay",
-				"label": "Reconnect Delay (seconds)",
-				"type": "number",
-				"defaultValue": 5,
-				"validation": {
-					"min": 1,
-					"max": 300
-				},
-				"helperText": "Wait time before attempting to reconnect when auto reconnect is enabled."
-			},
-			{
-				"key": "scanTimeout",
-				"label": "Scan Timeout (seconds)",
-				"type": "number",
-				"defaultValue": 15,
-				"validation": {
-					"min": 0,
-					"max": 120
-				},
-				"helperText": "Stop scanning after this many seconds. Zero keeps scanning until a match is found."
-			},
-			{
-				"key": "maxQueueLength",
-				"label": "Pending Message Queue Size",
-				"type": "number",
-				"defaultValue": 10,
-				"validation": {
-					"min": 0,
-					"max": 100
-				},
-				"helperText": "Messages queued while disconnected. Zero disables queueing."
-			},
-			{
-				"key": "writeWithResponse",
-				"label": "Request Write Response",
-				"type": "toggle",
-				"defaultValue": true,
-				"helperText": "Disable if the characteristic only supports write without response."
-			},
-			{
-				"key": "verboseLogging",
-				"label": "Verbose Logging",
-				"type": "toggle",
-				"defaultValue": false,
-				"helperText": "Emit extra BLE lifecycle details to the Lumia log panel."
-			}
-		],
-		"actions": [
-			{
-				"type": "connect",
-				"label": "Connect",
-				"description": "Start scanning and connect to the configured BLE device."
-			},
-			{
-				"type": "disconnect",
-				"label": "Disconnect",
-				"description": "Tear down the current connection and stop scanning."
-			},
-			{
-				"type": "send_message",
-				"label": "Send Message",
-				"description": "Write a payload to the configured characteristic.",
-				"fields": [
-					{
-						"key": "message",
-						"label": "Message",
-						"type": "textarea",
-						"rows": 4,
-						"defaultValue": "Hello from Lumia Stream!",
-						"helperText": "Supports variables and dynamic content."
-					},
-					{
-						"key": "encoding",
-						"label": "Encoding",
-						"type": "select",
-						"defaultValue": "inherit",
-						"options": [
-							{ "label": "Use Default", "value": "inherit" },
-							{ "label": "UTF-8 Text", "value": "utf8" },
-							{ "label": "Hexadecimal", "value": "hex" },
-							{ "label": "Base64", "value": "base64" }
-						]
-					},
-					{
-						"key": "lineEnding",
-						"label": "Line Ending",
-						"type": "select",
-						"defaultValue": "inherit",
-						"options": [
-							{ "label": "Use Default", "value": "inherit" },
-							{ "label": "None", "value": "none" },
-							{ "label": "LF (\\n)", "value": "lf" },
-							{ "label": "CRLF (\\r\\n)", "value": "crlf" }
-						],
-						"helperText": "Applied only for UTF-8 messages unless sending hex line endings."
-					},
-					{
-						"key": "queueWhenDisconnected",
-						"label": "Queue When Disconnected",
-						"type": "toggle",
-						"defaultValue": true,
-						"helperText": "Queue this payload until the device reconnects."
-					}
-				]
-			}
-		],
-		"variables": [
-			{
-				"name": "ble_status",
-				"description": "Current BLE connection state reported by the plugin.",
-				"value": "disconnected"
-			},
-			{
-				"name": "ble_last_message",
-				"description": "Most recent payload successfully sent to the BLE device.",
-				"value": ""
-			}
-		]
-	}
-}
-
-```
-
-## ble_messenger/package-lock.json
-
-```
-{
-  "name": "lumia-example-ble-messenger",
-  "version": "1.0.0",
-  "lockfileVersion": 3,
-  "requires": true,
-  "packages": {
-    "": {
-      "name": "lumia-example-ble-messenger",
-      "version": "1.0.0",
-      "dependencies": {
-        "@abandonware/noble": "^1.9.2-15",
-        "@lumiastream/plugin": "^0.1.15"
-      }
-    },
-    "node_modules/@abandonware/bluetooth-hci-socket": {
-      "version": "0.5.3-12",
-      "resolved": "https://registry.npmjs.org/@abandonware/bluetooth-hci-socket/-/bluetooth-hci-socket-0.5.3-12.tgz",
-      "integrity": "sha512-qo2cBoh94j6RPusaNXSLYI8Bzxuz01Bx3MD80a/QYzhHED/FZ6Y0k2w2kRbfIA2EEhFSCbXrBZDQlpilL4nbxA==",
-      "hasInstallScript": true,
-      "license": "MIT",
-      "optional": true,
-      "os": [
-        "linux",
-        "android",
-        "freebsd",
-        "win32"
-      ],
-      "dependencies": {
-        "@mapbox/node-pre-gyp": "^1.0.11",
-        "debug": "^4.3.4",
-        "nan": "^2.18.0",
-        "node-gyp": "^10.0.1"
-      },
-      "engines": {
-        "node": ">=10.0.0"
-      },
-      "optionalDependencies": {
-        "usb": "^2.11.0"
-      }
-    },
-    "node_modules/@abandonware/noble": {
-      "version": "1.9.2-26",
-      "resolved": "https://registry.npmjs.org/@abandonware/noble/-/noble-1.9.2-26.tgz",
-      "integrity": "sha512-dPx78rkxF+z2oR8KhVlNt3gHi5E6dMSkil6HaZuDanFlWAL/bP2oHqAtHrHZdqtKDnTiZUf7f93hpDkKWx36Lw==",
-      "hasInstallScript": true,
-      "license": "MIT",
-      "os": [
-        "darwin",
-        "linux",
-        "freebsd",
-        "win32"
-      ],
-      "dependencies": {
-        "debug": "^4.3.4",
-        "napi-thread-safe-callback": "^0.0.6",
-        "node-addon-api": "^8.3.0",
-        "node-gyp-build": "^4.8.4"
-      },
-      "engines": {
-        "node": ">=16"
-      },
-      "optionalDependencies": {
-        "@abandonware/bluetooth-hci-socket": "^0.5.3-11"
-      }
-    },
-    "node_modules/@isaacs/cliui": {
-      "version": "8.0.2",
-      "resolved": "https://registry.npmjs.org/@isaacs/cliui/-/cliui-8.0.2.tgz",
-      "integrity": "sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "string-width": "^5.1.2",
-        "string-width-cjs": "npm:string-width@^4.2.0",
-        "strip-ansi": "^7.0.1",
-        "strip-ansi-cjs": "npm:strip-ansi@^6.0.1",
-        "wrap-ansi": "^8.1.0",
-        "wrap-ansi-cjs": "npm:wrap-ansi@^7.0.0"
-      },
-      "engines": {
-        "node": ">=12"
-      }
-    },
-    "node_modules/@lumiastream/plugin": {
-      "version": "0.1.15",
-      "resolved": "https://registry.npmjs.org/@lumiastream/plugin/-/plugin-0.1.15.tgz",
-      "integrity": "sha512-wv8958Jo43dCoNRluID9tgBMN8W012MURIIdyryg8amUxj67M1+eN3RTBSOvICChyyN8m9ZESc9ZzbPezPLG3Q==",
-      "license": "MIT"
-    },
-    "node_modules/@mapbox/node-pre-gyp": {
-      "version": "1.0.11",
-      "resolved": "https://registry.npmjs.org/@mapbox/node-pre-gyp/-/node-pre-gyp-1.0.11.tgz",
-      "integrity": "sha512-Yhlar6v9WQgUp/He7BdgzOz8lqMQ8sU+jkCq7Wx8Myc5YFJLbEe7lgui/V7G1qB1DJykHSGwreceSaD60Y0PUQ==",
-      "license": "BSD-3-Clause",
-      "optional": true,
-      "dependencies": {
-        "detect-libc": "^2.0.0",
-        "https-proxy-agent": "^5.0.0",
-        "make-dir": "^3.1.0",
-        "node-fetch": "^2.6.7",
-        "nopt": "^5.0.0",
-        "npmlog": "^5.0.1",
-        "rimraf": "^3.0.2",
-        "semver": "^7.3.5",
-        "tar": "^6.1.11"
-      },
-      "bin": {
-        "node-pre-gyp": "bin/node-pre-gyp"
-      }
-    },
-    "node_modules/@npmcli/agent": {
-      "version": "2.2.2",
-      "resolved": "https://registry.npmjs.org/@npmcli/agent/-/agent-2.2.2.tgz",
-      "integrity": "sha512-OrcNPXdpSl9UX7qPVRWbmWMCSXrcDa2M9DvrbOTj7ao1S4PlqVFYv9/yLKMkrJKZ/V5A/kDBC690or307i26Og==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "agent-base": "^7.1.0",
-        "http-proxy-agent": "^7.0.0",
-        "https-proxy-agent": "^7.0.1",
-        "lru-cache": "^10.0.1",
-        "socks-proxy-agent": "^8.0.3"
-      },
-      "engines": {
-        "node": "^16.14.0 || >=18.0.0"
-      }
-    },
-    "node_modules/@npmcli/agent/node_modules/agent-base": {
-      "version": "7.1.4",
-      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-7.1.4.tgz",
-      "integrity": "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">= 14"
-      }
-    },
-    "node_modules/@npmcli/agent/node_modules/https-proxy-agent": {
-      "version": "7.0.6",
-      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-7.0.6.tgz",
-      "integrity": "sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "agent-base": "^7.1.2",
-        "debug": "4"
-      },
-      "engines": {
-        "node": ">= 14"
-      }
-    },
-    "node_modules/@npmcli/fs": {
-      "version": "3.1.1",
-      "resolved": "https://registry.npmjs.org/@npmcli/fs/-/fs-3.1.1.tgz",
-      "integrity": "sha512-q9CRWjpHCMIh5sVyefoD1cA7PkvILqCZsnSOEUUivORLjxCO/Irmue2DprETiNgEqktDBZaM1Bi+jrarx1XdCg==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "semver": "^7.3.5"
-      },
-      "engines": {
-        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
-      }
-    },
-    "node_modules/@pkgjs/parseargs": {
-      "version": "0.11.0",
-      "resolved": "https://registry.npmjs.org/@pkgjs/parseargs/-/parseargs-0.11.0.tgz",
-      "integrity": "sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=14"
-      }
-    },
-    "node_modules/@types/w3c-web-usb": {
-      "version": "1.0.13",
-      "resolved": "https://registry.npmjs.org/@types/w3c-web-usb/-/w3c-web-usb-1.0.13.tgz",
-      "integrity": "sha512-N2nSl3Xsx8mRHZBvMSdNGtzMyeleTvtlEw+ujujgXalPqOjIA6UtrqcB6OzyUjkTbDm3J7P1RNK1lgoO7jxtsw==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/abbrev": {
-      "version": "1.1.1",
-      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz",
-      "integrity": "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/agent-base": {
-      "version": "6.0.2",
-      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-6.0.2.tgz",
-      "integrity": "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "debug": "4"
-      },
-      "engines": {
-        "node": ">= 6.0.0"
-      }
-    },
-    "node_modules/aggregate-error": {
-      "version": "3.1.0",
-      "resolved": "https://registry.npmjs.org/aggregate-error/-/aggregate-error-3.1.0.tgz",
-      "integrity": "sha512-4I7Td01quW/RpocfNayFdFVk1qSuoh0E7JrbRJ16nH01HhKFQ88INq9Sd+nd72zqRySlr9BmDA8xlEJ6vJMrYA==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "clean-stack": "^2.0.0",
-        "indent-string": "^4.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/ansi-regex": {
-      "version": "6.2.2",
-      "resolved": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-6.2.2.tgz",
-      "integrity": "sha512-Bq3SmSpyFHaWjPk8If9yc6svM8c56dB5BAtW4Qbw5jHTwwXXcTLoRMkpDJp6VL0XzlWaCHTXrkFURMYmD0sLqg==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=12"
-      },
-      "funding": {
-        "url": "https://github.com/chalk/ansi-regex?sponsor=1"
-      }
-    },
-    "node_modules/ansi-styles": {
-      "version": "6.2.3",
-      "resolved": "https://registry.npmjs.org/ansi-styles/-/ansi-styles-6.2.3.tgz",
-      "integrity": "sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=12"
-      },
-      "funding": {
-        "url": "https://github.com/chalk/ansi-styles?sponsor=1"
-      }
-    },
-    "node_modules/aproba": {
-      "version": "2.1.0",
-      "resolved": "https://registry.npmjs.org/aproba/-/aproba-2.1.0.tgz",
-      "integrity": "sha512-tLIEcj5GuR2RSTnxNKdkK0dJ/GrC7P38sUkiDmDuHfsHmbagTFAxDVIBltoklXEVIQ/f14IL8IMJ5pn9Hez1Ew==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/are-we-there-yet": {
-      "version": "2.0.0",
-      "resolved": "https://registry.npmjs.org/are-we-there-yet/-/are-we-there-yet-2.0.0.tgz",
-      "integrity": "sha512-Ci/qENmwHnsYo9xKIcUJN5LeDKdJ6R1Z1j9V/J5wyq8nh/mYPEpIKJbBZXtZjG04HiK7zV/p6Vs9952MrMeUIw==",
-      "deprecated": "This package is no longer supported.",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "delegates": "^1.0.0",
-        "readable-stream": "^3.6.0"
-      },
-      "engines": {
-        "node": ">=10"
-      }
-    },
-    "node_modules/balanced-match": {
-      "version": "1.0.2",
-      "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-1.0.2.tgz",
-      "integrity": "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/brace-expansion": {
-      "version": "2.0.2",
-      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-2.0.2.tgz",
-      "integrity": "sha512-Jt0vHyM+jmUBqojB7E1NIYadt0vI0Qxjxd2TErW94wDz+E2LAm5vKMXXwg6ZZBTHPuUlDgQHKXvjGBdfcF1ZDQ==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "balanced-match": "^1.0.0"
-      }
-    },
-    "node_modules/cacache": {
-      "version": "18.0.4",
-      "resolved": "https://registry.npmjs.org/cacache/-/cacache-18.0.4.tgz",
-      "integrity": "sha512-B+L5iIa9mgcjLbliir2th36yEwPftrzteHYujzsx3dFP/31GCHcIeS8f5MGd80odLOjaOvSpU3EEAmRQptkxLQ==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "@npmcli/fs": "^3.1.0",
-        "fs-minipass": "^3.0.0",
-        "glob": "^10.2.2",
-        "lru-cache": "^10.0.1",
-        "minipass": "^7.0.3",
-        "minipass-collect": "^2.0.1",
-        "minipass-flush": "^1.0.5",
-        "minipass-pipeline": "^1.2.4",
-        "p-map": "^4.0.0",
-        "ssri": "^10.0.0",
-        "tar": "^6.1.11",
-        "unique-filename": "^3.0.0"
-      },
-      "engines": {
-        "node": "^16.14.0 || >=18.0.0"
-      }
-    },
-    "node_modules/chownr": {
-      "version": "2.0.0",
-      "resolved": "https://registry.npmjs.org/chownr/-/chownr-2.0.0.tgz",
-      "integrity": "sha512-bIomtDF5KGpdogkLd9VspvFzk9KfpyyGlS8YFVZl7TGPBHL5snIOnxeshwVgPteQ9b4Eydl+pVbIyE1DcvCWgQ==",
-      "license": "ISC",
-      "optional": true,
-      "engines": {
-        "node": ">=10"
-      }
-    },
-    "node_modules/clean-stack": {
-      "version": "2.2.0",
-      "resolved": "https://registry.npmjs.org/clean-stack/-/clean-stack-2.2.0.tgz",
-      "integrity": "sha512-4diC9HaTE+KRAMWhDhrGOECgWZxoevMc5TlkObMqNSsVU62PYzXZ/SMTjzyGAFF1YusgxGcSWTEXBhp0CPwQ1A==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=6"
-      }
-    },
-    "node_modules/color-convert": {
-      "version": "2.0.1",
-      "resolved": "https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz",
-      "integrity": "sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "color-name": "~1.1.4"
-      },
-      "engines": {
-        "node": ">=7.0.0"
-      }
-    },
-    "node_modules/color-name": {
-      "version": "1.1.4",
-      "resolved": "https://registry.npmjs.org/color-name/-/color-name-1.1.4.tgz",
-      "integrity": "sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/color-support": {
-      "version": "1.1.3",
-      "resolved": "https://registry.npmjs.org/color-support/-/color-support-1.1.3.tgz",
-      "integrity": "sha512-qiBjkpbMLO/HL68y+lh4q0/O1MZFj2RX6X/KmMa3+gJD3z+WwI1ZzDHysvqHGS3mP6mznPckpXmw1nI9cJjyRg==",
-      "license": "ISC",
-      "optional": true,
-      "bin": {
-        "color-support": "bin.js"
-      }
-    },
-    "node_modules/concat-map": {
-      "version": "0.0.1",
-      "resolved": "https://registry.npmjs.org/concat-map/-/concat-map-0.0.1.tgz",
-      "integrity": "sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/console-control-strings": {
-      "version": "1.1.0",
-      "resolved": "https://registry.npmjs.org/console-control-strings/-/console-control-strings-1.1.0.tgz",
-      "integrity": "sha512-ty/fTekppD2fIwRvnZAVdeOiGd1c7YXEixbgJTNzqcxJWKQnjJ/V1bNEEE6hygpM3WjwHFUVK6HTjWSzV4a8sQ==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/cross-spawn": {
-      "version": "7.0.6",
-      "resolved": "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.6.tgz",
-      "integrity": "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "path-key": "^3.1.0",
-        "shebang-command": "^2.0.0",
-        "which": "^2.0.1"
-      },
-      "engines": {
-        "node": ">= 8"
-      }
-    },
-    "node_modules/cross-spawn/node_modules/isexe": {
-      "version": "2.0.0",
-      "resolved": "https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz",
-      "integrity": "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/cross-spawn/node_modules/which": {
-      "version": "2.0.2",
-      "resolved": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
-      "integrity": "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "isexe": "^2.0.0"
-      },
-      "bin": {
-        "node-which": "bin/node-which"
-      },
-      "engines": {
-        "node": ">= 8"
-      }
-    },
-    "node_modules/debug": {
-      "version": "4.4.3",
-      "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
-      "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
-      "license": "MIT",
-      "dependencies": {
-        "ms": "^2.1.3"
-      },
-      "engines": {
-        "node": ">=6.0"
-      },
-      "peerDependenciesMeta": {
-        "supports-color": {
-          "optional": true
-        }
-      }
-    },
-    "node_modules/delegates": {
-      "version": "1.0.0",
-      "resolved": "https://registry.npmjs.org/delegates/-/delegates-1.0.0.tgz",
-      "integrity": "sha512-bd2L678uiWATM6m5Z1VzNCErI3jiGzt6HGY8OVICs40JQq/HALfbyNJmp0UDakEY4pMMaN0Ly5om/B1VI/+xfQ==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/detect-libc": {
-      "version": "2.1.2",
-      "resolved": "https://registry.npmjs.org/detect-libc/-/detect-libc-2.1.2.tgz",
-      "integrity": "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==",
-      "license": "Apache-2.0",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/eastasianwidth": {
-      "version": "0.2.0",
-      "resolved": "https://registry.npmjs.org/eastasianwidth/-/eastasianwidth-0.2.0.tgz",
-      "integrity": "sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/emoji-regex": {
-      "version": "9.2.2",
-      "resolved": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-9.2.2.tgz",
-      "integrity": "sha512-L18DaJsXSUk2+42pv8mLs5jJT2hqFkFE4j21wOmgbUqsZ2hL72NsUU785g9RXgo3s0ZNgVl42TiHp3ZtOv/Vyg==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/env-paths": {
-      "version": "2.2.1",
-      "resolved": "https://registry.npmjs.org/env-paths/-/env-paths-2.2.1.tgz",
-      "integrity": "sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=6"
-      }
-    },
-    "node_modules/err-code": {
-      "version": "2.0.3",
-      "resolved": "https://registry.npmjs.org/err-code/-/err-code-2.0.3.tgz",
-      "integrity": "sha512-2bmlRpNKBxT/CRmPOlyISQpNj+qSeYvcym/uT0Jx2bMOlKLtSy1ZmLuVxSEKKyor/N5yhvp/ZiG1oE3DEYMSFA==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/exponential-backoff": {
-      "version": "3.1.2",
-      "resolved": "https://registry.npmjs.org/exponential-backoff/-/exponential-backoff-3.1.2.tgz",
-      "integrity": "sha512-8QxYTVXUkuy7fIIoitQkPwGonB8F3Zj8eEO8Sqg9Zv/bkI7RJAzowee4gr81Hak/dUTpA2Z7VfQgoijjPNlUZA==",
-      "license": "Apache-2.0",
-      "optional": true
-    },
-    "node_modules/foreground-child": {
-      "version": "3.3.1",
-      "resolved": "https://registry.npmjs.org/foreground-child/-/foreground-child-3.3.1.tgz",
-      "integrity": "sha512-gIXjKqtFuWEgzFRJA9WCQeSJLZDjgJUOMCMzxtvFq/37KojM1BFGufqsCy0r4qSQmYLsZYMeyRqzIWOMup03sw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "cross-spawn": "^7.0.6",
-        "signal-exit": "^4.0.1"
-      },
-      "engines": {
-        "node": ">=14"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/isaacs"
-      }
-    },
-    "node_modules/fs-minipass": {
-      "version": "3.0.3",
-      "resolved": "https://registry.npmjs.org/fs-minipass/-/fs-minipass-3.0.3.tgz",
-      "integrity": "sha512-XUBA9XClHbnJWSfBzjkm6RvPsyg3sryZt06BEQoXcF7EK/xpGaQYJgQKDJSUH5SGZ76Y7pFx1QBnXz09rU5Fbw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "minipass": "^7.0.3"
-      },
-      "engines": {
-        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
-      }
-    },
-    "node_modules/fs.realpath": {
-      "version": "1.0.0",
-      "resolved": "https://registry.npmjs.org/fs.realpath/-/fs.realpath-1.0.0.tgz",
-      "integrity": "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/gauge": {
-      "version": "3.0.2",
-      "resolved": "https://registry.npmjs.org/gauge/-/gauge-3.0.2.tgz",
-      "integrity": "sha512-+5J6MS/5XksCuXq++uFRsnUd7Ovu1XenbeuIuNRJxYWjgQbPuFhT14lAvsWfqfAmnwluf1OwMjz39HjfLPci0Q==",
-      "deprecated": "This package is no longer supported.",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "aproba": "^1.0.3 || ^2.0.0",
-        "color-support": "^1.1.2",
-        "console-control-strings": "^1.0.0",
-        "has-unicode": "^2.0.1",
-        "object-assign": "^4.1.1",
-        "signal-exit": "^3.0.0",
-        "string-width": "^4.2.3",
-        "strip-ansi": "^6.0.1",
-        "wide-align": "^1.1.2"
-      },
-      "engines": {
-        "node": ">=10"
-      }
-    },
-    "node_modules/gauge/node_modules/ansi-regex": {
-      "version": "5.0.1",
-      "resolved": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz",
-      "integrity": "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/gauge/node_modules/emoji-regex": {
-      "version": "8.0.0",
-      "resolved": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz",
-      "integrity": "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/gauge/node_modules/signal-exit": {
-      "version": "3.0.7",
-      "resolved": "https://registry.npmjs.org/signal-exit/-/signal-exit-3.0.7.tgz",
-      "integrity": "sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/gauge/node_modules/string-width": {
-      "version": "4.2.3",
-      "resolved": "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz",
-      "integrity": "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "emoji-regex": "^8.0.0",
-        "is-fullwidth-code-point": "^3.0.0",
-        "strip-ansi": "^6.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/gauge/node_modules/strip-ansi": {
-      "version": "6.0.1",
-      "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz",
-      "integrity": "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "ansi-regex": "^5.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/glob": {
-      "version": "10.4.5",
-      "resolved": "https://registry.npmjs.org/glob/-/glob-10.4.5.tgz",
-      "integrity": "sha512-7Bv8RF0k6xjo7d4A/PxYLbUCfb6c+Vpd2/mB2yRDlew7Jb5hEXiCD9ibfO7wpk8i4sevK6DFny9h7EYbM3/sHg==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "foreground-child": "^3.1.0",
-        "jackspeak": "^3.1.2",
-        "minimatch": "^9.0.4",
-        "minipass": "^7.1.2",
-        "package-json-from-dist": "^1.0.0",
-        "path-scurry": "^1.11.1"
-      },
-      "bin": {
-        "glob": "dist/esm/bin.mjs"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/isaacs"
-      }
-    },
-    "node_modules/graceful-fs": {
-      "version": "4.2.11",
-      "resolved": "https://registry.npmjs.org/graceful-fs/-/graceful-fs-4.2.11.tgz",
-      "integrity": "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/has-unicode": {
-      "version": "2.0.1",
-      "resolved": "https://registry.npmjs.org/has-unicode/-/has-unicode-2.0.1.tgz",
-      "integrity": "sha512-8Rf9Y83NBReMnx0gFzA8JImQACstCYWUplepDa9xprwwtmgEZUF0h/i5xSA625zB/I37EtrswSST6OXxwaaIJQ==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/http-cache-semantics": {
-      "version": "4.2.0",
-      "resolved": "https://registry.npmjs.org/http-cache-semantics/-/http-cache-semantics-4.2.0.tgz",
-      "integrity": "sha512-dTxcvPXqPvXBQpq5dUr6mEMJX4oIEFv6bwom3FDwKRDsuIjjJGANqhBuoAn9c1RQJIdAKav33ED65E2ys+87QQ==",
-      "license": "BSD-2-Clause",
-      "optional": true
-    },
-    "node_modules/http-proxy-agent": {
-      "version": "7.0.2",
-      "resolved": "https://registry.npmjs.org/http-proxy-agent/-/http-proxy-agent-7.0.2.tgz",
-      "integrity": "sha512-T1gkAiYYDWYx3V5Bmyu7HcfcvL7mUrTWiM6yOfa3PIphViJ/gFPbvidQ+veqSOHci/PxBcDabeUNCzpOODJZig==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "agent-base": "^7.1.0",
-        "debug": "^4.3.4"
-      },
-      "engines": {
-        "node": ">= 14"
-      }
-    },
-    "node_modules/http-proxy-agent/node_modules/agent-base": {
-      "version": "7.1.4",
-      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-7.1.4.tgz",
-      "integrity": "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">= 14"
-      }
-    },
-    "node_modules/https-proxy-agent": {
-      "version": "5.0.1",
-      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz",
-      "integrity": "sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "agent-base": "6",
-        "debug": "4"
-      },
-      "engines": {
-        "node": ">= 6"
-      }
-    },
-    "node_modules/iconv-lite": {
-      "version": "0.6.3",
-      "resolved": "https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.6.3.tgz",
-      "integrity": "sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "safer-buffer": ">= 2.1.2 < 3.0.0"
-      },
-      "engines": {
-        "node": ">=0.10.0"
-      }
-    },
-    "node_modules/imurmurhash": {
-      "version": "0.1.4",
-      "resolved": "https://registry.npmjs.org/imurmurhash/-/imurmurhash-0.1.4.tgz",
-      "integrity": "sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=0.8.19"
-      }
-    },
-    "node_modules/indent-string": {
-      "version": "4.0.0",
-      "resolved": "https://registry.npmjs.org/indent-string/-/indent-string-4.0.0.tgz",
-      "integrity": "sha512-EdDDZu4A2OyIK7Lr/2zG+w5jmbuk1DVBnEwREQvBzspBJkCEbRa8GxU1lghYcaGJCnRWibjDXlq779X1/y5xwg==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/inflight": {
-      "version": "1.0.6",
-      "resolved": "https://registry.npmjs.org/inflight/-/inflight-1.0.6.tgz",
-      "integrity": "sha512-k92I/b08q4wvFscXCLvqfsHCrjrF7yiXsQuIVvVE7N82W3+aqpzuUdBbfhWcy/FZR3/4IgflMgKLOsvPDrGCJA==",
-      "deprecated": "This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "once": "^1.3.0",
-        "wrappy": "1"
-      }
-    },
-    "node_modules/inherits": {
-      "version": "2.0.4",
-      "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.4.tgz",
-      "integrity": "sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/ip-address": {
-      "version": "10.0.1",
-      "resolved": "https://registry.npmjs.org/ip-address/-/ip-address-10.0.1.tgz",
-      "integrity": "sha512-NWv9YLW4PoW2B7xtzaS3NCot75m6nK7Icdv0o3lfMceJVRfSoQwqD4wEH5rLwoKJwUiZ/rfpiVBhnaF0FK4HoA==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">= 12"
-      }
-    },
-    "node_modules/is-fullwidth-code-point": {
-      "version": "3.0.0",
-      "resolved": "https://registry.npmjs.org/is-fullwidth-code-point/-/is-fullwidth-code-point-3.0.0.tgz",
-      "integrity": "sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/is-lambda": {
-      "version": "1.0.1",
-      "resolved": "https://registry.npmjs.org/is-lambda/-/is-lambda-1.0.1.tgz",
-      "integrity": "sha512-z7CMFGNrENq5iFB9Bqo64Xk6Y9sg+epq1myIcdHaGnbMTYOxvzsEtdYqQUylB7LxfkvgrrjP32T6Ywciio9UIQ==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/isexe": {
-      "version": "3.1.1",
-      "resolved": "https://registry.npmjs.org/isexe/-/isexe-3.1.1.tgz",
-      "integrity": "sha512-LpB/54B+/2J5hqQ7imZHfdU31OlgQqx7ZicVlkm9kzg9/w8GKLEcFfJl/t7DCEDueOyBAD6zCCwTO6Fzs0NoEQ==",
-      "license": "ISC",
-      "optional": true,
-      "engines": {
-        "node": ">=16"
-      }
-    },
-    "node_modules/jackspeak": {
-      "version": "3.4.3",
-      "resolved": "https://registry.npmjs.org/jackspeak/-/jackspeak-3.4.3.tgz",
-      "integrity": "sha512-OGlZQpz2yfahA/Rd1Y8Cd9SIEsqvXkLVoSw/cgwhnhFMDbsQFeZYoJJ7bIZBS9BcamUW96asq/npPWugM+RQBw==",
-      "license": "BlueOak-1.0.0",
-      "optional": true,
-      "dependencies": {
-        "@isaacs/cliui": "^8.0.2"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/isaacs"
-      },
-      "optionalDependencies": {
-        "@pkgjs/parseargs": "^0.11.0"
-      }
-    },
-    "node_modules/lru-cache": {
-      "version": "10.4.3",
-      "resolved": "https://registry.npmjs.org/lru-cache/-/lru-cache-10.4.3.tgz",
-      "integrity": "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/make-dir": {
-      "version": "3.1.0",
-      "resolved": "https://registry.npmjs.org/make-dir/-/make-dir-3.1.0.tgz",
-      "integrity": "sha512-g3FeP20LNwhALb/6Cz6Dd4F2ngze0jz7tbzrD2wAV+o9FeNHe4rL+yK2md0J/fiSf1sa1ADhXqi5+oVwOM/eGw==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "semver": "^6.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/sindresorhus"
-      }
-    },
-    "node_modules/make-dir/node_modules/semver": {
-      "version": "6.3.1",
-      "resolved": "https://registry.npmjs.org/semver/-/semver-6.3.1.tgz",
-      "integrity": "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==",
-      "license": "ISC",
-      "optional": true,
-      "bin": {
-        "semver": "bin/semver.js"
-      }
-    },
-    "node_modules/make-fetch-happen": {
-      "version": "13.0.1",
-      "resolved": "https://registry.npmjs.org/make-fetch-happen/-/make-fetch-happen-13.0.1.tgz",
-      "integrity": "sha512-cKTUFc/rbKUd/9meOvgrpJ2WrNzymt6jfRDdwg5UCnVzv9dTpEj9JS5m3wtziXVCjluIXyL8pcaukYqezIzZQA==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "@npmcli/agent": "^2.0.0",
-        "cacache": "^18.0.0",
-        "http-cache-semantics": "^4.1.1",
-        "is-lambda": "^1.0.1",
-        "minipass": "^7.0.2",
-        "minipass-fetch": "^3.0.0",
-        "minipass-flush": "^1.0.5",
-        "minipass-pipeline": "^1.2.4",
-        "negotiator": "^0.6.3",
-        "proc-log": "^4.2.0",
-        "promise-retry": "^2.0.1",
-        "ssri": "^10.0.0"
-      },
-      "engines": {
-        "node": "^16.14.0 || >=18.0.0"
-      }
-    },
-    "node_modules/minimatch": {
-      "version": "9.0.5",
-      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-9.0.5.tgz",
-      "integrity": "sha512-G6T0ZX48xgozx7587koeX9Ys2NYy6Gmv//P89sEte9V9whIapMNF4idKxnW2QtCcLiTWlb/wfCabAtAFWhhBow==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "brace-expansion": "^2.0.1"
-      },
-      "engines": {
-        "node": ">=16 || 14 >=14.17"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/isaacs"
-      }
-    },
-    "node_modules/minipass": {
-      "version": "7.1.2",
-      "resolved": "https://registry.npmjs.org/minipass/-/minipass-7.1.2.tgz",
-      "integrity": "sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw==",
-      "license": "ISC",
-      "optional": true,
-      "engines": {
-        "node": ">=16 || 14 >=14.17"
-      }
-    },
-    "node_modules/minipass-collect": {
-      "version": "2.0.1",
-      "resolved": "https://registry.npmjs.org/minipass-collect/-/minipass-collect-2.0.1.tgz",
-      "integrity": "sha512-D7V8PO9oaz7PWGLbCACuI1qEOsq7UKfLotx/C0Aet43fCUB/wfQ7DYeq2oR/svFJGYDHPr38SHATeaj/ZoKHKw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "minipass": "^7.0.3"
-      },
-      "engines": {
-        "node": ">=16 || 14 >=14.17"
-      }
-    },
-    "node_modules/minipass-fetch": {
-      "version": "3.0.5",
-      "resolved": "https://registry.npmjs.org/minipass-fetch/-/minipass-fetch-3.0.5.tgz",
-      "integrity": "sha512-2N8elDQAtSnFV0Dk7gt15KHsS0Fyz6CbYZ360h0WTYV1Ty46li3rAXVOQj1THMNLdmrD9Vt5pBPtWtVkpwGBqg==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "minipass": "^7.0.3",
-        "minipass-sized": "^1.0.3",
-        "minizlib": "^2.1.2"
-      },
-      "engines": {
-        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
-      },
-      "optionalDependencies": {
-        "encoding": "^0.1.13"
-      }
-    },
-    "node_modules/minipass-flush": {
-      "version": "1.0.5",
-      "resolved": "https://registry.npmjs.org/minipass-flush/-/minipass-flush-1.0.5.tgz",
-      "integrity": "sha512-JmQSYYpPUqX5Jyn1mXaRwOda1uQ8HP5KAT/oDSLCzt1BYRhQU0/hDtsB1ufZfEEzMZ9aAVmsBw8+FWsIXlClWw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "minipass": "^3.0.0"
-      },
-      "engines": {
-        "node": ">= 8"
-      }
-    },
-    "node_modules/minipass-flush/node_modules/minipass": {
-      "version": "3.3.6",
-      "resolved": "https://registry.npmjs.org/minipass/-/minipass-3.3.6.tgz",
-      "integrity": "sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "yallist": "^4.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/minipass-pipeline": {
-      "version": "1.2.4",
-      "resolved": "https://registry.npmjs.org/minipass-pipeline/-/minipass-pipeline-1.2.4.tgz",
-      "integrity": "sha512-xuIq7cIOt09RPRJ19gdi4b+RiNvDFYe5JH+ggNvBqGqpQXcru3PcRmOZuHBKWK1Txf9+cQ+HMVN4d6z46LZP7A==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "minipass": "^3.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/minipass-pipeline/node_modules/minipass": {
-      "version": "3.3.6",
-      "resolved": "https://registry.npmjs.org/minipass/-/minipass-3.3.6.tgz",
-      "integrity": "sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "yallist": "^4.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/minipass-sized": {
-      "version": "1.0.3",
-      "resolved": "https://registry.npmjs.org/minipass-sized/-/minipass-sized-1.0.3.tgz",
-      "integrity": "sha512-MbkQQ2CTiBMlA2Dm/5cY+9SWFEN8pzzOXi6rlM5Xxq0Yqbda5ZQy9sU75a673FE9ZK0Zsbr6Y5iP6u9nktfg2g==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "minipass": "^3.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/minipass-sized/node_modules/minipass": {
-      "version": "3.3.6",
-      "resolved": "https://registry.npmjs.org/minipass/-/minipass-3.3.6.tgz",
-      "integrity": "sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "yallist": "^4.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/minizlib": {
-      "version": "2.1.2",
-      "resolved": "https://registry.npmjs.org/minizlib/-/minizlib-2.1.2.tgz",
-      "integrity": "sha512-bAxsR8BVfj60DWXHE3u30oHzfl4G7khkSuPW+qvpd7jFRHm7dLxOjUk1EHACJ/hxLY8phGJ0YhYHZo7jil7Qdg==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "minipass": "^3.0.0",
-        "yallist": "^4.0.0"
-      },
-      "engines": {
-        "node": ">= 8"
-      }
-    },
-    "node_modules/minizlib/node_modules/minipass": {
-      "version": "3.3.6",
-      "resolved": "https://registry.npmjs.org/minipass/-/minipass-3.3.6.tgz",
-      "integrity": "sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "yallist": "^4.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/mkdirp": {
-      "version": "1.0.4",
-      "resolved": "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz",
-      "integrity": "sha512-vVqVZQyf3WLx2Shd0qJ9xuvqgAyKPLAiqITEtqW0oIUjzo3PePDd6fW9iFz30ef7Ysp/oiWqbhszeGWW2T6Gzw==",
-      "license": "MIT",
-      "optional": true,
-      "bin": {
-        "mkdirp": "bin/cmd.js"
-      },
-      "engines": {
-        "node": ">=10"
-      }
-    },
-    "node_modules/ms": {
-      "version": "2.1.3",
-      "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
-      "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
-      "license": "MIT"
-    },
-    "node_modules/nan": {
-      "version": "2.23.0",
-      "resolved": "https://registry.npmjs.org/nan/-/nan-2.23.0.tgz",
-      "integrity": "sha512-1UxuyYGdoQHcGg87Lkqm3FzefucTa0NAiOcuRsDmysep3c1LVCRK2krrUDafMWtjSG04htvAmvg96+SDknOmgQ==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/napi-thread-safe-callback": {
-      "version": "0.0.6",
-      "resolved": "https://registry.npmjs.org/napi-thread-safe-callback/-/napi-thread-safe-callback-0.0.6.tgz",
-      "integrity": "sha512-X7uHCOCdY4u0yamDxDrv3jF2NtYc8A1nvPzBQgvpoSX+WB3jAe2cVNsY448V1ucq7Whf9Wdy02HEUoLW5rJKWg==",
-      "license": "ISC"
-    },
-    "node_modules/negotiator": {
-      "version": "0.6.4",
-      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.4.tgz",
-      "integrity": "sha512-myRT3DiWPHqho5PrJaIRyaMv2kgYf0mUVgBNOYMuCH5Ki1yEiQaf/ZJuQ62nvpc44wL5WDbTX7yGJi1Neevw8w==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">= 0.6"
-      }
-    },
-    "node_modules/node-addon-api": {
-      "version": "8.5.0",
-      "resolved": "https://registry.npmjs.org/node-addon-api/-/node-addon-api-8.5.0.tgz",
-      "integrity": "sha512-/bRZty2mXUIFY/xU5HLvveNHlswNJej+RnxBjOMkidWfwZzgTbPG1E3K5TOxRLOR+5hX7bSofy8yf1hZevMS8A==",
-      "license": "MIT",
-      "engines": {
-        "node": "^18 || ^20 || >= 21"
-      }
-    },
-    "node_modules/node-fetch": {
-      "version": "2.7.0",
-      "resolved": "https://registry.npmjs.org/node-fetch/-/node-fetch-2.7.0.tgz",
-      "integrity": "sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "whatwg-url": "^5.0.0"
-      },
-      "engines": {
-        "node": "4.x || >=6.0.0"
-      },
-      "peerDependencies": {
-        "encoding": "^0.1.0"
-      },
-      "peerDependenciesMeta": {
-        "encoding": {
-          "optional": true
-        }
-      }
-    },
-    "node_modules/node-gyp": {
-      "version": "10.3.1",
-      "resolved": "https://registry.npmjs.org/node-gyp/-/node-gyp-10.3.1.tgz",
-      "integrity": "sha512-Pp3nFHBThHzVtNY7U6JfPjvT/DTE8+o/4xKsLQtBoU+j2HLsGlhcfzflAoUreaJbNmYnX+LlLi0qjV8kpyO6xQ==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "env-paths": "^2.2.0",
-        "exponential-backoff": "^3.1.1",
-        "glob": "^10.3.10",
-        "graceful-fs": "^4.2.6",
-        "make-fetch-happen": "^13.0.0",
-        "nopt": "^7.0.0",
-        "proc-log": "^4.1.0",
-        "semver": "^7.3.5",
-        "tar": "^6.2.1",
-        "which": "^4.0.0"
-      },
-      "bin": {
-        "node-gyp": "bin/node-gyp.js"
-      },
-      "engines": {
-        "node": "^16.14.0 || >=18.0.0"
-      }
-    },
-    "node_modules/node-gyp-build": {
-      "version": "4.8.4",
-      "resolved": "https://registry.npmjs.org/node-gyp-build/-/node-gyp-build-4.8.4.tgz",
-      "integrity": "sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==",
-      "license": "MIT",
-      "bin": {
-        "node-gyp-build": "bin.js",
-        "node-gyp-build-optional": "optional.js",
-        "node-gyp-build-test": "build-test.js"
-      }
-    },
-    "node_modules/node-gyp/node_modules/abbrev": {
-      "version": "2.0.0",
-      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-2.0.0.tgz",
-      "integrity": "sha512-6/mh1E2u2YgEsCHdY0Yx5oW+61gZU+1vXaoiHHrpKeuRNNgFvS+/jrwHiQhB5apAf5oB7UB7E19ol2R2LKH8hQ==",
-      "license": "ISC",
-      "optional": true,
-      "engines": {
-        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
-      }
-    },
-    "node_modules/node-gyp/node_modules/nopt": {
-      "version": "7.2.1",
-      "resolved": "https://registry.npmjs.org/nopt/-/nopt-7.2.1.tgz",
-      "integrity": "sha512-taM24ViiimT/XntxbPyJQzCG+p4EKOpgD3mxFwW38mGjVUrfERQOeY4EDHjdnptttfHuHQXFx+lTP08Q+mLa/w==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "abbrev": "^2.0.0"
-      },
-      "bin": {
-        "nopt": "bin/nopt.js"
-      },
-      "engines": {
-        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
-      }
-    },
-    "node_modules/nopt": {
-      "version": "5.0.0",
-      "resolved": "https://registry.npmjs.org/nopt/-/nopt-5.0.0.tgz",
-      "integrity": "sha512-Tbj67rffqceeLpcRXrT7vKAN8CwfPeIBgM7E6iBkmKLV7bEMwpGgYLGv0jACUsECaa/vuxP0IjEont6umdMgtQ==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "abbrev": "1"
-      },
-      "bin": {
-        "nopt": "bin/nopt.js"
-      },
-      "engines": {
-        "node": ">=6"
-      }
-    },
-    "node_modules/npmlog": {
-      "version": "5.0.1",
-      "resolved": "https://registry.npmjs.org/npmlog/-/npmlog-5.0.1.tgz",
-      "integrity": "sha512-AqZtDUWOMKs1G/8lwylVjrdYgqA4d9nu8hc+0gzRxlDb1I10+FHBGMXs6aiQHFdCUUlqH99MUMuLfzWDNDtfxw==",
-      "deprecated": "This package is no longer supported.",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "are-we-there-yet": "^2.0.0",
-        "console-control-strings": "^1.1.0",
-        "gauge": "^3.0.0",
-        "set-blocking": "^2.0.0"
-      }
-    },
-    "node_modules/object-assign": {
-      "version": "4.1.1",
-      "resolved": "https://registry.npmjs.org/object-assign/-/object-assign-4.1.1.tgz",
-      "integrity": "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=0.10.0"
-      }
-    },
-    "node_modules/once": {
-      "version": "1.4.0",
-      "resolved": "https://registry.npmjs.org/once/-/once-1.4.0.tgz",
-      "integrity": "sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "wrappy": "1"
-      }
-    },
-    "node_modules/p-map": {
-      "version": "4.0.0",
-      "resolved": "https://registry.npmjs.org/p-map/-/p-map-4.0.0.tgz",
-      "integrity": "sha512-/bjOqmgETBYB5BoEeGVea8dmvHb2m9GLy1E9W43yeyfP6QQCZGFNa+XRceJEuDB6zqr+gKpIAmlLebMpykw/MQ==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "aggregate-error": "^3.0.0"
-      },
-      "engines": {
-        "node": ">=10"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/sindresorhus"
-      }
-    },
-    "node_modules/package-json-from-dist": {
-      "version": "1.0.1",
-      "resolved": "https://registry.npmjs.org/package-json-from-dist/-/package-json-from-dist-1.0.1.tgz",
-      "integrity": "sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==",
-      "license": "BlueOak-1.0.0",
-      "optional": true
-    },
-    "node_modules/path-is-absolute": {
-      "version": "1.0.1",
-      "resolved": "https://registry.npmjs.org/path-is-absolute/-/path-is-absolute-1.0.1.tgz",
-      "integrity": "sha512-AVbw3UJ2e9bq64vSaS9Am0fje1Pa8pbGqTTsmXfaIiMpnr5DlDhfJOuLj9Sf95ZPVDAUerDfEk88MPmPe7UCQg==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=0.10.0"
-      }
-    },
-    "node_modules/path-key": {
-      "version": "3.1.1",
-      "resolved": "https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz",
-      "integrity": "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/path-scurry": {
-      "version": "1.11.1",
-      "resolved": "https://registry.npmjs.org/path-scurry/-/path-scurry-1.11.1.tgz",
-      "integrity": "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA==",
-      "license": "BlueOak-1.0.0",
-      "optional": true,
-      "dependencies": {
-        "lru-cache": "^10.2.0",
-        "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
-      },
-      "engines": {
-        "node": ">=16 || 14 >=14.18"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/isaacs"
-      }
-    },
-    "node_modules/proc-log": {
-      "version": "4.2.0",
-      "resolved": "https://registry.npmjs.org/proc-log/-/proc-log-4.2.0.tgz",
-      "integrity": "sha512-g8+OnU/L2v+wyiVK+D5fA34J7EH8jZ8DDlvwhRCMxmMj7UCBvxiO1mGeN+36JXIKF4zevU4kRBd8lVgG9vLelA==",
-      "license": "ISC",
-      "optional": true,
-      "engines": {
-        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
-      }
-    },
-    "node_modules/promise-retry": {
-      "version": "2.0.1",
-      "resolved": "https://registry.npmjs.org/promise-retry/-/promise-retry-2.0.1.tgz",
-      "integrity": "sha512-y+WKFlBR8BGXnsNlIHFGPZmyDf3DFMoLhaflAnyZgV6rG6xu+JwesTo2Q9R6XwYmtmwAFCkAk3e35jEdoeh/3g==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "err-code": "^2.0.2",
-        "retry": "^0.12.0"
-      },
-      "engines": {
-        "node": ">=10"
-      }
-    },
-    "node_modules/readable-stream": {
-      "version": "3.6.2",
-      "resolved": "https://registry.npmjs.org/readable-stream/-/readable-stream-3.6.2.tgz",
-      "integrity": "sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "inherits": "^2.0.3",
-        "string_decoder": "^1.1.1",
-        "util-deprecate": "^1.0.1"
-      },
-      "engines": {
-        "node": ">= 6"
-      }
-    },
-    "node_modules/retry": {
-      "version": "0.12.0",
-      "resolved": "https://registry.npmjs.org/retry/-/retry-0.12.0.tgz",
-      "integrity": "sha512-9LkiTwjUh6rT555DtE9rTX+BKByPfrMzEAtnlEtdEwr3Nkffwiihqe2bWADg+OQRjt9gl6ICdmB/ZFDCGAtSow==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">= 4"
-      }
-    },
-    "node_modules/rimraf": {
-      "version": "3.0.2",
-      "resolved": "https://registry.npmjs.org/rimraf/-/rimraf-3.0.2.tgz",
-      "integrity": "sha512-JZkJMZkAGFFPP2YqXZXPbMlMBgsxzE8ILs4lMIX/2o0L9UBw9O/Y3o6wFw/i9YLapcUJWwqbi3kdxIPdC62TIA==",
-      "deprecated": "Rimraf versions prior to v4 are no longer supported",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "glob": "^7.1.3"
-      },
-      "bin": {
-        "rimraf": "bin.js"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/isaacs"
-      }
-    },
-    "node_modules/rimraf/node_modules/brace-expansion": {
-      "version": "1.1.12",
-      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.12.tgz",
-      "integrity": "sha512-9T9UjW3r0UW5c1Q7GTwllptXwhvYmEzFhzMfZ9H7FQWt+uZePjZPjBP/W1ZEyZ1twGWom5/56TF4lPcqjnDHcg==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "balanced-match": "^1.0.0",
-        "concat-map": "0.0.1"
-      }
-    },
-    "node_modules/rimraf/node_modules/glob": {
-      "version": "7.2.3",
-      "resolved": "https://registry.npmjs.org/glob/-/glob-7.2.3.tgz",
-      "integrity": "sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==",
-      "deprecated": "Glob versions prior to v9 are no longer supported",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "fs.realpath": "^1.0.0",
-        "inflight": "^1.0.4",
-        "inherits": "2",
-        "minimatch": "^3.1.1",
-        "once": "^1.3.0",
-        "path-is-absolute": "^1.0.0"
-      },
-      "engines": {
-        "node": "*"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/isaacs"
-      }
-    },
-    "node_modules/rimraf/node_modules/minimatch": {
-      "version": "3.1.2",
-      "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-3.1.2.tgz",
-      "integrity": "sha512-J7p63hRiAjw1NDEww1W7i37+ByIrOWO5XQQAzZ3VOcL0PNybwpfmV/N05zFAzwQ9USyEcX6t3UO+K5aqBQOIHw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "brace-expansion": "^1.1.7"
-      },
-      "engines": {
-        "node": "*"
-      }
-    },
-    "node_modules/safe-buffer": {
-      "version": "5.2.1",
-      "resolved": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz",
-      "integrity": "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==",
-      "funding": [
-        {
-          "type": "github",
-          "url": "https://github.com/sponsors/feross"
-        },
-        {
-          "type": "patreon",
-          "url": "https://www.patreon.com/feross"
-        },
-        {
-          "type": "consulting",
-          "url": "https://feross.org/support"
-        }
-      ],
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/safer-buffer": {
-      "version": "2.1.2",
-      "resolved": "https://registry.npmjs.org/safer-buffer/-/safer-buffer-2.1.2.tgz",
-      "integrity": "sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/semver": {
-      "version": "7.7.3",
-      "resolved": "https://registry.npmjs.org/semver/-/semver-7.7.3.tgz",
-      "integrity": "sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==",
-      "license": "ISC",
-      "optional": true,
-      "bin": {
-        "semver": "bin/semver.js"
-      },
-      "engines": {
-        "node": ">=10"
-      }
-    },
-    "node_modules/set-blocking": {
-      "version": "2.0.0",
-      "resolved": "https://registry.npmjs.org/set-blocking/-/set-blocking-2.0.0.tgz",
-      "integrity": "sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/shebang-command": {
-      "version": "2.0.0",
-      "resolved": "https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz",
-      "integrity": "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "shebang-regex": "^3.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/shebang-regex": {
-      "version": "3.0.0",
-      "resolved": "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz",
-      "integrity": "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/signal-exit": {
-      "version": "4.1.0",
-      "resolved": "https://registry.npmjs.org/signal-exit/-/signal-exit-4.1.0.tgz",
-      "integrity": "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==",
-      "license": "ISC",
-      "optional": true,
-      "engines": {
-        "node": ">=14"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/isaacs"
-      }
-    },
-    "node_modules/smart-buffer": {
-      "version": "4.2.0",
-      "resolved": "https://registry.npmjs.org/smart-buffer/-/smart-buffer-4.2.0.tgz",
-      "integrity": "sha512-94hK0Hh8rPqQl2xXc3HsaBoOXKV20MToPkcXvwbISWLEs+64sBq5kFgn2kJDHb1Pry9yrP0dxrCI9RRci7RXKg==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">= 6.0.0",
-        "npm": ">= 3.0.0"
-      }
-    },
-    "node_modules/socks": {
-      "version": "2.8.7",
-      "resolved": "https://registry.npmjs.org/socks/-/socks-2.8.7.tgz",
-      "integrity": "sha512-HLpt+uLy/pxB+bum/9DzAgiKS8CX1EvbWxI4zlmgGCExImLdiad2iCwXT5Z4c9c3Eq8rP2318mPW2c+QbtjK8A==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "ip-address": "^10.0.1",
-        "smart-buffer": "^4.2.0"
-      },
-      "engines": {
-        "node": ">= 10.0.0",
-        "npm": ">= 3.0.0"
-      }
-    },
-    "node_modules/socks-proxy-agent": {
-      "version": "8.0.5",
-      "resolved": "https://registry.npmjs.org/socks-proxy-agent/-/socks-proxy-agent-8.0.5.tgz",
-      "integrity": "sha512-HehCEsotFqbPW9sJ8WVYB6UbmIMv7kUUORIF2Nncq4VQvBfNBLibW9YZR5dlYCSUhwcD628pRllm7n+E+YTzJw==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "agent-base": "^7.1.2",
-        "debug": "^4.3.4",
-        "socks": "^2.8.3"
-      },
-      "engines": {
-        "node": ">= 14"
-      }
-    },
-    "node_modules/socks-proxy-agent/node_modules/agent-base": {
-      "version": "7.1.4",
-      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-7.1.4.tgz",
-      "integrity": "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">= 14"
-      }
-    },
-    "node_modules/ssri": {
-      "version": "10.0.6",
-      "resolved": "https://registry.npmjs.org/ssri/-/ssri-10.0.6.tgz",
-      "integrity": "sha512-MGrFH9Z4NP9Iyhqn16sDtBpRRNJ0Y2hNa6D65h736fVSaPCHr4DM4sWUNvVaSuC+0OBGhwsrydQwmgfg5LncqQ==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "minipass": "^7.0.3"
-      },
-      "engines": {
-        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
-      }
-    },
-    "node_modules/string_decoder": {
-      "version": "1.3.0",
-      "resolved": "https://registry.npmjs.org/string_decoder/-/string_decoder-1.3.0.tgz",
-      "integrity": "sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "safe-buffer": "~5.2.0"
-      }
-    },
-    "node_modules/string-width": {
-      "version": "5.1.2",
-      "resolved": "https://registry.npmjs.org/string-width/-/string-width-5.1.2.tgz",
-      "integrity": "sha512-HnLOCR3vjcY8beoNLtcjZ5/nxn2afmME6lhrDrebokqMap+XbeW8n9TXpPDOqdGK5qcI3oT0GKTW6wC7EMiVqA==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "eastasianwidth": "^0.2.0",
-        "emoji-regex": "^9.2.2",
-        "strip-ansi": "^7.0.1"
-      },
-      "engines": {
-        "node": ">=12"
-      },
-      "funding": {
-        "url": "https://github.com/sponsors/sindresorhus"
-      }
-    },
-    "node_modules/string-width-cjs": {
-      "name": "string-width",
-      "version": "4.2.3",
-      "resolved": "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz",
-      "integrity": "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "emoji-regex": "^8.0.0",
-        "is-fullwidth-code-point": "^3.0.0",
-        "strip-ansi": "^6.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/string-width-cjs/node_modules/ansi-regex": {
-      "version": "5.0.1",
-      "resolved": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz",
-      "integrity": "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/string-width-cjs/node_modules/emoji-regex": {
-      "version": "8.0.0",
-      "resolved": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz",
-      "integrity": "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/string-width-cjs/node_modules/strip-ansi": {
-      "version": "6.0.1",
-      "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz",
-      "integrity": "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "ansi-regex": "^5.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/strip-ansi": {
-      "version": "7.1.2",
-      "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-7.1.2.tgz",
-      "integrity": "sha512-gmBGslpoQJtgnMAvOVqGZpEz9dyoKTCzy2nfz/n8aIFhN/jCE/rCmcxabB6jOOHV+0WNnylOxaxBQPSvcWklhA==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "ansi-regex": "^6.0.1"
-      },
-      "engines": {
-        "node": ">=12"
-      },
-      "funding": {
-        "url": "https://github.com/chalk/strip-ansi?sponsor=1"
-      }
-    },
-    "node_modules/strip-ansi-cjs": {
-      "name": "strip-ansi",
-      "version": "6.0.1",
-      "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz",
-      "integrity": "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "ansi-regex": "^5.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/strip-ansi-cjs/node_modules/ansi-regex": {
-      "version": "5.0.1",
-      "resolved": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz",
-      "integrity": "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/tar": {
-      "version": "6.2.1",
-      "resolved": "https://registry.npmjs.org/tar/-/tar-6.2.1.tgz",
-      "integrity": "sha512-DZ4yORTwrbTj/7MZYq2w+/ZFdI6OZ/f9SFHR+71gIVUZhOQPHzVCLpvRnPgyaMpfWxxk/4ONva3GQSyNIKRv6A==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "chownr": "^2.0.0",
-        "fs-minipass": "^2.0.0",
-        "minipass": "^5.0.0",
-        "minizlib": "^2.1.1",
-        "mkdirp": "^1.0.3",
-        "yallist": "^4.0.0"
-      },
-      "engines": {
-        "node": ">=10"
-      }
-    },
-    "node_modules/tar/node_modules/fs-minipass": {
-      "version": "2.1.0",
-      "resolved": "https://registry.npmjs.org/fs-minipass/-/fs-minipass-2.1.0.tgz",
-      "integrity": "sha512-V/JgOLFCS+R6Vcq0slCuaeWEdNC3ouDlJMNIsacH2VtALiu9mV4LPrHc5cDl8k5aw6J8jwgWWpiTo5RYhmIzvg==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "minipass": "^3.0.0"
-      },
-      "engines": {
-        "node": ">= 8"
-      }
-    },
-    "node_modules/tar/node_modules/fs-minipass/node_modules/minipass": {
-      "version": "3.3.6",
-      "resolved": "https://registry.npmjs.org/minipass/-/minipass-3.3.6.tgz",
-      "integrity": "sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "yallist": "^4.0.0"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/tar/node_modules/minipass": {
-      "version": "5.0.0",
-      "resolved": "https://registry.npmjs.org/minipass/-/minipass-5.0.0.tgz",
-      "integrity": "sha512-3FnjYuehv9k6ovOEbyOswadCDPX1piCfhV8ncmYtHOjuPwylVWsghTLo7rabjC3Rx5xD4HDx8Wm1xnMF7S5qFQ==",
-      "license": "ISC",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/tr46": {
-      "version": "0.0.3",
-      "resolved": "https://registry.npmjs.org/tr46/-/tr46-0.0.3.tgz",
-      "integrity": "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/unique-filename": {
-      "version": "3.0.0",
-      "resolved": "https://registry.npmjs.org/unique-filename/-/unique-filename-3.0.0.tgz",
-      "integrity": "sha512-afXhuC55wkAmZ0P18QsVE6kp8JaxrEokN2HGIoIVv2ijHQd419H0+6EigAFcIzXeMIkcIkNBpB3L/DXB3cTS/g==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "unique-slug": "^4.0.0"
-      },
-      "engines": {
-        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
-      }
-    },
-    "node_modules/unique-slug": {
-      "version": "4.0.0",
-      "resolved": "https://registry.npmjs.org/unique-slug/-/unique-slug-4.0.0.tgz",
-      "integrity": "sha512-WrcA6AyEfqDX5bWige/4NQfPZMtASNVxdmWR76WESYQVAACSgWcR6e9i0mofqqBxYFtL4oAxPIptY73/0YE1DQ==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "imurmurhash": "^0.1.4"
-      },
-      "engines": {
-        "node": "^14.17.0 || ^16.13.0 || >=18.0.0"
-      }
-    },
-    "node_modules/usb": {
-      "version": "2.16.0",
-      "resolved": "https://registry.npmjs.org/usb/-/usb-2.16.0.tgz",
-      "integrity": "sha512-jD88fvzDViMDH5KmmNJgzMBDj/95bDTt6+kBNaNxP4G98xUTnDMiLUY2CYmToba6JAFhM9VkcaQuxCNRLGR7zg==",
-      "hasInstallScript": true,
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "@types/w3c-web-usb": "^1.0.6",
-        "node-addon-api": "^8.0.0",
-        "node-gyp-build": "^4.5.0"
-      },
-      "engines": {
-        "node": ">=12.22.0 <13.0 || >=14.17.0"
-      }
-    },
-    "node_modules/util-deprecate": {
-      "version": "1.0.2",
-      "resolved": "https://registry.npmjs.org/util-deprecate/-/util-deprecate-1.0.2.tgz",
-      "integrity": "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/webidl-conversions": {
-      "version": "3.0.1",
-      "resolved": "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-3.0.1.tgz",
-      "integrity": "sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==",
-      "license": "BSD-2-Clause",
-      "optional": true
-    },
-    "node_modules/whatwg-url": {
-      "version": "5.0.0",
-      "resolved": "https://registry.npmjs.org/whatwg-url/-/whatwg-url-5.0.0.tgz",
-      "integrity": "sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "tr46": "~0.0.3",
-        "webidl-conversions": "^3.0.0"
-      }
-    },
-    "node_modules/which": {
-      "version": "4.0.0",
-      "resolved": "https://registry.npmjs.org/which/-/which-4.0.0.tgz",
-      "integrity": "sha512-GlaYyEb07DPxYCKhKzplCWBJtvxZcZMrL+4UkrTSJHHPyZU4mYYTv3qaOe77H7EODLSSopAUFAc6W8U4yqvscg==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "isexe": "^3.1.1"
-      },
-      "bin": {
-        "node-which": "bin/which.js"
-      },
-      "engines": {
-        "node": "^16.13.0 || >=18.0.0"
-      }
-    },
-    "node_modules/wide-align": {
-      "version": "1.1.5",
-      "resolved": "https://registry.npmjs.org/wide-align/-/wide-align-1.1.5.tgz",
-      "integrity": "sha512-eDMORYaPNZ4sQIuuYPDHdQvf4gyCF9rEEV/yPxGfwPkRodwEgiMUUXTx/dex+Me0wxx53S+NgUHaP7y3MGlDmg==",
-      "license": "ISC",
-      "optional": true,
-      "dependencies": {
-        "string-width": "^1.0.2 || 2 || 3 || 4"
-      }
-    },
-    "node_modules/wide-align/node_modules/ansi-regex": {
-      "version": "5.0.1",
-      "resolved": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz",
-      "integrity": "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/wide-align/node_modules/emoji-regex": {
-      "version": "8.0.0",
-      "resolved": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz",
-      "integrity": "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/wide-align/node_modules/string-width": {
-      "version": "4.2.3",
-      "resolved": "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz",
-      "integrity": "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "emoji-regex": "^8.0.0",
-        "is-fullwidth-code-point": "^3.0.0",
-        "strip-ansi": "^6.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/wide-align/node_modules/strip-ansi": {
-      "version": "6.0.1",
-      "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz",
-      "integrity": "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "ansi-regex": "^5.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/wrap-ansi": {
-      "version": "8.1.0",
-      "resolved": "https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-8.1.0.tgz",
-      "integrity": "sha512-si7QWI6zUMq56bESFvagtmzMdGOtoxfR+Sez11Mobfc7tm+VkUckk9bW2UeffTGVUbOksxmSw0AA2gs8g71NCQ==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "ansi-styles": "^6.1.0",
-        "string-width": "^5.0.1",
-        "strip-ansi": "^7.0.1"
-      },
-      "engines": {
-        "node": ">=12"
-      },
-      "funding": {
-        "url": "https://github.com/chalk/wrap-ansi?sponsor=1"
-      }
-    },
-    "node_modules/wrap-ansi-cjs": {
-      "name": "wrap-ansi",
-      "version": "7.0.0",
-      "resolved": "https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz",
-      "integrity": "sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "ansi-styles": "^4.0.0",
-        "string-width": "^4.1.0",
-        "strip-ansi": "^6.0.0"
-      },
-      "engines": {
-        "node": ">=10"
-      },
-      "funding": {
-        "url": "https://github.com/chalk/wrap-ansi?sponsor=1"
-      }
-    },
-    "node_modules/wrap-ansi-cjs/node_modules/ansi-regex": {
-      "version": "5.0.1",
-      "resolved": "https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz",
-      "integrity": "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==",
-      "license": "MIT",
-      "optional": true,
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/wrap-ansi-cjs/node_modules/ansi-styles": {
-      "version": "4.3.0",
-      "resolved": "https://registry.npmjs.org/ansi-styles/-/ansi-styles-4.3.0.tgz",
-      "integrity": "sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "color-convert": "^2.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      },
-      "funding": {
-        "url": "https://github.com/chalk/ansi-styles?sponsor=1"
-      }
-    },
-    "node_modules/wrap-ansi-cjs/node_modules/emoji-regex": {
-      "version": "8.0.0",
-      "resolved": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz",
-      "integrity": "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==",
-      "license": "MIT",
-      "optional": true
-    },
-    "node_modules/wrap-ansi-cjs/node_modules/string-width": {
-      "version": "4.2.3",
-      "resolved": "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz",
-      "integrity": "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "emoji-regex": "^8.0.0",
-        "is-fullwidth-code-point": "^3.0.0",
-        "strip-ansi": "^6.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/wrap-ansi-cjs/node_modules/strip-ansi": {
-      "version": "6.0.1",
-      "resolved": "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz",
-      "integrity": "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==",
-      "license": "MIT",
-      "optional": true,
-      "dependencies": {
-        "ansi-regex": "^5.0.1"
-      },
-      "engines": {
-        "node": ">=8"
-      }
-    },
-    "node_modules/wrappy": {
-      "version": "1.0.2",
-      "resolved": "https://registry.npmjs.org/wrappy/-/wrappy-1.0.2.tgz",
-      "integrity": "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==",
-      "license": "ISC",
-      "optional": true
-    },
-    "node_modules/yallist": {
-      "version": "4.0.0",
-      "resolved": "https://registry.npmjs.org/yallist/-/yallist-4.0.0.tgz",
-      "integrity": "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==",
-      "license": "ISC",
-      "optional": true
-    }
-  }
-}
-
-```
-
-## ble_messenger/package.json
-
-```
-{
-  "name": "lumia-example-ble-messenger",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Bluetooth Low Energy messaging plugin for Lumia Stream.",
-  "main": "main.js",
-  "keywords": ["lumia", "plugin", "bluetooth", "ble"],
-  "dependencies": {
-    "@abandonware/noble": "^1.9.2-15",
-    "@lumiastream/plugin": "^0.1.17"
-  }
-}
-
-```
-
-## cosmic_weather/README.md
-
-```
-# Weather
-
-A sample Lumia Stream plugin bundled with the SDK examples. It demonstrates how to require multiple npm packages from inside a plugin:
-
-- [`axios`](https://www.npmjs.com/package/axios) for HTTP requests
-- [`luxon`](https://www.npmjs.com/package/luxon) for time formatting
-- [`color`](https://www.npmjs.com/package/color) for palette generation
-- [`unique-names-generator`](https://www.npmjs.com/package/unique-names-generator) for playful AI-like verbiage
-
-The plugin fetches live weather data from the free [Open-Meteo](https://open-meteo.com/) APIs, remixes the response with synthwave-inspired copy, and emits a Lumia alert packed with neon-friendly metadata.
-
-## Getting Started
-
-```bash
-cd plugins/examples/weather
-npm install
-zip -r weather.lumiaplugin .
-```
-
-Install the resulting `weather.lumiaplugin` with the Lumia Stream plugin manager. After installation, open the **Weather** connection, enter a city, optionally add the state/region to disambiguate, and enable the recurring interval if you want automatic updates.
-
-Trigger the included "Trigger Forecast" action to broadcast a fresh neon forecast on demand—the action accepts both city and state inputs as well.
-
-## Notes
-
-- The example intentionally keeps dependencies unbundled so the runtime can exercise nested `node_modules/` lookups.
-- No API key is required—the sample uses the open endpoints for geocoding and current conditions.
-- Feel free to swap dependencies or enhance the visuals to experiment with the plugin sandbox.
-
-```
-
-## cosmic_weather/main.js
-
-```
-const { Plugin } = require("@lumiastream/plugin");
-const axios = require("axios");
-const Color = require("color");
-const { DateTime } = require("luxon");
-const {
-	uniqueNamesGenerator,
-	adjectives,
-	colors,
-	animals,
-} = require("unique-names-generator");
-
-const GEO_BASE_URL = "https://geocoding-api.open-meteo.com/v1/search";
-const WEATHER_BASE_URL = "https://api.open-meteo.com/v1/forecast";
-
-class CosmicWeather extends Plugin {
+class DivoomPixooPlugin extends Plugin {
 	constructor(manifest, context) {
 		super(manifest, context);
-		this._pollHandle = null;
-		this._lastWeatherType = null; // Track previous weather type for change detection
+
+		// Connection state tracking
+		this.connectionHealth = {
+			lastSuccessTime: 0,
+			consecutiveFailures: 0,
+			commandsSinceRefresh: 0,
+		};
+
+		// Rate limiting to prevent device crashes
+		this.lastPushTime = 0;
+		this.MIN_PUSH_INTERVAL = 1000; // 1 second minimum between screen updates
+		this.MAX_COMMANDS_BEFORE_REFRESH = 250; // Refresh before hitting 300-command limit
+
+		// PicID counter for Draw/SendHttpGif (resets at 1000 like pixoo-api library)
+		this.picIdCounter = 0;
 	}
 
 	async onload() {
-		await this.lumia.addLog("[CosmicWeather] Initializing neon satellites…");
-		const currentCity = this.settings.city || "Neo Tokyo";
-		const currentState = this.settings.state || "";
-		await this._broadcastForecast(
-			currentCity,
-			currentState,
-			this.settings.units
-		);
-
-		if (Number(this.settings.autoInterval) > 0) {
-			this._scheduleAutoForecast();
-		}
-
-		await this.lumia.addLog("[CosmicWeather] Online and glowing.");
-	}
-
-	async onunload() {
-		this._clearAutoForecast();
-		await this.lumia.addLog("[CosmicWeather] Going dark.");
+		await this.resetHttpGifId();
+		await this.testConnection();
 	}
 
 	async onsettingsupdate(settings, previousSettings) {
-		const cityChanged = settings.city !== previousSettings?.city;
-		const stateChanged = settings.state !== previousSettings?.state;
-		const unitsChanged = settings.units !== previousSettings?.units;
-		const scheduleChanged =
-			settings.autoInterval !== previousSettings?.autoInterval;
+		const addressChanged =
+			settings?.deviceAddress !== previousSettings?.deviceAddress;
+		const portChanged = settings?.devicePort !== previousSettings?.devicePort;
 
-		if (scheduleChanged) {
-			if (Number(settings.autoInterval) > 0) {
-				this._scheduleAutoForecast();
-			} else {
-				this._clearAutoForecast();
-			}
-		}
-
-		if (cityChanged || stateChanged || unitsChanged) {
-			await this._broadcastForecast(
-				settings.city,
-				settings.state,
-				settings.units
-			);
+		if (addressChanged || portChanged) {
+			await this.testConnection();
 		}
 	}
 
 	async actions(config = {}) {
 		const actionList = Array.isArray(config.actions) ? config.actions : [];
 
-		if (!actionList.length) {
-			return;
-		}
-
 		for (const action of actionList) {
-			if (action?.type === "triggerForecast") {
-				const city = action.value?.city || this.settings.city;
-				const state =
-					action.value?.state !== undefined
-						? action.value.state
-						: this.settings.state;
-				await this._broadcastForecast(city, state, this.settings.units);
+			const params = action?.value ?? action?.data ?? {};
+
+			try {
+				switch (action.type) {
+					case "set_brightness":
+						await this.setBrightness(
+							this.normalizeNumber(params.brightness, 0, 100, 50),
+						);
+						break;
+
+					case "send_text":
+						await this.sendText({
+							message: String(params.message || ""),
+							color: params.color || "#FFFFFF",
+							scrollSpeed: this.normalizeNumber(params.scrollSpeed, 1, 100, 32),
+							direction: params.direction || "left",
+							repeat: this.normalizeNumber(params.repeat, 0, 10, 1),
+							align: params.align || "center",
+						});
+						break;
+
+					case "clear_screen":
+						await this.clearScreen(params.color || "#000000");
+						break;
+
+					case "draw_pixel":
+						await this.drawPixel(params.pixels || "");
+						break;
+
+					case "draw_filled_rectangle":
+						await this.drawFilledRectangle(params.rectangles || "");
+						break;
+
+					case "play_gif_url":
+						await this.playGifFromUrl(params.url || "");
+						break;
+
+					case "set_screen_on":
+						await this.setScreenPower(true);
+						break;
+
+					case "set_screen_off":
+						await this.setScreenPower(false);
+						break;
+
+					case "play_buzzer":
+						await this.playBuzzer(
+							this.normalizeNumber(params.duration, 100, 5000, 500),
+						);
+						break;
+
+					case "reset_display":
+						await this.resetDisplay();
+						break;
+
+					case "send_raw_command":
+						await this.sendRaw(
+							params.command || "",
+							this.parseJson(params.payload),
+						);
+						break;
+
+					default:
+						await this.lumia.addLog(
+							`[Divoom Pixoo] Unknown action: ${String(action.type)}`,
+						);
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await this.lumia.addLog(
+					`[Divoom Pixoo] Error in action ${action.type}: ${message}`,
+				);
 			}
 		}
 	}
 
-	async validateAuth() {
-		const city = (this.settings.city || "").trim();
-		const state = (this.settings.state || "").trim();
+	// ============================================================================
+	// Connection Management
+	// ============================================================================
 
-		if (!city) {
+	async testConnection() {
+		const address = this.getDeviceAddress();
+		if (!address) {
 			await this.lumia.addLog(
-				"[CosmicWeather] Validation failed: City setting is required to resolve a forecast."
+				"[Divoom Pixoo] ⚠️ Device address not configured",
 			);
+			await this.lumia.showToast({
+				message: "Please configure Pixoo device IP address in settings",
+			});
 			return false;
 		}
 
-		try {
-			await this._resolveLocation(city, state);
+		const result = await this.sendCommand("Device/GetDeviceTime", {});
+
+		if (result.success) {
+			this.connectionHealth.lastSuccessTime = Date.now();
+			this.connectionHealth.consecutiveFailures = 0;
 			return true;
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(`[CosmicWeather] Validation failed: ${message}`);
-			return false;
-		}
-	}
-
-	_scheduleAutoForecast() {
-		const intervalMinutes = Number(this.settings.autoInterval);
-
-		if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) {
-			this._clearAutoForecast();
-			return;
-		}
-
-		this._clearAutoForecast();
-		this._pollHandle = setInterval(() => {
-			void this._broadcastForecast(
-				this.settings.city,
-				this.settings.state,
-				this.settings.units
-			);
-		}, intervalMinutes * 60 * 1000);
-	}
-
-	_clearAutoForecast() {
-		if (this._pollHandle) {
-			clearInterval(this._pollHandle);
-			this._pollHandle = null;
-		}
-	}
-
-	async _broadcastForecast(city = "Neo Tokyo", state = "", units = "metric") {
-		try {
-			const forecast = await this._createForecast(city, state, units);
-
-			await this.lumia.updateSettings({
-				lastUpdated: forecast.renderedAt,
-				temperature: forecast.displayTemperature,
-			});
-
-			await this._updateVariables(forecast);
-			await this._triggerAlert(forecast);
-			// Toast
-			this.lumia.showToast({
-				message: `Forecast broadcasted for ${
-					forecast.city
-				} with ${JSON.stringify(forecast)}`,
-			});
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(`[CosmicWeather] Forecast failed: ${message}`);
-		}
-	}
-
-	async _createForecast(city, state, units) {
-		const location = await this._resolveLocation(city, state);
-		const weather = await this._fetchWeather(location, units);
-		const palette = this._buildPalette(weather.temperatureC);
-		const vibe = uniqueNamesGenerator({
-			dictionaries: [adjectives, colors, animals],
-			separator: " ",
-			style: "capital",
-		});
-
-		const renderedAt = DateTime.utc().toISO();
-		const displayTemperature =
-			units === "imperial"
-				? `${(weather.temperatureC * 9) / 5 + 32}°F`
-				: `${weather.temperatureC}°C`;
-
-		const weatherType = this._categorizeWeatherType(weather.weatherCode);
-
-		return {
-			city: location.displayName,
-			state: location.state,
-			country: location.country,
-			latitude: location.latitude,
-			longitude: location.longitude,
-			temperatureC: weather.temperatureC,
-			displayTemperature,
-			summary: weather.summary,
-			weatherCode: weather.weatherCode,
-			weatherType,
-			trend: vibe,
-			palette,
-			renderedAt,
-		};
-	}
-
-	async _resolveLocation(city, state) {
-		const trimmedCity = (city || "").trim();
-		const trimmedState = (state || "").trim();
-
-		if (!trimmedCity) {
-			throw new Error("City is required to fetch a forecast");
-		}
-
-		const fetchLocations = async (query, limit = 5) => {
-			const response = await axios.get(GEO_BASE_URL, {
-				params: {
-					name: query,
-					count: limit,
-					language: "en",
-					format: "json",
-				},
-			});
-			return Array.isArray(response.data?.results) ? response.data.results : [];
-		};
-
-		const normalize = (value) =>
-			typeof value === "string"
-				? value.toLowerCase().replace(/\./g, "").trim()
-				: "";
-
-		let results = await fetchLocations(trimmedCity, trimmedState ? 10 : 5);
-		if (!results.length && trimmedState) {
-			results = await fetchLocations(`${trimmedCity} ${trimmedState}`, 10);
-		}
-
-		if (!results.length) {
-			const target = trimmedState
-				? `${trimmedCity}, ${trimmedState}`
-				: trimmedCity;
-			throw new Error(`Unable to locate coordinates for ${target}`);
-		}
-
-		let selection = results[0];
-
-		if (trimmedState) {
-			const normalizedState = normalize(trimmedState);
-			const exactMatch = results.find(
-				(location) => normalize(location.admin1) === normalizedState
-			);
-			const partialMatch = results.find((location) =>
-				normalize(location.admin1)?.includes(normalizedState)
-			);
-			selection = exactMatch || partialMatch || selection;
-		}
-
-		const stateName = selection.admin1 || "";
-		const countryName = selection.country || selection.country_code || "";
-		return {
-			name: selection.name,
-			displayName:
-				trimmedState && stateName
-					? `${selection.name}, ${stateName}`
-					: selection.name,
-			state: stateName,
-			country: countryName,
-			latitude: selection.latitude,
-			longitude: selection.longitude,
-		};
-	}
-
-	async _fetchWeather(location, units) {
-		const params = {
-			latitude: location.latitude,
-			longitude: location.longitude,
-			current_weather: true,
-			timezone: "UTC",
-		};
-
-		const response = await axios.get(WEATHER_BASE_URL, { params });
-		const current = response.data?.current_weather;
-
-		if (!current) {
-			throw new Error("Weather payload missing current conditions");
-		}
-
-		const temperatureC = Math.round(current.temperature);
-		const weatherCode = current.weathercode;
-		const summary = this._describeConditions(weatherCode);
-
-		return {
-			temperatureC,
-			summary,
-			weatherCode,
-		};
-	}
-
-	_describeConditions(code) {
-		const lookup = {
-			0: "crystal-clear neon skies",
-			1: "dreamy synth clouds",
-			2: "lo-fi drifting fog",
-			3: "electric overcast",
-			45: "holographic haze",
-			51: "pixel drizzle",
-			61: "analog rain showers",
-			71: "laser snowfall",
-			80: "glitchy downpour",
-			95: "thunderous bass storms",
-		};
-		return lookup[code] || "mysterious cosmic weather";
-	}
-
-	_categorizeWeatherType(code) {
-		// Categorize weather codes into types for significant change detection
-		if (code === 0 || code === 1) return "clear";
-		if (code === 2 || code === 3) return "cloudy";
-		if (code === 45) return "foggy";
-		if (code === 51 || code === 61 || code === 80) return "rainy";
-		if (code === 71) return "snowy";
-		if (code === 95) return "stormy";
-		return "unknown";
-	}
-
-	_buildPalette(tempC) {
-		const base = tempC > 25 ? Color("#ff2e92") : Color("#00f0ff");
-		const accent = base.rotate(tempC > 25 ? 45 : -45).lighten(0.2);
-		const shadow = base.darken(0.4);
-
-		return {
-			base: base.hex(),
-			accent: accent.hex(),
-			shadow: shadow.hex(),
-		};
-	}
-
-	async _updateVariables(forecast) {
-		await this.lumia.setVariable("city", forecast.city);
-		await this.lumia.setVariable("temperature", forecast.displayTemperature);
-		await this.lumia.setVariable("trend", forecast.trend);
-	}
-
-	async _triggerAlert(forecast) {
-		// Only trigger alert if weather type has significantly changed
-		const currentWeatherType = forecast.weatherType;
-		const hasChanged = this._lastWeatherType !== currentWeatherType;
-
-		if (hasChanged) {
-			const previousType = this._lastWeatherType || "none";
-
-			await this.lumia.triggerAlert({
-				alert: "weatherChange",
-				dynamic: {
-					city: forecast.city,
-					temperature: forecast.displayTemperature,
-					summary: forecast.summary,
-					trend: forecast.trend,
-					palette: forecast.palette,
-					timestamp: forecast.renderedAt,
-					weatherType: currentWeatherType,
-					previousWeatherType: previousType,
-				},
-			});
-
-			await this.lumia.addLog(
-				`[CosmicWeather] Weather changed: ${previousType} → ${currentWeatherType}`
-			);
-
-			// Update the last weather type after triggering
-			this._lastWeatherType = currentWeatherType;
 		} else {
 			await this.lumia.addLog(
-				`[CosmicWeather] Weather type unchanged (${currentWeatherType}), skipping alert`
+				`[Divoom Pixoo] ❌ Connection failed: ${result.error}`,
+			);
+			await this.lumia.showToast({
+				message: `Failed to connect to Pixoo: ${result.error}`,
+			});
+			this.connectionHealth.consecutiveFailures++;
+			return false;
+		}
+	}
+
+	shouldRefreshConnection() {
+		// Refresh connection before hitting the ~300 command limit
+		return (
+			this.connectionHealth.commandsSinceRefresh >=
+			this.MAX_COMMANDS_BEFORE_REFRESH
+		);
+	}
+
+	async refreshConnection() {
+		await this.lumia.addLog(
+			"[Divoom Pixoo] Refreshing connection to prevent device freeze...",
+		);
+
+		// Send a simple query to reset internal counter
+		const result = await this.sendCommand("Device/GetDeviceTime", {});
+
+		if (!result.success) {
+			await this.lumia.addLog(
+				"[Divoom Pixoo] Connection refresh failed, will retry",
 			);
 		}
 	}
-}
 
-module.exports = CosmicWeather;
+	// ============================================================================
+	// Device Control Actions
+	// ============================================================================
 
-```
+	async setBrightness(brightness) {
+		const value = Math.round(brightness);
+		const result = await this.sendCommand("Channel/SetBrightness", {
+			Brightness: value,
+		});
 
-## cosmic_weather/manifest.json
-
-```
-{
-	"id": "cosmic_weather",
-	"name": "Cosmic Weather",
-	"version": "1.0.0",
-	"author": "Lumia Stream",
-	"description": "Streams weather reports and alerts when the weather changes.",
-	"license": "MIT",
-	"lumiaVersion": ">=8.9.0",
-	"category": "utilities",
-	"icon": "cosmic-weather.png",
-	"config": {
-		"settings": [
-			{
-				"key": "city",
-				"label": "City",
-				"type": "text",
-				"placeholder": "San Francisco",
-				"defaultValue": "San Francisco",
-				"required": true
-			},
-			{
-				"key": "state",
-				"label": "State / Region",
-				"type": "text",
-				"placeholder": "California",
-				"defaultValue": "",
-				"helperText": "Optional: narrow the geocoding to a specific state or region."
-			},
-			{
-				"key": "units",
-				"label": "Units",
-				"type": "select",
-				"defaultValue": "metric",
-				"options": [
-					{ "label": "Celsius", "value": "metric" },
-					{ "label": "Fahrenheit", "value": "imperial" }
-				]
-			},
-			{
-				"key": "autoInterval",
-				"label": "Auto Forecast Interval (minutes)",
-				"type": "number",
-				"defaultValue": 0,
-				"helperText": "Set to a value greater than 0 to schedule recurring synthwave forecasts."
-			},
-			{
-				"key": "apiKey",
-				"label": "Weather API Key",
-				"type": "password",
-				"helperText": "Optional: provide an OpenWeather-style API key to fetch live data."
-			}
-		],
-		"actions": [
-			{
-				"type": "triggerForecast",
-				"label": "Trigger Forecast",
-				"description": "Push a fresh synthwave forecast to Lumia",
-				"fields": [
-					{
-						"key": "city",
-						"label": "City",
-						"type": "text",
-						"placeholder": "San Francisco"
-					},
-					{
-						"key": "state",
-						"label": "State / Region",
-						"type": "text",
-						"placeholder": "California"
-					}
-				]
-			}
-		],
-		"alerts": [
-			{
-				"title": "Weather Change",
-				"key": "weatherChange",
-				"info": "Plays when a a major weather change is detected. For example, from sunny to cloudy, or from clear to rain.",
-				"defaultMessage": "{{city}} is glowing at {{temperature}}° with {{summary}} vibes",
-				"acceptedVariables": [
-					"city",
-					"temperature",
-					"summary",
-					"trend",
-					"palette",
-					"timestamp",
-					"weatherType",
-					"previousWeatherType"
-				]
-			}
-		],
-		"variables": [
-			{
-				"name": "cosmic_weather_city",
-				"description": "City last forecasted",
-				"value": ""
-			},
-			{
-				"name": "cosmic_weather_temperature",
-				"description": "Last temperature reading",
-				"value": ""
-			}
-		]
+		if (!result.success) {
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to set brightness: ${result.error}`,
+			);
+		}
+		return result.success;
 	}
-}
 
-```
+	async setChannel(channel, id) {
+		// Map channel types to indices (based on pixoo-api library)
+		const channelIndexMap = {
+			faces: 0,
+			cloud: 1,
+			visualizer: 2,
+			custom: 3,
+			clock: 0, // Alias for faces
+		};
 
-## cosmic_weather/package-lock.json
+		// First switch to the base channel using SetIndex
+		const channelIndex = channelIndexMap[channel] ?? 0;
+		await this.sendCommand("Channel/SetIndex", { SelectIndex: channelIndex });
 
-```
-{
-	"name": "weather",
-	"version": "1.0.0",
-	"lockfileVersion": 3,
-	"requires": true,
-	"packages": {
-		"": {
-			"name": "weather",
-			"version": "1.0.0",
-			"license": "MIT",
-			"dependencies": {
-				"axios": "^1.6.7",
-				"color": "^4.2.3",
-				"luxon": "^3.4.4",
-				"unique-names-generator": "^4.7.1"
-			}
-		},
-		"node_modules/async-function": {
-			"version": "1.0.0",
-			"resolved": "https://registry.npmjs.org/async-function/-/async-function-1.0.0.tgz",
-			"integrity": "sha512-hsU18Ae8CDTR6Kgu9DYf0EbCr/a5iGL0rytQDobUcdpYOKokk8LEjVphnXkDkgpi0wYVsqrXuP0bZxJaTqdgoA==",
-			"license": "MIT",
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/async-generator-function": {
-			"version": "1.0.0",
-			"resolved": "https://registry.npmjs.org/async-generator-function/-/async-generator-function-1.0.0.tgz",
-			"integrity": "sha512-+NAXNqgCrB95ya4Sr66i1CL2hqLVckAk7xwRYWdcm39/ELQ6YNn1aw5r0bdQtqNZgQpEWzc5yc/igXc7aL5SLA==",
-			"license": "MIT",
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/asynckit": {
-			"version": "0.4.0",
-			"resolved": "https://registry.npmjs.org/asynckit/-/asynckit-0.4.0.tgz",
-			"integrity": "sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==",
-			"license": "MIT"
-		},
-		"node_modules/axios": {
-			"version": "1.12.2",
-			"resolved": "https://registry.npmjs.org/axios/-/axios-1.12.2.tgz",
-			"integrity": "sha512-vMJzPewAlRyOgxV2dU0Cuz2O8zzzx9VYtbJOaBgXFeLc4IV/Eg50n4LowmehOOR61S8ZMpc2K5Sa7g6A4jfkUw==",
-			"license": "MIT",
-			"dependencies": {
-				"follow-redirects": "^1.15.6",
-				"form-data": "^4.0.4",
-				"proxy-from-env": "^1.1.0"
-			}
-		},
-		"node_modules/call-bind-apply-helpers": {
-			"version": "1.0.2",
-			"resolved": "https://registry.npmjs.org/call-bind-apply-helpers/-/call-bind-apply-helpers-1.0.2.tgz",
-			"integrity": "sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==",
-			"license": "MIT",
-			"dependencies": {
-				"es-errors": "^1.3.0",
-				"function-bind": "^1.1.2"
-			},
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/color": {
-			"version": "4.2.3",
-			"resolved": "https://registry.npmjs.org/color/-/color-4.2.3.tgz",
-			"integrity": "sha512-1rXeuUUiGGrykh+CeBdu5Ie7OJwinCgQY0bc7GCRxy5xVHy+moaqkpL/jqQq0MtQOeYcrqEz4abc5f0KtU7W4A==",
-			"license": "MIT",
-			"dependencies": {
-				"color-convert": "^2.0.1",
-				"color-string": "^1.9.0"
-			},
-			"engines": {
-				"node": ">=12.5.0"
-			}
-		},
-		"node_modules/color-convert": {
-			"version": "2.0.1",
-			"resolved": "https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz",
-			"integrity": "sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==",
-			"license": "MIT",
-			"dependencies": {
-				"color-name": "~1.1.4"
-			},
-			"engines": {
-				"node": ">=7.0.0"
-			}
-		},
-		"node_modules/color-name": {
-			"version": "1.1.4",
-			"resolved": "https://registry.npmjs.org/color-name/-/color-name-1.1.4.tgz",
-			"integrity": "sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==",
-			"license": "MIT"
-		},
-		"node_modules/color-string": {
-			"version": "1.9.1",
-			"resolved": "https://registry.npmjs.org/color-string/-/color-string-1.9.1.tgz",
-			"integrity": "sha512-shrVawQFojnZv6xM40anx4CkoDP+fZsw/ZerEMsW/pyzsRbElpsL/DBVW7q3ExxwusdNXI3lXpuhEZkzs8p5Eg==",
-			"license": "MIT",
-			"dependencies": {
-				"color-name": "^1.0.0",
-				"simple-swizzle": "^0.2.2"
-			}
-		},
-		"node_modules/combined-stream": {
-			"version": "1.0.8",
-			"resolved": "https://registry.npmjs.org/combined-stream/-/combined-stream-1.0.8.tgz",
-			"integrity": "sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==",
-			"license": "MIT",
-			"dependencies": {
-				"delayed-stream": "~1.0.0"
-			},
-			"engines": {
-				"node": ">= 0.8"
-			}
-		},
-		"node_modules/delayed-stream": {
-			"version": "1.0.0",
-			"resolved": "https://registry.npmjs.org/delayed-stream/-/delayed-stream-1.0.0.tgz",
-			"integrity": "sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==",
-			"license": "MIT",
-			"engines": {
-				"node": ">=0.4.0"
-			}
-		},
-		"node_modules/dunder-proto": {
-			"version": "1.0.1",
-			"resolved": "https://registry.npmjs.org/dunder-proto/-/dunder-proto-1.0.1.tgz",
-			"integrity": "sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==",
-			"license": "MIT",
-			"dependencies": {
-				"call-bind-apply-helpers": "^1.0.1",
-				"es-errors": "^1.3.0",
-				"gopd": "^1.2.0"
-			},
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/es-define-property": {
-			"version": "1.0.1",
-			"resolved": "https://registry.npmjs.org/es-define-property/-/es-define-property-1.0.1.tgz",
-			"integrity": "sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g==",
-			"license": "MIT",
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/es-errors": {
-			"version": "1.3.0",
-			"resolved": "https://registry.npmjs.org/es-errors/-/es-errors-1.3.0.tgz",
-			"integrity": "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw==",
-			"license": "MIT",
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/es-object-atoms": {
-			"version": "1.1.1",
-			"resolved": "https://registry.npmjs.org/es-object-atoms/-/es-object-atoms-1.1.1.tgz",
-			"integrity": "sha512-FGgH2h8zKNim9ljj7dankFPcICIK9Cp5bm+c2gQSYePhpaG5+esrLODihIorn+Pe6FGJzWhXQotPv73jTaldXA==",
-			"license": "MIT",
-			"dependencies": {
-				"es-errors": "^1.3.0"
-			},
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/es-set-tostringtag": {
-			"version": "2.1.0",
-			"resolved": "https://registry.npmjs.org/es-set-tostringtag/-/es-set-tostringtag-2.1.0.tgz",
-			"integrity": "sha512-j6vWzfrGVfyXxge+O0x5sh6cvxAog0a/4Rdd2K36zCMV5eJ+/+tOAngRO8cODMNWbVRdVlmGZQL2YS3yR8bIUA==",
-			"license": "MIT",
-			"dependencies": {
-				"es-errors": "^1.3.0",
-				"get-intrinsic": "^1.2.6",
-				"has-tostringtag": "^1.0.2",
-				"hasown": "^2.0.2"
-			},
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/follow-redirects": {
-			"version": "1.15.11",
-			"resolved": "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.15.11.tgz",
-			"integrity": "sha512-deG2P0JfjrTxl50XGCDyfI97ZGVCxIpfKYmfyrQ54n5FO/0gfIES8C/Psl6kWVDolizcaaxZJnTS0QSMxvnsBQ==",
-			"funding": [
-				{
-					"type": "individual",
-					"url": "https://github.com/sponsors/RubenVerborgh"
-				}
-			],
-			"license": "MIT",
-			"engines": {
-				"node": ">=4.0"
-			},
-			"peerDependenciesMeta": {
-				"debug": {
-					"optional": true
-				}
-			}
-		},
-		"node_modules/form-data": {
-			"version": "4.0.4",
-			"resolved": "https://registry.npmjs.org/form-data/-/form-data-4.0.4.tgz",
-			"integrity": "sha512-KrGhL9Q4zjj0kiUt5OO4Mr/A/jlI2jDYs5eHBpYHPcBEVSiipAvn2Ko2HnPe20rmcuuvMHNdZFp+4IlGTMF0Ow==",
-			"license": "MIT",
-			"dependencies": {
-				"asynckit": "^0.4.0",
-				"combined-stream": "^1.0.8",
-				"es-set-tostringtag": "^2.1.0",
-				"hasown": "^2.0.2",
-				"mime-types": "^2.1.12"
-			},
-			"engines": {
-				"node": ">= 6"
-			}
-		},
-		"node_modules/function-bind": {
-			"version": "1.1.2",
-			"resolved": "https://registry.npmjs.org/function-bind/-/function-bind-1.1.2.tgz",
-			"integrity": "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==",
-			"license": "MIT",
-			"funding": {
-				"url": "https://github.com/sponsors/ljharb"
-			}
-		},
-		"node_modules/generator-function": {
-			"version": "2.0.0",
-			"resolved": "https://registry.npmjs.org/generator-function/-/generator-function-2.0.0.tgz",
-			"integrity": "sha512-xPypGGincdfyl/AiSGa7GjXLkvld9V7GjZlowup9SHIJnQnHLFiLODCd/DqKOp0PBagbHJ68r1KJI9Mut7m4sA==",
-			"license": "MIT",
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/get-intrinsic": {
-			"version": "1.3.1",
-			"resolved": "https://registry.npmjs.org/get-intrinsic/-/get-intrinsic-1.3.1.tgz",
-			"integrity": "sha512-fk1ZVEeOX9hVZ6QzoBNEC55+Ucqg4sTVwrVuigZhuRPESVFpMyXnd3sbXvPOwp7Y9riVyANiqhEuRF0G1aVSeQ==",
-			"license": "MIT",
-			"dependencies": {
-				"async-function": "^1.0.0",
-				"async-generator-function": "^1.0.0",
-				"call-bind-apply-helpers": "^1.0.2",
-				"es-define-property": "^1.0.1",
-				"es-errors": "^1.3.0",
-				"es-object-atoms": "^1.1.1",
-				"function-bind": "^1.1.2",
-				"generator-function": "^2.0.0",
-				"get-proto": "^1.0.1",
-				"gopd": "^1.2.0",
-				"has-symbols": "^1.1.0",
-				"hasown": "^2.0.2",
-				"math-intrinsics": "^1.1.0"
-			},
-			"engines": {
-				"node": ">= 0.4"
-			},
-			"funding": {
-				"url": "https://github.com/sponsors/ljharb"
-			}
-		},
-		"node_modules/get-proto": {
-			"version": "1.0.1",
-			"resolved": "https://registry.npmjs.org/get-proto/-/get-proto-1.0.1.tgz",
-			"integrity": "sha512-sTSfBjoXBp89JvIKIefqw7U2CCebsc74kiY6awiGogKtoSGbgjYE/G/+l9sF3MWFPNc9IcoOC4ODfKHfxFmp0g==",
-			"license": "MIT",
-			"dependencies": {
-				"dunder-proto": "^1.0.1",
-				"es-object-atoms": "^1.0.0"
-			},
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/gopd": {
-			"version": "1.2.0",
-			"resolved": "https://registry.npmjs.org/gopd/-/gopd-1.2.0.tgz",
-			"integrity": "sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==",
-			"license": "MIT",
-			"engines": {
-				"node": ">= 0.4"
-			},
-			"funding": {
-				"url": "https://github.com/sponsors/ljharb"
-			}
-		},
-		"node_modules/has-symbols": {
-			"version": "1.1.0",
-			"resolved": "https://registry.npmjs.org/has-symbols/-/has-symbols-1.1.0.tgz",
-			"integrity": "sha512-1cDNdwJ2Jaohmb3sg4OmKaMBwuC48sYni5HUw2DvsC8LjGTLK9h+eb1X6RyuOHe4hT0ULCW68iomhjUoKUqlPQ==",
-			"license": "MIT",
-			"engines": {
-				"node": ">= 0.4"
-			},
-			"funding": {
-				"url": "https://github.com/sponsors/ljharb"
-			}
-		},
-		"node_modules/has-tostringtag": {
-			"version": "1.0.2",
-			"resolved": "https://registry.npmjs.org/has-tostringtag/-/has-tostringtag-1.0.2.tgz",
-			"integrity": "sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==",
-			"license": "MIT",
-			"dependencies": {
-				"has-symbols": "^1.0.3"
-			},
-			"engines": {
-				"node": ">= 0.4"
-			},
-			"funding": {
-				"url": "https://github.com/sponsors/ljharb"
-			}
-		},
-		"node_modules/hasown": {
-			"version": "2.0.2",
-			"resolved": "https://registry.npmjs.org/hasown/-/hasown-2.0.2.tgz",
-			"integrity": "sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==",
-			"license": "MIT",
-			"dependencies": {
-				"function-bind": "^1.1.2"
-			},
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/is-arrayish": {
-			"version": "0.3.4",
-			"resolved": "https://registry.npmjs.org/is-arrayish/-/is-arrayish-0.3.4.tgz",
-			"integrity": "sha512-m6UrgzFVUYawGBh1dUsWR5M2Clqic9RVXC/9f8ceNlv2IcO9j9J/z8UoCLPqtsPBFNzEpfR3xftohbfqDx8EQA==",
-			"license": "MIT"
-		},
-		"node_modules/luxon": {
-			"version": "3.7.2",
-			"resolved": "https://registry.npmjs.org/luxon/-/luxon-3.7.2.tgz",
-			"integrity": "sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==",
-			"license": "MIT",
-			"engines": {
-				"node": ">=12"
-			}
-		},
-		"node_modules/math-intrinsics": {
-			"version": "1.1.0",
-			"resolved": "https://registry.npmjs.org/math-intrinsics/-/math-intrinsics-1.1.0.tgz",
-			"integrity": "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==",
-			"license": "MIT",
-			"engines": {
-				"node": ">= 0.4"
-			}
-		},
-		"node_modules/mime-db": {
-			"version": "1.52.0",
-			"resolved": "https://registry.npmjs.org/mime-db/-/mime-db-1.52.0.tgz",
-			"integrity": "sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==",
-			"license": "MIT",
-			"engines": {
-				"node": ">= 0.6"
-			}
-		},
-		"node_modules/mime-types": {
-			"version": "2.1.35",
-			"resolved": "https://registry.npmjs.org/mime-types/-/mime-types-2.1.35.tgz",
-			"integrity": "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw==",
-			"license": "MIT",
-			"dependencies": {
-				"mime-db": "1.52.0"
-			},
-			"engines": {
-				"node": ">= 0.6"
-			}
-		},
-		"node_modules/proxy-from-env": {
-			"version": "1.1.0",
-			"resolved": "https://registry.npmjs.org/proxy-from-env/-/proxy-from-env-1.1.0.tgz",
-			"integrity": "sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg==",
-			"license": "MIT"
-		},
-		"node_modules/simple-swizzle": {
-			"version": "0.2.4",
-			"resolved": "https://registry.npmjs.org/simple-swizzle/-/simple-swizzle-0.2.4.tgz",
-			"integrity": "sha512-nAu1WFPQSMNr2Zn9PGSZK9AGn4t/y97lEm+MXTtUDwfP0ksAIX4nO+6ruD9Jwut4C49SB1Ws+fbXsm/yScWOHw==",
-			"license": "MIT",
-			"dependencies": {
-				"is-arrayish": "^0.3.1"
-			}
-		},
-		"node_modules/unique-names-generator": {
-			"version": "4.7.1",
-			"resolved": "https://registry.npmjs.org/unique-names-generator/-/unique-names-generator-4.7.1.tgz",
-			"integrity": "sha512-lMx9dX+KRmG8sq6gulYYpKWZc9RlGsgBR6aoO8Qsm3qvkSJ+3rAymr+TnV8EDMrIrwuFJ4kruzMWM/OpYzPoow==",
-			"license": "MIT",
-			"engines": {
-				"node": ">=8"
+		// Small delay for channel switch to take effect
+		await new Promise((resolve) => setTimeout(resolve, 300));
+
+		// Then set the specific ID if applicable
+		if (id !== undefined && id !== null) {
+			const mapping = {
+				faces: { command: "Channel/SetClock", key: "ClockId" },
+				clock: { command: "Channel/SetClock", key: "ClockId" },
+				visualizer: { command: "Channel/SetVisualizer", key: "VisualizerId" },
+				custom: { command: "Channel/SetCustomPageIndex", key: "Index" },
+			};
+
+			const entry = mapping[channel];
+			if (entry) {
+				const payload = {};
+				payload[entry.key] = Math.floor(id);
+				await this.sendCommand(entry.command, payload);
 			}
 		}
+
+		return true;
+	}
+
+	async exitCustomMode() {
+		// Switch to channel index 3 (Cloud/Custom channel) to exit any blocking modes
+		await this.sendCommand("Channel/SetIndex", { SelectIndex: 3 });
+		// Small delay to let the device process the mode change
+		await new Promise((resolve) => setTimeout(resolve, 300));
+	}
+
+	async sendText({ message, color, scrollSpeed, direction, repeat, align }) {
+		const trimmed = message.trim();
+		if (!trimmed) {
+			await this.lumia.addLog("[Divoom Pixoo] Text message cannot be empty");
+			return false;
+		}
+
+		// Truncate to max 512 chars (API limit)
+		const text = trimmed.substring(0, 512);
+
+		// Clear the screen first using the buffer approach (like pixels)
+		await this.clearScreen("#000000");
+
+		const directionMap = { left: 0, right: 1 }; // API only supports left/right for dir
+		const alignMap = { left: 1, center: 2, right: 3 };
+
+		const { width } = this.getDefaultDimensions();
+
+		// Ensure TextWidth is between 16-64 as per API docs
+		const textWidth = Math.max(16, Math.min(64, width));
+
+		const payload = {
+			LcdId: 0, // Standard display
+			TextId: 1, // Unique ID (1-19)
+			x: 0,
+			y: 0,
+			dir: directionMap[direction] ?? directionMap.left,
+			font: 0, // App animation font (0-7)
+			TextWidth: textWidth,
+			TextString: text,
+			speed: Math.round(scrollSpeed), // Time in ms per step
+			color: this.hexToDecimalColor(color),
+			align: alignMap[align] ?? alignMap.center,
+		};
+
+		const result = await this.sendCommand("Draw/SendHttpText", payload);
+
+		if (!result.success) {
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to send text: ${result.error}`,
+			);
+		}
+		return result.success;
+	}
+
+	async clearScreen(color = "#000000") {
+		// Ensure we're in the right channel for drawing
+		await this.exitCustomMode();
+
+		const rgb = this.parseColorToRGB(color);
+		const { width, height } = this.getDefaultDimensions();
+
+		// Create a full buffer filled with the specified color
+		const buffer = [];
+		for (let i = 0; i < width * height; i++) {
+			buffer.push(rgb[0], rgb[1], rgb[2]);
+		}
+
+		// Encode as base64 and send
+		const base64Data = this.encodeBase64(buffer);
+		const result = await this.sendHttpGif(base64Data, width);
+
+		if (!result.success) {
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to clear screen: ${result.error}`,
+			);
+		}
+		return result.success;
+	}
+
+	async drawPixel(pixelsInput) {
+		// Clear the screen first (required for all drawing actions)
+		await this.clearScreen("#000000");
+
+		const { width, height } = this.getDefaultDimensions();
+
+		// Create black canvas buffer
+		const buffer = [];
+		for (let i = 0; i < width * height; i++) {
+			buffer.push(0, 0, 0);
+		}
+
+		// Parse pixels: "x,y,color;x,y,color" or newline-separated
+		const input = String(pixelsInput || "").replace(/\n/g, ";");
+		const pixels = input.split(";").filter((p) => p.trim());
+		let drawnCount = 0;
+
+		for (const pixelStr of pixels) {
+			const parts = pixelStr.split(",").map((p) => p.trim());
+			if (parts.length < 3) continue;
+
+			const x = this.normalizeNumber(parts[0], 0, width - 1, 0);
+			const y = this.normalizeNumber(parts[1], 0, height - 1, 0);
+			const color = parts[2];
+			const rgb = this.parseColorToRGB(color);
+
+			// Set pixel in buffer
+			const index = (y * width + x) * 3;
+			buffer[index] = rgb[0];
+			buffer[index + 1] = rgb[1];
+			buffer[index + 2] = rgb[2];
+			drawnCount++;
+		}
+
+		if (drawnCount === 0) {
+			await this.lumia.addLog("[Divoom Pixoo] No valid pixels to draw");
+			return false;
+		}
+
+		// Encode as base64 and send
+		const base64Data = this.encodeBase64(buffer);
+		const result = await this.sendHttpGif(base64Data, width);
+
+		if (!result.success) {
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to draw pixels: ${result.error}`,
+			);
+		}
+		return result.success;
+	}
+
+	async drawFilledRectangle(rectanglesInput) {
+		// Clear the screen first (required for all drawing actions)
+		await this.clearScreen("#000000");
+
+		const { width, height } = this.getDefaultDimensions();
+
+		// Create black canvas buffer
+		const buffer = [];
+		for (let i = 0; i < width * height; i++) {
+			buffer.push(0, 0, 0);
+		}
+
+		// Parse rectangles: "x,y,width,height,color;..." or newline-separated
+		const input = String(rectanglesInput || "").replace(/\n/g, ";");
+		const rectangles = input.split(";").filter((r) => r.trim());
+		let drawnCount = 0;
+
+		for (const rectStr of rectangles) {
+			const parts = rectStr.split(",").map((p) => p.trim());
+			if (parts.length < 5) continue;
+
+			const x = this.normalizeNumber(parts[0], 0, width - 1, 0);
+			const y = this.normalizeNumber(parts[1], 0, height - 1, 0);
+			const rectWidth = this.normalizeNumber(parts[2], 1, width, 1);
+			const rectHeight = this.normalizeNumber(parts[3], 1, height, 1);
+			const color = parts[4];
+			const rgb = this.parseColorToRGB(color);
+
+			// Draw rectangle into buffer
+			for (let py = 0; py < height; py++) {
+				for (let px = 0; px < width; px++) {
+					if (px >= x && px < x + rectWidth && py >= y && py < y + rectHeight) {
+						const index = (py * width + px) * 3;
+						buffer[index] = rgb[0];
+						buffer[index + 1] = rgb[1];
+						buffer[index + 2] = rgb[2];
+					}
+				}
+			}
+			drawnCount++;
+		}
+
+		if (drawnCount === 0) {
+			await this.lumia.addLog("[Divoom Pixoo] No valid rectangles to draw");
+			return false;
+		}
+
+		// Encode as base64 and send
+		const base64Data = this.encodeBase64(buffer);
+		const result = await this.sendHttpGif(base64Data, width);
+
+		if (!result.success) {
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to draw rectangles: ${result.error}`,
+			);
+		}
+		return result.success;
+	}
+
+	async playGifFromUrl(url) {
+		if (!url || typeof url !== "string" || !url.startsWith("http")) {
+			await this.lumia.addLog("[Divoom Pixoo] Invalid GIF URL");
+			return false;
+		}
+
+		// Clear the screen first (like pixels)
+		await this.clearScreen("#000000");
+
+		// Use Device/PlayTFGif with FileType 2 for net files (per API docs)
+		// Note: GIF must be 16x16, 32x32, or 64x64 pixels
+		const result = await this.sendCommand("Device/PlayTFGif", {
+			FileType: 2, // 2 = play net file (URL)
+			FileName: url,
+		});
+
+		if (!result.success) {
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to play GIF: ${result.error}`,
+			);
+		}
+		return result.success;
+	}
+
+	async setScreenPower(on) {
+		const result = await this.sendCommand("Channel/OnOffScreen", {
+			OnOff: on ? 1 : 0,
+		});
+
+		if (!result.success) {
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to set screen power: ${result.error}`,
+			);
+		}
+		return result.success;
+	}
+
+	async playBuzzer(duration) {
+		const result = await this.sendCommand("Device/PlayBuzzer", {
+			ActiveTimeInCycle: Math.round(duration),
+			OffTimeInCycle: 0,
+			PlayTotalTime: Math.round(duration),
+		});
+
+		if (!result.success) {
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to play buzzer: ${result.error}`,
+			);
+		}
+		return result.success;
+	}
+
+	async resetDisplay() {
+		// Clear any text
+		await this.sendCommand("Draw/ClearHttpText", {});
+
+		// Reset to default channel (clock)
+		await this.setChannel("clock", 0);
+
+		// Refresh connection
+		this.connectionHealth.commandsSinceRefresh = 0;
+
+		return true;
+	}
+
+	async sendRaw(command, payload) {
+		const trimmed = command.trim();
+		if (!trimmed) {
+			await this.lumia.addLog(
+				"[Divoom Pixoo] Raw command requires a command string",
+			);
+			return false;
+		}
+
+		const extra = payload && typeof payload === "object" ? payload : {};
+		const result = await this.sendCommand(trimmed, extra);
+
+		if (!result.success) {
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Raw command failed: ${result.error}`,
+			);
+		}
+		return result.success;
+	}
+
+	// ============================================================================
+	// HTTP Communication Layer
+	// ============================================================================
+
+	async sendCommand(command, payload = {}, retryCount = 0) {
+		// Check if we need to refresh connection
+		if (this.shouldRefreshConnection()) {
+			await this.refreshConnection();
+		}
+
+		const deviceAddress = this.getDeviceAddress();
+		if (!deviceAddress) {
+			return {
+				success: false,
+				error: "Device address not configured",
+			};
+		}
+
+		// Rate limiting check
+		const now = Date.now();
+		const timeSinceLastPush = now - this.lastPushTime;
+
+		if (timeSinceLastPush < this.MIN_PUSH_INTERVAL && this.lastPushTime > 0) {
+			// Wait to respect rate limit
+			const waitTime = this.MIN_PUSH_INTERVAL - timeSinceLastPush;
+			await new Promise((resolve) => setTimeout(resolve, waitTime));
+		}
+
+		const body = JSON.stringify({
+			Command: command,
+			...payload,
+		});
+
+		const useHttps = this.getDevicePort() === 443;
+		const protocol = useHttps ? https : http;
+
+		const options = {
+			host: deviceAddress,
+			port: this.getDevicePort(),
+			path: "/post",
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"Content-Length": Buffer.byteLength(body),
+			},
+			timeout: 5000,
+		};
+
+		return new Promise((resolve) => {
+			const request = protocol.request(options, (response) => {
+				const chunks = [];
+
+				response.on("data", (chunk) => chunks.push(chunk));
+
+				response.on("end", () => {
+					const data = Buffer.concat(chunks).toString("utf8");
+
+					if (response.statusCode >= 200 && response.statusCode < 300) {
+						let parsed;
+						try {
+							parsed = data ? JSON.parse(data) : {};
+						} catch (error) {
+							parsed = { raw: data };
+						}
+
+						// Update connection health
+						this.connectionHealth.lastSuccessTime = Date.now();
+						this.connectionHealth.consecutiveFailures = 0;
+						this.connectionHealth.commandsSinceRefresh++;
+						this.lastPushTime = Date.now();
+
+						resolve({
+							success: true,
+							response: parsed,
+						});
+					} else {
+						// Track failure
+						this.connectionHealth.consecutiveFailures++;
+
+						resolve({
+							success: false,
+							error: `HTTP ${response.statusCode}: ${data}`,
+						});
+					}
+				});
+			});
+
+			request.on("error", async (error) => {
+				this.connectionHealth.consecutiveFailures++;
+
+				// Retry logic for network errors
+				const maxRetries = 2;
+				if (retryCount < maxRetries) {
+					await this.lumia.addLog(
+						`[Divoom Pixoo] Network error, retrying (${retryCount + 1}/${maxRetries})...`,
+					);
+					await new Promise((r) => setTimeout(r, 1000));
+					resolve(await this.sendCommand(command, payload, retryCount + 1));
+				} else {
+					resolve({
+						success: false,
+						error: error.message,
+					});
+				}
+			});
+
+			request.on("timeout", () => {
+				request.destroy(new Error("Request timed out"));
+			});
+
+			request.write(body);
+			request.end();
+		});
+	}
+
+	// ============================================================================
+	// Helper Methods
+	// ============================================================================
+
+	getDeviceAddress() {
+		const address = (this.settings.deviceAddress ?? "").trim();
+		return address.length > 0 ? address : null;
+	}
+
+	getDevicePort() {
+		const port = Number(this.settings.devicePort);
+		if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+			return 80;
+		}
+		return port;
+	}
+
+	getDefaultDimensions() {
+		const width = Number(this.settings.defaultTextWidth);
+		const height = Number(this.settings.defaultTextHeight);
+		return {
+			width: Number.isInteger(width) && width > 0 ? width : 64,
+			height: Number.isInteger(height) && height > 0 ? height : 64,
+		};
+	}
+
+	normalizeNumber(value, min, max, defaultValue) {
+		const num = Number(value);
+		if (!Number.isFinite(num)) {
+			return defaultValue;
+		}
+		return Math.max(min, Math.min(max, num));
+	}
+
+	parseJson(value) {
+		if (typeof value !== "string" || value.trim().length === 0) {
+			return {};
+		}
+
+		try {
+			return JSON.parse(value);
+		} catch (error) {
+			void this.lumia.addLog(
+				`[Divoom Pixoo] Failed to parse JSON: ${error.message}`,
+			);
+			return {};
+		}
+	}
+
+	parseColorToRGB(input) {
+		if (typeof input !== "string") {
+			return [255, 255, 255];
+		}
+
+		const match = input.trim().match(/^#?([a-fA-F0-9]{6})$/);
+		if (!match) {
+			return [255, 255, 255];
+		}
+
+		const value = parseInt(match[1], 16);
+		const r = (value >> 16) & 0xff;
+		const g = (value >> 8) & 0xff;
+		const b = value & 0xff;
+		return [r, g, b];
+	}
+
+	hexToDecimalColor(hex) {
+		// Convert hex color to decimal (e.g., "#FF0000" -> "#FF0000" format expected by API)
+		if (typeof hex !== "string") {
+			return "#FFFFFF";
+		}
+		const cleaned = hex.trim();
+		if (cleaned.startsWith("#")) {
+			return cleaned;
+		}
+		return `#${cleaned}`;
+	}
+
+	async resetHttpGifId() {
+		// Reset the PicID counter (like pixoo-api's initialize method)
+		this.picIdCounter = 0;
+		return await this.sendCommand("Draw/ResetHttpGifId", {});
+	}
+
+	getNextPicId() {
+		// Increment counter and reset at 1000 (like pixoo-api library)
+		if (this.picIdCounter >= 1000) {
+			this.picIdCounter = 0;
+		}
+		return this.picIdCounter++;
+	}
+
+	async sendHttpGif(base64Data, width) {
+		// Send the buffer to the device using Draw/SendHttpGif
+		const picId = this.getNextPicId();
+
+		return await this.sendCommand("Draw/SendHttpGif", {
+			PicNum: 1,
+			PicWidth: width,
+			PicOffset: 0,
+			PicID: picId,
+			PicSpeed: 1000,
+			PicData: base64Data,
+		});
+	}
+
+	encodeBase64(buffer) {
+		// Convert buffer array to base64 string (like pixoo-api library)
+		const uint8Array = new Uint8Array(buffer);
+		return Buffer.from(uint8Array).toString("base64");
+	}
+
+	generatePixelData(x, y, rgb, width, height) {
+		// Generate pixel data for a canvas with a single pixel
+		const data = [];
+
+		for (let py = 0; py < height; py++) {
+			for (let px = 0; px < width; px++) {
+				if (px === x && py === y) {
+					data.push(rgb[0], rgb[1], rgb[2]);
+				} else {
+					data.push(0, 0, 0); // Black background
+				}
+			}
+		}
+
+		return data;
+	}
+
+	generateRectangleData(
+		x,
+		y,
+		rectWidth,
+		rectHeight,
+		rgb,
+		canvasWidth,
+		canvasHeight,
+	) {
+		// Generate pixel data for a canvas with a filled rectangle
+		const data = [];
+
+		for (let py = 0; py < canvasHeight; py++) {
+			for (let px = 0; px < canvasWidth; px++) {
+				// Check if this pixel is inside the rectangle
+				if (px >= x && px < x + rectWidth && py >= y && py < y + rectHeight) {
+					data.push(rgb[0], rgb[1], rgb[2]);
+				} else {
+					data.push(0, 0, 0); // Black background
+				}
+			}
+		}
+
+		return data;
 	}
 }
 
-```
-
-## cosmic_weather/package.json
-
-```
-{
-	"name": "weather",
-	"version": "1.0.0",
-	"description": "Sample Lumia plugin that showcases requiring multiple npm dependencies.",
-	"main": "main.js",
-	"license": "MIT",
-	"dependencies": {
-		"axios": "^1.6.7",
-		"color": "^4.2.3",
-		"luxon": "^3.4.4",
-		"unique-names-generator": "^4.7.1"
-	}
-}
+module.exports = DivoomPixooPlugin;
 
 ```
 
-## divoom_controller/README.md
-
-```
-# Divoom Controller Example Plugin
-
-A Lumia Stream example plugin that sends commands to Divoom Pixoo devices. The plugin exposes actions that can be wired into Lumia automations so you can change brightness, switch channels, or push scrolling text when events occur.
-
-> The Divoom Local API is undocumented by the vendor. The commands used here follow the behaviours observed on Pixoo 16/64 devices. If you run a different model, double-check the endpoint list in the official mobile app capture or Divoom community documentation.
-
-## Features
-
-- Simple HTTP client that posts to `http://<ip>/post`
-- Configurable device address, port, timeout, and default canvas size for text
-- High-level actions for brightness, channel switching, and scrolling text
-- Escape hatch action for raw JSON when you need more control
-
-## Settings
-
-| Key                 | Description                                                |
-| ------------------- | ---------------------------------------------------------- |
-| `deviceAddress`     | Required IPv4/hostname of the Pixoo (e.g. `192.168.1.42`). |
-| `devicePort`        | API port (default `80`).                                   |
-| `requestTimeout`    | Timeout in milliseconds for each request (default `5000`). |
-| `defaultTextWidth`  | Canvas width used by scrolling text (default `64`).        |
-| `defaultTextHeight` | Canvas height used by scrolling text (default `64`).       |
-
-## Actions
-
-### Set Brightness (`set_brightness`)
-
-Sets the global panel brightness via `Channel/SetBrightness`. Accepts a number between `0` and `100`.
-
-### Switch Channel (`set_channel`)
-
-Routes to one of the channel commands listed below and sends the selected identifier:
-
-| Option            | Command                      | Payload key    |
-| ----------------- | ---------------------------- | -------------- |
-| Clock             | `Channel/SetClock`           | `ClockId`      |
-| Visualizer        | `Channel/SetVisualizer`      | `VisualizerId` |
-| Scene             | `Channel/SetScene`           | `SceneId`      |
-| Custom Page Index | `Channel/SetCustomPageIndex` | `Index`        |
-
-You can find valid ids by using the official Divoom app and monitoring network traffic or browsing community lists. For example, `ClockId` `46` is a minimal digital clock on Pixoo 64.
-
-### Send Scrolling Text (`send_text`)
-
-Sends a `Draw/SendHttpText` payload. Fields:
-
-- `message` – text to render (required)
-- `color` – hex colour (defaults to `#FFFFFF`, converted to an `[r, g, b]` array)
-- `scrollSpeed` – 1–100 (maps to `TextSpeed`)
-- `direction` – left/right/up/down (converted to `ScrollDirection` 0–3)
-- `repeat` – number of loops (1–10)
-
-The plugin also injects `TextWidth`, `TextHeight`, `TextAlign`, and `TextFont` from settings so you can tailor the marquee to your Pixoo resolution.
-
-### Send Raw Command (`send_raw_command`)
-
-Allows power users to send any payload that the local API understands. The `command` field is merged into the `Command` property, and the JSON payload is merged into the root body. Example:
-
-```json
-{
-	"command": "Device/SetRTC",
-	"payload": "{ \"RtcHour\": 12, \"RtcMin\": 34, \"RtcSec\": 56 }"
-}
-```
-
-## Testing
-
-1. Set the plugin settings inside Lumia Stream (IP/port/timeout).
-2. Trigger an action manually from the Lumia UI to confirm connectivity.
-3. For debugging, open the Lumia Stream log panel to view the messages emitted by the plugin.
-
-If a command fails (HTTP errors, timeouts, invalid JSON), the plugin logs the reason so you can adjust the payload and try again.
-
-## Packaging
-
-```
-npm install
-npx lumia-plugin build ./examples/divoom_controller --out ./divoom_controller-1.0.0.lumiaplugin
-```
-
-You can then load the generated `.lumiaplugin` file in the Lumia Stream desktop app.
-
-```
-
-## divoom_controller/main.js
-
-```
-const { Plugin } = require("@lumiastream/plugin");
-const http = require("node:http");
-
-class DivoomControllerPlugin extends Plugin {
-  async onload() {
-    await this.lumia.addLog("[divoom_controller] Plugin loaded");
-  }
-
-  async onunload() {
-    await this.lumia.addLog("[divoom_controller] Plugin unloaded");
-  }
-
-  async actions(config = {}) {
-    const actionList = Array.isArray(config.actions) ? config.actions : [];
-
-    for (const action of actionList) {
-      const params = action?.value ?? action?.data ?? {};
-
-      switch (action.type) {
-        case "set_brightness": {
-          const raw = Number(params.brightness);
-          const brightness = Number.isFinite(raw) ? raw : 0;
-          await this.setBrightness(brightness);
-          break;
-        }
-        case "set_channel": {
-          const channel = typeof params.channel === "string" ? params.channel : "clock";
-          const id = Number(params.id);
-          await this.setChannel(channel, Number.isFinite(id) ? id : 0);
-          break;
-        }
-        case "send_text": {
-          const message = typeof params.message === "string" ? params.message : "";
-          const color = typeof params.color === "string" ? params.color : "#FFFFFF";
-          const scrollSpeed = Number(params.scrollSpeed);
-          const direction = typeof params.direction === "string" ? params.direction : "left";
-          const repeat = Number(params.repeat);
-          await this.sendText({
-            message,
-            color,
-            scrollSpeed: Number.isFinite(scrollSpeed) ? scrollSpeed : 32,
-            direction,
-            repeat: Number.isFinite(repeat) ? repeat : 1,
-          });
-          break;
-        }
-        case "send_raw_command": {
-          const command = typeof params.command === "string" ? params.command : "";
-          const payload = this.parseJson(params.payload);
-          await this.sendRaw(command, payload);
-          break;
-        }
-        default:
-          await this.lumia.addLog(
-            `[divoom_controller] Unknown action type: ${String(action.type)}`
-          );
-      }
-    }
-  }
-
-  getDeviceAddress() {
-    const address = (this.settings.deviceAddress ?? "").trim();
-    return address.length > 0 ? address : null;
-  }
-
-  getDevicePort() {
-    const fallback = 80;
-    const port = Number(this.settings.devicePort);
-    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-      return fallback;
-    }
-    return port;
-  }
-
-  getRequestTimeout() {
-    const fallback = 5000;
-    const timeout = Number(this.settings.requestTimeout);
-    if (!Number.isInteger(timeout) || timeout < 500) {
-      return fallback;
-    }
-    return timeout;
-  }
-
-  getDefaultDimensions() {
-    const width = Number(this.settings.defaultTextWidth);
-    const height = Number(this.settings.defaultTextHeight);
-    return {
-      width: Number.isInteger(width) && width > 0 ? width : 64,
-      height: Number.isInteger(height) && height > 0 ? height : 64,
-    };
-  }
-
-  async setBrightness(brightness) {
-    const value = Math.max(0, Math.min(100, Math.round(brightness)));
-    const result = await this.sendCommand("Channel/SetBrightness", {
-      Brightness: value,
-    });
-
-    if (result.success) {
-      await this.lumia.addLog(
-        `[divoom_controller] Brightness set to ${value}`
-      );
-    } else {
-      await this.lumia.addLog(
-        `[divoom_controller] Failed to set brightness: ${result.error}`
-      );
-    }
-  }
-
-  async setChannel(channel, id) {
-    const mapping = {
-      clock: { command: "Channel/SetClock", key: "ClockId" },
-      visualizer: { command: "Channel/SetVisualizer", key: "VisualizerId" },
-      scene: { command: "Channel/SetScene", key: "SceneId" },
-      custom_page_index: {
-        command: "Channel/SetCustomPageIndex",
-        key: "Index",
-      },
-    };
-
-    const entry = mapping[channel] ?? mapping.clock;
-    const payload = {};
-    payload[entry.key] = Math.max(0, Math.floor(id));
-
-    const result = await this.sendCommand(entry.command, payload);
-
-    if (result.success) {
-      await this.lumia.addLog(
-        `[divoom_controller] Switched channel (${entry.command}) with ${entry.key}=${payload[entry.key]}`
-      );
-    } else {
-      await this.lumia.addLog(
-        `[divoom_controller] Failed to switch channel: ${result.error}`
-      );
-    }
-  }
-
-  async sendText({ message, color, scrollSpeed, direction, repeat }) {
-    const trimmed = message.trim();
-    if (!trimmed) {
-      await this.lumia.addLog(
-        "[divoom_controller] Text message cannot be empty"
-      );
-      return;
-    }
-
-    const speed = Math.max(1, Math.min(100, Math.round(scrollSpeed)));
-    const directionMap = {
-      left: 0,
-      right: 1,
-      up: 2,
-      down: 3,
-    };
-    const scrollDirection = directionMap[direction] ?? directionMap.left;
-    const repeatCount = Math.max(1, Math.min(10, Math.round(repeat)));
-    const { width, height } = this.getDefaultDimensions();
-
-    const result = await this.sendCommand("Draw/SendHttpText", {
-      TextId: 0,
-      TextString: trimmed,
-      TextWidth: width,
-      TextHeight: height,
-      TextAlign: 1,
-      TextVAlign: 0,
-      TextSpace: 0,
-      FontId: 0,
-      TextSpeed: speed,
-      ScrollDirection: scrollDirection,
-      TextDirection: scrollDirection,
-      Repeat: repeatCount,
-      TextMode: 0,
-      TextSound: 0,
-      TextColor: this.parseColor(color),
-    });
-
-    if (result.success) {
-      await this.lumia.addLog(
-        `[divoom_controller] Sent scrolling text (${trimmed})`
-      );
-    } else {
-      await this.lumia.addLog(
-        `[divoom_controller] Failed to send scrolling text: ${result.error}`
-      );
-    }
-  }
-
-  async sendRaw(command, payload) {
-    const trimmed = command.trim();
-    if (!trimmed) {
-      await this.lumia.addLog(
-        "[divoom_controller] Raw command requires a command string"
-      );
-      return;
-    }
-
-    const extra = payload && typeof payload === "object" ? payload : {};
-    const result = await this.sendCommand(trimmed, extra);
-
-    if (result.success) {
-      await this.lumia.addLog(
-        `[divoom_controller] Sent raw command ${trimmed}`
-      );
-    } else {
-      await this.lumia.addLog(
-        `[divoom_controller] Failed raw command ${trimmed}: ${result.error}`
-      );
-    }
-  }
-
-  async sendCommand(command, payload = {}) {
-    const deviceAddress = this.getDeviceAddress();
-    if (!deviceAddress) {
-      return {
-        success: false,
-        error: "Device address not configured",
-      };
-    }
-
-    const body = JSON.stringify({
-      Command: command,
-      ...payload,
-    });
-
-    const options = {
-      host: deviceAddress,
-      port: this.getDevicePort(),
-      path: "/post",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(body),
-      },
-      timeout: this.getRequestTimeout(),
-    };
-
-    return new Promise((resolve) => {
-      const request = http.request(options, (response) => {
-        const chunks = [];
-
-        response.on("data", (chunk) => chunks.push(chunk));
-
-        response.on("end", () => {
-          const data = Buffer.concat(chunks).toString("utf8");
-          if (response.statusCode >= 200 && response.statusCode < 300) {
-            let parsed;
-            try {
-              parsed = data ? JSON.parse(data) : undefined;
-            } catch (error) {
-              parsed = undefined;
-            }
-
-            resolve({
-              success: true,
-              response: parsed,
-            });
-          } else {
-            resolve({
-              success: false,
-              error: `HTTP ${response.statusCode}: ${data}`,
-            });
-          }
-        });
-      });
-
-      request.on("error", (error) => {
-        resolve({
-          success: false,
-          error: error.message,
-        });
-      });
-
-      request.on("timeout", () => {
-        request.destroy(new Error("Request timed out"));
-      });
-
-      request.write(body);
-      request.end();
-    });
-  }
-
-  parseJson(value) {
-    if (typeof value !== "string" || value.trim().length === 0) {
-      return undefined;
-    }
-
-    try {
-      return JSON.parse(value);
-    } catch (error) {
-      void this.lumia.addLog(
-        `[divoom_controller] Failed to parse JSON payload: ${error.message}`
-      );
-      return undefined;
-    }
-  }
-
-  parseColor(input) {
-    if (typeof input !== "string") {
-      return [255, 255, 255];
-    }
-
-    const match = input.trim().match(/^#?([a-fA-F0-9]{6})$/);
-    if (!match) {
-      return [255, 255, 255];
-    }
-
-    const value = parseInt(match[1], 16);
-    const r = (value >> 16) & 0xff;
-    const g = (value >> 8) & 0xff;
-    const b = value & 0xff;
-    return [r, g, b];
-  }
-}
-
-module.exports = DivoomControllerPlugin;
-
-```
-
-## divoom_controller/manifest.json
+## divoom_pixoo/manifest.json
 
 ```
 {
-	"id": "divoom_controller",
-	"name": "Divoom Controller",
+	"id": "divoom_pixoo",
+	"name": "Divoom Pixoo",
 	"version": "1.0.0",
 	"author": "Lumia Stream",
-	"description": "Control Divoom Pixoo displays via Lumia Stream actions.",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "https://github.com/LumiaStream/divoom-pixoo-plugin",
+	"description": "Control Divoom Pixoo WIFI LED matrix displays with reliable communication. Supports text, GIFs, drawing, and more. Includes automatic connection refresh to prevent device freezing.",
 	"lumiaVersion": "^9.0.0",
 	"license": "MIT",
 	"category": "devices",
@@ -4763,9 +1135,10 @@ module.exports = DivoomControllerPlugin;
 		"settings": [
 			{
 				"key": "deviceAddress",
-				"label": "Divoom IP Address",
+				"label": "Pixoo IP Address",
 				"type": "text",
 				"placeholder": "192.168.1.42",
+				"helperText": "Your Pixoo device IP address on the local network",
 				"required": true
 			},
 			{
@@ -4773,26 +1146,18 @@ module.exports = DivoomControllerPlugin;
 				"label": "Port",
 				"type": "number",
 				"defaultValue": 80,
+				"helperText": "HTTP port (usually 80)",
 				"validation": {
 					"min": 1,
 					"max": 65535
 				}
 			},
 			{
-				"key": "requestTimeout",
-				"label": "Request Timeout (ms)",
-				"type": "number",
-				"defaultValue": 5000,
-				"validation": {
-					"min": 500,
-					"max": 15000
-				}
-			},
-			{
 				"key": "defaultTextWidth",
-				"label": "Default Text Width",
+				"label": "Screen Width",
 				"type": "number",
 				"defaultValue": 64,
+				"helperText": "64 for Pixoo 64, 16 for Pixoo 16",
 				"validation": {
 					"min": 16,
 					"max": 128
@@ -4800,20 +1165,35 @@ module.exports = DivoomControllerPlugin;
 			},
 			{
 				"key": "defaultTextHeight",
-				"label": "Default Text Height",
+				"label": "Screen Height",
 				"type": "number",
 				"defaultValue": 64,
+				"helperText": "64 for Pixoo 64, 16 for Pixoo 16",
 				"validation": {
 					"min": 16,
 					"max": 128
 				}
 			}
 		],
+		"settings_tutorial": "---\n### 🎨 Setup Your Divoom Pixoo\n\n1. **Find Your Pixoo's IP Address**:\n   - Use your router's device list\n   - Or use the Divoom app → Device Settings\n   - Example: `192.168.1.42`\n\n2. **Set Static IP (Recommended)**:\n   - Reserve IP in your router's DHCP settings\n   - Prevents IP from changing\n\n3. **Enter Settings**:\n   - IP Address (required)\n   - Port: 80 (default)\n   - Screen size: 64x64 (or 16x16 for Pixoo 16)\n\n4. **Click Save**\n   - Plugin auto-tests connection\n   - Look for ✅ success message\n---",
+		"actions_tutorial": "---\n### 🔧 Available Commands\n\n**Basic Control**:\n- Test Connection - Verify device is reachable\n- Set Brightness - Adjust display brightness (0-100)\n- Set Channel - Switch to clock/visualizer/scene\n- Screen On/Off - Power screen on or off\n- Reset Display - Clear and reset to default\n\n**Display Content**:\n- Send Scrolling Text - Display text messages\n- Clear Screen - Clear all content\n- Display Image - Show image from URL\n- Play GIF - Play animated GIF from URL\n\n**Drawing**:\n- Draw Pixel - Draw individual pixels\n- Draw Rectangle - Draw colored rectangles\n\n**Sound**:\n- Play Buzzer - Play buzzer sound\n\n**Advanced**:\n- Send Raw Command - Send custom API commands\n\n---\n### 💡 Tips\n- Commands are rate-limited to 1 per second (prevents crashes)\n- Connection auto-refreshes every 250 commands\n---",
 		"actions": [
+			{
+				"type": "set_screen_on",
+				"label": "Screen On",
+				"description": "Turn the screen on",
+				"fields": []
+			},
+			{
+				"type": "set_screen_off",
+				"label": "Screen Off",
+				"description": "Turn the screen off",
+				"fields": []
+			},
 			{
 				"type": "set_brightness",
 				"label": "Set Brightness",
-				"description": "Set device brightness between 0 and 100.",
+				"description": "Set device brightness (0-100%)",
 				"fields": [
 					{
 						"key": "brightness",
@@ -4829,53 +1209,35 @@ module.exports = DivoomControllerPlugin;
 				]
 			},
 			{
-				"type": "set_channel",
-				"label": "Switch Channel",
-				"description": "Switch to a clock, visualizer, scene, or custom page.",
+				"type": "play_buzzer",
+				"label": "Play Buzzer",
+				"description": "Play the built-in buzzer sound",
 				"fields": [
 					{
-						"key": "channel",
-						"label": "Channel",
-						"type": "select",
-						"required": true,
-						"options": [
-							{
-								"label": "Clock (Channel/SetClock)",
-								"value": "clock"
-							},
-							{
-								"label": "Visualizer (Channel/SetVisualizer)",
-								"value": "visualizer"
-							},
-							{
-								"label": "Scene (Channel/SetScene)",
-								"value": "scene"
-							},
-							{
-								"label": "Custom Page Index (Channel/SetCustomPageIndex)",
-								"value": "custom_page_index"
-							}
-						]
-					},
-					{
-						"key": "id",
-						"label": "Channel ID / Index",
+						"key": "duration",
+						"label": "Duration (ms)",
 						"type": "number",
 						"required": true,
-						"defaultValue": 0
+						"defaultValue": 500,
+						"validation": {
+							"min": 100,
+							"max": 5000
+						},
+						"helperText": "How long to play the buzzer (100-5000ms)"
 					}
 				]
 			},
 			{
 				"type": "send_text",
 				"label": "Send Scrolling Text",
-				"description": "Display a scrolling message using Draw/SendHttpText.",
+				"description": "Display scrolling text message (max 512 characters)",
 				"fields": [
 					{
 						"key": "message",
 						"label": "Message",
 						"type": "textarea",
-						"required": true
+						"required": true,
+						"placeholder": "Enter your message (max 512 chars)..."
 					},
 					{
 						"key": "color",
@@ -4885,9 +1247,10 @@ module.exports = DivoomControllerPlugin;
 					},
 					{
 						"key": "scrollSpeed",
-						"label": "Scroll Speed (1-100)",
+						"label": "Scroll Speed (ms per step)",
 						"type": "number",
-						"defaultValue": 32,
+						"defaultValue": 10,
+						"helperText": "Time in milliseconds per step (lower = faster)",
 						"validation": {
 							"min": 1,
 							"max": 100
@@ -4895,56 +1258,111 @@ module.exports = DivoomControllerPlugin;
 					},
 					{
 						"key": "direction",
-						"label": "Direction",
+						"label": "Scroll Direction",
 						"type": "select",
 						"defaultValue": "left",
 						"options": [
-							{
-								"label": "Left",
-								"value": "left"
-							},
-							{
-								"label": "Right",
-								"value": "right"
-							},
-							{
-								"label": "Up",
-								"value": "up"
-							},
-							{
-								"label": "Down",
-								"value": "down"
-							}
+							{ "label": "Left", "value": "left" },
+							{ "label": "Right", "value": "right" }
 						]
 					},
 					{
-						"key": "repeat",
-						"label": "Repeat Count",
-						"type": "number",
-						"defaultValue": 1,
-						"validation": {
-							"min": 1,
-							"max": 10
-						}
+						"key": "align",
+						"label": "Text Alignment",
+						"type": "select",
+						"defaultValue": "center",
+						"options": [
+							{ "label": "Left", "value": "left" },
+							{ "label": "Center", "value": "center" },
+							{ "label": "Right", "value": "right" }
+						]
 					}
 				]
 			},
 			{
+				"type": "draw_pixel",
+				"label": "Draw Pixels",
+				"description": "Draw multiple pixels (one per line or semicolon-separated)",
+				"fields": [
+					{
+						"key": "pixels",
+						"label": "Pixels",
+						"type": "textarea",
+						"required": true,
+						"placeholder": "10,10,#FF0000\n20,20,#00FF00\n30,30,#0000FF",
+						"helperText": "Format: x,y,color (one per line or use ; separator). Example: 10,10,#FF0000;20,20,#00FF00"
+					}
+				]
+			},
+			{
+				"type": "draw_filled_rectangle",
+				"label": "Draw Filled Rectangles",
+				"description": "Draw multiple filled rectangles (one per line or semicolon-separated)",
+				"fields": [
+					{
+						"key": "rectangles",
+						"label": "Rectangles",
+						"type": "textarea",
+						"required": true,
+						"placeholder": "10,10,20,20,#FF0000\n35,35,15,15,#00FF00",
+						"helperText": "Format: x,y,width,height,color (one per line or use ; separator). Example: 10,10,20,20,#FF0000;30,30,15,15,#00FF00"
+					}
+				]
+			},
+			{
+				"type": "play_gif_url",
+				"label": "Play GIF from URL",
+				"description": "Play an animated GIF from the internet (must be 16x16, 32x32, or 64x64 pixels)",
+				"fields": [
+					{
+						"key": "url",
+						"label": "GIF URL",
+						"type": "text",
+						"required": true,
+						"placeholder": "https://example.com/animation.gif",
+						"helperText": "Direct link to animated GIF. Must be exactly 16x16, 32x32, or 64x64 pixels."
+					}
+				]
+			},
+			{
+				"type": "clear_screen",
+				"label": "Clear Screen",
+				"description": "Clear all content from the display",
+				"fields": [
+					{
+						"key": "color",
+						"label": "Background Color",
+						"type": "color",
+						"defaultValue": "#000000",
+						"helperText": "Color to fill screen after clearing"
+					}
+				]
+			},
+			{
+				"type": "reset_display",
+				"label": "Reset Display",
+				"description": "Clear everything and reset to default state (clock)",
+				"fields": []
+			},
+			{
 				"type": "send_raw_command",
 				"label": "Send Raw Command",
-				"description": "Send a custom command payload directly to the device.",
+				"description": "Send a custom command directly to the device API",
 				"fields": [
 					{
 						"key": "command",
 						"label": "Command",
 						"type": "text",
-						"required": true
+						"required": true,
+						"placeholder": "Device/SetRTC",
+						"helperText": "API command path (e.g., Channel/SetClock)"
 					},
 					{
 						"key": "payload",
 						"label": "Payload JSON",
 						"type": "textarea",
-						"helperText": "Additional properties as JSON (e.g. { \"SceneId\": 6 })."
+						"placeholder": "{\"ClockId\": 182}",
+						"helperText": "Additional command parameters as JSON"
 					}
 				]
 			}
@@ -4954,87 +1372,664 @@ module.exports = DivoomControllerPlugin;
 
 ```
 
-## divoom_controller/package.json
+## divoom_pixoo/package-lock.json
 
 ```
 {
   "name": "lumia-example-divoom-controller",
   "version": "1.0.0",
-  "private": true,
-  "description": "Control Divoom Pixoo devices from Lumia Stream actions.",
-  "main": "main.js",
-  "dependencies": {
-    "@lumiastream/plugin": "^0.1.17"
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "lumia-example-divoom-controller",
+      "version": "1.0.0",
+      "dependencies": {
+        "@lumiastream/plugin": "^0.1.18"
+      }
+    },
+    "node_modules/@lumiastream/plugin": {
+      "version": "0.1.18",
+      "resolved": "https://registry.npmjs.org/@lumiastream/plugin/-/plugin-0.1.18.tgz",
+      "integrity": "sha512-J290nM+G6wD8fUFAdJgzEWkRZEZCKtDjLDRAh5utHVOily+sJrg/tl2HhyEXGB+ALHZpEiYGfIyLWghhYlKiTQ==",
+      "license": "MIT"
+    }
   }
 }
 
 ```
 
-## hot_news/README.md
+## divoom_pixoo/package.json
 
 ```
-# Hot News Plugin
+{
+	"name": "lumia-example-divoom-controller",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.1.18"
+	}
+}
 
-Example Lumia Stream plugin that taps into [NewsAPI.org](https://newsapi.org/) to surface breaking headlines. It keeps Lumia variables in sync with the freshest story, pushes a compact JSON payload of recent results, and triggers an alert whenever a brand-new headline lands for your selected topic.
+```
 
-## Features
+## elevenlabs_tts/main.js
 
-- Polls NewsAPI for top headlines using optional country, category, and keyword filters.
-- Stores the latest headline details (title, summary, URL, image, published time) in Lumia variables.
-- Persists a JSON bundle (`hotnews_recent_articles`) with up to 20 stories for overlays or chat commands.
-- Detects unseen headlines and fires a configurable Lumia alert.
-- Manual actions let you refresh immediately or run an on-demand topic search.
+```
+const { Plugin } = require("@lumiastream/plugin");
+const fs = require("fs/promises");
+const path = require("path");
+const os = require("os");
 
-## Requirements
+const DEFAULTS = {
+	modelId: "eleven_multilingual_v2",
+	outputFormat: "mp3_44100_128",
+	stability: 0.5,
+	similarityBoost: 0.5,
+	style: 0.0,
+	speakerBoost: true,
+	volume: 100,
+};
 
-1. Create a free NewsAPI account and generate an API key: https://newsapi.org/register.
-2. Enter the key in the **NewsAPI Key** setting (stored client-side only).
-3. Adjust country/category/keyword filters to match the coverage you want.
+const MODEL_CHAR_LIMITS = {
+	eleven_v3: 5000,
+	eleven_flash_v2_5: 40000,
+	eleven_flash_v2: 30000,
+	eleven_turbo_v2_5: 40000,
+	eleven_turbo_v2: 30000,
+	eleven_multilingual_v2: 10000,
+	eleven_multilingual_v1: 10000,
+	eleven_english_sts_v2: 10000,
+	eleven_english_sts_v1: 10000,
+};
 
-⚠️ NewsAPI free tiers enforce daily request limits (currently 100 requests/day) and block commercial usage. Increase the poll interval if you are close to the limit.
+const toNumber = (value, fallback) => {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : fallback;
+	}
+	return fallback;
+};
 
-## Settings
+const toBoolean = (value, fallback) => {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (["true", "yes", "1", "on"].includes(normalized)) {
+			return true;
+		}
+		if (["false", "no", "0", "off"].includes(normalized)) {
+			return false;
+		}
+	}
+	return fallback;
+};
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `apiKey` | — | Your NewsAPI key (required). |
-| `country` | `us` | Country code to localise headlines (set blank to disable). |
-| `category` | `""` | Optional NewsAPI category filter (business, sports, etc.). |
-| `query` | `""` | Keyword/phrase filter to focus on a specific topic. |
-| `pollInterval` | 300s | How often to refresh headlines (clamped 60-1800s). |
-| `resultsLimit` | 5 | Number of articles to pull per refresh (1-20). |
-| `enableAlerts` | true | Toggle alerts when a headline appears that has not been seen before. |
+const trimString = (value, fallback = "") => {
+	if (typeof value !== "string") {
+		return fallback;
+	}
+	const trimmed = value.trim();
+	return trimmed.length ? trimmed : fallback;
+};
 
-## Actions
+const getCharLimitForModel = (modelId) => {
+	if (typeof modelId !== "string") {
+		return null;
+	}
+	const normalized = modelId.trim().toLowerCase();
+	return MODEL_CHAR_LIMITS[normalized] ?? null;
+};
 
-- `hotnews_manual_refresh` – Fetch headlines immediately using the saved settings.
-- `hotnews_search_topic` – Run a one-off search with a custom keyword/limit (does not fire alerts).
+const getOptionalLimit = (value) => {
+	const limit = toNumber(value, 0);
+	return Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : null;
+};
 
-## Alerts
+const truncateText = (text, limit) => {
+	if (!limit || typeof text !== "string") {
+		return { text, truncated: false, limit: null };
+	}
+	if (text.length <= limit) {
+		return { text, truncated: false, limit };
+	}
+	return { text: text.slice(0, limit), truncated: true, limit };
+};
 
-| Alert Key | Default Message | Trigger |
-| --------- | --------------- | ------- |
-| `hotnews_new_headline` | `🔥 {{hotnews_latest_title}} ({{hotnews_latest_source}})` | Fired when a new headline is detected and alerts are enabled. |
+const parseJson = (value) => {
+	if (typeof value !== "string" || !value.trim().length) {
+		return null;
+	}
+	try {
+		return JSON.parse(value);
+	} catch (_err) {
+		return null;
+	}
+};
 
-## Variables
+const buildVoiceSettings = ({
+	stability,
+	similarityBoost,
+	style,
+	speakerBoost,
+}) => {
+	const settings = {};
+	if (Number.isFinite(stability)) settings.stability = stability;
+	if (Number.isFinite(similarityBoost))
+		settings.similarity_boost = similarityBoost;
+	if (Number.isFinite(style)) settings.style = style;
+	if (typeof speakerBoost === "boolean")
+		settings.use_speaker_boost = speakerBoost;
+	return settings;
+};
 
-- `hotnews_latest_title`
-- `hotnews_latest_description`
-- `hotnews_latest_url`
-- `hotnews_latest_source`
-- `hotnews_latest_image`
-- `hotnews_latest_published`
-- `hotnews_article_count`
-- `hotnews_recent_articles` – JSON payload with `keyword`, `count`, and `articles[]` (title, source, url, image, description, publishedAt).
-- `hotnews_keyword`
-- `hotnews_last_updated`
+const getAudioMimeType = (outputFormat) => {
+	if (typeof outputFormat !== "string") {
+		return "audio/mpeg";
+	}
+	const normalized = outputFormat.toLowerCase();
+	if (normalized.includes("wav")) {
+		return "audio/wav";
+	}
+	return "audio/mpeg";
+};
 
-## Extending The Plugin
+const getAudioExtension = (outputFormat) => {
+	if (typeof outputFormat !== "string") {
+		return "mp3";
+	}
+	const normalized = outputFormat.toLowerCase();
+	if (normalized.includes("wav")) {
+		return "wav";
+	}
+	return "mp3";
+};
 
-- Add additional alert types keyed on source names or categories (for example, “Tech Update” when `source` matches your favourite publication).
-- Store the full `payload.totalResults` in another variable to track overall volume for a topic.
-- Layer in NewsAPI’s `/everything` endpoint for deeper historical searches (watch the request quota).
-- Use the `hotnews_recent_articles` JSON inside a custom Lumia overlay to render a scrolling news ticker.
+const getDesktopPath = () => {
+	const homeDir = os.homedir?.();
+	if (!homeDir) {
+		return null;
+	}
+	return path.join(homeDir, "Desktop");
+};
+
+const buildMusicFilename = (outputFormat) => {
+	const extension = getAudioExtension(outputFormat);
+	const now = new Date();
+	const stamp = [
+		now.getFullYear(),
+		String(now.getMonth() + 1).padStart(2, "0"),
+		String(now.getDate()).padStart(2, "0"),
+		"_",
+		String(now.getHours()).padStart(2, "0"),
+		String(now.getMinutes()).padStart(2, "0"),
+		String(now.getSeconds()).padStart(2, "0"),
+	].join("");
+	return `elevenlabs_music_${stamp}.${extension}`;
+};
+
+class ElevenLabsTTSPlugin extends Plugin {
+	async onload() {
+		await this.lumia.addLog("[ElevenLabs] Plugin loaded");
+	}
+
+	async onunload() {
+		await this.lumia.addLog("[ElevenLabs] Plugin unloaded");
+	}
+
+	getSettingsSnapshot() {
+		const raw = this.settings || {};
+		return {
+			apiKey: trimString(raw.apiKey),
+		};
+	}
+
+	async actions(config = {}) {
+		const actionList = Array.isArray(config.actions) ? config.actions : [];
+		if (!actionList.length) {
+			return;
+		}
+
+		for (const action of actionList) {
+			try {
+				const actionData =
+					action?.value ?? action?.data ?? action?.params ?? {};
+				if (action.type === "speak") {
+					await this.handleSpeak(actionData);
+				} else if (action.type === "stream_music") {
+					await this.handleStreamMusic(actionData);
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await this.lumia.addLog(`[ElevenLabs] Action failed: ${message}`);
+			}
+		}
+	}
+
+	async handleSpeak(data = {}) {
+		const settings = this.getSettingsSnapshot();
+		let message = trimString(data.message || data.text, "");
+		if (!message) {
+			await this.lumia.addLog("[ElevenLabs] Missing message text");
+			return;
+		}
+
+		const apiKey = settings.apiKey;
+		if (!apiKey) {
+			await this.lumia.addLog("[ElevenLabs] Missing API key");
+			return;
+		}
+
+		const voiceId = trimString(data.voiceId, "");
+		if (!voiceId) {
+			await this.lumia.addLog("[ElevenLabs] Missing Voice ID");
+			return;
+		}
+		const modelId = trimString(data.modelId, DEFAULTS.modelId);
+		const modelLimit = getCharLimitForModel(modelId);
+		const userLimit = getOptionalLimit(data.maxChars);
+		const effectiveLimit =
+			modelLimit && userLimit
+				? Math.min(modelLimit, userLimit)
+				: (modelLimit ?? userLimit);
+		const truncatedMessage = truncateText(message, effectiveLimit);
+		message = truncatedMessage.text;
+		if (truncatedMessage.truncated) {
+			const limitLabel =
+				modelLimit && userLimit
+					? `${effectiveLimit} (min of model ${modelLimit} and user ${userLimit})`
+					: `${effectiveLimit}`;
+			await this.lumia.addLog(
+				`[ElevenLabs] Message exceeded ${limitLabel} characters; truncated.`,
+			);
+		}
+		const outputFormat = DEFAULTS.outputFormat;
+		const stability = Number.isFinite(toNumber(data.stability, NaN))
+			? toNumber(data.stability, NaN)
+			: DEFAULTS.stability;
+		const similarityBoost = Number.isFinite(toNumber(data.similarityBoost, NaN))
+			? toNumber(data.similarityBoost, NaN)
+			: DEFAULTS.similarityBoost;
+		const style = Number.isFinite(toNumber(data.style, NaN))
+			? toNumber(data.style, NaN)
+			: DEFAULTS.style;
+		const speakerBoost = DEFAULTS.speakerBoost;
+		const volume = Number.isFinite(toNumber(data.volume, NaN))
+			? toNumber(data.volume, NaN)
+			: DEFAULTS.volume;
+		const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream`;
+		const voiceSettings = buildVoiceSettings({
+			stability,
+			similarityBoost,
+			style,
+			speakerBoost,
+		});
+
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime");
+		}
+		if (
+			typeof Blob === "undefined" ||
+			typeof URL === "undefined" ||
+			typeof URL.createObjectURL !== "function"
+		) {
+			throw new Error("Blob/URL APIs are not available in this runtime");
+		}
+
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"xi-api-key": apiKey,
+			},
+			body: JSON.stringify({
+				text: message,
+				model_id: modelId,
+				voice_settings: voiceSettings,
+			}),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(
+				`ElevenLabs error ${response.status}: ${errorText || response.statusText}`,
+			);
+		}
+
+		const audioBuffer = await response.arrayBuffer();
+		const audioBlob = new Blob([audioBuffer], {
+			type: getAudioMimeType(outputFormat),
+		});
+		const audioUrl = URL.createObjectURL(audioBlob);
+
+		await this.lumia.playAudio({
+			path: audioUrl,
+			volume,
+			waitForAudioToStop: true,
+		});
+		URL.revokeObjectURL(audioUrl);
+	}
+
+	async handleStreamMusic(data = {}) {
+		const settings = this.getSettingsSnapshot();
+		const apiKey = settings.apiKey;
+		if (!apiKey) {
+			await this.lumia.addLog("[ElevenLabs] Missing API key");
+			return;
+		}
+
+		let prompt = trimString(data.prompt || data.text, "");
+		const compositionPlan = parseJson(
+			data.compositionPlanJson || data.composition_plan || "",
+		);
+		if (!prompt && !compositionPlan) {
+			await this.lumia.addLog(
+				"[ElevenLabs] Provide a prompt or composition plan",
+			);
+			return;
+		}
+
+		const modelId = trimString(data.modelId, "music_v1");
+		const promptLimit = getOptionalLimit(data.maxPromptChars);
+		if (promptLimit && prompt) {
+			const truncatedPrompt = truncateText(prompt, promptLimit);
+			prompt = truncatedPrompt.text;
+			if (truncatedPrompt.truncated) {
+				await this.lumia.addLog(
+					`[ElevenLabs] Prompt exceeded ${promptLimit} characters; truncated.`,
+				);
+			}
+		}
+		const outputFormat = DEFAULTS.outputFormat;
+		const musicLengthMs = toNumber(
+			data.musicLengthMs ?? data.music_length_ms,
+			15000,
+		);
+		const forceInstrumental = toBoolean(
+			data.forceInstrumental ?? data.force_instrumental,
+			true,
+		);
+		const volume = Number.isFinite(toNumber(data.volume, NaN))
+			? toNumber(data.volume, NaN)
+			: DEFAULTS.volume;
+		const saveToDesktop = toBoolean(data.saveToDesktop, false);
+		// Always wait for playback to finish so we can safely revoke the blob URL.
+
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime");
+		}
+		if (
+			typeof Blob === "undefined" ||
+			typeof URL === "undefined" ||
+			typeof URL.createObjectURL !== "function"
+		) {
+			throw new Error("Blob/URL APIs are not available in this runtime");
+		}
+
+		const endpoint = `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
+		const body = {
+			model_id: modelId,
+			music_length_ms: musicLengthMs,
+			force_instrumental: forceInstrumental,
+			...(prompt ? { prompt } : {}),
+			...(compositionPlan ? { composition_plan: compositionPlan } : {}),
+		};
+
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"xi-api-key": apiKey,
+			},
+			body: JSON.stringify(body),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(
+				`ElevenLabs music error ${response.status}: ${errorText || response.statusText}`,
+			);
+		}
+
+		const audioBuffer = await response.arrayBuffer();
+		const audioBlob = new Blob([audioBuffer], {
+			type: getAudioMimeType(outputFormat),
+		});
+		const audioUrl = URL.createObjectURL(audioBlob);
+
+		await this.lumia.playAudio({
+			path: audioUrl,
+			volume,
+			waitForAudioToStop: true,
+		});
+		URL.revokeObjectURL(audioUrl);
+
+		if (saveToDesktop) {
+			const desktopPath = getDesktopPath();
+			if (!desktopPath) {
+				await this.lumia.addLog("[ElevenLabs] Could not resolve Desktop path");
+				return;
+			}
+			const filename = buildMusicFilename(outputFormat);
+			const filePath = path.join(desktopPath, filename);
+			await fs.writeFile(filePath, Buffer.from(audioBuffer));
+			await this.lumia.addLog(`[ElevenLabs] Saved music to ${filePath}`);
+		}
+	}
+}
+
+module.exports = ElevenLabsTTSPlugin;
+
+```
+
+## elevenlabs_tts/manifest.json
+
+```
+{
+	"id": "elevenlabs_tts",
+	"name": "ElevenLabs TTS",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://elevenlabs.io",
+	"repository": "",
+	"description": "Generate ElevenLabs text-to-speech audio and play it inside Lumia Stream.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "examples",
+	"icon": "elevenlabs_icon.jpg",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Key ID (API Key)",
+				"type": "password",
+				"helperText": "Create an API key in your ElevenLabs dashboard.",
+				"required": true
+			}
+		],
+		"settings_tutorial": "---\n### \ud83d\udd10 Get Your ElevenLabs API Key\n1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key. Then copy the Key ID and paste it here.\n---\n### \ud83c\udf9b\ufe0f Voice Tuning (used in Actions)\n- **Stability**: Higher values make speech more consistent/predictable; lower values sound more dynamic.\n- **Similarity Boost**: Higher values keep output closer to the original voice; lower values allow more variation.\n- **Style**: Adds expressiveness/character; higher values can sound more dramatic.\n---",
+		"actions_tutorial": "---\n### \ud83d\udce2 Speak Action\n1) Enter the **Message** you want spoken.\n2) Paste the **Voice ID** you copied from ElevenLabs (find it at https://elevenlabs.io/app/voice-lab).\n3) Choose a **Model ID** (view model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n4) Adjust **Stability**, **Similarity Boost**, and **Style** if desired.\n---\n### \ud83c\udfb5 Stream Music Action\n1) Enter a **Prompt** (or provide a Composition Plan JSON).\n2) Choose the **Model ID** (see music model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n3) Set **Music Length** and **Volume**.\n---",
+		"actions": [
+			{
+				"type": "speak",
+				"label": "Speak",
+				"description": "Generate ElevenLabs TTS audio and play it in Lumia.",
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "text",
+						"defaultValue": "Hello from Lumia!",
+						"helperText": "Text to synthesize. Character limits vary per model; long messages will be truncated."
+					},
+					{
+						"key": "maxChars",
+						"label": "Max Characters (optional)",
+						"type": "number",
+						"helperText": "Leave empty to use the model limit; if set, the smaller limit is used.",
+						"min": 0,
+						"max": 100000
+					},
+					{
+						"key": "voiceId",
+						"label": "Voice ID",
+						"type": "text",
+						"defaultValue": "JBFqnCBsd6RMkjVDRZzb",
+						"helperText": "Find this in ElevenLabs Voice Lab or your Voices page."
+					},
+					{
+						"key": "modelId",
+						"label": "Model ID",
+						"type": "select",
+						"allowTyping": true,
+						"defaultValue": "eleven_multilingual_v2",
+						"helperText": "Choose a speech model or type a custom model ID.",
+						"options": [
+							{ "label": "Eleven v3", "value": "eleven_v3" },
+							{ "label": "Multilingual v2", "value": "eleven_multilingual_v2" },
+							{ "label": "Multilingual v1", "value": "eleven_multilingual_v1" },
+							{ "label": "Turbo v2.5", "value": "eleven_turbo_v2_5" },
+							{ "label": "Turbo v2", "value": "eleven_turbo_v2" },
+							{ "label": "Flash v2.5", "value": "eleven_flash_v2_5" },
+							{ "label": "Flash v2", "value": "eleven_flash_v2" }
+						]
+					},
+					{
+						"key": "stability",
+						"label": "Stability (0-1)",
+						"type": "number",
+						"defaultValue": 0.5,
+						"helperText": "Higher is more consistent; lower is more expressive.",
+						"min": 0,
+						"max": 1
+					},
+					{
+						"key": "similarityBoost",
+						"label": "Similarity Boost (0-1)",
+						"type": "number",
+						"defaultValue": 0.5,
+						"helperText": "Higher keeps closer to the original voice.",
+						"min": 0,
+						"max": 1
+					},
+					{
+						"key": "style",
+						"label": "Style (0-1)",
+						"type": "number",
+						"defaultValue": 0,
+						"helperText": "Higher adds more stylistic variation.",
+						"min": 0,
+						"max": 1
+					},
+					{
+						"key": "volume",
+						"label": "Volume",
+						"type": "number",
+						"defaultValue": 100,
+						"helperText": "Output volume in Lumia (0-100).",
+						"min": 0,
+						"max": 100
+					}
+				]
+			},
+			{
+				"type": "stream_music",
+				"label": "Stream Music",
+				"description": "Generate ElevenLabs music and play it in Lumia.",
+				"fields": [
+					{
+						"key": "prompt",
+						"label": "Prompt",
+						"type": "textarea",
+						"defaultValue": "Warm lo-fi beats with soft piano and vinyl crackle.",
+						"helperText": "Describe the music you want. Prompts can be long; use Max Characters to cap the length."
+					},
+					{
+						"key": "maxPromptChars",
+						"label": "Max Prompt Characters (optional)",
+						"type": "number",
+						"helperText": "Optional cap for prompt length.",
+						"min": 0,
+						"max": 100000
+					},
+					{
+						"key": "compositionPlanJson",
+						"label": "Composition Plan JSON (optional)",
+						"type": "textarea",
+						"placeholder": "{\"sections\":[{\"time\":0,\"notes\":\"intro\"}]}",
+						"defaultValue": "",
+						"helperText": "Advanced structure. Leave empty to use prompt only."
+					},
+					{
+						"key": "musicLengthMs",
+						"label": "Music Length (ms)",
+						"type": "number",
+						"defaultValue": 15000,
+						"helperText": "Length of the generated clip in milliseconds.",
+						"min": 1000,
+						"max": 300000
+					},
+					{
+						"key": "modelId",
+						"label": "Model ID",
+						"type": "select",
+						"allowTyping": true,
+						"defaultValue": "music_v1",
+						"helperText": "Choose a music model or type a custom model ID.",
+						"options": [{ "label": "Music v1", "value": "music_v1" }]
+					},
+					{
+						"key": "forceInstrumental",
+						"label": "Force Instrumental",
+						"type": "toggle",
+						"defaultValue": true,
+						"helperText": "If enabled, vocals are removed."
+					},
+					{
+						"key": "volume",
+						"label": "Volume",
+						"type": "number",
+						"defaultValue": 100,
+						"helperText": "Output volume in Lumia (0-100).",
+						"min": 0,
+						"max": 100
+					},
+					{
+						"key": "saveToDesktop",
+						"label": "Save Music File to Desktop",
+						"type": "checkbox",
+						"defaultValue": false,
+						"helperText": "Saves the generated audio to your Desktop."
+					}
+				]
+			}
+		]
+	}
+}
+
+```
+
+## elevenlabs_tts/package.json
+
+```
+{
+	"name": "lumia-elevenlabs-tts",
+	"version": "1.0.0",
+	"private": true,
+	"description": "ElevenLabs TTS plugin for Lumia Stream.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.1.18"
+	}
+}
 
 ```
 
@@ -5804,8 +2799,1044 @@ module.exports = HotNewsPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.1.17"
+    "@lumiastream/plugin": "^0.1.18"
   }
+}
+
+```
+
+## minecraft_server/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+const net = require("net");
+const dgram = require("dgram");
+
+/**
+ * Minecraft Server Status Plugin
+ *
+ * Monitors Minecraft Java Edition servers using:
+ * - Server List Ping (TCP) - Always available
+ * - Query Protocol (UDP) - Requires enable-query=true
+ *
+ * Based on protocols documented at:
+ * - https://wiki.vg/Server_List_Ping
+ * - https://wiki.vg/Query
+ */
+
+const ALERT_TYPES = {
+	SERVER_ONLINE: "serverOnline",
+	SERVER_OFFLINE: "serverOffline",
+	PLAYER_JOINED: "playerJoined",
+	PLAYER_LEFT: "playerLeft",
+	PLAYER_MILESTONE: "playerMilestone",
+	SERVER_FULL: "serverFull",
+};
+
+class MinecraftServerPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+
+		// Polling state
+		this.pollInterval = null;
+		this.lastState = null;
+		this.hasBaseline = false;
+
+		// Player tracking
+		this.previousPlayers = new Set();
+		this.milestonesReached = new Set();
+	}
+
+	async onload() {
+		await this.lumia.addLog("[Minecraft Server] Plugin loaded");
+
+		if (this.settings?.enablePolling && this.settings?.serverHost) {
+			await this.startPolling();
+		} else if (!this.settings?.serverHost) {
+			await this.lumia.addLog(
+				"[Minecraft Server] Server address not configured. Please configure in settings."
+			);
+		}
+	}
+
+	async onunload() {
+		await this.lumia.addLog("[Minecraft Server] Plugin unloaded");
+		await this.stopPolling();
+	}
+
+	async onsettingsupdate(settings, previousSettings) {
+		const hostChanged = settings?.serverHost !== previousSettings?.serverHost;
+		const portChanged = settings?.serverPort !== previousSettings?.serverPort;
+		const pollingChanged =
+			settings?.enablePolling !== previousSettings?.enablePolling;
+
+		if (hostChanged || portChanged || pollingChanged) {
+			await this.stopPolling();
+
+			if (settings?.enablePolling && settings?.serverHost) {
+				await this.startPolling();
+			}
+		}
+	}
+
+	async actions(config = {}) {
+		const actionList = Array.isArray(config.actions) ? config.actions : [];
+
+		for (const action of actionList) {
+			try {
+				switch (action.type) {
+					case "manual_poll":
+						await this.lumia.addLog(
+							"[Minecraft Server] Manual poll triggered"
+						);
+						await this.pollServer();
+						break;
+
+					case "test_connection":
+						await this.lumia.addLog(
+							"[Minecraft Server] Testing connection..."
+						);
+						await this.testConnection();
+						break;
+
+					default:
+						await this.lumia.addLog(
+							`[Minecraft Server] Unknown action: ${action.type}`
+						);
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await this.lumia.addLog(
+					`[Minecraft Server] Error in action ${action.type}: ${message}`
+				);
+			}
+		}
+	}
+
+	// ============================================================================
+	// Polling Management
+	// ============================================================================
+
+	async startPolling() {
+		if (this.pollInterval) {
+			return;
+		}
+
+		const interval = this.getPollInterval();
+		await this.lumia.addLog(
+			`[Minecraft Server] Starting polling (every ${interval}s)`
+		);
+
+		// Initial poll
+		await this.pollServer();
+
+		// Start interval
+		this.pollInterval = setInterval(() => {
+			void this.pollServer();
+		}, interval * 1000);
+	}
+
+	async stopPolling() {
+		if (this.pollInterval) {
+			clearInterval(this.pollInterval);
+			this.pollInterval = null;
+			await this.lumia.addLog("[Minecraft Server] Stopped polling");
+		}
+	}
+
+	async pollServer() {
+		try {
+			const host = this.getServerHost();
+			const port = this.getServerPort();
+
+			if (!host) {
+				return;
+			}
+
+			// Always try Server List Ping first
+			const pingData = await this.serverListPing(host, port);
+
+			// If Query is enabled, try to get additional data
+			let queryData = null;
+			if (this.settings?.useQuery) {
+				try {
+					const queryPort = this.getQueryPort();
+					queryData = await this.queryServer(host, queryPort);
+				} catch (error) {
+					// Query failed, but that's okay - we have ping data
+					await this.lumia.addLog(
+						`[Minecraft Server] Query failed: ${error.message}`
+					);
+				}
+			}
+
+			// Process the combined data
+			await this.processServerData(pingData, queryData);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`[Minecraft Server] Poll failed: ${message}`
+			);
+
+			// Server is offline
+			await this.processServerData(null, null);
+		}
+	}
+
+	async testConnection() {
+		const host = this.getServerHost();
+		const port = this.getServerPort();
+
+		if (!host) {
+			await this.lumia.showToast({
+				message: "Please configure server address in settings",
+			});
+			return;
+		}
+
+		try {
+			const data = await this.serverListPing(host, port);
+
+			await this.lumia.showToast({
+				message: `✅ Connected to ${host}:${port}\n${data.players.online}/${data.players.max} players online`,
+			});
+
+			await this.lumia.addLog(
+				`[Minecraft Server] ✅ Connection successful!\n` +
+					`Version: ${data.version.name}\n` +
+					`Players: ${data.players.online}/${data.players.max}\n` +
+					`MOTD: ${this.cleanMOTD(data.description)}`
+			);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.showToast({
+				message: `❌ Connection failed: ${message}`,
+			});
+			await this.lumia.addLog(
+				`[Minecraft Server] ❌ Connection failed: ${message}`
+			);
+		}
+	}
+
+	// ============================================================================
+	// Server List Ping Protocol (TCP)
+	// ============================================================================
+
+	async serverListPing(host, port) {
+		return new Promise((resolve, reject) => {
+			const timeout = this.getTimeout();
+			const client = new net.Socket();
+			let timeoutHandle;
+
+			const cleanup = () => {
+				clearTimeout(timeoutHandle);
+				client.destroy();
+			};
+
+			timeoutHandle = setTimeout(() => {
+				cleanup();
+				reject(new Error("Connection timeout"));
+			}, timeout * 1000);
+
+			client.connect(port, host, () => {
+				// Send handshake packet
+				const handshake = this.createHandshakePacket(host, port);
+				client.write(handshake);
+
+				// Send status request packet
+				const statusRequest = this.createStatusRequestPacket();
+				client.write(statusRequest);
+			});
+
+			let buffer = Buffer.alloc(0);
+
+			client.on("data", (data) => {
+				buffer = Buffer.concat([buffer, data]);
+
+				try {
+					// Read packet length
+					const lengthResult = this.readVarInt(buffer, 0);
+					const packetLength = lengthResult.value;
+					const dataStart = lengthResult.length;
+
+					// Check if we have the full packet
+					if (buffer.length < dataStart + packetLength) {
+						return; // Wait for more data
+					}
+
+					// Read packet ID
+					const idResult = this.readVarInt(buffer, dataStart);
+					const packetId = idResult.value;
+
+					if (packetId !== 0x00) {
+						cleanup();
+						reject(new Error(`Unexpected packet ID: ${packetId}`));
+						return;
+					}
+
+					// Read JSON length
+					const jsonLengthResult = this.readVarInt(
+						buffer,
+						dataStart + idResult.length
+					);
+					const jsonLength = jsonLengthResult.value;
+					const jsonStart = dataStart + idResult.length + jsonLengthResult.length;
+
+					// Extract JSON string
+					const jsonString = buffer
+						.slice(jsonStart, jsonStart + jsonLength)
+						.toString("utf8");
+
+					cleanup();
+					resolve(JSON.parse(jsonString));
+				} catch (error) {
+					cleanup();
+					reject(error);
+				}
+			});
+
+			client.on("error", (error) => {
+				cleanup();
+				reject(error);
+			});
+		});
+	}
+
+	createHandshakePacket(host, port) {
+		const protocolVersion = this.writeVarInt(47); // Protocol version 47 (1.8+)
+		const hostLength = this.writeVarInt(host.length);
+		const hostBuffer = Buffer.from(host, "utf8");
+		const portBuffer = Buffer.allocUnsafe(2);
+		portBuffer.writeUInt16BE(port, 0);
+		const nextState = this.writeVarInt(1); // 1 = status
+
+		const data = Buffer.concat([
+			this.writeVarInt(0x00), // Packet ID
+			protocolVersion,
+			hostLength,
+			hostBuffer,
+			portBuffer,
+			nextState,
+		]);
+
+		const length = this.writeVarInt(data.length);
+		return Buffer.concat([length, data]);
+	}
+
+	createStatusRequestPacket() {
+		const packetId = this.writeVarInt(0x00);
+		const length = this.writeVarInt(packetId.length);
+		return Buffer.concat([length, packetId]);
+	}
+
+	// ============================================================================
+	// Query Protocol (UDP)
+	// ============================================================================
+
+	async queryServer(host, port) {
+		return new Promise((resolve, reject) => {
+			const timeout = this.getTimeout();
+			const client = dgram.createSocket("udp4");
+			let timeoutHandle;
+			let sessionId;
+
+			const cleanup = () => {
+				clearTimeout(timeoutHandle);
+				client.close();
+			};
+
+			timeoutHandle = setTimeout(() => {
+				cleanup();
+				reject(new Error("Query timeout"));
+			}, timeout * 1000);
+
+			// Step 1: Send handshake
+			sessionId = Math.floor(Math.random() * 0x7fffffff);
+			const handshake = this.createQueryHandshake(sessionId);
+
+			client.send(handshake, port, host, (error) => {
+				if (error) {
+					cleanup();
+					reject(error);
+				}
+			});
+
+			let challengeToken = null;
+
+			client.on("message", async (msg) => {
+				try {
+					if (challengeToken === null) {
+						// Parse handshake response
+						const type = msg.readUInt8(0);
+						if (type !== 0x09) {
+							throw new Error("Invalid handshake response");
+						}
+
+						const responseSessionId = msg.readInt32BE(1);
+						if (responseSessionId !== sessionId) {
+							throw new Error("Session ID mismatch");
+						}
+
+						// Extract challenge token
+						const tokenString = msg.slice(5, msg.length - 1).toString("utf8");
+						challengeToken = parseInt(tokenString, 10);
+
+						// Step 2: Send full stat request
+						const statRequest = this.createQueryStatRequest(
+							sessionId,
+							challengeToken
+						);
+						client.send(statRequest, port, host);
+					} else {
+						// Parse stat response
+						const data = this.parseQueryResponse(msg);
+						cleanup();
+						resolve(data);
+					}
+				} catch (error) {
+					cleanup();
+					reject(error);
+				}
+			});
+
+			client.on("error", (error) => {
+				cleanup();
+				reject(error);
+			});
+		});
+	}
+
+	createQueryHandshake(sessionId) {
+		const buffer = Buffer.allocUnsafe(7);
+		buffer.writeUInt16BE(0xfefd, 0); // Magic
+		buffer.writeUInt8(0x09, 2); // Type: handshake
+		buffer.writeInt32BE(sessionId, 3);
+		return buffer;
+	}
+
+	createQueryStatRequest(sessionId, challengeToken) {
+		const buffer = Buffer.allocUnsafe(15);
+		buffer.writeUInt16BE(0xfefd, 0); // Magic
+		buffer.writeUInt8(0x00, 2); // Type: stat
+		buffer.writeInt32BE(sessionId, 3);
+		buffer.writeInt32BE(challengeToken, 7);
+		buffer.writeInt32BE(0x00000000, 11); // Padding for full stat
+		return buffer;
+	}
+
+	parseQueryResponse(msg) {
+		const type = msg.readUInt8(0);
+		if (type !== 0x00) {
+			throw new Error("Invalid stat response");
+		}
+
+		// Skip header
+		let offset = 5;
+
+		// Skip padding
+		offset += 11;
+
+		// Parse key-value pairs
+		const data = {};
+		while (offset < msg.length) {
+			// Read key
+			let keyEnd = msg.indexOf(0, offset);
+			if (keyEnd === -1) break;
+			const key = msg.slice(offset, keyEnd).toString("utf8");
+			offset = keyEnd + 1;
+
+			// Read value
+			let valueEnd = msg.indexOf(0, offset);
+			if (valueEnd === -1) break;
+			const value = msg.slice(offset, valueEnd).toString("utf8");
+			offset = valueEnd + 1;
+
+			if (key.length === 0 && value.length === 0) {
+				// End of key-value section
+				offset++;
+				break;
+			}
+
+			data[key] = value;
+		}
+
+		// Parse player list
+		data.players = [];
+		while (offset < msg.length) {
+			let playerEnd = msg.indexOf(0, offset);
+			if (playerEnd === -1) break;
+			const player = msg.slice(offset, playerEnd).toString("utf8");
+			offset = playerEnd + 1;
+
+			if (player.length > 0) {
+				data.players.push(player);
+			}
+		}
+
+		return data;
+	}
+
+	// ============================================================================
+	// Data Processing
+	// ============================================================================
+
+	async processServerData(pingData, queryData) {
+		const newState = {
+			online: !!pingData,
+			playersOnline: pingData ? pingData.players.online : 0,
+			playersMax: pingData ? pingData.players.max : 0,
+			version: pingData ? pingData.version.name : "",
+			protocolVersion: pingData ? pingData.version.protocol : 0,
+			motd: pingData ? this.cleanMOTD(pingData.description) : "",
+			playerList: queryData?.players || [],
+			map: queryData?.map || "",
+			gameType: queryData?.gametype || "",
+		};
+
+		// Update variables
+		await this.updateVariables(newState);
+
+		if (!this.hasBaseline) {
+			// First poll - establish baseline
+			this.hasBaseline = true;
+			this.lastState = newState;
+			if (newState.online) {
+				this.previousPlayers = new Set(newState.playerList);
+			}
+			return;
+		}
+
+		// Check for state changes
+		await this.checkServerOnlineOffline(newState, this.lastState);
+
+		if (newState.online) {
+			await this.checkPlayerChanges(newState, this.lastState);
+			await this.checkPlayerMilestones(newState);
+			await this.checkServerFull(newState);
+		}
+
+		this.lastState = newState;
+	}
+
+	async updateVariables(state) {
+		const updates = [
+			this.lumia.setVariable("mc_online", state.online),
+			this.lumia.setVariable("mc_players_online", state.playersOnline),
+			this.lumia.setVariable("mc_players_max", state.playersMax),
+			this.lumia.setVariable("mc_version", state.version),
+			this.lumia.setVariable("mc_motd", state.motd),
+			this.lumia.setVariable("mc_protocol_version", state.protocolVersion),
+			this.lumia.setVariable("mc_player_list", state.playerList.join(", ")),
+			this.lumia.setVariable("mc_map", state.map),
+			this.lumia.setVariable("mc_game_type", state.gameType),
+		];
+
+		await Promise.all(updates);
+	}
+
+	async checkServerOnlineOffline(newState, oldState) {
+		if (newState.online && !oldState.online) {
+			// Server came online
+			await this.lumia.addLog("[Minecraft Server] ✅ Server is now ONLINE");
+			await this.lumia.triggerAlert({
+				alert: ALERT_TYPES.SERVER_ONLINE,
+				extraSettings: {
+					mc_online: true,
+					mc_version: newState.version,
+					mc_motd: newState.motd,
+					mc_players_max: newState.playersMax,
+				},
+			});
+		} else if (!newState.online && oldState.online) {
+			// Server went offline
+			await this.lumia.addLog("[Minecraft Server] ❌ Server is now OFFLINE");
+			await this.lumia.triggerAlert({
+				alert: ALERT_TYPES.SERVER_OFFLINE,
+				extraSettings: {},
+			});
+
+			// Clear player tracking
+			this.previousPlayers.clear();
+			this.milestonesReached.clear();
+		}
+	}
+
+	async checkPlayerChanges(newState, oldState) {
+		const newPlayers = new Set(newState.playerList);
+		const oldPlayers = this.previousPlayers;
+
+		// Check for joins
+		for (const player of newPlayers) {
+			if (!oldPlayers.has(player)) {
+				await this.lumia.setVariable("mc_last_player_joined", player);
+				await this.lumia.addLog(
+					`[Minecraft Server] 👤 ${player} joined (${newState.playersOnline}/${newState.playersMax})`
+				);
+				await this.lumia.triggerAlert({
+					alert: ALERT_TYPES.PLAYER_JOINED,
+					extraSettings: {
+						username: player,
+						mc_last_player_joined: player,
+						mc_players_online: newState.playersOnline,
+						mc_players_max: newState.playersMax,
+					},
+				});
+			}
+		}
+
+		// Check for leaves
+		for (const player of oldPlayers) {
+			if (!newPlayers.has(player)) {
+				await this.lumia.setVariable("mc_last_player_left", player);
+				await this.lumia.addLog(
+					`[Minecraft Server] 👋 ${player} left (${newState.playersOnline}/${newState.playersMax})`
+				);
+				await this.lumia.triggerAlert({
+					alert: ALERT_TYPES.PLAYER_LEFT,
+					extraSettings: {
+						username: player,
+						mc_last_player_left: player,
+						mc_players_online: newState.playersOnline,
+						mc_players_max: newState.playersMax,
+					},
+				});
+			}
+		}
+
+		this.previousPlayers = newPlayers;
+	}
+
+	async checkPlayerMilestones(newState) {
+		const count = newState.playersOnline;
+		const milestones = [5, 10, 25, 50, 100, 200];
+
+		for (const milestone of milestones) {
+			if (count >= milestone && !this.milestonesReached.has(milestone)) {
+				this.milestonesReached.add(milestone);
+				await this.lumia.addLog(
+					`[Minecraft Server] 🎉 Player milestone reached: ${milestone} players!`
+				);
+				await this.lumia.triggerAlert({
+					alert: ALERT_TYPES.PLAYER_MILESTONE,
+					dynamic: { value: count },
+					extraSettings: {
+						mc_players_online: count,
+						mc_players_max: newState.playersMax,
+					},
+				});
+			}
+		}
+
+		// Reset milestones if player count drops below them
+		for (const milestone of this.milestonesReached) {
+			if (count < milestone) {
+				this.milestonesReached.delete(milestone);
+			}
+		}
+	}
+
+	async checkServerFull(newState) {
+		if (
+			newState.playersOnline >= newState.playersMax &&
+			newState.playersMax > 0
+		) {
+			if (
+				!this.lastState ||
+				this.lastState.playersOnline < this.lastState.playersMax
+			) {
+				await this.lumia.addLog(
+					`[Minecraft Server] 🔴 Server is FULL (${newState.playersMax}/${newState.playersMax})`
+				);
+				await this.lumia.triggerAlert({
+					alert: ALERT_TYPES.SERVER_FULL,
+					extraSettings: {
+						mc_players_online: newState.playersOnline,
+						mc_players_max: newState.playersMax,
+					},
+				});
+			}
+		}
+	}
+
+	// ============================================================================
+	// Helper Methods
+	// ============================================================================
+
+	getServerHost() {
+		const host = (this.settings?.serverHost ?? "").trim();
+		return host.length > 0 ? host : null;
+	}
+
+	getServerPort() {
+		const port = Number(this.settings?.serverPort);
+		return Number.isInteger(port) && port > 0 && port <= 65535 ? port : 25565;
+	}
+
+	getQueryPort() {
+		const port = Number(this.settings?.queryPort);
+		return Number.isInteger(port) && port > 0 && port <= 65535
+			? port
+			: this.getServerPort();
+	}
+
+	getPollInterval() {
+		const interval = Number(this.settings?.pollInterval);
+		return Number.isInteger(interval) && interval >= 10 && interval <= 300
+			? interval
+			: 30;
+	}
+
+	getTimeout() {
+		const timeout = Number(this.settings?.timeout);
+		return Number.isInteger(timeout) && timeout >= 1 && timeout <= 30
+			? timeout
+			: 5;
+	}
+
+	cleanMOTD(description) {
+		if (typeof description === "string") {
+			return description.replace(/§./g, ""); // Remove color codes
+		}
+		if (typeof description === "object" && description.text) {
+			return description.text.replace(/§./g, "");
+		}
+		if (typeof description === "object" && description.extra) {
+			return description.extra
+				.map((part) => (typeof part === "string" ? part : part.text || ""))
+				.join("")
+				.replace(/§./g, "");
+		}
+		return String(description).replace(/§./g, "");
+	}
+
+	// VarInt encoding/decoding for Minecraft protocol
+	writeVarInt(value) {
+		const buffer = [];
+		do {
+			let byte = value & 0x7f;
+			value >>>= 7;
+			if (value !== 0) {
+				byte |= 0x80;
+			}
+			buffer.push(byte);
+		} while (value !== 0);
+		return Buffer.from(buffer);
+	}
+
+	readVarInt(buffer, offset) {
+		let value = 0;
+		let length = 0;
+		let currentByte;
+
+		do {
+			if (offset + length >= buffer.length) {
+				throw new Error("VarInt extends beyond buffer");
+			}
+			currentByte = buffer[offset + length];
+			value |= (currentByte & 0x7f) << (length * 7);
+			length++;
+			if (length > 5) {
+				throw new Error("VarInt is too big");
+			}
+		} while ((currentByte & 0x80) !== 0);
+
+		return { value, length };
+	}
+}
+
+module.exports = MinecraftServerPlugin;
+
+```
+
+## minecraft_server/manifest.json
+
+```
+{
+	"id": "minecraft_server",
+	"name": "Minecraft Server Status",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "https://github.com/LumiaStream/minecraft-server-plugin",
+	"description": "Monitor Minecraft Java Edition servers using Server List Ping and Query protocols. Track player count, server status, and trigger alerts based on server activity.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "platforms",
+	"icon": "minecraft.png",
+	"changelog": "# Changelog\n\n## 1.0.0\n- Initial release\n- Server List Ping support (always available)\n- Query protocol support (requires enable-query=true)\n- Automatic polling with configurable interval\n- Player tracking and events\n- Server online/offline detection\n- Template variables for server stats\n- Manual poll and test actions",
+	"config": {
+		"settings": [
+			{
+				"key": "serverHost",
+				"label": "Server Address",
+				"type": "text",
+				"placeholder": "play.hypixel.net or 192.168.1.100",
+				"helperText": "Minecraft server hostname or IP address",
+				"required": true
+			},
+			{
+				"key": "serverPort",
+				"label": "Server Port",
+				"type": "number",
+				"defaultValue": 25565,
+				"helperText": "Default Minecraft port is 25565",
+				"validation": {
+					"min": 1,
+					"max": 65535
+				}
+			},
+			{
+				"key": "useQuery",
+				"label": "Use Query Protocol",
+				"type": "checkbox",
+				"defaultValue": false,
+				"helperText": "Enable if server has enable-query=true in server.properties. Provides more detailed stats including player list."
+			},
+			{
+				"key": "queryPort",
+				"label": "Query Port",
+				"type": "number",
+				"defaultValue": 25565,
+				"helperText": "Query port (usually same as server port)",
+				"validation": {
+					"min": 1,
+					"max": 65535
+				}
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 30,
+				"helperText": "How often to check server status (10-300 seconds)",
+				"validation": {
+					"min": 10,
+					"max": 300
+				}
+			},
+			{
+				"key": "enablePolling",
+				"label": "Enable Automatic Polling",
+				"type": "checkbox",
+				"defaultValue": true,
+				"helperText": "Automatically poll server at specified interval"
+			},
+			{
+				"key": "timeout",
+				"label": "Request Timeout (seconds)",
+				"type": "number",
+				"defaultValue": 5,
+				"helperText": "Timeout for server requests",
+				"validation": {
+					"min": 1,
+					"max": 30
+				}
+			}
+		],
+		"settings_tutorial": "---\n### 🎮 Setup Your Minecraft Server Monitoring\n1) Enter your server address (hostname or IP)\n2) Enter server port (default: 25565)\n3) (Optional) Enable Query protocol for detailed stats\n   - Requires `enable-query=true` in server.properties\n   - Provides player list and more details\n4) Set poll interval (how often to check)\n5) Click **Save** to start monitoring\n---\n### ✅ Verify Connection\nUse the **Test Connection** action to verify server is reachable.\n---\n### 📊 What Gets Tracked\n- Server online/offline status\n- Current player count\n- Maximum players\n- Server version\n- MOTD (Message of the Day)\n- Player list (if Query enabled)\n---",
+		"actions_tutorial": "---\n### 🔄 Manual Poll\nManually check server status without waiting for next scheduled poll.\n---\n### 🧪 Test Connection\nTest connection to server and display current status.\n---",
+		"actions": [
+			{
+				"type": "manual_poll",
+				"label": "Manual Poll",
+				"description": "Manually poll server status",
+				"fields": []
+			}
+		],
+		"variables": [
+			{
+				"name": "mc_online",
+				"description": "Whether the server is online",
+				"value": false
+			},
+			{
+				"name": "mc_players_online",
+				"description": "Number of players currently online",
+				"value": 0
+			},
+			{
+				"name": "mc_players_max",
+				"description": "Maximum number of players allowed",
+				"value": 0
+			},
+			{
+				"name": "mc_version",
+				"description": "Server version (e.g., 1.21.5)",
+				"value": ""
+			},
+			{
+				"name": "mc_motd",
+				"description": "Server Message of the Day",
+				"value": ""
+			},
+			{
+				"name": "mc_protocol_version",
+				"description": "Protocol version number",
+				"value": 0
+			},
+			{
+				"name": "mc_player_list",
+				"description": "Comma-separated list of player names (Query only)",
+				"value": ""
+			},
+			{
+				"name": "mc_map",
+				"description": "Current world/map name (Query only)",
+				"value": ""
+			},
+			{
+				"name": "mc_game_type",
+				"description": "Game type (Survival, Creative, etc.) (Query only)",
+				"value": ""
+			},
+			{
+				"name": "mc_last_player_joined",
+				"description": "Username of last player who joined",
+				"value": ""
+			},
+			{
+				"name": "mc_last_player_left",
+				"description": "Username of last player who left",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Server Online",
+				"key": "serverOnline",
+				"acceptedVariables": [
+					"mc_online",
+					"mc_version",
+					"mc_motd",
+					"mc_players_max"
+				],
+				"defaultMessage": "Minecraft server is now online!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Server Offline",
+				"key": "serverOffline",
+				"acceptedVariables": [],
+				"defaultMessage": "Minecraft server went offline",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Player Joined",
+				"key": "playerJoined",
+				"acceptedVariables": [
+					"mc_last_player_joined",
+					"mc_players_online",
+					"mc_players_max"
+				],
+				"defaultMessage": "{{username}} joined the server! ({{mc_players_online}}/{{mc_players_max}})",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Player Left",
+				"key": "playerLeft",
+				"acceptedVariables": [
+					"mc_last_player_left",
+					"mc_players_online",
+					"mc_players_max"
+				],
+				"defaultMessage": "{{username}} left the server ({{mc_players_online}}/{{mc_players_max}})",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Player Milestone",
+				"key": "playerMilestone",
+				"acceptedVariables": ["mc_players_online", "mc_players_max"],
+				"defaultMessage": "{{mc_players_online}} players online!",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Player count is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Server Full",
+				"key": "serverFull",
+				"acceptedVariables": ["mc_players_online", "mc_players_max"],
+				"defaultMessage": "Server is full! ({{mc_players_max}}/{{mc_players_max}})",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			}
+		]
+	}
+}
+
+```
+
+## minecraft_server/package-lock.json
+
+```
+{
+	"name": "lumia-minecraft-server",
+	"version": "1.0.0",
+	"lockfileVersion": 3,
+	"requires": true,
+	"packages": {
+		"": {
+			"name": "lumia-minecraft-server",
+			"version": "1.0.0",
+			"dependencies": {
+				"@lumiastream/plugin": "^0.1.18"
+			}
+		},
+		"node_modules/@lumiastream/plugin": {
+			"version": "0.1.18",
+			"resolved": "https://registry.npmjs.org/@lumiastream/plugin/-/plugin-0.1.18.tgz",
+			"integrity": "sha512-J290nM+G6wD8fUFAdJgzEWkRZEZCKtDjLDRAh5utHVOily+sJrg/tl2HhyEXGB+ALHZpEiYGfIyLWghhYlKiTQ==",
+			"license": "MIT"
+		}
+	}
+}
+
+```
+
+## minecraft_server/package.json
+
+```
+{
+	"name": "lumia-minecraft-server",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Monitor Minecraft Java Edition servers using Server List Ping and Query protocols.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.1.18"
+	}
 }
 
 ```
@@ -5945,98 +3976,9 @@ module.exports = MockLightsPlugin;
   "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
   "main": "main.js",
   "dependencies": {
-    "@lumiastream/plugin": "^0.1.17"
+    "@lumiastream/plugin": "^0.1.18"
   }
 }
-
-```
-
-## rumble/README.md
-
-```
-# Rumble Livestream Plugin (Example)
-
-An opinionated Lumia Stream plugin that polls the Rumble livestream API and surfaces live viewers, chat activity, rumbles, rants, followers, likes, dislikes, subs, and stream metadata directly into Lumia variables and alerts.
-
-The example is written in plain JavaScript so you can copy the files directly into `~/Documents/LumiaStream/Plugins/<your_plugin_id>` (or use **Load from Directory** inside Lumia Stream) without running a build step.
-
-## Files
-
-```
-examples/rumble/
-├── assets/                 # Icon and screenshot assets referenced by the manifest
-├── main.js                 # Plugin implementation (CommonJS module)
-├── manifest.json           # Plugin metadata and configuration definition
-├── package.json            # Optional: declares the SDK dependency when you `npm install`
-└── README.md
-```
-
-## Quick Copy/Paste Instructions
-
-1. Create a new folder for your plugin (for example `~/Documents/LumiaStream/Plugins/rumble`).
-2. Copy `manifest.json`, `main.js`, and the `assets/` directory from this example into that folder.
-3. (Optional) copy `package.json` if you want to track dependencies – then run `npm install` to pull in `@lumiastream/plugin`.
-4. Launch Lumia Stream and load the plugin from the directory (or restart if you copied into the plugins folder).
-5. Open the plugin settings and paste your Rumble livestream API key. A valid key looks like `https://rumble.com/-livestream-api/get-data?key=YOUR_KEY` (copy the value after `key=`).
-
-The plugin will begin polling every 30 seconds by default and will log activity in the Lumia console.
-
-## Highlights
-
-- Built with the `@lumiastream/plugin` runtime `Plugin` base class
-- Tracks a rich set of variables including viewers, chat members, followers, likes, dislikes, subs, rumbles, rants, thumbnails, URLs, and timestamps
-- Raises alerts for stream lifecycle events plus follower, rant, like/dislike, sub, and sub gift changes
-- Demonstrates manual actions (`manual_poll`, `manual_alert`) that can be triggered from the Lumia UI
-
-## Variables at a Glance
-
-The plugin keeps the following Lumia variables updated (see `manifest.json` for full descriptions):
-
-- `rumble_live`, `rumble_viewers`, `rumble_joined`
-- `rumble_rumbles`, `rumble_rants`, `rumble_rant_amount`
-- `rumble_chat_members`, `rumble_followers`, `rumble_likes`, `rumble_dislikes`, `rumble_subs`, `rumble_sub_gifts`
-- `rumble_title`, `rumble_thumbnail`, `rumble_stream_url`, `rumble_video_id`
-- `rumble_channel_name`, `rumble_channel_image`, `rumble_category`, `rumble_language`
-- `rumble_started_at`, `rumble_scheduled_start`, `rumble_last_polled`
-
-## Alert Triggers
-
-Alerts fire automatically for:
-
-- Stream start / end (`rumble-streamStarted`, `rumble-streamEnded`)
-- Follower gains (`rumble-follower`)
-- Rants (with amount raised) (`rumble-rant`)
-- Likes (`rumble-like`) and dislikes (`rumble-dislike`)
-- New subs (`rumble-sub`) and gifted subs (`rumble-subGift`)
-
-## Customising
-
-- Tweak the polling cadence via the `pollInterval` setting (10–300 seconds). The plugin normalises milliseconds as well.
-- Adjust detection details (for example `RANT_AMOUNT_EPSILON`) or extend alert payloads by editing `check*` helpers in `main.js`.
-- Add more custom variables or alerts to match your channel’s workflow—the code is intentionally straightforward to modify.
-
-## TypeScript Version?
-
-If you prefer TypeScript, start from this JavaScript version and rename `main.js` to `main.ts`. Add a local `tsconfig.json` such as:
-
-```json
-{
-	"compilerOptions": {
-		"target": "ES2020",
-		"module": "CommonJS",
-		"strict": true,
-		"esModuleInterop": true,
-		"skipLibCheck": true,
-		"outDir": "dist",
-		"rootDir": "."
-	},
-	"include": ["main.ts"]
-}
-```
-
-Compile with `npx tsc` and point `manifest.json` at the emitted `dist/main.js` file (or copy the compiled file into the plugin root). Keeping the TypeScript config beside the file avoids any `../../tsconfig.json` references, so the project still copies cleanly.
-
-MIT License
 
 ```
 
@@ -6265,6 +4207,127 @@ function parseTimestamp(value) {
 	return null;
 }
 
+function normalizeBadges(value) {
+	if (Array.isArray(value)) {
+		return value
+			.map((badge) => normalizeBadgeUrl(coerceString(badge, "")))
+			.filter(Boolean);
+	}
+
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (!trimmed.length) {
+			return [];
+		}
+		const parts = trimmed.includes(",")
+			? trimmed.split(",").map((badge) => badge.trim())
+			: [trimmed];
+		return parts.map((badge) => normalizeBadgeUrl(badge)).filter(Boolean);
+	}
+
+	if (value && typeof value === "object") {
+		const candidate =
+			coerceString(value.url, "") ||
+			coerceString(value.image, "") ||
+			coerceString(value.icon, "") ||
+			coerceString(value.badge, "") ||
+			coerceString(value.badge_url, "") ||
+			coerceString(value.badgeUrl, "") ||
+			coerceString(value.src, "");
+		const normalized = normalizeBadgeUrl(candidate);
+		return normalized ? [normalized] : [];
+	}
+
+	return [];
+}
+
+function normalizeBadgeUrl(value) {
+	if (!value || typeof value !== "string") {
+		return "";
+	}
+	const trimmed = value.trim();
+	if (!trimmed.length) {
+		return "";
+	}
+	// Rumble chat can send badge names like "admin" without a path.
+	if (!/[/.]/.test(trimmed)) {
+		return `https://rumble.com/i/badges/${trimmed}_48.png`;
+	}
+	if (/^https?:\/\//i.test(trimmed)) {
+		return trimmed;
+	}
+	if (trimmed.startsWith("//")) {
+		return `https:${trimmed}`;
+	}
+	if (trimmed.startsWith("/")) {
+		return `https://rumble.com${trimmed}`;
+	}
+	return `https://rumble.com/${trimmed}`;
+}
+
+function buildAlertVariables(state) {
+	if (!state) {
+		return {};
+	}
+	return {
+		rumble_live: state.live,
+		rumble_viewers: state.viewers,
+		rumble_title: state.title,
+		rumble_stream_url: state.streamUrl,
+		rumble_followers: state.followers,
+		rumble_likes: state.likes,
+		rumble_dislikes: state.dislikes,
+		rumble_subs: state.subs,
+		rumble_sub_gifts: state.subGifts,
+		rumble_rants: state.rants,
+		rumble_rant_amount: roundToTwo(state.rantAmount),
+	};
+}
+
+function normalizeAvatar(value) {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : "";
+	}
+
+	if (value && typeof value === "object") {
+		return (
+			coerceString(value.url, "") ||
+			coerceString(value.image, "") ||
+			coerceString(value.avatar, "") ||
+			coerceString(value.src, "")
+		);
+	}
+
+	return "";
+}
+
+function extractChatAvatar(message) {
+	if (!message || typeof message !== "object") {
+		return "";
+	}
+
+	return (
+		normalizeAvatar(message.avatar) ||
+		normalizeAvatar(message.profile_pic_url) ||
+		normalizeAvatar(message.user_image) ||
+		normalizeAvatar(message.user_image_url) ||
+		normalizeAvatar(message.profile_image) ||
+		normalizeAvatar(message.profile_image_url) ||
+		normalizeAvatar(message.image) ||
+		normalizeAvatar(message.thumbnail) ||
+		normalizeAvatar(message.user?.avatar) ||
+		normalizeAvatar(message.user?.image) ||
+		normalizeAvatar(message.user?.profile_image) ||
+		normalizeAvatar(message.user?.profile_image_url)
+	);
+}
+
+function parseChatTimestamp(value) {
+	const parsed = parseTimestamp(value);
+	return parsed ? parsed.getTime() : 0;
+}
+
 // Top-level plugin that polls the API, tracks session state, and surfaces events to Lumia.
 class RumblePlugin extends Plugin {
 	constructor(manifest, context) {
@@ -6275,6 +4338,8 @@ class RumblePlugin extends Plugin {
 		this.sessionData = this.createEmptySession();
 		this.hasBaseline = false;
 		this.streamCounter = 0;
+		this.chatState = this.createEmptyChatState();
+		this.chatHasBaseline = false;
 	}
 
 	createEmptyState() {
@@ -6304,6 +4369,14 @@ class RumblePlugin extends Plugin {
 			channelImage: "",
 			startedAt: null,
 			scheduledStart: null,
+		};
+	}
+
+	createEmptyChatState() {
+		return {
+			lastTimestamp: 0,
+			seenKeys: new Set(),
+			seenOrder: [],
 		};
 	}
 
@@ -6389,6 +4462,7 @@ class RumblePlugin extends Plugin {
 						await this.lumia.triggerAlert({
 							alert: ALERT_TYPES.STREAM_START,
 							extraSettings: {
+								...buildAlertVariables(this.lastKnownState),
 								title: this.lastKnownState.title,
 								thumbnail: this.lastKnownState.thumbnail || "",
 								viewers: this.lastKnownState.viewers,
@@ -6402,7 +4476,7 @@ class RumblePlugin extends Plugin {
 
 					default: {
 						await this.lumia.addLog(
-							`[Rumble] Unknown action type: ${action.type}`
+							`[Rumble] Unknown action type: ${action.type}`,
 						);
 					}
 				}
@@ -6472,7 +4546,7 @@ class RumblePlugin extends Plugin {
 		}
 
 		const normalizedInterval = this.normalizePollInterval(
-			this.currentSettings.pollInterval
+			this.currentSettings.pollInterval,
 		);
 
 		if (normalizedInterval !== this.currentSettings.pollInterval) {
@@ -6516,7 +4590,7 @@ class RumblePlugin extends Plugin {
 			const apiKey = this.apiKey;
 			if (!apiKey) {
 				await this.lumia.addLog(
-					"[Rumble] Poll skipped: API key not configured"
+					"[Rumble] Poll skipped: API key not configured",
 				);
 				return;
 			}
@@ -6545,7 +4619,7 @@ class RumblePlugin extends Plugin {
 		state.rantAmount = coerceNumber(pickFirst(data, FIELD_PATHS.rantAmount), 0);
 		state.followers = coerceNumber(
 			pickFirst(data, FIELD_PATHS.followers),
-			this.lastKnownState.followers || 0
+			this.lastKnownState.followers || 0,
 		);
 		state.likes = coerceNumber(pickFirst(data, FIELD_PATHS.likes));
 		state.dislikes = coerceNumber(pickFirst(data, FIELD_PATHS.dislikes));
@@ -6553,26 +4627,26 @@ class RumblePlugin extends Plugin {
 		state.subGifts = coerceNumber(pickFirst(data, FIELD_PATHS.subGifts));
 		state.chatMembers = coerceNumber(
 			pickFirst(data, FIELD_PATHS.chatMembers),
-			0
+			0,
 		);
 		state.category = coerceString(pickFirst(data, FIELD_PATHS.category), "");
 		state.description = coerceString(
 			pickFirst(data, FIELD_PATHS.description),
-			""
+			"",
 		);
 		state.language = coerceString(pickFirst(data, FIELD_PATHS.language), "");
 		state.chatUrl = coerceString(pickFirst(data, FIELD_PATHS.chatUrl), "");
 		state.channelName = coerceString(
 			pickFirst(data, FIELD_PATHS.channelName),
-			""
+			"",
 		);
 		state.channelImage = coerceString(
 			pickFirst(data, FIELD_PATHS.channelImage),
-			""
+			"",
 		);
 		state.startedAt = parseTimestamp(pickFirst(data, FIELD_PATHS.startedAt));
 		state.scheduledStart = parseTimestamp(
-			pickFirst(data, FIELD_PATHS.scheduledStart)
+			pickFirst(data, FIELD_PATHS.scheduledStart),
 		);
 
 		return state;
@@ -6605,6 +4679,11 @@ class RumblePlugin extends Plugin {
 		}
 
 		await this.updateVariables(state, previous, !hadBaseline);
+		if (state.live) {
+			await this.processChatMessages(data);
+		} else if (this.chatHasBaseline) {
+			this.resetChatState();
+		}
 		this.lastKnownState = state;
 		this.hasBaseline = true;
 	}
@@ -6641,7 +4720,7 @@ class RumblePlugin extends Plugin {
 		setIfChanged(
 			"rumble_stream_url",
 			state.streamUrl,
-			previousState?.streamUrl
+			previousState?.streamUrl,
 		);
 		setIfChanged("rumble_video_id", state.videoId, previousState?.videoId);
 		setIfChanged("rumble_rumbles", state.rumbles, previousState?.rumbles);
@@ -6654,30 +4733,30 @@ class RumblePlugin extends Plugin {
 		setIfChanged(
 			"rumble_rant_amount",
 			roundToTwo(state.rantAmount),
-			prevRantAmount
+			prevRantAmount,
 		);
 		setIfChanged(
 			"rumble_chat_members",
 			state.chatMembers,
-			previousState?.chatMembers
+			previousState?.chatMembers,
 		);
 		setIfChanged("rumble_category", state.category, previousState?.category);
 		setIfChanged(
 			"rumble_description",
 			state.description,
-			previousState?.description
+			previousState?.description,
 		);
 		setIfChanged("rumble_language", state.language, previousState?.language);
 		setIfChanged("rumble_chat_url", state.chatUrl, previousState?.chatUrl);
 		setIfChanged(
 			"rumble_channel_name",
 			state.channelName,
-			previousState?.channelName
+			previousState?.channelName,
 		);
 		setIfChanged(
 			"rumble_channel_image",
 			state.channelImage,
-			previousState?.channelImage
+			previousState?.channelImage,
 		);
 		setIfChanged("rumble_started_at", startedIso, prevStartedIso);
 		setIfChanged("rumble_scheduled_start", scheduledIso, prevScheduledIso);
@@ -6693,6 +4772,7 @@ class RumblePlugin extends Plugin {
 
 	// When a stream flips from offline to live, start a new session and alert.
 	async handleStreamStart(rawData, state) {
+		this.resetChatState();
 		this.sessionData = this.createEmptySession();
 		this.sessionData.streamStartTime = new Date();
 		this.sessionData.lastRantsCount = state.rants;
@@ -6706,6 +4786,7 @@ class RumblePlugin extends Plugin {
 				value: this.streamCounter,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				title: state.title,
 				thumbnail: state.thumbnail,
 				viewers: state.viewers,
@@ -6745,6 +4826,7 @@ class RumblePlugin extends Plugin {
 				total: this.streamCounter,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				streamNumber: this.streamCounter,
 				finalViewers: state.viewers,
 				durationMinutes,
@@ -6762,6 +4844,7 @@ class RumblePlugin extends Plugin {
 		});
 
 		this.sessionData.streamStartTime = null;
+		this.resetChatState();
 	}
 
 	// Emit a follower alert whenever the cumulative follower total increases.
@@ -6773,11 +4856,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.FOLLOWER,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.followers,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newFollowers: delta,
 				totalFollowers: state.followers,
 				streamUrl: state.streamUrl,
@@ -6795,11 +4880,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.LIKE,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.likes,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newLikes: delta,
 				totalLikes: state.likes,
 				streamUrl: state.streamUrl,
@@ -6817,11 +4904,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.DISLIKE,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.dislikes,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newDislikes: delta,
 				totalDislikes: state.dislikes,
 				streamUrl: state.streamUrl,
@@ -6839,11 +4928,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.SUB,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.subs,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newSubs: delta,
 				totalSubs: state.subs,
 				streamUrl: state.streamUrl,
@@ -6861,11 +4952,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.SUB_GIFT,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.subGifts,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newGiftSubs: delta,
 				totalGiftSubs: state.subGifts,
 				streamUrl: state.streamUrl,
@@ -6890,11 +4983,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.RANT,
+			showInEventList: true,
 			dynamic: {
 				value: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
 				total: roundToTwo(state.rantAmount),
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newRants: Math.max(countDelta, 0),
 				rantsTotal: state.rants,
 				rantAmountIncrement: roundToTwo(amountDelta),
@@ -6906,16 +5001,117 @@ class RumblePlugin extends Plugin {
 		});
 	}
 
+	resetChatState() {
+		this.chatState = this.createEmptyChatState();
+		this.chatHasBaseline = false;
+	}
+
+	extractChatMessages(rawData = {}) {
+		const livestream = Array.isArray(rawData.livestreams)
+			? rawData.livestreams[0]
+			: null;
+		const chat = livestream?.chat;
+		if (!chat) {
+			return [];
+		}
+
+		const recentMessages = Array.isArray(chat.recent_messages)
+			? chat.recent_messages
+			: [];
+		const latestMessage = chat.latest_message ? [chat.latest_message] : [];
+		const combined = [...recentMessages, ...latestMessage];
+
+		const normalized = combined
+			.map((message) => {
+				const username = coerceString(message?.username, "");
+				const text = coerceString(message?.text ?? message?.message, "");
+				const timestamp = parseChatTimestamp(
+					message?.created_on ?? message?.created_at,
+				);
+				return {
+					username,
+					text,
+					timestamp,
+					avatar: extractChatAvatar(message),
+				};
+			})
+			.filter((message) => message.username && message.text);
+
+		normalized.sort((a, b) => a.timestamp - b.timestamp);
+		return normalized;
+	}
+
+	cacheChatKey(key) {
+		this.chatState.seenKeys.add(key);
+		this.chatState.seenOrder.push(key);
+		const maxCacheSize = 200;
+		if (this.chatState.seenOrder.length > maxCacheSize) {
+			const overflow = this.chatState.seenOrder.length - maxCacheSize;
+			const removed = this.chatState.seenOrder.splice(0, overflow);
+			removed.forEach((oldKey) => this.chatState.seenKeys.delete(oldKey));
+		}
+	}
+
+	async processChatMessages(rawData = {}) {
+		const messages = this.extractChatMessages(rawData);
+		if (!messages.length) {
+			return;
+		}
+
+		if (!this.chatHasBaseline) {
+			messages.forEach((message) => {
+				const key = `${message.timestamp}:${message.username}:${message.text}`;
+				this.cacheChatKey(key);
+				this.chatState.lastTimestamp = Math.max(
+					this.chatState.lastTimestamp,
+					message.timestamp,
+				);
+			});
+			this.chatHasBaseline = true;
+			return;
+		}
+
+		for (const message of messages) {
+			const key = `${message.timestamp}:${message.username}:${message.text}`;
+			if (this.chatState.seenKeys.has(key)) {
+				continue;
+			}
+
+			if (
+				message.timestamp &&
+				message.timestamp < this.chatState.lastTimestamp
+			) {
+				this.cacheChatKey(key);
+				continue;
+			}
+
+			this.cacheChatKey(key);
+			this.chatState.lastTimestamp = Math.max(
+				this.chatState.lastTimestamp,
+				message.timestamp,
+			);
+
+			this.lumia.displayChat({
+				platform: "rumble",
+				username: message.username,
+				displayname: message.username,
+				message: message.text,
+				avatar: message.avatar || undefined,
+				messageId: `rumble-${message.timestamp}-${message.username}`,
+			});
+		}
+	}
+
 	// Wraps the fetch call so we can centralise error handling and payload shape.
 	async fetchStreamData(apiKey) {
 		const url = `https://rumble.com/-livestream-api/get-data?key=${encodeURIComponent(
-			apiKey
+			apiKey,
 		)}`;
 		const response = await fetch(url);
 
 		if (!response.ok) {
 			throw new Error(
-				`HTTP ${response.status}: ${response.statusText || "Request failed"}`
+				`HTTP ${response.status}: ${response.statusText || "Request failed"}`,
 			);
 		}
 
@@ -6965,17 +5161,17 @@ module.exports = RumblePlugin;
 {
 	"id": "rumble",
 	"name": "Rumble Livestream",
-	"version": "1.2.0",
+	"version": "1.0.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "https://github.com/LumiaStream/rumble-plugin",
-	"description": "Monitor Rumble livestream status and surface follower, rant, reaction, and subscription activity inside Lumia.",
+	"description": "Monitor Rumble livestream status, surface follower/rant/reaction/subscription activity, and display chat messages inside Lumia.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "platforms",
-	"icon": "assets/rumble-icon.png",
-	"changelog": "# Changelog\n\n## 1.2.0\n- Simplified alerts to focus on followers, rants, likes, dislikes, subs, and sub gifts\n- Added variables for subs, sub gifts, likes, dislikes, and follower deltas\n- Removed milestone and peak-based alerts\n- Aligned alert identifiers with Lumia defaults (for example `rumble-follower`, `rumble-sub`)\n\n## 1.1.0\n- Added variables for chat members, followers, rumbles, rants, and scheduling info\n- New alerts for viewer milestones, new peak viewers, rumbles, rants, follower milestones, and chat spikes\n- Improved stream session tracking and alert payloads\n\n## 1.0.0\n- Initial release\n- Rumble API polling\n- Stream start/end detection\n- Viewer count change tracking\n- Template variable updates\n- Manual action handlers",
+	"icon": "rumble-icon.png",
+	"changelog": "# Changelog\n\n## 1.0.0\n- Simplified alerts to focus on followers, rants, likes, dislikes, subs, and sub gifts\n- Added variables for subs, sub gifts, likes, dislikes, and follower deltas\n- Removed milestone and peak-based alerts\n- Aligned alert identifiers with Lumia defaults (for example `rumble-follower`, `rumble-sub`)\n\n## 1.1.0\n- Added variables for chat members, followers, rumbles, rants, and scheduling info\n- New alerts for viewer milestones, new peak viewers, rumbles, rants, follower milestones, and chat spikes\n- Improved stream session tracking and alert payloads\n\n## 1.0.0\n- Initial release\n- Rumble API polling\n- Stream start/end detection\n- Viewer count change tracking\n- Template variable updates\n- Manual action handlers",
 	"config": {
 		"settings": [
 			{
@@ -6994,6 +5190,8 @@ module.exports = RumblePlugin;
 				"helperText": "How often to check for stream updates (10-300 seconds)"
 			}
 		],
+		"settings_tutorial": "---\n### 🔑 Get Your Rumble Livestream API URL\n1) Open https://rumble.com/account/livestream-api while logged in.\n2) Copy the full Livestream API URL shown on that page.\n3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).\n---\n### ✅ Verify Access\nClick **Save**, then trigger **Manual Poll** to confirm data is flowing.\n---\n### ⏱️ Adjust Polling\nSet a poll interval that balances freshness with API limits (10–300 seconds).\n---",
+		"actions_tutorial": "---\n### 🔁 Manual Poll\nUse this to fetch the latest livestream stats without waiting for the next scheduled poll.\n---\n### 🚨 Manual Alert\nFire the “Stream Started” alert for testing your alert/overlay setup.\n---",
 		"actions": [
 			{
 				"type": "manual_poll",
@@ -7314,14 +5512,1126 @@ module.exports = RumblePlugin;
 
 ```
 {
-	"name": "lumia-example-rumble",
-	"version": "1.2.0",
+	"name": "lumia-rumble",
+	"version": "1.0.0",
 	"private": true,
-	"description": "Example Lumia Stream plugin that monitors a Rumble livestream and surfaces follower, rant, reaction, and subscription activity.",
+	"description": "Lumia Stream plugin that monitors a Rumble livestream and surfaces follower, rant, reaction, and subscription activity.",
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.17"
+		"@lumiastream/plugin": "^0.1.18"
+	}
+}
+
+```
+
+## tikfinity/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+// Alert identifiers aligned with Lumia's built-in conventions
+const ALERT_TYPES = {
+	STREAM_START: "streamStarted",
+	STREAM_END: "streamEnded",
+	CHAT: "chat",
+	GIFT: "gift",
+	FOLLOW: "follow",
+	SHARE: "share",
+	LIKE: "like",
+	SUBSCRIBE: "subscribe",
+};
+
+// Tikfinity WebSocket event types (based on TikTok LIVE events)
+const EVENT_TYPES = {
+	CONNECTED: "connected",
+	DISCONNECTED: "disconnected",
+	STREAM_END: "streamEnd",
+	ROOM_USER: "roomUser",
+	MEMBER: "member",
+	CHAT: "chat",
+	GIFT: "gift",
+	FOLLOW: "follow",
+	SHARE: "share",
+	LIKE: "like",
+	SUBSCRIBE: "subscribe",
+	ERROR: "error",
+};
+
+// Default reconnect settings
+const DEFAULT_RECONNECT_INTERVAL = 30;
+const MIN_RECONNECT_INTERVAL = 10;
+const MAX_RECONNECT_INTERVAL = 300;
+
+// Helper functions for data normalization
+function coerceString(value, fallback = "") {
+	if (typeof value === "string") {
+		return value;
+	}
+	if (value === null || value === undefined) {
+		return fallback;
+	}
+	return String(value);
+}
+
+function coerceNumber(value, fallback = 0) {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : fallback;
+	}
+	if (typeof value === "boolean") {
+		return value ? 1 : 0;
+	}
+	return fallback;
+}
+
+function coerceBoolean(value, fallback = false) {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (typeof value === "number") {
+		return value !== 0;
+	}
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (normalized === "true" || normalized === "yes" || normalized === "1") {
+			return true;
+		}
+		if (normalized === "false" || normalized === "no" || normalized === "0") {
+			return false;
+		}
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return parsed !== 0;
+		}
+	}
+	return fallback;
+}
+
+function normalizeAvatar(value) {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : "";
+	}
+
+	if (value && typeof value === "object") {
+		return (
+			coerceString(value.url, "") ||
+			coerceString(value.avatar, "") ||
+			coerceString(value.profilePictureUrl, "") ||
+			coerceString(value.image, "")
+		);
+	}
+
+	return "";
+}
+
+class TikfinityPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+
+		this.ws = null;
+		this.reconnectTimeoutId = null;
+		this.isConnecting = false;
+		this.isManuallyDisconnected = false;
+
+		this.sessionData = this.createEmptySession();
+		this.seenFollowers = new Set();
+		this.giftStreaks = new Map();
+		this.GIFT_FINALIZE_TIMEOUT = 5000; // 5 seconds
+	}
+
+	createEmptySession() {
+		return {
+			live: false,
+			viewers: 0,
+			totalViewers: 0,
+			title: "",
+			likes: 0,
+			diamonds: 0,
+			followers: 0,
+			shares: 0,
+			lastChatter: "",
+			lastGifter: "",
+			lastFollower: "",
+		};
+	}
+
+	get currentSettings() {
+		return this.settings || {};
+	}
+
+	get username() {
+		return this.extractUsername(this.currentSettings.username);
+	}
+
+	get apiKey() {
+		return this.extractApiKey(this.currentSettings.apiKey);
+	}
+
+	extractUsername(value) {
+		if (typeof value !== "string") {
+			return undefined;
+		}
+		const trimmed = value.trim().replace(/^@/, "");
+		return trimmed.length ? trimmed : undefined;
+	}
+
+	extractApiKey(value) {
+		if (typeof value !== "string") {
+			return undefined;
+		}
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : undefined;
+	}
+
+	async onload() {
+		await this.lumia.addLog("[Tikfinity] Plugin loading...");
+
+		if (this.username) {
+			await this.connect({ showToast: false });
+		}
+
+		await this.lumia.addLog("[Tikfinity] Plugin loaded");
+	}
+
+	async onunload() {
+		await this.lumia.addLog("[Tikfinity] Plugin unloading...");
+		this.isManuallyDisconnected = true;
+		await this.disconnect(false);
+		await this.lumia.addLog("[Tikfinity] Plugin unloaded");
+	}
+
+	async onsettingsupdate(settings, previousSettings) {
+		const next = settings || {};
+		const previous = previousSettings || {};
+
+		const nextUsername = this.extractUsername(next.username);
+		const prevUsername = this.extractUsername(previous.username);
+
+		const nextApiKey = this.extractApiKey(next.apiKey);
+		const prevApiKey = this.extractApiKey(previous.apiKey);
+
+		const usernameChanged = nextUsername !== prevUsername;
+		const apiKeyChanged = nextApiKey !== prevApiKey;
+
+		if (!nextUsername) {
+			await this.disconnect(false);
+			return;
+		}
+
+		if (!this.ws || this.ws.readyState !== 1) {
+			await this.connect({ showToast: false });
+			return;
+		}
+
+		if (usernameChanged || apiKeyChanged) {
+			await this.disconnect(false);
+			await this.connect({ showToast: false });
+		}
+	}
+
+	async actions(config = {}) {
+		const actionList = Array.isArray(config.actions) ? config.actions : [];
+
+		if (!actionList.length) {
+			return;
+		}
+
+		for (const action of actionList) {
+			try {
+				switch (action.type) {
+					case "manual_connect": {
+						await this.connect({ showToast: true });
+						await this.lumia.addLog("[Tikfinity] Manual connect triggered");
+						break;
+					}
+
+					case "manual_disconnect": {
+						this.isManuallyDisconnected = true;
+						await this.disconnect(true);
+						await this.lumia.addLog("[Tikfinity] Manual disconnect triggered");
+						break;
+					}
+
+					case "test_alert": {
+						await this.lumia.triggerAlert({
+							alert: ALERT_TYPES.STREAM_START,
+							extraSettings: {
+								...this.buildAlertVariables(),
+								title: this.sessionData.title || "Test Stream",
+								viewers: this.sessionData.viewers,
+							},
+						});
+						await this.lumia.addLog("[Tikfinity] Test alert triggered");
+						break;
+					}
+
+					default: {
+						await this.lumia.addLog(
+							`[Tikfinity] Unknown action type: ${action.type}`,
+						);
+					}
+				}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				await this.lumia.addLog(`[Tikfinity] Action failed: ${message}`);
+			}
+		}
+	}
+
+	async validateAuth(data = {}) {
+		try {
+			const username = this.extractUsername(data.username);
+			if (!username) {
+				return false;
+			}
+			// For now, we just validate that the username exists
+			// In the future, we could ping Tikfinity API to verify
+			return true;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(`[Tikfinity] Auth validation failed: ${message}`);
+			return false;
+		}
+	}
+
+	buildWebSocketUrl() {
+		const username = this.username;
+		if (!username) {
+			throw new Error("Username is required to connect");
+		}
+
+		// Tikfinity WebSocket endpoint format based on the documentation
+		// Using instance "1" as default, can be configurable if needed
+		const instance = "1";
+		const baseUrl = `wss://tikfinity-cws-${instance}.zerody.one`;
+
+		// Add API key if provided
+		const apiKey = this.apiKey;
+		if (apiKey) {
+			return `${baseUrl}/?uniqueId=${encodeURIComponent(username)}&apiKey=${encodeURIComponent(apiKey)}`;
+		}
+
+		return `${baseUrl}/?uniqueId=${encodeURIComponent(username)}`;
+	}
+
+	async connect(options = {}) {
+		const { showToast = true } = options;
+
+		if (this.isConnecting) {
+			await this.lumia.addLog("[Tikfinity] Connection already in progress");
+			return;
+		}
+
+		if (!this.username) {
+			await this.lumia.addLog("[Tikfinity] Missing username, cannot connect");
+			if (showToast) {
+				await this.lumia.showToast({
+					message: "TikTok username required to connect",
+				});
+			}
+			return;
+		}
+
+		if (this.ws && this.ws.readyState === 1) {
+			await this.lumia.addLog("[Tikfinity] Already connected");
+			return;
+		}
+
+		try {
+			this.isConnecting = true;
+			this.isManuallyDisconnected = false;
+
+			const wsUrl = this.buildWebSocketUrl();
+			await this.lumia.addLog(`[Tikfinity] Connecting to ${wsUrl}`);
+
+			this.ws = new WebSocket(wsUrl);
+
+			this.ws.onopen = () => {
+				void this.handleOpen(showToast);
+			};
+
+			this.ws.onmessage = (event) => {
+				void this.handleMessage(event);
+			};
+
+			this.ws.onerror = (error) => {
+				void this.handleError(error);
+			};
+
+			this.ws.onclose = () => {
+				void this.handleClose();
+			};
+		} catch (error) {
+			this.isConnecting = false;
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(`[Tikfinity] Connection error: ${message}`);
+			if (showToast) {
+				await this.lumia.showToast({
+					message: `Failed to connect: ${message}`,
+				});
+			}
+		}
+	}
+
+	async disconnect(showToast = true) {
+		if (this.reconnectTimeoutId) {
+			clearTimeout(this.reconnectTimeoutId);
+			this.reconnectTimeoutId = null;
+		}
+
+		if (this.ws) {
+			this.ws.onclose = null; // Prevent reconnection
+			this.ws.close();
+			this.ws = null;
+		}
+
+		// Clear all gift streak timers
+		for (const streak of this.giftStreaks.values()) {
+			clearTimeout(streak.timer);
+		}
+		this.giftStreaks.clear();
+
+		this.isConnecting = false;
+
+		if (showToast) {
+			await this.lumia.showToast({ message: "Disconnected from Tikfinity" });
+		}
+
+		await this.lumia.updateConnection(false);
+		await this.updateVariable("tikfinity_connected", false);
+	}
+
+	async handleOpen(showToast = true) {
+		this.isConnecting = false;
+		await this.lumia.addLog("[Tikfinity] WebSocket connected");
+
+		if (showToast) {
+			await this.lumia.showToast({
+				message: `Connected to Tikfinity for @${this.username}`,
+			});
+		}
+
+		await this.lumia.updateConnection(true);
+		await this.updateVariable("tikfinity_connected", true);
+	}
+
+	async handleMessage(event) {
+		try {
+			const data = JSON.parse(event.data);
+			await this.processEvent(data);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(`[Tikfinity] Error processing message: ${message}`);
+		}
+	}
+
+	async handleError(error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await this.lumia.addLog(`[Tikfinity] WebSocket error: ${message}`);
+	}
+
+	async handleClose() {
+		await this.lumia.addLog("[Tikfinity] WebSocket disconnected");
+		await this.lumia.updateConnection(false);
+		await this.updateVariable("tikfinity_connected", false);
+
+		// Only attempt reconnection if not manually disconnected
+		if (!this.isManuallyDisconnected) {
+			await this.scheduleReconnect();
+		}
+	}
+
+	async scheduleReconnect() {
+		if (this.reconnectTimeoutId) {
+			return;
+		}
+
+		const interval = this.normalizeReconnectInterval(
+			this.currentSettings.reconnectInterval,
+		);
+
+		await this.lumia.addLog(
+			`[Tikfinity] Scheduling reconnect in ${interval} seconds`,
+		);
+
+		this.reconnectTimeoutId = setTimeout(() => {
+			this.reconnectTimeoutId = null;
+			void this.connect({ showToast: false });
+		}, interval * 1000);
+	}
+
+	normalizeReconnectInterval(value) {
+		if (typeof value === "number" && Number.isFinite(value)) {
+			return this.clampInterval(value);
+		}
+
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return this.clampInterval(parsed);
+		}
+
+		return DEFAULT_RECONNECT_INTERVAL;
+	}
+
+	clampInterval(value) {
+		const rounded = Math.round(value);
+		return Math.min(
+			Math.max(rounded, MIN_RECONNECT_INTERVAL),
+			MAX_RECONNECT_INTERVAL,
+		);
+	}
+
+	async processEvent(data) {
+		const eventType = data.event || data.type;
+
+		if (!eventType) {
+			return;
+		}
+
+		switch (eventType) {
+			case EVENT_TYPES.CONNECTED:
+				await this.handleConnectedEvent(data);
+				break;
+
+			case EVENT_TYPES.STREAM_END:
+				await this.handleStreamEndEvent(data);
+				break;
+
+			case EVENT_TYPES.ROOM_USER:
+				await this.handleRoomUserEvent(data);
+				break;
+
+			case EVENT_TYPES.MEMBER:
+				await this.handleMemberEvent(data);
+				break;
+
+			case EVENT_TYPES.CHAT:
+				await this.handleChatEvent(data);
+				break;
+
+			case EVENT_TYPES.GIFT:
+				await this.handleGiftEvent(data);
+				break;
+
+			case EVENT_TYPES.FOLLOW:
+				await this.handleFollowEvent(data);
+				break;
+
+			case EVENT_TYPES.SHARE:
+				await this.handleShareEvent(data);
+				break;
+
+			case EVENT_TYPES.LIKE:
+				await this.handleLikeEvent(data);
+				break;
+
+			case EVENT_TYPES.SUBSCRIBE:
+				await this.handleSubscribeEvent(data);
+				break;
+
+			case EVENT_TYPES.ERROR:
+				await this.handleErrorEvent(data);
+				break;
+
+			default:
+				await this.lumia.addLog(
+					`[Tikfinity] Unknown event type: ${eventType}`,
+				);
+		}
+	}
+
+	async handleConnectedEvent(data) {
+		// Stream has started
+		if (!this.sessionData.live) {
+			this.sessionData.live = true;
+			this.sessionData.title = coerceString(data.title || data.roomTitle, "");
+
+			await this.updateVariable("tikfinity_live", true);
+			await this.updateVariable("tikfinity_title", this.sessionData.title);
+
+			await this.lumia.triggerAlert({
+				alert: ALERT_TYPES.STREAM_START,
+				dynamic: {
+					name: this.sessionData.title,
+				},
+				extraSettings: {
+					...this.buildAlertVariables(),
+					title: this.sessionData.title,
+				},
+			});
+		}
+	}
+
+	async handleStreamEndEvent(data) {
+		if (this.sessionData.live) {
+			this.sessionData.live = false;
+
+			await this.updateVariable("tikfinity_live", false);
+
+			await this.lumia.triggerAlert({
+				alert: ALERT_TYPES.STREAM_END,
+				extraSettings: {
+					...this.buildAlertVariables(),
+					viewers: this.sessionData.viewers,
+					likes: this.sessionData.likes,
+					diamonds: this.sessionData.diamonds,
+					followers: this.sessionData.followers,
+					shares: this.sessionData.shares,
+				},
+			});
+
+			// Reset session data
+			this.sessionData = this.createEmptySession();
+			this.seenFollowers.clear();
+		}
+	}
+
+	async handleRoomUserEvent(data) {
+		const viewers = coerceNumber(data.viewerCount || data.viewers, 0);
+		this.sessionData.viewers = viewers;
+		await this.updateVariable("tikfinity_viewers", viewers);
+	}
+
+	async handleMemberEvent(data) {
+		const totalViewers = this.sessionData.totalViewers + 1;
+		this.sessionData.totalViewers = totalViewers;
+		await this.updateVariable("tikfinity_total_viewers", totalViewers);
+	}
+
+	async handleChatEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+		const message = coerceString(data.comment || data.message, "");
+		const displayname = coerceString(data.nickname || data.displayName || username, "");
+		const avatar = normalizeAvatar(
+			data.profilePictureUrl || data.avatar || data.profilePicture,
+		);
+
+		if (!username || !message) {
+			return;
+		}
+
+		this.sessionData.lastChatter = username;
+		await this.updateVariable("tikfinity_last_chatter", username);
+
+		// Display chat in Lumia
+		await this.lumia.displayChat({
+			platform: "tikfinity",
+			username,
+			displayname,
+			message,
+			avatar: avatar || undefined,
+			messageId: `tikfinity-${Date.now()}-${username}`,
+		});
+
+		// Optionally trigger chat alert
+		// await this.lumia.triggerAlert({
+		// 	alert: ALERT_TYPES.CHAT,
+		// 	extraSettings: {
+		// 		...this.buildAlertVariables(),
+		// 		username,
+		// 		displayname,
+		// 		message,
+		// 		avatar,
+		// 	},
+		// });
+	}
+
+	finalizeGiftStreak = (giftKey) => {
+		const streak = this.giftStreaks.get(giftKey);
+		if (!streak) return;
+
+		const { data } = streak;
+		const username = coerceString(data.uniqueId || data.username, "");
+		const giftName = coerceString(data.giftName, "Gift");
+		const diamondCount = coerceNumber(data.diamondCount || data.diamonds, 1);
+		const finalRepeatCount = streak.lastCount || coerceNumber(data.repeatCount, 1);
+		const totalDiamonds = diamondCount * finalRepeatCount;
+
+		this.sessionData.diamonds += totalDiamonds;
+		this.sessionData.lastGifter = username;
+
+		void this.updateVariable("tikfinity_diamonds", this.sessionData.diamonds);
+		void this.updateVariable("tikfinity_last_gifter", username);
+
+		void this.lumia.triggerAlert({
+			alert: ALERT_TYPES.GIFT,
+			dynamic: {
+				value: totalDiamonds,
+				name: giftName,
+			},
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+				giftName,
+				giftAmount: finalRepeatCount,
+				diamonds: totalDiamonds,
+				diamondCount,
+			},
+		});
+
+		clearTimeout(streak.timer);
+		this.giftStreaks.delete(giftKey);
+	};
+
+	async handleGiftEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+		const giftId = coerceString(data.giftId, "");
+		const giftName = coerceString(data.giftName, "Gift");
+		const diamondCount = coerceNumber(data.diamondCount || data.diamonds, 1);
+		const repeatCount = coerceNumber(data.repeatCount, 1);
+		const repeatEnd = coerceBoolean(data.repeatEnd, false);
+		const giftType = coerceNumber(data.giftType, 0);
+
+		if (!username) {
+			return;
+		}
+
+		const giftKey = `${username}_${giftId}`;
+
+		// Handle repeatable gifts with streak management (giftType 1)
+		if (giftType === 1 && !repeatEnd) {
+			const existingStreak = this.giftStreaks.get(giftKey);
+
+			if (existingStreak) {
+				clearTimeout(existingStreak.timer);
+			}
+
+			const timer = setTimeout(() => {
+				this.finalizeGiftStreak(giftKey);
+			}, this.GIFT_FINALIZE_TIMEOUT);
+
+			this.giftStreaks.set(giftKey, {
+				timer,
+				lastCount: repeatCount,
+				data,
+			});
+
+			return;
+		}
+
+		// Handle end of streak or non-repeatable gifts
+		if (giftType === 1 && repeatEnd) {
+			const existingStreak = this.giftStreaks.get(giftKey);
+			if (existingStreak) {
+				clearTimeout(existingStreak.timer);
+				this.giftStreaks.delete(giftKey);
+			}
+		}
+
+		// Process non-repeatable gifts or final gift in streak
+		if (giftType !== 1 || repeatEnd) {
+			const totalDiamonds = diamondCount * repeatCount;
+
+			this.sessionData.diamonds += totalDiamonds;
+			this.sessionData.lastGifter = username;
+
+			await this.updateVariable("tikfinity_diamonds", this.sessionData.diamonds);
+			await this.updateVariable("tikfinity_last_gifter", username);
+
+			await this.lumia.triggerAlert({
+				alert: ALERT_TYPES.GIFT,
+				dynamic: {
+					value: totalDiamonds,
+					name: giftName,
+				},
+				extraSettings: {
+					...this.buildAlertVariables(),
+					username,
+					giftName,
+					giftAmount: repeatCount,
+					diamonds: totalDiamonds,
+					diamondCount,
+				},
+			});
+		}
+	}
+
+	async handleFollowEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+
+		if (!username || this.seenFollowers.has(username)) {
+			return;
+		}
+
+		this.seenFollowers.add(username);
+		this.sessionData.followers++;
+		this.sessionData.lastFollower = username;
+
+		await this.updateVariable("tikfinity_followers", this.sessionData.followers);
+		await this.updateVariable("tikfinity_last_follower", username);
+
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.FOLLOW,
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+			},
+		});
+	}
+
+	async handleShareEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+
+		if (!username) {
+			return;
+		}
+
+		this.sessionData.shares++;
+
+		await this.updateVariable("tikfinity_shares", this.sessionData.shares);
+
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.SHARE,
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+			},
+		});
+	}
+
+	async handleLikeEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+		const likeCount = coerceNumber(data.likeCount, 1);
+		const totalLikeCount = coerceNumber(data.totalLikeCount, 0);
+
+		this.sessionData.likes = totalLikeCount || this.sessionData.likes + likeCount;
+
+		await this.updateVariable("tikfinity_likes", this.sessionData.likes);
+
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.LIKE,
+			dynamic: {
+				value: likeCount,
+				total: this.sessionData.likes,
+			},
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+				likeCount,
+				totalLikes: this.sessionData.likes,
+			},
+		});
+	}
+
+	async handleSubscribeEvent(data) {
+		const username = coerceString(data.uniqueId || data.username, "");
+
+		if (!username) {
+			return;
+		}
+
+		await this.lumia.triggerAlert({
+			alert: ALERT_TYPES.SUBSCRIBE,
+			extraSettings: {
+				...this.buildAlertVariables(),
+				username,
+			},
+		});
+	}
+
+	async handleErrorEvent(data) {
+		const message = coerceString(data.message || data.error, "Unknown error");
+		await this.lumia.addLog(`[Tikfinity] Server error: ${message}`);
+	}
+
+	buildAlertVariables() {
+		return {
+			tikfinity_connected: this.ws?.readyState === 1,
+			tikfinity_live: this.sessionData.live,
+			tikfinity_viewers: this.sessionData.viewers,
+			tikfinity_total_viewers: this.sessionData.totalViewers,
+			tikfinity_title: this.sessionData.title,
+			tikfinity_likes: this.sessionData.likes,
+			tikfinity_diamonds: this.sessionData.diamonds,
+			tikfinity_followers: this.sessionData.followers,
+			tikfinity_shares: this.sessionData.shares,
+			tikfinity_last_chatter: this.sessionData.lastChatter,
+			tikfinity_last_gifter: this.sessionData.lastGifter,
+			tikfinity_last_follower: this.sessionData.lastFollower,
+		};
+	}
+
+	async updateVariable(name, value) {
+		try {
+			await this.lumia.setVariable(name, value);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`[Tikfinity] Error updating variable ${name}: ${message}`,
+			);
+		}
+	}
+}
+
+module.exports = TikfinityPlugin;
+
+```
+
+## tikfinity/manifest.json
+
+```
+{
+	"id": "tikfinity",
+	"name": "Tikfinity TikTok LIVE",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "https://github.com/LumiaStream/tikfinity-plugin",
+	"description": "Connect to TikTok LIVE streams via Tikfinity Desktop WebSocket service to receive real-time events like chat, gifts, follows, shares, likes, and more.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "platforms",
+	"icon": "tikfinity-icon.png",
+	"changelog": "# Changelog\n\n## 1.0.0\n- Initial release\n- WebSocket connection to Tikfinity API\n- Real-time event processing for chat, gifts, follows, shares, likes\n- Stream start/end detection\n- Viewer count tracking\n- Template variable updates\n- Manual connection/disconnection handlers",
+	"config": {
+		"settings": [
+			{
+				"key": "username",
+				"label": "TikTok Username",
+				"type": "text",
+				"placeholder": "Enter your TikTok username (without @)",
+				"helperText": "Your TikTok username to monitor for LIVE events",
+				"required": true
+			},
+			{
+				"key": "apiKey",
+				"label": "Tikfinity API Key (Optional)",
+				"type": "text",
+				"placeholder": "Enter your Tikfinity API key for Pro features",
+				"helperText": "Optional: Get your API key from https://tikfinity.zerody.one for Pro features",
+				"required": false
+			},
+			{
+				"key": "reconnectInterval",
+				"label": "Reconnect Interval (seconds)",
+				"type": "number",
+				"defaultValue": 30,
+				"helperText": "How long to wait before attempting reconnection (10-300 seconds)"
+			}
+		],
+		"settings_tutorial": "---\n### 🔑 Setup Your Tikfinity Connection\n1) Enter your TikTok username (the one you use to go LIVE).\n2) (Optional) Get a Pro API key from https://tikfinity.zerody.one for enhanced features.\n3) Click **Save** to establish the connection.\n---\n### ✅ Verify Connection\nThe plugin will attempt to connect when you go LIVE on TikTok.\n---\n### ⏱️ Adjust Reconnection\nSet a reconnect interval for automatic reconnection attempts (10–300 seconds).\n---",
+		"actions_tutorial": "---\n### 🔗 Manual Connect\nUse this to manually establish a connection to Tikfinity.\n---\n### ❌ Manual Disconnect\nUse this to manually disconnect from Tikfinity.\n---\n### 🚨 Test Alert\nFire a test alert to verify your alert/overlay setup.\n---",
+		"actions": [
+			{
+				"type": "manual_connect",
+				"label": "Manual Connect",
+				"description": "Manually connect to Tikfinity WebSocket",
+				"fields": []
+			},
+			{
+				"type": "manual_disconnect",
+				"label": "Manual Disconnect",
+				"description": "Manually disconnect from Tikfinity",
+				"fields": []
+			},
+			{
+				"type": "test_alert",
+				"label": "Test Alert",
+				"description": "Trigger a test alert",
+				"fields": []
+			}
+		],
+		"variables": [
+			{
+				"name": "tikfinity_connected",
+				"description": "Whether the Tikfinity connection is active",
+				"value": false
+			},
+			{
+				"name": "tikfinity_live",
+				"description": "Whether the TikTok stream is currently live",
+				"value": false
+			},
+			{
+				"name": "tikfinity_viewers",
+				"description": "Current number of viewers watching the stream",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_title",
+				"description": "Current stream title",
+				"value": ""
+			},
+			{
+				"name": "tikfinity_total_viewers",
+				"description": "Total viewers that have joined the stream session",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_likes",
+				"description": "Total likes received during the stream",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_diamonds",
+				"description": "Total diamonds received during the stream",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_followers",
+				"description": "Session follower count",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_shares",
+				"description": "Number of shares during the stream",
+				"value": 0
+			},
+			{
+				"name": "tikfinity_last_chatter",
+				"description": "Username of the last person to chat",
+				"value": ""
+			},
+			{
+				"name": "tikfinity_last_gifter",
+				"description": "Username of the last person to send a gift",
+				"value": ""
+			},
+			{
+				"name": "tikfinity_last_follower",
+				"description": "Username of the last person to follow",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Stream Started",
+				"key": "streamStarted",
+				"acceptedVariables": [
+					"tikfinity_live",
+					"tikfinity_viewers",
+					"tikfinity_title"
+				],
+				"defaultMessage": "{{username}} has started streaming on TikTok!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Stream Ended",
+				"key": "streamEnded",
+				"acceptedVariables": [
+					"tikfinity_viewers",
+					"tikfinity_likes",
+					"tikfinity_diamonds",
+					"tikfinity_followers",
+					"tikfinity_shares"
+				],
+				"defaultMessage": "{{username}} has ended their TikTok stream.",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Chat Message",
+				"key": "chat",
+				"acceptedVariables": ["tikfinity_last_chatter"],
+				"defaultMessage": "{{username}}: {{message}}",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Gift",
+				"key": "gift",
+				"acceptedVariables": ["tikfinity_last_gifter", "tikfinity_diamonds"],
+				"defaultMessage": "{{username}} sent {{giftName}} x{{giftAmount}}!",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Gift diamond value is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Follow",
+				"key": "follow",
+				"acceptedVariables": ["tikfinity_last_follower", "tikfinity_followers"],
+				"defaultMessage": "{{username}} followed!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Share",
+				"key": "share",
+				"acceptedVariables": ["tikfinity_shares"],
+				"defaultMessage": "{{username}} shared the stream!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Like",
+				"key": "like",
+				"acceptedVariables": ["tikfinity_likes"],
+				"defaultMessage": "{{username}} liked the stream!",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Like count is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Subscribe",
+				"key": "subscribe",
+				"acceptedVariables": [],
+				"defaultMessage": "{{username}} subscribed!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			}
+		]
+	}
+}
+
+```
+
+## tikfinity/package.json
+
+```
+{
+	"name": "lumia-tikfinity",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that connects to TikTok LIVE streams via Tikfinity WebSocket service to receive real-time events.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.1.18"
 	}
 }
 

@@ -92,6 +92,7 @@ export interface PluginSetting {
 	helperText?: string;
 	required?: boolean;
 	options?: Array<{ label: string; value: string | number | boolean }>;
+	allowTyping?: boolean;
 	rows?: number;
 	defaultValue?: string | number | boolean;
 	validation?: {
@@ -127,6 +128,7 @@ export interface PluginActionField {
 	max?: number;
 	step?: number;
 	rows?: number;
+	allowTyping?: boolean;
 	defaultValue?: any;
 	validation?: {
 		min?: number;
@@ -145,6 +147,8 @@ export interface PluginActionDefinition {
 
 export interface PluginIntegrationConfig {
 	settings?: PluginSetting[];
+	settings_tutorial?: string;
+	actions_tutorial?: string;
 	variables?: PluginVariableDefinition[];
 	alerts?: PluginAlertDefinition[];
 	actions?: PluginActionDefinition[];
@@ -218,6 +222,7 @@ export interface PluginTriggerAlertOptions {
 	alert: string;
 	dynamic?: { name: string; value: string | number | boolean };
 	extraSettings?: Record<string, any>;
+	showInEventList?: boolean;
 }
 
 export interface PluginDisplayChatOptions {
@@ -229,6 +234,25 @@ export interface PluginDisplayChatOptions {
 	color?: string;
 	badges?: string[];
 	messageId?: string;
+	channel?: string;
+	user?: {
+		isSelf?: boolean;
+		broadcaster?: boolean;
+		mod?: boolean;
+		vip?: boolean;
+		subscriber?: boolean;
+		member?: boolean;
+		tier1?: boolean;
+		tier2?: boolean;
+		tier3?: boolean;
+		follower?: boolean;
+		regular?: boolean;
+		badges?: Record<string, any> | string[];
+		userId?: string;
+	};
+	emotesRaw?: string;
+	emotesPack?: Record<string, any> | any[];
+	isCheer?: boolean;
 	extraInfo?: Record<string, any>;
 }
 

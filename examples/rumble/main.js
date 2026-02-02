@@ -220,6 +220,127 @@ function parseTimestamp(value) {
 	return null;
 }
 
+function normalizeBadges(value) {
+	if (Array.isArray(value)) {
+		return value
+			.map((badge) => normalizeBadgeUrl(coerceString(badge, "")))
+			.filter(Boolean);
+	}
+
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (!trimmed.length) {
+			return [];
+		}
+		const parts = trimmed.includes(",")
+			? trimmed.split(",").map((badge) => badge.trim())
+			: [trimmed];
+		return parts.map((badge) => normalizeBadgeUrl(badge)).filter(Boolean);
+	}
+
+	if (value && typeof value === "object") {
+		const candidate =
+			coerceString(value.url, "") ||
+			coerceString(value.image, "") ||
+			coerceString(value.icon, "") ||
+			coerceString(value.badge, "") ||
+			coerceString(value.badge_url, "") ||
+			coerceString(value.badgeUrl, "") ||
+			coerceString(value.src, "");
+		const normalized = normalizeBadgeUrl(candidate);
+		return normalized ? [normalized] : [];
+	}
+
+	return [];
+}
+
+function normalizeBadgeUrl(value) {
+	if (!value || typeof value !== "string") {
+		return "";
+	}
+	const trimmed = value.trim();
+	if (!trimmed.length) {
+		return "";
+	}
+	// Rumble chat can send badge names like "admin" without a path.
+	if (!/[/.]/.test(trimmed)) {
+		return `https://rumble.com/i/badges/${trimmed}_48.png`;
+	}
+	if (/^https?:\/\//i.test(trimmed)) {
+		return trimmed;
+	}
+	if (trimmed.startsWith("//")) {
+		return `https:${trimmed}`;
+	}
+	if (trimmed.startsWith("/")) {
+		return `https://rumble.com${trimmed}`;
+	}
+	return `https://rumble.com/${trimmed}`;
+}
+
+function buildAlertVariables(state) {
+	if (!state) {
+		return {};
+	}
+	return {
+		rumble_live: state.live,
+		rumble_viewers: state.viewers,
+		rumble_title: state.title,
+		rumble_stream_url: state.streamUrl,
+		rumble_followers: state.followers,
+		rumble_likes: state.likes,
+		rumble_dislikes: state.dislikes,
+		rumble_subs: state.subs,
+		rumble_sub_gifts: state.subGifts,
+		rumble_rants: state.rants,
+		rumble_rant_amount: roundToTwo(state.rantAmount),
+	};
+}
+
+function normalizeAvatar(value) {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : "";
+	}
+
+	if (value && typeof value === "object") {
+		return (
+			coerceString(value.url, "") ||
+			coerceString(value.image, "") ||
+			coerceString(value.avatar, "") ||
+			coerceString(value.src, "")
+		);
+	}
+
+	return "";
+}
+
+function extractChatAvatar(message) {
+	if (!message || typeof message !== "object") {
+		return "";
+	}
+
+	return (
+		normalizeAvatar(message.avatar) ||
+		normalizeAvatar(message.profile_pic_url) ||
+		normalizeAvatar(message.user_image) ||
+		normalizeAvatar(message.user_image_url) ||
+		normalizeAvatar(message.profile_image) ||
+		normalizeAvatar(message.profile_image_url) ||
+		normalizeAvatar(message.image) ||
+		normalizeAvatar(message.thumbnail) ||
+		normalizeAvatar(message.user?.avatar) ||
+		normalizeAvatar(message.user?.image) ||
+		normalizeAvatar(message.user?.profile_image) ||
+		normalizeAvatar(message.user?.profile_image_url)
+	);
+}
+
+function parseChatTimestamp(value) {
+	const parsed = parseTimestamp(value);
+	return parsed ? parsed.getTime() : 0;
+}
+
 // Top-level plugin that polls the API, tracks session state, and surfaces events to Lumia.
 class RumblePlugin extends Plugin {
 	constructor(manifest, context) {
@@ -230,6 +351,8 @@ class RumblePlugin extends Plugin {
 		this.sessionData = this.createEmptySession();
 		this.hasBaseline = false;
 		this.streamCounter = 0;
+		this.chatState = this.createEmptyChatState();
+		this.chatHasBaseline = false;
 	}
 
 	createEmptyState() {
@@ -259,6 +382,14 @@ class RumblePlugin extends Plugin {
 			channelImage: "",
 			startedAt: null,
 			scheduledStart: null,
+		};
+	}
+
+	createEmptyChatState() {
+		return {
+			lastTimestamp: 0,
+			seenKeys: new Set(),
+			seenOrder: [],
 		};
 	}
 
@@ -344,6 +475,7 @@ class RumblePlugin extends Plugin {
 						await this.lumia.triggerAlert({
 							alert: ALERT_TYPES.STREAM_START,
 							extraSettings: {
+								...buildAlertVariables(this.lastKnownState),
 								title: this.lastKnownState.title,
 								thumbnail: this.lastKnownState.thumbnail || "",
 								viewers: this.lastKnownState.viewers,
@@ -357,7 +489,7 @@ class RumblePlugin extends Plugin {
 
 					default: {
 						await this.lumia.addLog(
-							`[Rumble] Unknown action type: ${action.type}`
+							`[Rumble] Unknown action type: ${action.type}`,
 						);
 					}
 				}
@@ -427,7 +559,7 @@ class RumblePlugin extends Plugin {
 		}
 
 		const normalizedInterval = this.normalizePollInterval(
-			this.currentSettings.pollInterval
+			this.currentSettings.pollInterval,
 		);
 
 		if (normalizedInterval !== this.currentSettings.pollInterval) {
@@ -471,7 +603,7 @@ class RumblePlugin extends Plugin {
 			const apiKey = this.apiKey;
 			if (!apiKey) {
 				await this.lumia.addLog(
-					"[Rumble] Poll skipped: API key not configured"
+					"[Rumble] Poll skipped: API key not configured",
 				);
 				return;
 			}
@@ -500,7 +632,7 @@ class RumblePlugin extends Plugin {
 		state.rantAmount = coerceNumber(pickFirst(data, FIELD_PATHS.rantAmount), 0);
 		state.followers = coerceNumber(
 			pickFirst(data, FIELD_PATHS.followers),
-			this.lastKnownState.followers || 0
+			this.lastKnownState.followers || 0,
 		);
 		state.likes = coerceNumber(pickFirst(data, FIELD_PATHS.likes));
 		state.dislikes = coerceNumber(pickFirst(data, FIELD_PATHS.dislikes));
@@ -508,26 +640,26 @@ class RumblePlugin extends Plugin {
 		state.subGifts = coerceNumber(pickFirst(data, FIELD_PATHS.subGifts));
 		state.chatMembers = coerceNumber(
 			pickFirst(data, FIELD_PATHS.chatMembers),
-			0
+			0,
 		);
 		state.category = coerceString(pickFirst(data, FIELD_PATHS.category), "");
 		state.description = coerceString(
 			pickFirst(data, FIELD_PATHS.description),
-			""
+			"",
 		);
 		state.language = coerceString(pickFirst(data, FIELD_PATHS.language), "");
 		state.chatUrl = coerceString(pickFirst(data, FIELD_PATHS.chatUrl), "");
 		state.channelName = coerceString(
 			pickFirst(data, FIELD_PATHS.channelName),
-			""
+			"",
 		);
 		state.channelImage = coerceString(
 			pickFirst(data, FIELD_PATHS.channelImage),
-			""
+			"",
 		);
 		state.startedAt = parseTimestamp(pickFirst(data, FIELD_PATHS.startedAt));
 		state.scheduledStart = parseTimestamp(
-			pickFirst(data, FIELD_PATHS.scheduledStart)
+			pickFirst(data, FIELD_PATHS.scheduledStart),
 		);
 
 		return state;
@@ -560,6 +692,11 @@ class RumblePlugin extends Plugin {
 		}
 
 		await this.updateVariables(state, previous, !hadBaseline);
+		if (state.live) {
+			await this.processChatMessages(data);
+		} else if (this.chatHasBaseline) {
+			this.resetChatState();
+		}
 		this.lastKnownState = state;
 		this.hasBaseline = true;
 	}
@@ -596,7 +733,7 @@ class RumblePlugin extends Plugin {
 		setIfChanged(
 			"rumble_stream_url",
 			state.streamUrl,
-			previousState?.streamUrl
+			previousState?.streamUrl,
 		);
 		setIfChanged("rumble_video_id", state.videoId, previousState?.videoId);
 		setIfChanged("rumble_rumbles", state.rumbles, previousState?.rumbles);
@@ -609,30 +746,30 @@ class RumblePlugin extends Plugin {
 		setIfChanged(
 			"rumble_rant_amount",
 			roundToTwo(state.rantAmount),
-			prevRantAmount
+			prevRantAmount,
 		);
 		setIfChanged(
 			"rumble_chat_members",
 			state.chatMembers,
-			previousState?.chatMembers
+			previousState?.chatMembers,
 		);
 		setIfChanged("rumble_category", state.category, previousState?.category);
 		setIfChanged(
 			"rumble_description",
 			state.description,
-			previousState?.description
+			previousState?.description,
 		);
 		setIfChanged("rumble_language", state.language, previousState?.language);
 		setIfChanged("rumble_chat_url", state.chatUrl, previousState?.chatUrl);
 		setIfChanged(
 			"rumble_channel_name",
 			state.channelName,
-			previousState?.channelName
+			previousState?.channelName,
 		);
 		setIfChanged(
 			"rumble_channel_image",
 			state.channelImage,
-			previousState?.channelImage
+			previousState?.channelImage,
 		);
 		setIfChanged("rumble_started_at", startedIso, prevStartedIso);
 		setIfChanged("rumble_scheduled_start", scheduledIso, prevScheduledIso);
@@ -648,6 +785,7 @@ class RumblePlugin extends Plugin {
 
 	// When a stream flips from offline to live, start a new session and alert.
 	async handleStreamStart(rawData, state) {
+		this.resetChatState();
 		this.sessionData = this.createEmptySession();
 		this.sessionData.streamStartTime = new Date();
 		this.sessionData.lastRantsCount = state.rants;
@@ -661,6 +799,7 @@ class RumblePlugin extends Plugin {
 				value: this.streamCounter,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				title: state.title,
 				thumbnail: state.thumbnail,
 				viewers: state.viewers,
@@ -700,6 +839,7 @@ class RumblePlugin extends Plugin {
 				total: this.streamCounter,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				streamNumber: this.streamCounter,
 				finalViewers: state.viewers,
 				durationMinutes,
@@ -717,6 +857,7 @@ class RumblePlugin extends Plugin {
 		});
 
 		this.sessionData.streamStartTime = null;
+		this.resetChatState();
 	}
 
 	// Emit a follower alert whenever the cumulative follower total increases.
@@ -728,11 +869,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.FOLLOWER,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.followers,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newFollowers: delta,
 				totalFollowers: state.followers,
 				streamUrl: state.streamUrl,
@@ -750,11 +893,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.LIKE,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.likes,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newLikes: delta,
 				totalLikes: state.likes,
 				streamUrl: state.streamUrl,
@@ -772,11 +917,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.DISLIKE,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.dislikes,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newDislikes: delta,
 				totalDislikes: state.dislikes,
 				streamUrl: state.streamUrl,
@@ -794,11 +941,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.SUB,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.subs,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newSubs: delta,
 				totalSubs: state.subs,
 				streamUrl: state.streamUrl,
@@ -816,11 +965,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.SUB_GIFT,
+			showInEventList: true,
 			dynamic: {
 				value: delta,
 				total: state.subGifts,
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newGiftSubs: delta,
 				totalGiftSubs: state.subGifts,
 				streamUrl: state.streamUrl,
@@ -845,11 +996,13 @@ class RumblePlugin extends Plugin {
 
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.RANT,
+			showInEventList: true,
 			dynamic: {
 				value: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
 				total: roundToTwo(state.rantAmount),
 			},
 			extraSettings: {
+				...buildAlertVariables(state),
 				newRants: Math.max(countDelta, 0),
 				rantsTotal: state.rants,
 				rantAmountIncrement: roundToTwo(amountDelta),
@@ -861,16 +1014,117 @@ class RumblePlugin extends Plugin {
 		});
 	}
 
+	resetChatState() {
+		this.chatState = this.createEmptyChatState();
+		this.chatHasBaseline = false;
+	}
+
+	extractChatMessages(rawData = {}) {
+		const livestream = Array.isArray(rawData.livestreams)
+			? rawData.livestreams[0]
+			: null;
+		const chat = livestream?.chat;
+		if (!chat) {
+			return [];
+		}
+
+		const recentMessages = Array.isArray(chat.recent_messages)
+			? chat.recent_messages
+			: [];
+		const latestMessage = chat.latest_message ? [chat.latest_message] : [];
+		const combined = [...recentMessages, ...latestMessage];
+
+		const normalized = combined
+			.map((message) => {
+				const username = coerceString(message?.username, "");
+				const text = coerceString(message?.text ?? message?.message, "");
+				const timestamp = parseChatTimestamp(
+					message?.created_on ?? message?.created_at,
+				);
+				return {
+					username,
+					text,
+					timestamp,
+					avatar: extractChatAvatar(message),
+				};
+			})
+			.filter((message) => message.username && message.text);
+
+		normalized.sort((a, b) => a.timestamp - b.timestamp);
+		return normalized;
+	}
+
+	cacheChatKey(key) {
+		this.chatState.seenKeys.add(key);
+		this.chatState.seenOrder.push(key);
+		const maxCacheSize = 200;
+		if (this.chatState.seenOrder.length > maxCacheSize) {
+			const overflow = this.chatState.seenOrder.length - maxCacheSize;
+			const removed = this.chatState.seenOrder.splice(0, overflow);
+			removed.forEach((oldKey) => this.chatState.seenKeys.delete(oldKey));
+		}
+	}
+
+	async processChatMessages(rawData = {}) {
+		const messages = this.extractChatMessages(rawData);
+		if (!messages.length) {
+			return;
+		}
+
+		if (!this.chatHasBaseline) {
+			messages.forEach((message) => {
+				const key = `${message.timestamp}:${message.username}:${message.text}`;
+				this.cacheChatKey(key);
+				this.chatState.lastTimestamp = Math.max(
+					this.chatState.lastTimestamp,
+					message.timestamp,
+				);
+			});
+			this.chatHasBaseline = true;
+			return;
+		}
+
+		for (const message of messages) {
+			const key = `${message.timestamp}:${message.username}:${message.text}`;
+			if (this.chatState.seenKeys.has(key)) {
+				continue;
+			}
+
+			if (
+				message.timestamp &&
+				message.timestamp < this.chatState.lastTimestamp
+			) {
+				this.cacheChatKey(key);
+				continue;
+			}
+
+			this.cacheChatKey(key);
+			this.chatState.lastTimestamp = Math.max(
+				this.chatState.lastTimestamp,
+				message.timestamp,
+			);
+
+			this.lumia.displayChat({
+				platform: "rumble",
+				username: message.username,
+				displayname: message.username,
+				message: message.text,
+				avatar: message.avatar || undefined,
+				messageId: `rumble-${message.timestamp}-${message.username}`,
+			});
+		}
+	}
+
 	// Wraps the fetch call so we can centralise error handling and payload shape.
 	async fetchStreamData(apiKey) {
 		const url = `https://rumble.com/-livestream-api/get-data?key=${encodeURIComponent(
-			apiKey
+			apiKey,
 		)}`;
 		const response = await fetch(url);
 
 		if (!response.ok) {
 			throw new Error(
-				`HTTP ${response.status}: ${response.statusText || "Request failed"}`
+				`HTTP ${response.status}: ${response.statusText || "Request failed"}`,
 			);
 		}
 

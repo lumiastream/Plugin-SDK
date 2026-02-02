@@ -148,6 +148,10 @@ Settings create a configuration UI for users:
 }
 ```
 
+If you provide `settings_tutorial` (markdown), it renders as a setup guide in the auth screen.
+
+To provide a tutorial that is specific to actions, use `actions_tutorial`. When present, it renders in the Actions editor.
+
 #### Setting Types
 
 - **`text`** - Single-line text input
@@ -322,6 +326,7 @@ Action fields support the following input types:
 	"label": "Mode",
 	"type": "select",
 	"defaultValue": "normal",
+	"allowTyping": true,
 	"options": [
 		{ "label": "Normal", "value": "normal" },
 		{ "label": "Fast", "value": "fast" },
@@ -329,6 +334,8 @@ Action fields support the following input types:
 	]
 }
 ```
+
+Set `allowTyping` to let users type custom values in addition to the provided options. The dropdown list still appears as suggestions.
 
 **Checkbox**
 
@@ -487,6 +494,20 @@ await this.lumia.triggerAlert({
 ```
 
 If no matching selection is found for the provided condition values (or no `dynamic` payload is supplied), Lumia falls back to the base alert configuration and `defaultMessage`.
+
+To also show a plugin-triggered alert inside the Event List, opt in explicitly:
+
+```ts
+await this.lumia.triggerAlert({
+	alert: "giftedMembership",
+	showInEventList: true,
+	extraSettings: {
+		gifter: "StreamerFan42",
+		recipient: "LuckyViewer",
+		gift_count: 5,
+	},
+});
+```
 
 Tip: `LumiaDynamicCondition` in `lumia-types/src/alert.types.ts:99` lists every property (`value`, `currency`, `subMonths`, `giftAmount`, etc.) that variation checkers use.
 },
