@@ -226,7 +226,6 @@ export interface PluginTriggerAlertOptions {
 }
 
 export interface PluginDisplayChatOptions {
-	platform?: string;
 	username: string;
 	displayname?: string;
 	message: string;
@@ -339,7 +338,7 @@ export interface PluginRuntime {
 	settings: Record<string, any>;
 	onsettingsupdate?(
 		settings: Record<string, any>,
-		previousSettings: Record<string, any>
+		previousSettings: Record<string, any>,
 	): Promise<void> | void;
 }
 

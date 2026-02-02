@@ -396,7 +396,9 @@ class TikfinityPlugin extends Plugin {
 			await this.processEvent(data);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(`[Tikfinity] Error processing message: ${message}`);
+			await this.lumia.addLog(
+				`[Tikfinity] Error processing message: ${message}`,
+			);
 		}
 	}
 
@@ -509,9 +511,7 @@ class TikfinityPlugin extends Plugin {
 				break;
 
 			default:
-				await this.lumia.addLog(
-					`[Tikfinity] Unknown event type: ${eventType}`,
-				);
+				await this.lumia.addLog(`[Tikfinity] Unknown event type: ${eventType}`);
 		}
 	}
 
@@ -576,7 +576,10 @@ class TikfinityPlugin extends Plugin {
 	async handleChatEvent(data) {
 		const username = coerceString(data.uniqueId || data.username, "");
 		const message = coerceString(data.comment || data.message, "");
-		const displayname = coerceString(data.nickname || data.displayName || username, "");
+		const displayname = coerceString(
+			data.nickname || data.displayName || username,
+			"",
+		);
 		const avatar = normalizeAvatar(
 			data.profilePictureUrl || data.avatar || data.profilePicture,
 		);
@@ -590,7 +593,6 @@ class TikfinityPlugin extends Plugin {
 
 		// Display chat in Lumia
 		await this.lumia.displayChat({
-			platform: "tikfinity",
 			username,
 			displayname,
 			message,
@@ -619,7 +621,8 @@ class TikfinityPlugin extends Plugin {
 		const username = coerceString(data.uniqueId || data.username, "");
 		const giftName = coerceString(data.giftName, "Gift");
 		const diamondCount = coerceNumber(data.diamondCount || data.diamonds, 1);
-		const finalRepeatCount = streak.lastCount || coerceNumber(data.repeatCount, 1);
+		const finalRepeatCount =
+			streak.lastCount || coerceNumber(data.repeatCount, 1);
 		const totalDiamonds = diamondCount * finalRepeatCount;
 
 		this.sessionData.diamonds += totalDiamonds;
@@ -700,7 +703,10 @@ class TikfinityPlugin extends Plugin {
 			this.sessionData.diamonds += totalDiamonds;
 			this.sessionData.lastGifter = username;
 
-			await this.updateVariable("tikfinity_diamonds", this.sessionData.diamonds);
+			await this.updateVariable(
+				"tikfinity_diamonds",
+				this.sessionData.diamonds,
+			);
 			await this.updateVariable("tikfinity_last_gifter", username);
 
 			await this.lumia.triggerAlert({
@@ -732,7 +738,10 @@ class TikfinityPlugin extends Plugin {
 		this.sessionData.followers++;
 		this.sessionData.lastFollower = username;
 
-		await this.updateVariable("tikfinity_followers", this.sessionData.followers);
+		await this.updateVariable(
+			"tikfinity_followers",
+			this.sessionData.followers,
+		);
 		await this.updateVariable("tikfinity_last_follower", username);
 
 		await this.lumia.triggerAlert({
@@ -769,7 +778,8 @@ class TikfinityPlugin extends Plugin {
 		const likeCount = coerceNumber(data.likeCount, 1);
 		const totalLikeCount = coerceNumber(data.totalLikeCount, 0);
 
-		this.sessionData.likes = totalLikeCount || this.sessionData.likes + likeCount;
+		this.sessionData.likes =
+			totalLikeCount || this.sessionData.likes + likeCount;
 
 		await this.updateVariable("tikfinity_likes", this.sessionData.likes);
 
