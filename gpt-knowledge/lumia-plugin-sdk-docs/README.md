@@ -81,7 +81,6 @@ await this.lumia.triggerAlert({
 await this.lumia.playAudio({ path: "alert.mp3", volume: 0.7 });
 this.lumia.setVariable("follower_count", 1337);
 this.lumia.displayChat({
-	platform: "my_plugin",
 	username: "Viewer123",
 	message: "Hello from the plugin!",
 });

@@ -218,7 +218,6 @@ await this.lumia.triggerAlert({
 
 ```ts
 this.lumia.displayChat({
-	platform: "my_plugin",
 	username: "Viewer123",
 	displayname: "Viewer123",
 	message: "Hello from the plugin!",
@@ -232,7 +231,7 @@ this.lumia.displayChat({
 });
 ```
 
-`displayChat` posts a message to Lumia Stream chatboxes and overlay chat widgets. The `platform` value should match your integration key so the correct icon is displayed; unknown platforms fall back to the Lumia icon.
+`displayChat` posts a message to Lumia Stream chatboxes and overlay chat widgets.
 
 ### File Operations
 

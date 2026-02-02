@@ -1105,7 +1105,6 @@ class RumblePlugin extends Plugin {
 			);
 
 			this.lumia.displayChat({
-				platform: "rumble",
 				username: message.username,
 				displayname: message.username,
 				message: message.text,
