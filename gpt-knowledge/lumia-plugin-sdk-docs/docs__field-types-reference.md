@@ -108,6 +108,25 @@ Multi-line text input with variable support and configurable rows.
 
 ---
 
+#### `text_list`
+Multi-value text input that stores an array of strings. Settings only.
+
+```json
+{
+  "key": "lightIds",
+  "label": "Light IDs",
+  "type": "text_list",
+  "helperText": "Add one or more light identifiers",
+  "defaultValue": ["keylight-1", "keylight-2"]
+}
+```
+
+**Properties:**
+- Outputs an array of strings (e.g., `["one", "two"]`)
+- `defaultValue` should be an array of strings
+
+---
+
 ### Numeric Input Types
 
 #### `number`
@@ -264,6 +283,7 @@ File path input with file browser dialog.
 | `url` | ✅ | ✅ | ✅ | auto | URL validation |
 | `password` | ✅ | ❌ | ❌ | pattern, length | Hidden characters |
 | `textarea` | ✅ | ✅ | ✅ | length | Multi-line, rows configurable |
+| `text_list` | ✅ | ❌ | ❌ | - | Array of strings |
 | `number` | ✅ | ✅ | ❌ | min, max | Numeric input |
 | `slider` | ✅ | ✅ | ❌ | min, max, step | Visual slider |
 | `select` | ✅ | ✅ | ❌ | - | Dropdown menu |
@@ -283,7 +303,7 @@ All field types support these common properties:
   "type": "text",              // Required: Field type
   "placeholder": "...",        // Optional: Placeholder text
   "helperText": "...",         // Optional: Help text below field
-  "defaultValue": null,        // Optional: Default value
+  "defaultValue": null,        // Optional: Default value (string, number, boolean, or string[])
   "required": false            // Optional: Whether field is required
 }
 ```
