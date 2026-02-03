@@ -5,6 +5,8 @@ export type {
   PluginFormField,
   PluginAuthConfig,
   PluginActionsConfig,
+  PluginAuthValidationResponse,
+  PluginAuthValidationResult,
   PluginInstance,
   PluginConfig,
   PluginStats,

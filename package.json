@@ -1,6 +1,6 @@
 {
 	"name": "@lumiastream/plugin",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Official Lumia Stream Plugin SDK for building Lumia Stream plugins.",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",

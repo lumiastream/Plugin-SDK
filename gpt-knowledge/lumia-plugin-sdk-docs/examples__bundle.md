@@ -328,7 +328,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.0"
 	}
 }
 
@@ -2095,7 +2095,7 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.0"
 	}
 }
 
@@ -2713,7 +2713,7 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.0"
 	}
 }
 
@@ -3760,7 +3760,7 @@ module.exports = EveOnlinePlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.1.18"
+    "@lumiastream/plugin": "^0.2.0"
   }
 }
 
@@ -3789,7 +3789,6 @@ const VARIABLE_NAMES = {
 	distance: "fitbit_distance",
 	calories: "fitbit_calories",
 	restingHeartRate: "fitbit_resting_heart_rate",
-	heartZones: "fitbit_heart_rate_zones",
 	durationSecs: "fitbit_activity_duration_secs",
 	durationMin: "fitbit_activity_duration_min",
 	cadence: "fitbit_cadence",
@@ -4039,9 +4038,6 @@ class FitbitPlugin extends Plugin {
 		const pace = this._coerceNumber(metrics?.pace, 0);
 		const paceSource = this._coerceString(metrics?.paceSource, "none");
 		const resolvedHeartRate = this._coerceNumber(metrics?.heartRate, 0);
-		const heartRateZones = Array.isArray(metrics?.heartRateZones)
-			? metrics.heartRateZones
-			: [];
 		const latestName = this._coerceString(metrics?.activityName, "");
 		const latestStart = this._coerceString(metrics?.activityStart, "");
 
@@ -4051,10 +4047,6 @@ class FitbitPlugin extends Plugin {
 			{ name: VARIABLE_NAMES.distance, value: distance },
 			{ name: VARIABLE_NAMES.calories, value: calories },
 			{ name: VARIABLE_NAMES.restingHeartRate, value: resolvedHeartRate },
-			{
-				name: VARIABLE_NAMES.heartZones,
-				value: JSON.stringify(heartRateZones ?? []),
-			},
 			{ name: VARIABLE_NAMES.durationSecs, value: durationSecs },
 			{ name: VARIABLE_NAMES.durationMin, value: durationMin },
 			{ name: VARIABLE_NAMES.cadence, value: cadence },
@@ -4099,6 +4091,10 @@ class FitbitPlugin extends Plugin {
 		const heartThreshold =
 			activityState?.heartThreshold ??
 			this._heartRateThreshold(heartSummary.restingHeartRate);
+		const latestHeartRate = this._selectHeartRate({
+			dataset: heartIntraday.dataset,
+			endMinute: null,
+		});
 
 		const stepsWindow = this._calculateActiveWindow({
 			steps: stepsData.dataset,
@@ -4112,7 +4108,7 @@ class FitbitPlugin extends Plugin {
 		const activeWindow = this._selectActiveWindow(stepsWindow, heartWindow);
 
 		if (activeWindow.activeMinutes <= 0) {
-			return this._inactiveMetrics(date);
+			return this._inactiveMetrics(date, { heartRate: latestHeartRate });
 		}
 
 		const totals = this._sumWindowTotals(
@@ -4157,13 +4153,12 @@ class FitbitPlugin extends Plugin {
 			pace,
 			paceSource,
 			heartRate,
-			heartRateZones: heartSummary.heartRateZones,
 			activityName,
 			activityStart,
 		};
 	}
 
-	_inactiveMetrics(date) {
+	_inactiveMetrics(date, { heartRate = 0 } = {}) {
 		return {
 			date,
 			steps: 0,
@@ -4174,8 +4169,7 @@ class FitbitPlugin extends Plugin {
 			cadence: 0,
 			pace: 0,
 			paceSource: "none",
-			heartRate: 0,
-			heartRateZones: [],
+			heartRate,
 			activityName: "",
 			activityStart: "",
 		};
@@ -4689,7 +4683,6 @@ class FitbitPlugin extends Plugin {
 			this._setVariableIfChanged(VARIABLE_NAMES.distance, 0),
 			this._setVariableIfChanged(VARIABLE_NAMES.calories, 0),
 			this._setVariableIfChanged(VARIABLE_NAMES.restingHeartRate, 0),
-			this._setVariableIfChanged(VARIABLE_NAMES.heartZones, ""),
 			this._setVariableIfChanged(VARIABLE_NAMES.durationSecs, 0),
 			this._setVariableIfChanged(VARIABLE_NAMES.durationMin, 0),
 			this._setVariableIfChanged(VARIABLE_NAMES.cadence, 0),
@@ -4826,7 +4819,7 @@ module.exports = FitbitPlugin;
 {
 	"id": "fitbit",
 	"name": "Fitbit",
-	"version": "1.0.0",
+	"version": "1.0.6",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -4841,7 +4834,7 @@ module.exports = FitbitPlugin;
 			"buttonLabel": "Authorize Fitbit",
 			"helperText": "Connect your Fitbit account to pull current activity metrics (intraday access required for server apps).",
 			"openInBrowser": true,
-			"scopes": ["activity", "heartrate"],
+			"scopes": ["activity", "heartrate", "profile", "settings"],
 			"tokenKeys": {
 				"accessToken": "accessToken",
 				"refreshToken": "refreshToken",
@@ -4903,11 +4896,6 @@ module.exports = FitbitPlugin;
 				"value": 0
 			},
 			{
-				"name": "fitbit_heart_rate_zones",
-				"description": "JSON array of heart rate zone data for today.",
-				"value": ""
-			},
-			{
 				"name": "fitbit_activity_duration_secs",
 				"description": "Active duration (seconds) for the current session.",
 				"value": 0
@@ -4964,7 +4952,7 @@ module.exports = FitbitPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.1.18"
+    "@lumiastream/plugin": "^0.2.0"
   }
 }
 
@@ -5736,7 +5724,7 @@ module.exports = HotNewsPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.1.18"
+    "@lumiastream/plugin": "^0.2.0"
   }
 }
 
@@ -6441,32 +6429,27 @@ class MinecraftServerPlugin extends Plugin {
 	}
 
 	async onload() {
-		await this.lumia.addLog("[Minecraft Server] Plugin loaded");
-
-		if (this.settings?.enablePolling && this.settings?.serverHost) {
+		if (this.settings?.serverHost) {
 			await this.startPolling();
 		} else if (!this.settings?.serverHost) {
 			await this.lumia.addLog(
-				"[Minecraft Server] Server address not configured. Please configure in settings."
+				"[Minecraft Server] Server address not configured. Please configure in settings.",
 			);
 		}
 	}
 
 	async onunload() {
-		await this.lumia.addLog("[Minecraft Server] Plugin unloaded");
 		await this.stopPolling();
 	}
 
 	async onsettingsupdate(settings, previousSettings) {
 		const hostChanged = settings?.serverHost !== previousSettings?.serverHost;
 		const portChanged = settings?.serverPort !== previousSettings?.serverPort;
-		const pollingChanged =
-			settings?.enablePolling !== previousSettings?.enablePolling;
 
-		if (hostChanged || portChanged || pollingChanged) {
+		if (hostChanged || portChanged) {
 			await this.stopPolling();
 
-			if (settings?.enablePolling && settings?.serverHost) {
+			if (settings?.serverHost) {
 				await this.startPolling();
 			}
 		}
@@ -6479,31 +6462,85 @@ class MinecraftServerPlugin extends Plugin {
 			try {
 				switch (action.type) {
 					case "manual_poll":
-						await this.lumia.addLog(
-							"[Minecraft Server] Manual poll triggered"
-						);
 						await this.pollServer();
 						break;
 
 					case "test_connection":
-						await this.lumia.addLog(
-							"[Minecraft Server] Testing connection..."
-						);
 						await this.testConnection();
 						break;
-
-					default:
-						await this.lumia.addLog(
-							`[Minecraft Server] Unknown action: ${action.type}`
-						);
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				await this.lumia.addLog(
-					`[Minecraft Server] Error in action ${action.type}: ${message}`
+					`[Minecraft Server] Error in action ${action.type}: ${message}`,
 				);
 			}
 		}
+	}
+
+	async validateAuth(data = {}) {
+		await this.lumia.showToast({ message: "Validating auth", time: 4 });
+		const host = String(
+			data?.serverHost ?? this.settings?.serverHost ?? "",
+		).trim();
+		const parsePort = (value, fallback) => {
+			const port = Number(value);
+			return Number.isInteger(port) && port > 0 && port <= 65535
+				? port
+				: fallback;
+		};
+		const port = parsePort(
+			data?.serverPort ?? this.settings?.serverPort,
+			25565,
+		);
+		const queryPort = parsePort(
+			data?.queryPort ?? this.settings?.queryPort,
+			port,
+		);
+		const useQuery = Boolean(
+			data?.useQuery ?? this.settings?.useQuery ?? false,
+		);
+
+		if (!host) {
+			return { ok: false, message: "Server address is required." };
+		}
+
+		try {
+			await this.serverListPing(host, port);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`[Minecraft Server] Auth validation failed: ${message}`,
+			);
+			return {
+				ok: false,
+				message: `Unable to reach ${host}:${port}. ${message}`,
+			};
+		}
+
+		if (!useQuery) {
+			return {
+				ok: true,
+				message:
+					"Connected. Query is disabled, so player list/username alerts will be generic. Enable enable-query=true for full tracking.",
+			};
+		}
+
+		try {
+			await this.queryServer(host, queryPort);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`[Minecraft Server] Query validation failed: ${message}`,
+			);
+			return {
+				ok: true,
+				message:
+					"Connected, but Query is not reachable. Player list/username alerts will be generic. Ensure enable-query=true and UDP query.port is open.",
+			};
+		}
+
+		return { ok: true, message: "Connection verified. Query is enabled." };
 	}
 
 	// ============================================================================
@@ -6516,9 +6553,6 @@ class MinecraftServerPlugin extends Plugin {
 		}
 
 		const interval = this.getPollInterval();
-		await this.lumia.addLog(
-			`[Minecraft Server] Starting polling (every ${interval}s)`
-		);
 
 		// Initial poll
 		await this.pollServer();
@@ -6533,7 +6567,6 @@ class MinecraftServerPlugin extends Plugin {
 		if (this.pollInterval) {
 			clearInterval(this.pollInterval);
 			this.pollInterval = null;
-			await this.lumia.addLog("[Minecraft Server] Stopped polling");
 		}
 	}
 
@@ -6556,9 +6589,9 @@ class MinecraftServerPlugin extends Plugin {
 					const queryPort = this.getQueryPort();
 					queryData = await this.queryServer(host, queryPort);
 				} catch (error) {
-					// Query failed, but that's okay - we have ping data
+					const message = error instanceof Error ? error.message : String(error);
 					await this.lumia.addLog(
-						`[Minecraft Server] Query failed: ${error.message}`
+						`[Minecraft Server] Query failed: ${message}`,
 					);
 				}
 			}
@@ -6566,11 +6599,6 @@ class MinecraftServerPlugin extends Plugin {
 			// Process the combined data
 			await this.processServerData(pingData, queryData);
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
-				`[Minecraft Server] Poll failed: ${message}`
-			);
-
 			// Server is offline
 			await this.processServerData(null, null);
 		}
@@ -6593,21 +6621,11 @@ class MinecraftServerPlugin extends Plugin {
 			await this.lumia.showToast({
 				message: `✅ Connected to ${host}:${port}\n${data.players.online}/${data.players.max} players online`,
 			});
-
-			await this.lumia.addLog(
-				`[Minecraft Server] ✅ Connection successful!\n` +
-					`Version: ${data.version.name}\n` +
-					`Players: ${data.players.online}/${data.players.max}\n` +
-					`MOTD: ${this.cleanMOTD(data.description)}`
-			);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			await this.lumia.showToast({
 				message: `❌ Connection failed: ${message}`,
 			});
-			await this.lumia.addLog(
-				`[Minecraft Server] ❌ Connection failed: ${message}`
-			);
 		}
 	}
 
@@ -6670,14 +6688,15 @@ class MinecraftServerPlugin extends Plugin {
 					// Read JSON length
 					const jsonLengthResult = this.readVarInt(
 						buffer,
-						dataStart + idResult.length
+						dataStart + idResult.length,
 					);
 					const jsonLength = jsonLengthResult.value;
-					const jsonStart = dataStart + idResult.length + jsonLengthResult.length;
+					const jsonStart =
+						dataStart + idResult.length + jsonLengthResult.length;
 
 					// Extract JSON string
 					const jsonString = buffer
-						.slice(jsonStart, jsonStart + jsonLength)
+						.subarray(jsonStart, jsonStart + jsonLength)
 						.toString("utf8");
 
 					cleanup();
@@ -6744,7 +6763,8 @@ class MinecraftServerPlugin extends Plugin {
 			}, timeout * 1000);
 
 			// Step 1: Send handshake
-			sessionId = Math.floor(Math.random() * 0x7fffffff);
+			// Session ID must be masked with 0x0F0F0F0F per Minecraft Query Protocol
+			sessionId = Math.floor(Math.random() * 0x0f0f0f0f) & 0x0f0f0f0f;
 			const handshake = this.createQueryHandshake(sessionId);
 
 			client.send(handshake, port, host, (error) => {
@@ -6759,30 +6779,50 @@ class MinecraftServerPlugin extends Plugin {
 			client.on("message", async (msg) => {
 				try {
 					if (challengeToken === null) {
-						// Parse handshake response
-						const type = msg.readUInt8(0);
+						// Parse handshake response (some servers include 0xFEFD prefix)
+						let offset = 0;
+						if (msg.length >= 2 && msg.readUInt16BE(0) === 0xfefd) {
+							offset = 2;
+						}
+
+						const type = msg.readUInt8(offset);
 						if (type !== 0x09) {
 							throw new Error("Invalid handshake response");
 						}
 
-						const responseSessionId = msg.readInt32BE(1);
-						if (responseSessionId !== sessionId) {
-							throw new Error("Session ID mismatch");
-						}
+						const responseSessionId = msg.readInt32BE(offset + 1);
+						sessionId = responseSessionId;
 
 						// Extract challenge token
-						const tokenString = msg.slice(5, msg.length - 1).toString("utf8");
+						const tokenStart = offset + 5;
+						const tokenEnd = msg.indexOf(0, tokenStart);
+						const tokenSliceEnd = tokenEnd === -1 ? msg.length : tokenEnd;
+						const tokenString = msg
+							.subarray(tokenStart, tokenSliceEnd)
+							.toString("utf8")
+							.trim();
 						challengeToken = parseInt(tokenString, 10);
+						if (Number.isNaN(challengeToken)) {
+							throw new Error(
+								`Invalid challenge token response: "${tokenString}"`,
+							);
+						}
 
 						// Step 2: Send full stat request
+						await this.lumia.addLog(
+							`[Minecraft Server] Query handshake successful, token: ${challengeToken}`,
+						);
 						const statRequest = this.createQueryStatRequest(
 							sessionId,
-							challengeToken
+							challengeToken,
 						);
 						client.send(statRequest, port, host);
 					} else {
 						// Parse stat response
 						const data = this.parseQueryResponse(msg);
+						await this.lumia.addLog(
+							`[Minecraft Server] Query stat received, players: ${data.players?.length ?? 0}`,
+						);
 						cleanup();
 						resolve(data);
 					}
@@ -6818,13 +6858,18 @@ class MinecraftServerPlugin extends Plugin {
 	}
 
 	parseQueryResponse(msg) {
-		const type = msg.readUInt8(0);
+		let offset = 0;
+		if (msg.length >= 2 && msg.readUInt16BE(0) === 0xfefd) {
+			offset = 2;
+		}
+
+		const type = msg.readUInt8(offset);
 		if (type !== 0x00) {
 			throw new Error("Invalid stat response");
 		}
 
 		// Skip header
-		let offset = 5;
+		offset += 5;
 
 		// Skip padding
 		offset += 11;
@@ -6835,22 +6880,29 @@ class MinecraftServerPlugin extends Plugin {
 			// Read key
 			let keyEnd = msg.indexOf(0, offset);
 			if (keyEnd === -1) break;
-			const key = msg.slice(offset, keyEnd).toString("utf8");
+			const key = msg.subarray(offset, keyEnd).toString("utf8");
 			offset = keyEnd + 1;
 
 			// Read value
 			let valueEnd = msg.indexOf(0, offset);
 			if (valueEnd === -1) break;
-			const value = msg.slice(offset, valueEnd).toString("utf8");
+			const value = msg.subarray(offset, valueEnd).toString("utf8");
 			offset = valueEnd + 1;
 
-			if (key.length === 0 && value.length === 0) {
+			if (key.length === 0) {
 				// End of key-value section
-				offset++;
 				break;
 			}
 
 			data[key] = value;
+		}
+
+		// Skip player list padding: \x01player_\x00\x00 (10 bytes)
+		// Find the start of player names by looking for "player_\x00\x00"
+		const playerMarker = Buffer.from([0x01, 0x70, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x5f, 0x00, 0x00]);
+		const markerIndex = msg.indexOf(playerMarker, offset);
+		if (markerIndex !== -1) {
+			offset = markerIndex + playerMarker.length;
 		}
 
 		// Parse player list
@@ -6858,7 +6910,7 @@ class MinecraftServerPlugin extends Plugin {
 		while (offset < msg.length) {
 			let playerEnd = msg.indexOf(0, offset);
 			if (playerEnd === -1) break;
-			const player = msg.slice(offset, playerEnd).toString("utf8");
+			const player = msg.subarray(offset, playerEnd).toString("utf8");
 			offset = playerEnd + 1;
 
 			if (player.length > 0) {
@@ -6913,15 +6965,15 @@ class MinecraftServerPlugin extends Plugin {
 
 	async updateVariables(state) {
 		const updates = [
-			this.lumia.setVariable("mc_online", state.online),
-			this.lumia.setVariable("mc_players_online", state.playersOnline),
-			this.lumia.setVariable("mc_players_max", state.playersMax),
-			this.lumia.setVariable("mc_version", state.version),
-			this.lumia.setVariable("mc_motd", state.motd),
-			this.lumia.setVariable("mc_protocol_version", state.protocolVersion),
-			this.lumia.setVariable("mc_player_list", state.playerList.join(", ")),
-			this.lumia.setVariable("mc_map", state.map),
-			this.lumia.setVariable("mc_game_type", state.gameType),
+			this.lumia.setVariable("online", state.online),
+			this.lumia.setVariable("players_online", state.playersOnline),
+			this.lumia.setVariable("players_max", state.playersMax),
+			this.lumia.setVariable("version", state.version),
+			this.lumia.setVariable("motd", state.motd),
+			this.lumia.setVariable("protocol_version", state.protocolVersion),
+			this.lumia.setVariable("player_list", state.playerList.join(", ")),
+			this.lumia.setVariable("map", state.map),
+			this.lumia.setVariable("game_type", state.gameType),
 		];
 
 		await Promise.all(updates);
@@ -6930,19 +6982,17 @@ class MinecraftServerPlugin extends Plugin {
 	async checkServerOnlineOffline(newState, oldState) {
 		if (newState.online && !oldState.online) {
 			// Server came online
-			await this.lumia.addLog("[Minecraft Server] ✅ Server is now ONLINE");
 			await this.lumia.triggerAlert({
 				alert: ALERT_TYPES.SERVER_ONLINE,
 				extraSettings: {
-					mc_online: true,
-					mc_version: newState.version,
-					mc_motd: newState.motd,
-					mc_players_max: newState.playersMax,
+					online: true,
+					version: newState.version,
+					motd: newState.motd,
+					players_max: newState.playersMax,
 				},
 			});
 		} else if (!newState.online && oldState.online) {
 			// Server went offline
-			await this.lumia.addLog("[Minecraft Server] ❌ Server is now OFFLINE");
 			await this.lumia.triggerAlert({
 				alert: ALERT_TYPES.SERVER_OFFLINE,
 				extraSettings: {},
@@ -6958,20 +7008,62 @@ class MinecraftServerPlugin extends Plugin {
 		const newPlayers = new Set(newState.playerList);
 		const oldPlayers = this.previousPlayers;
 
+		const hasPlayerList =
+			(Array.isArray(newState.playerList) && newState.playerList.length > 0) ||
+			(Array.isArray(oldState.playerList) && oldState.playerList.length > 0);
+
+		if (!hasPlayerList) {
+			const delta = newState.playersOnline - oldState.playersOnline;
+			if (delta > 0) {
+				for (let i = 0; i < delta; i += 1) {
+					const label = "Player";
+					await this.lumia.setVariable("last_player_joined", label);
+					await this.lumia.triggerAlert({
+						alert: ALERT_TYPES.PLAYER_JOINED,
+						showInEventList: true,
+						extraSettings: {
+							username: label,
+							last_player_joined: label,
+							players_online: newState.playersOnline,
+							players_max: newState.playersMax,
+						},
+					});
+				}
+			} else if (delta < 0) {
+				for (let i = 0; i < Math.abs(delta); i += 1) {
+					const label = "Player";
+					await this.lumia.setVariable("last_player_left", label);
+					await this.lumia.triggerAlert({
+						alert: ALERT_TYPES.PLAYER_LEFT,
+						showInEventList: true,
+						extraSettings: {
+							username: label,
+							last_player_left: label,
+							players_online: newState.playersOnline,
+							players_max: newState.playersMax,
+						},
+					});
+				}
+			}
+
+			this.previousPlayers = newPlayers;
+			return;
+		}
 		// Check for joins
 		for (const player of newPlayers) {
 			if (!oldPlayers.has(player)) {
-				await this.lumia.setVariable("mc_last_player_joined", player);
+				await this.lumia.setVariable("last_player_joined", player);
 				await this.lumia.addLog(
-					`[Minecraft Server] 👤 ${player} joined (${newState.playersOnline}/${newState.playersMax})`
+					`[Minecraft Server] 👤 ${player} joined (${newState.playersOnline}/${newState.playersMax})`,
 				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_JOINED,
+					showInEventList: true,
 					extraSettings: {
 						username: player,
-						mc_last_player_joined: player,
-						mc_players_online: newState.playersOnline,
-						mc_players_max: newState.playersMax,
+						last_player_joined: player,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
 					},
 				});
 			}
@@ -6980,17 +7072,18 @@ class MinecraftServerPlugin extends Plugin {
 		// Check for leaves
 		for (const player of oldPlayers) {
 			if (!newPlayers.has(player)) {
-				await this.lumia.setVariable("mc_last_player_left", player);
+				await this.lumia.setVariable("last_player_left", player);
 				await this.lumia.addLog(
-					`[Minecraft Server] 👋 ${player} left (${newState.playersOnline}/${newState.playersMax})`
+					`[Minecraft Server] 👋 ${player} left (${newState.playersOnline}/${newState.playersMax})`,
 				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_LEFT,
+					showInEventList: true,
 					extraSettings: {
 						username: player,
-						mc_last_player_left: player,
-						mc_players_online: newState.playersOnline,
-						mc_players_max: newState.playersMax,
+						last_player_left: player,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
 					},
 				});
 			}
@@ -7006,15 +7099,12 @@ class MinecraftServerPlugin extends Plugin {
 		for (const milestone of milestones) {
 			if (count >= milestone && !this.milestonesReached.has(milestone)) {
 				this.milestonesReached.add(milestone);
-				await this.lumia.addLog(
-					`[Minecraft Server] 🎉 Player milestone reached: ${milestone} players!`
-				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_MILESTONE,
 					dynamic: { value: count },
 					extraSettings: {
-						mc_players_online: count,
-						mc_players_max: newState.playersMax,
+						players_online: count,
+						players_max: newState.playersMax,
 					},
 				});
 			}
@@ -7037,14 +7127,11 @@ class MinecraftServerPlugin extends Plugin {
 				!this.lastState ||
 				this.lastState.playersOnline < this.lastState.playersMax
 			) {
-				await this.lumia.addLog(
-					`[Minecraft Server] 🔴 Server is FULL (${newState.playersMax}/${newState.playersMax})`
-				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.SERVER_FULL,
 					extraSettings: {
-						mc_players_online: newState.playersOnline,
-						mc_players_max: newState.playersMax,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
 					},
 				});
 			}
@@ -7054,7 +7141,6 @@ class MinecraftServerPlugin extends Plugin {
 	// ============================================================================
 	// Helper Methods
 	// ============================================================================
-
 	getServerHost() {
 		const host = (this.settings?.serverHost ?? "").trim();
 		return host.length > 0 ? host : null;
@@ -7080,10 +7166,7 @@ class MinecraftServerPlugin extends Plugin {
 	}
 
 	getTimeout() {
-		const timeout = Number(this.settings?.timeout);
-		return Number.isInteger(timeout) && timeout >= 1 && timeout <= 30
-			? timeout
-			: 5;
+		return 5;
 	}
 
 	cleanMOTD(description) {
@@ -7146,8 +7229,8 @@ module.exports = MinecraftServerPlugin;
 ```
 {
 	"id": "minecraft_server",
-	"name": "Minecraft Server Status",
-	"version": "1.0.0",
+	"name": "Minecraft Server",
+	"version": "1.0.9",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -7181,17 +7264,17 @@ module.exports = MinecraftServerPlugin;
 			},
 			{
 				"key": "useQuery",
-				"label": "Use Query Protocol",
+				"label": "Enable Query Protocol (Required for player tracking)",
 				"type": "checkbox",
-				"defaultValue": false,
-				"helperText": "Enable if server has enable-query=true in server.properties. Provides more detailed stats including player list."
+				"defaultValue": true,
+				"helperText": "Required for player list, join/leave alerts, map, and game type. Set enable-query=true in server.properties."
 			},
 			{
 				"key": "queryPort",
 				"label": "Query Port",
 				"type": "number",
 				"defaultValue": 25565,
-				"helperText": "Query port (usually same as server port)",
+				"helperText": "Must match query.port in server.properties (usually the same as server port)",
 				"validation": {
 					"min": 1,
 					"max": 65535
@@ -7201,33 +7284,15 @@ module.exports = MinecraftServerPlugin;
 				"key": "pollInterval",
 				"label": "Poll Interval (seconds)",
 				"type": "number",
-				"defaultValue": 30,
+				"defaultValue": 10,
 				"helperText": "How often to check server status (10-300 seconds)",
 				"validation": {
 					"min": 10,
 					"max": 300
 				}
-			},
-			{
-				"key": "enablePolling",
-				"label": "Enable Automatic Polling",
-				"type": "checkbox",
-				"defaultValue": true,
-				"helperText": "Automatically poll server at specified interval"
-			},
-			{
-				"key": "timeout",
-				"label": "Request Timeout (seconds)",
-				"type": "number",
-				"defaultValue": 5,
-				"helperText": "Timeout for server requests",
-				"validation": {
-					"min": 1,
-					"max": 30
-				}
 			}
 		],
-		"settings_tutorial": "---\n### 🎮 Setup Your Minecraft Server Monitoring\n1) Enter your server address (hostname or IP)\n2) Enter server port (default: 25565)\n3) (Optional) Enable Query protocol for detailed stats\n   - Requires `enable-query=true` in server.properties\n   - Provides player list and more details\n4) Set poll interval (how often to check)\n5) Click **Save** to start monitoring\n---\n### ✅ Verify Connection\nUse the **Test Connection** action to verify server is reachable.\n---\n### 📊 What Gets Tracked\n- Server online/offline status\n- Current player count\n- Maximum players\n- Server version\n- MOTD (Message of the Day)\n- Player list (if Query enabled)\n---",
+		"settings_tutorial": "---\n### 🎮 Setup Your Minecraft Server Monitoring\n1) Enter your server address (hostname or IP)\n2) Enter server port (default: 25565)\n3) **Enable Query protocol (required for player tracking)**\n   - Set `enable-query=true` in server.properties\n   - Ensure `query.port` matches the Query Port setting\n   - Enables player list, join/leave alerts, map, and game type\n4) Set poll interval (how often to check)\n5) Click **Save** to start monitoring\n---\n### ✅ Verify Connection\nUse the **Test Connection** action to verify server is reachable.\n---\n### 📊 What Gets Tracked\n- Server online/offline status\n- Current player count\n- Maximum players\n- Server version\n- MOTD (Message of the Day)\n- Player list (Query required)\n---",
 		"actions_tutorial": "---\n### 🔄 Manual Poll\nManually check server status without waiting for next scheduled poll.\n---\n### 🧪 Test Connection\nTest connection to server and display current status.\n---",
 		"actions": [
 			{
@@ -7239,57 +7304,57 @@ module.exports = MinecraftServerPlugin;
 		],
 		"variables": [
 			{
-				"name": "mc_online",
+				"name": "online",
 				"description": "Whether the server is online",
 				"value": false
 			},
 			{
-				"name": "mc_players_online",
+				"name": "players_online",
 				"description": "Number of players currently online",
 				"value": 0
 			},
 			{
-				"name": "mc_players_max",
+				"name": "players_max",
 				"description": "Maximum number of players allowed",
 				"value": 0
 			},
 			{
-				"name": "mc_version",
+				"name": "version",
 				"description": "Server version (e.g., 1.21.5)",
 				"value": ""
 			},
 			{
-				"name": "mc_motd",
+				"name": "motd",
 				"description": "Server Message of the Day",
 				"value": ""
 			},
 			{
-				"name": "mc_protocol_version",
+				"name": "protocol_version",
 				"description": "Protocol version number",
 				"value": 0
 			},
 			{
-				"name": "mc_player_list",
+				"name": "player_list",
 				"description": "Comma-separated list of player names (Query only)",
 				"value": ""
 			},
 			{
-				"name": "mc_map",
+				"name": "map",
 				"description": "Current world/map name (Query only)",
 				"value": ""
 			},
 			{
-				"name": "mc_game_type",
+				"name": "game_type",
 				"description": "Game type (Survival, Creative, etc.) (Query only)",
 				"value": ""
 			},
 			{
-				"name": "mc_last_player_joined",
+				"name": "last_player_joined",
 				"description": "Username of last player who joined",
 				"value": ""
 			},
 			{
-				"name": "mc_last_player_left",
+				"name": "last_player_left",
 				"description": "Username of last player who left",
 				"value": ""
 			}
@@ -7298,12 +7363,7 @@ module.exports = MinecraftServerPlugin;
 			{
 				"title": "Server Online",
 				"key": "serverOnline",
-				"acceptedVariables": [
-					"mc_online",
-					"mc_version",
-					"mc_motd",
-					"mc_players_max"
-				],
+				"acceptedVariables": ["online", "version", "motd", "players_max"],
 				"defaultMessage": "Minecraft server is now online!",
 				"variationConditions": [
 					{
@@ -7328,11 +7388,12 @@ module.exports = MinecraftServerPlugin;
 				"title": "Player Joined",
 				"key": "playerJoined",
 				"acceptedVariables": [
-					"mc_last_player_joined",
-					"mc_players_online",
-					"mc_players_max"
+					"username",
+					"last_player_joined",
+					"players_online",
+					"players_max"
 				],
-				"defaultMessage": "{{username}} joined the server! ({{mc_players_online}}/{{mc_players_max}})",
+				"defaultMessage": "{{last_player_joined}} joined the server! ({{players_online}}/{{players_max}})",
 				"variationConditions": [
 					{
 						"type": "RANDOM",
@@ -7344,39 +7405,12 @@ module.exports = MinecraftServerPlugin;
 				"title": "Player Left",
 				"key": "playerLeft",
 				"acceptedVariables": [
-					"mc_last_player_left",
-					"mc_players_online",
-					"mc_players_max"
+					"username",
+					"last_player_left",
+					"players_online",
+					"players_max"
 				],
-				"defaultMessage": "{{username}} left the server ({{mc_players_online}}/{{mc_players_max}})",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Player Milestone",
-				"key": "playerMilestone",
-				"acceptedVariables": ["mc_players_online", "mc_players_max"],
-				"defaultMessage": "{{mc_players_online}} players online!",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Player count is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Server Full",
-				"key": "serverFull",
-				"acceptedVariables": ["mc_players_online", "mc_players_max"],
-				"defaultMessage": "Server is full! ({{mc_players_max}}/{{mc_players_max}})",
+				"defaultMessage": "{{last_player_left}} left the server ({{players_online}}/{{players_max}})",
 				"variationConditions": [
 					{
 						"type": "RANDOM",
@@ -7428,7 +7462,7 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.0"
 	}
 }
 
@@ -7569,7 +7603,7 @@ module.exports = MockLightsPlugin;
   "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
   "main": "main.js",
   "dependencies": {
-    "@lumiastream/plugin": "^0.1.18"
+    "@lumiastream/plugin": "^0.2.0"
   }
 }
 
@@ -8375,7 +8409,7 @@ module.exports = OctoPrintPlugin;
 	"description": "OctoPrint integration example plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.0"
 	}
 }
 
@@ -9050,7 +9084,7 @@ module.exports = PlaystationNetworkPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.1.18",
+    "@lumiastream/plugin": "^0.2.0",
     "psn-api": "^2.11.0"
   }
 }
@@ -10593,7 +10627,7 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.0"
 	}
 }
 
@@ -11518,7 +11552,7 @@ module.exports = StripePaymentsPlugin;
 	"description": "Stripe payments plugin example for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.0"
 	}
 }
 
@@ -12640,7 +12674,7 @@ module.exports = TikfinityPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.0"
 	}
 }
 
@@ -12670,16 +12704,13 @@ This example plugin polls the Unraid GraphQL API and exposes array + Docker stat
 - `Set Array State` - start or stop the array.
 - `Send Unraid Notification` - create an Unraid notification.
 
-## Alerts
-
-Base alert messages are disabled by default using `defaults.disableBaseAlert`. Configure alert variations in Lumia to enable notifications.
-
-- High CPU usage (GREATER_NUMBER variations using percent).
-- High memory usage (GREATER_NUMBER variations using percent).
-- High disk temperature (GREATER_NUMBER variations using temperature).
-- Disk SMART warning count (GREATER_NUMBER variations).
-- Docker containers stopped count (GREATER_NUMBER variations).
-- Array state change (EQUAL_SELECTION variations).
+Tips:
+- Names can be taken from the Unraid UI (Docker tab / VMs tab).
+- Prefixed IDs can be queried via GraphQL:
+  - Docker: `docker { containers { id names } }`
+  - VMs: `vms { id name }`
+- If you use a Docker name, pick one of the values in `names` and remove any leading `/`.
+- API keys must allow write access for Docker/VM/Array/Notifications; read-only keys can refresh status but will block actions.
 
 ## Variables
 
@@ -12699,7 +12730,7 @@ Base alert messages are disabled by default using `defaults.disableBaseAlert`. C
 - `unraid_docker_stopped`
 - `unraid_docker_stopped_names`
 - `unraid_os_release`
-- `unraid_os_uptime`
+- `unraid_os_uptime` (seconds or formatted string, depending on API)
 - `unraid_cpu_brand`
 - `unraid_cpu_percent`
 - `unraid_mem_percent`
@@ -12707,10 +12738,6 @@ Base alert messages are disabled by default using `defaults.disableBaseAlert`. C
 - `unraid_mem_used_bytes`
 - `unraid_mem_free_bytes`
 - `unraid_mem_available_bytes`
-- `unraid_swap_percent`
-- `unraid_swap_total_bytes`
-- `unraid_swap_used_bytes`
-- `unraid_swap_free_bytes`
 - `unraid_last_updated`
 
 ## Notes
@@ -12761,10 +12788,6 @@ const VARIABLE_NAMES = {
 	memUsed: "unraid_mem_used_bytes",
 	memFree: "unraid_mem_free_bytes",
 	memAvailable: "unraid_mem_available_bytes",
-	swapPercent: "unraid_swap_percent",
-	swapTotal: "unraid_swap_total_bytes",
-	swapUsed: "unraid_swap_used_bytes",
-	swapFree: "unraid_swap_free_bytes",
 	lastUpdated: "unraid_last_updated",
 };
 
@@ -12950,7 +12973,7 @@ class UnraidPlugin extends Plugin {
 					.flatMap((container) =>
 						Array.isArray(container?.names) ? container.names : []
 					)
-					.map((name) => (name || "").toString().replace(/^\\/+/, ""))
+					.map((name) => (name || "").toString().replace(/^\/+/, ""))
 					.filter(Boolean)
 			: [];
 
@@ -12996,7 +13019,7 @@ class UnraidPlugin extends Plugin {
 		);
 		await this._setVariable(
 			VARIABLE_NAMES.osUptime,
-			this._toNumber(data?.info?.os?.uptime)
+			this._coerceUptime(data?.info?.os?.uptime)
 		);
 		await this._setVariable(
 			VARIABLE_NAMES.cpuBrand,
@@ -13029,22 +13052,6 @@ class UnraidPlugin extends Plugin {
 				VARIABLE_NAMES.memAvailable,
 				this._toNumber(memory?.available)
 			);
-			await this._setVariable(
-				VARIABLE_NAMES.swapPercent,
-				this._toNumber(memory?.percentSwapTotal)
-			);
-			await this._setVariable(
-				VARIABLE_NAMES.swapTotal,
-				this._toNumber(memory?.swapTotal)
-			);
-			await this._setVariable(
-				VARIABLE_NAMES.swapUsed,
-				this._toNumber(memory?.swapUsed)
-			);
-			await this._setVariable(
-				VARIABLE_NAMES.swapFree,
-				this._toNumber(memory?.swapFree)
-			);
 		}
 		if (Array.isArray(diskInventory)) {
 			await this._updateDiskMetrics(diskInventory);
@@ -13054,34 +13061,35 @@ class UnraidPlugin extends Plugin {
 			new Date().toISOString()
 		);
 
-		await this._maybeTriggerAlerts({
-			arrayState,
-			cpuPercent,
-			memPercent,
-			diskMetrics: Array.isArray(diskInventory)
-				? {
-						tempMax: this._toNumber(
-							this._lastVariables.get(VARIABLE_NAMES.diskTempMax)
-						),
-						tempAvg: this._toNumber(
-							this._lastVariables.get(VARIABLE_NAMES.diskTempAvg)
-						),
-						smartUnknownCount: this._toNumber(
-							this._lastVariables.get(
-								VARIABLE_NAMES.diskSmartUnknownCount
-							)
-						),
-				  }
-				: null,
-			docker: Array.isArray(dockerContainers)
-				? {
-						stopped: dockerStopped,
-						running: dockerRunning,
-						total: dockerTotal,
-						stoppedNames: dockerStoppedNames,
-				  }
-				: null,
-		});
+		// Alerts temporarily disabled.
+		// await this._maybeTriggerAlerts({
+		// 	arrayState,
+		// 	cpuPercent,
+		// 	memPercent,
+		// 	diskMetrics: Array.isArray(diskInventory)
+		// 		? {
+		// 				tempMax: this._toNumber(
+		// 					this._lastVariables.get(VARIABLE_NAMES.diskTempMax)
+		// 				),
+		// 				tempAvg: this._toNumber(
+		// 					this._lastVariables.get(VARIABLE_NAMES.diskTempAvg)
+		// 				),
+		// 				smartUnknownCount: this._toNumber(
+		// 					this._lastVariables.get(
+		// 						VARIABLE_NAMES.diskSmartUnknownCount
+		// 					)
+		// 				),
+		// 		  }
+		// 		: null,
+		// 	docker: Array.isArray(dockerContainers)
+		// 		? {
+		// 				stopped: dockerStopped,
+		// 				running: dockerRunning,
+		// 				total: dockerTotal,
+		// 				stoppedNames: dockerStoppedNames,
+		// 		  }
+		// 		: null,
+		// });
 
 		if (this.settings?.logArrayStateChanges) {
 			if (this._lastArrayState && this._lastArrayState !== arrayState) {
@@ -13303,7 +13311,7 @@ class UnraidPlugin extends Plugin {
 		return (value || "")
 			.toString()
 			.trim()
-			.replace(/^\\/+/, "")
+			.replace(/^\/+/, "")
 			.toLowerCase();
 	}
 
@@ -13362,15 +13370,15 @@ class UnraidPlugin extends Plugin {
 		return this._vmIndex.get(key) || "";
 	}
 
-	async _refreshDockerIndex() {
-		const containers = await this._fetchDockerContainers();
+	async _refreshDockerIndex(forceInfo = false) {
+		const containers = await this._fetchDockerContainers(forceInfo);
 		if (Array.isArray(containers)) {
 			this._updateDockerIndex(containers);
 		}
 	}
 
-	async _fetchVmsList() {
-		const vmInfo = await this._ensureVmInfo();
+	async _fetchVmsList(forceInfo = false) {
+		const vmInfo = await this._ensureVmInfo(forceInfo);
 		if (!vmInfo?.fields?.length) {
 			return [];
 		}
@@ -13394,9 +13402,14 @@ class UnraidPlugin extends Plugin {
 			return;
 		}
 
-		const mutationInfo = await this._ensureMutationInfo();
-		const dockerMutation = mutationInfo?.docker;
-		const fieldInfo = dockerMutation?.fields?.get(operation);
+		let mutationInfo = await this._ensureMutationInfo();
+		let dockerMutation = mutationInfo?.docker;
+		let fieldInfo = dockerMutation?.fields?.get(operation);
+		if (!fieldInfo) {
+			mutationInfo = await this._ensureMutationInfo(true);
+			dockerMutation = mutationInfo?.docker;
+			fieldInfo = dockerMutation?.fields?.get(operation);
+		}
 		if (!fieldInfo) {
 			await this._log(
 				"Docker actions are not available in this Unraid API schema.",
@@ -13417,7 +13430,7 @@ class UnraidPlugin extends Plugin {
 			}
 			id = this._resolveDockerIdByName(name);
 			if (!id) {
-				await this._refreshDockerIndex();
+				await this._refreshDockerIndex(true);
 				id = this._resolveDockerIdByName(name);
 			}
 		}
@@ -13427,18 +13440,26 @@ class UnraidPlugin extends Plugin {
 			return;
 		}
 
-		const selection = this._requiresSelection(fieldInfo?.type)
-			? " { __typename }"
-			: "";
-		const query = `
+		await this._log(`Running Docker ${operation} for ${id}.`);
+
+		const selection = this._requiresSelection(fieldInfo?.type);
+		const queryWithSelection = `
 			mutation DockerAction($id: PrefixedID!) {
 				docker {
-					${operation}(id: $id)${selection}
+					${operation}(id: $id) { __typename }
 				}
 			}
 		`;
-
-		await this._runMutation(query, { id }, `Docker ${operation}`);
+		const queryWithoutSelection = `
+			mutation DockerAction($id: PrefixedID!) {
+				docker {
+					${operation}(id: $id)
+				}
+			}
+		`;
+		const primary = selection ? queryWithSelection : queryWithoutSelection;
+		const fallback = selection ? queryWithoutSelection : queryWithSelection;
+		await this._runMutation(primary, { id }, `Docker ${operation}`, fallback);
 	}
 
 	async _handleVmAction(data = {}) {
@@ -13458,9 +13479,14 @@ class UnraidPlugin extends Plugin {
 			return;
 		}
 
-		const mutationInfo = await this._ensureMutationInfo();
-		const vmMutation = mutationInfo?.vm;
-		const fieldInfo = vmMutation?.fields?.get(operation);
+		let mutationInfo = await this._ensureMutationInfo();
+		let vmMutation = mutationInfo?.vm;
+		let fieldInfo = vmMutation?.fields?.get(operation);
+		if (!fieldInfo) {
+			mutationInfo = await this._ensureMutationInfo(true);
+			vmMutation = mutationInfo?.vm;
+			fieldInfo = vmMutation?.fields?.get(operation);
+		}
 		if (!fieldInfo) {
 			await this._log(
 				"VM actions are not available in this Unraid API schema.",
@@ -13478,7 +13504,7 @@ class UnraidPlugin extends Plugin {
 			}
 			id = this._resolveVmIdByName(name);
 			if (!id) {
-				const vms = await this._fetchVmsList();
+				const vms = await this._fetchVmsList(true);
 				this._updateVmIndex(vms);
 				id = this._resolveVmIdByName(name);
 			}
@@ -13489,18 +13515,26 @@ class UnraidPlugin extends Plugin {
 			return;
 		}
 
-		const selection = this._requiresSelection(fieldInfo?.type)
-			? " { __typename }"
-			: "";
-		const query = `
+		await this._log(`Running VM ${operation} for ${id}.`);
+
+		const selection = this._requiresSelection(fieldInfo?.type);
+		const queryWithSelection = `
 			mutation VmAction($id: PrefixedID!) {
 				vm {
-					${operation}(id: $id)${selection}
+					${operation}(id: $id) { __typename }
 				}
 			}
 		`;
-
-		await this._runMutation(query, { id }, `VM ${operation}`);
+		const queryWithoutSelection = `
+			mutation VmAction($id: PrefixedID!) {
+				vm {
+					${operation}(id: $id)
+				}
+			}
+		`;
+		const primary = selection ? queryWithSelection : queryWithoutSelection;
+		const fallback = selection ? queryWithoutSelection : queryWithSelection;
+		await this._runMutation(primary, { id }, `VM ${operation}`, fallback);
 	}
 
 	async _handleParityAction(data = {}) {
@@ -13511,9 +13545,14 @@ class UnraidPlugin extends Plugin {
 			return;
 		}
 
-		const mutationInfo = await this._ensureMutationInfo();
-		const parityMutation = mutationInfo?.parityCheck;
-		const fieldInfo = parityMutation?.fields?.get(operation);
+		let mutationInfo = await this._ensureMutationInfo();
+		let parityMutation = mutationInfo?.parityCheck;
+		let fieldInfo = parityMutation?.fields?.get(operation);
+		if (!fieldInfo) {
+			mutationInfo = await this._ensureMutationInfo(true);
+			parityMutation = mutationInfo?.parityCheck;
+			fieldInfo = parityMutation?.fields?.get(operation);
+		}
 		if (!fieldInfo) {
 			await this._log(
 				"Parity actions are not available in this Unraid API schema.",
@@ -13522,31 +13561,47 @@ class UnraidPlugin extends Plugin {
 			return;
 		}
 
-		const selection = this._requiresSelection(fieldInfo?.type)
-			? " { __typename }"
-			: "";
+		const selection = this._requiresSelection(fieldInfo?.type);
 
 		if (operation === "start") {
 			const correct = Boolean(data?.correct);
-			const query = `
+			const queryWithSelection = `
 				mutation ParityStart($correct: Boolean!) {
 					parityCheck {
-						start(correct: $correct)${selection}
+						start(correct: $correct) { __typename }
 					}
 				}
 			`;
-			await this._runMutation(query, { correct }, "Parity start");
+			const queryWithoutSelection = `
+				mutation ParityStart($correct: Boolean!) {
+					parityCheck {
+						start(correct: $correct)
+					}
+				}
+			`;
+			const primary = selection ? queryWithSelection : queryWithoutSelection;
+			const fallback = selection ? queryWithoutSelection : queryWithSelection;
+			await this._runMutation(primary, { correct }, "Parity start", fallback);
 			return;
 		}
 
-		const query = `
+		const queryWithSelection = `
 			mutation ParityAction {
 				parityCheck {
-					${operation}${selection}
+					${operation} { __typename }
 				}
 			}
 		`;
-		await this._runMutation(query, {}, `Parity ${operation}`);
+		const queryWithoutSelection = `
+			mutation ParityAction {
+				parityCheck {
+					${operation}
+				}
+			}
+		`;
+		const primary = selection ? queryWithSelection : queryWithoutSelection;
+		const fallback = selection ? queryWithoutSelection : queryWithSelection;
+		await this._runMutation(primary, {}, `Parity ${operation}`, fallback);
 	}
 
 	async _handleArrayStateAction(data = {}) {
@@ -13556,9 +13611,14 @@ class UnraidPlugin extends Plugin {
 			return;
 		}
 
-		const mutationInfo = await this._ensureMutationInfo();
-		const arrayMutation = mutationInfo?.array;
-		const fieldInfo = arrayMutation?.fields?.get("setState");
+		let mutationInfo = await this._ensureMutationInfo();
+		let arrayMutation = mutationInfo?.array;
+		let fieldInfo = arrayMutation?.fields?.get("setState");
+		if (!fieldInfo) {
+			mutationInfo = await this._ensureMutationInfo(true);
+			arrayMutation = mutationInfo?.array;
+			fieldInfo = arrayMutation?.fields?.get("setState");
+		}
 		if (!fieldInfo) {
 			await this._log(
 				"Array state actions are not available in this Unraid API schema.",
@@ -13576,18 +13636,24 @@ class UnraidPlugin extends Plugin {
 			return;
 		}
 
-		const selection = this._requiresSelection(fieldInfo?.type)
-			? " { __typename }"
-			: "";
-		const query = `
+		const selection = this._requiresSelection(fieldInfo?.type);
+		const queryWithSelection = `
 			mutation ArrayState($state: ArrayStateInputState!) {
 				array {
-					setState(input: { desiredState: $state })${selection}
+					setState(input: { desiredState: $state }) { __typename }
 				}
 			}
 		`;
-
-		await this._runMutation(query, { state: desiredState }, "Array state");
+		const queryWithoutSelection = `
+			mutation ArrayState($state: ArrayStateInputState!) {
+				array {
+					setState(input: { desiredState: $state })
+				}
+			}
+		`;
+		const primary = selection ? queryWithSelection : queryWithoutSelection;
+		const fallback = selection ? queryWithoutSelection : queryWithSelection;
+		await this._runMutation(primary, { state: desiredState }, "Array state", fallback);
 	}
 
 	async _handleNotificationAction(data = {}) {
@@ -13605,8 +13671,12 @@ class UnraidPlugin extends Plugin {
 			return;
 		}
 
-		const mutationInfo = await this._ensureMutationInfo();
-		const createNotification = mutationInfo?.createNotification;
+		let mutationInfo = await this._ensureMutationInfo();
+		let createNotification = mutationInfo?.createNotification;
+		if (!createNotification) {
+			mutationInfo = await this._ensureMutationInfo(true);
+			createNotification = mutationInfo?.createNotification;
+		}
 		if (!createNotification) {
 			await this._log(
 				"Notifications are not available in this Unraid API schema.",
@@ -13629,26 +13699,53 @@ class UnraidPlugin extends Plugin {
 			input.link = link;
 		}
 
-		const selection = this._requiresSelection(createNotification?.type)
-			? " { __typename }"
-			: "";
-		const query = `
+		await this._log(`Creating Unraid notification (${importance}).`);
+
+		const selection = this._requiresSelection(createNotification?.type);
+		const queryWithSelection = `
 			mutation CreateNotification($input: NotificationData!) {
-				createNotification(input: $input)${selection}
+				createNotification(input: $input) { __typename }
 			}
 		`;
-
-		await this._runMutation(query, { input }, "Create notification");
+		const queryWithoutSelection = `
+			mutation CreateNotification($input: NotificationData!) {
+				createNotification(input: $input)
+			}
+		`;
+		const primary = selection ? queryWithSelection : queryWithoutSelection;
+		const fallback = selection ? queryWithoutSelection : queryWithSelection;
+		await this._runMutation(primary, { input }, "Create notification", fallback);
 	}
 
-	async _runMutation(query, variables, label) {
-		try {
-			const payload = await this._fetchGraphQLRaw(query, variables);
+	async _runMutation(query, variables, label, fallbackQuery) {
+		const attempt = async (payloadQuery) => {
+			const payload = await this._fetchGraphQLRaw(payloadQuery, variables);
 			if (payload?.errors?.length) {
 				const messages = payload.errors
 					.map((item) => item?.message)
-					.filter(Boolean)
-					.join("; ");
+					.filter(Boolean);
+				return { ok: false, messages, payload };
+			}
+			return { ok: true, messages: [], payload };
+		};
+
+		try {
+			let result = await attempt(query);
+			if (!result.ok && fallbackQuery) {
+				const joined = result.messages.join("; ").toLowerCase();
+				const needsSelection =
+					joined.includes("must have a selection") ||
+					joined.includes("subfields") ||
+					joined.includes("sub selection");
+				const noSelection =
+					joined.includes("must not have a selection") ||
+					joined.includes("no subfields");
+				if (needsSelection || noSelection) {
+					result = await attempt(fallbackQuery);
+				}
+			}
+			if (!result.ok) {
+				const messages = result.messages.join("; ");
 				await this._log(
 					`${label} failed: ${messages || "unknown error"}`,
 					"warn"
@@ -13733,7 +13830,10 @@ class UnraidPlugin extends Plugin {
 		return this._rootInfo;
 	}
 
-	async _ensureVmInfo() {
+	async _ensureVmInfo(force = false) {
+		if (force) {
+			this._vmInfo = null;
+		}
 		if (this._vmInfo) {
 			return this._vmInfo;
 		}
@@ -13773,7 +13873,10 @@ class UnraidPlugin extends Plugin {
 		return this._vmInfo;
 	}
 
-	async _ensureMutationInfo() {
+	async _ensureMutationInfo(force = false) {
+		if (force) {
+			this._mutationInfo = null;
+		}
 		if (this._mutationInfo) {
 			return this._mutationInfo;
 		}
@@ -14012,10 +14115,6 @@ class UnraidPlugin extends Plugin {
 								free
 								available
 								percentTotal
-								swapTotal
-								swapUsed
-								swapFree
-								percentSwapTotal
 							}
 						}
 					}
@@ -14091,8 +14190,8 @@ class UnraidPlugin extends Plugin {
 		};
 	}
 
-	async _fetchDockerContainers() {
-		const dockerInfo = await this._ensureDockerInfo();
+	async _fetchDockerContainers(forceInfo = false) {
+		const dockerInfo = await this._ensureDockerInfo(forceInfo);
 		if (!dockerInfo || dockerInfo.mode === "none") {
 			return null;
 		}
@@ -14146,7 +14245,10 @@ class UnraidPlugin extends Plugin {
 			: null;
 	}
 
-	async _ensureDockerInfo() {
+	async _ensureDockerInfo(force = false) {
+		if (force) {
+			this._dockerInfo = null;
+		}
 		if (this._dockerInfo) {
 			return this._dockerInfo;
 		}
@@ -14413,6 +14515,20 @@ class UnraidPlugin extends Plugin {
 		return Number.isFinite(number) ? number : 0;
 	}
 
+	_coerceUptime(value) {
+		if (value == null) {
+			return "";
+		}
+		if (typeof value === "number" && Number.isFinite(value)) {
+			return value;
+		}
+		const number = Number(value);
+		if (Number.isFinite(number)) {
+			return number;
+		}
+		return String(value);
+	}
+
 	async _setVariable(name, value) {
 		if (this._lastVariables.get(name) === value) {
 			return;
@@ -14532,8 +14648,8 @@ module.exports = UnraidPlugin;
 				"defaultValue": true
 			}
 		],
-		"settings_tutorial": "---\n### Connect Unraid\n1) In the Unraid web UI, enable the API and create an API key (Settings > Management Access).\n2) Copy the API key into the **API Key** field.\n3) Enter the base URL for your Unraid server (for example: `http://tower.local` or `http://192.168.1.10`).\n---\n### Alerts\n- Base alerts are disabled by default using defaults.disableBaseAlert. Configure alert variations in Lumia to enable notifications.\n- For threshold-style alerts, use GREATER_NUMBER variations and set your percentage/temperature.\n---\n### Notes\n- The plugin uses the Unraid GraphQL endpoint at `/graphql`.\n- If you use HTTPS with a self-signed certificate, the request may fail unless your environment trusts it.\n---",
-		"actions_tutorial": "---\n### Refresh Now\nUse **Refresh Status** to pull the latest Unraid data immediately.\n---",
+		"settings_tutorial": "---\n### Connect Unraid\n1) In the Unraid web UI, enable the API and create an API key (Settings > Management Access).\n2) Copy the API key into the **API Key** field.\n3) Enter the base URL for your Unraid server (for example: `http://tower.local` or `http://192.168.1.10`).\n---\n### Notes\n- The plugin uses the Unraid GraphQL endpoint at `/graphql`.\n- If you use HTTPS with a self-signed certificate, the request may fail unless your environment trusts it.\n---",
+		"actions_tutorial": "---\n### Refresh Now\nUse **Refresh Status** to pull the latest Unraid data immediately.\n---\n### Docker/VM Actions\n- You can use the container or VM name from the Unraid UI (Docker tab or VMs tab).\n- If a name does not resolve, use the PrefixedID from the API instead.\n- Example GraphQL to list Docker container IDs + names:\n```\n{\n  docker {\n    containers {\n      id\n      names\n    }\n  }\n}\n```\n- Example GraphQL to list VM IDs + names:\n```\n{\n  vms {\n    id\n    name\n  }\n}\n```\n- If you use a container name, pick one of the values in `names` (remove any leading `/`).\n---\n### Notifications + Permissions\n- The API key must allow write access to Docker/VM/Array/Notifications. Read-only keys can refresh status but will block actions.\n- Notification `importance` must be one of: ALERT, WARNING, INFO (use the schema enum if your server differs).\n---",
 		"actions": [
 			{
 				"type": "unraid_refresh",
@@ -14772,8 +14888,8 @@ module.exports = UnraidPlugin;
 			},
 			{
 				"name": "unraid_os_uptime",
-				"description": "Unraid OS uptime (seconds, if reported).",
-				"value": 0
+				"description": "Unraid OS uptime as reported by the API (seconds or formatted string).",
+				"value": ""
 			},
 			{
 				"name": "unraid_cpu_brand",
@@ -14811,143 +14927,9 @@ module.exports = UnraidPlugin;
 				"value": 0
 			},
 			{
-				"name": "unraid_swap_percent",
-				"description": "Swap utilization percent.",
-				"value": 0
-			},
-			{
-				"name": "unraid_swap_total_bytes",
-				"description": "Total swap memory (bytes).",
-				"value": 0
-			},
-			{
-				"name": "unraid_swap_used_bytes",
-				"description": "Used swap memory (bytes).",
-				"value": 0
-			},
-			{
-				"name": "unraid_swap_free_bytes",
-				"description": "Free swap memory (bytes).",
-				"value": 0
-			},
-			{
 				"name": "unraid_last_updated",
 				"description": "ISO timestamp for the last refresh.",
 				"value": ""
-			}
-		],
-		"alerts": [
-			{
-				"title": "High CPU Usage",
-				"key": "unraid_cpu_high",
-				"acceptedVariables": ["unraid_cpu_percent"],
-				"defaultMessage": "",
-				"defaults": {
-					"disableBaseAlert": true
-				},
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Trigger when CPU percent is greater than the configured threshold."
-					}
-				]
-			},
-			{
-				"title": "High Memory Usage",
-				"key": "unraid_mem_high",
-				"acceptedVariables": [
-					"unraid_mem_percent",
-					"unraid_mem_used_bytes",
-					"unraid_mem_total_bytes"
-				],
-				"defaultMessage": "",
-				"defaults": {
-					"disableBaseAlert": true
-				},
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Trigger when memory percent is greater than the configured threshold."
-					}
-				]
-			},
-			{
-				"title": "High Disk Temperature",
-				"key": "unraid_disk_temp_high",
-				"acceptedVariables": [
-					"unraid_disk_temp_max_c",
-					"unraid_disk_temp_avg_c",
-					"unraid_disks_json"
-				],
-				"defaultMessage": "",
-				"defaults": {
-					"disableBaseAlert": true
-				},
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Trigger when disk temperature exceeds the configured threshold."
-					}
-				]
-			},
-			{
-				"title": "Disk SMART Warning",
-				"key": "unraid_disk_smart",
-				"acceptedVariables": [
-					"unraid_disk_smart_unknown_count",
-					"unraid_disks_json"
-				],
-				"defaultMessage": "",
-				"defaults": {
-					"disableBaseAlert": true
-				},
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Trigger when SMART warnings are greater than the configured threshold."
-					}
-				]
-			},
-			{
-				"title": "Docker Containers Stopped",
-				"key": "unraid_docker_stopped",
-				"acceptedVariables": [
-					"unraid_docker_stopped",
-					"unraid_docker_stopped_names",
-					"unraid_docker_total"
-				],
-				"defaultMessage": "",
-				"defaults": {
-					"disableBaseAlert": true
-				},
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Trigger when stopped containers exceed the configured threshold."
-					}
-				]
-			},
-			{
-				"title": "Array State Changed",
-				"key": "unraid_array_state_change",
-				"acceptedVariables": ["unraid_array_state"],
-				"defaultMessage": "",
-				"defaults": {
-					"disableBaseAlert": true
-				},
-				"variationConditions": [
-					{
-						"type": "EQUAL_SELECTION",
-						"description": "Trigger when the array state matches the selected value.",
-						"selections": [
-							{ "label": "STARTED", "value": "STARTED" },
-							{ "label": "STOPPED", "value": "STOPPED" },
-							{ "label": "PAUSED", "value": "PAUSED" },
-							{ "label": "ERROR", "value": "ERROR" },
-							{ "label": "UNKNOWN", "value": "UNKNOWN" }
-						]
-					}
-				]
 			}
 		]
 	}
@@ -14965,7 +14947,7 @@ module.exports = UnraidPlugin;
 	"description": "Unraid integration example plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.0"
 	}
 }
 
