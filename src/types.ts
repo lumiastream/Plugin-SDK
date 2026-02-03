@@ -78,6 +78,7 @@ export interface PluginSetting {
 	type:
 		| "text"
 		| "number"
+		| "text_list"
 		| "select"
 		| "checkbox"
 		| "slider"
@@ -94,7 +95,8 @@ export interface PluginSetting {
 	options?: Array<{ label: string; value: string | number | boolean }>;
 	allowTyping?: boolean;
 	rows?: number;
-	defaultValue?: string | number | boolean;
+	defaultValue?: string | number | boolean | string[];
+	disabled?: boolean;
 	validation?: {
 		pattern?: string;
 		min?: number;
@@ -123,18 +125,31 @@ export interface PluginActionField {
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
-	options?: Array<{ label: string; value: string | number | boolean }>;
+	options?: PluginActionFieldOption[];
 	min?: number;
 	max?: number;
 	step?: number;
 	rows?: number;
 	allowTyping?: boolean;
 	defaultValue?: any;
+	/**
+	 * When true, changing this field triggers refreshActionOptions in the UI.
+	 */
+	refreshOnChange?: boolean;
+	/**
+	 * When true, this field can receive dynamic options from the plugin.
+	 */
+	dynamicOptions?: boolean;
 	validation?: {
 		min?: number;
 		max?: number;
 		pattern?: string;
 	};
+}
+
+export interface PluginActionFieldOption {
+	label: string;
+	value: string | number | boolean;
 }
 
 export interface PluginActionDefinition {
@@ -145,6 +160,43 @@ export interface PluginActionDefinition {
 	fields: PluginActionField[];
 }
 
+export interface PluginOAuthTokenKeys {
+	accessToken?: string;
+	refreshToken?: string;
+	tokenSecret?: string;
+}
+
+export interface PluginOAuthConfig {
+	/**
+	 * Full OAuth service URL. When set, it overrides provider-based URLs.
+	 */
+	serviceUrl?: string;
+	/**
+	 * Opens OAuth in the system browser instead of the embedded window.
+	 */
+	openInBrowser?: boolean;
+	/**
+	 * Optional button label shown in the PluginAuth UI.
+	 */
+	buttonLabel?: string;
+	/**
+	 * Helper text shown below the OAuth button.
+	 */
+	helperText?: string;
+	/**
+	 * Extra query string params (without leading "?") to append to the service URL.
+	 */
+	extraParams?: string;
+	/**
+	 * Optional OAuth scopes to request.
+	 */
+	scopes?: string[];
+	/**
+	 * Map OAuth response tokens into plugin settings keys.
+	 */
+	tokenKeys?: PluginOAuthTokenKeys;
+}
+
 export interface PluginIntegrationConfig {
 	settings?: PluginSetting[];
 	settings_tutorial?: string;
@@ -153,6 +205,7 @@ export interface PluginIntegrationConfig {
 	alerts?: PluginAlertDefinition[];
 	actions?: PluginActionDefinition[];
 	lights?: PluginLightsConfig;
+	oauth?: PluginOAuthConfig;
 	[key: string]: any;
 }
 
@@ -266,6 +319,7 @@ export interface ILumiaAPI {
 	getSettings: () => Record<string, any>;
 	setSettings: (newSettings: Record<string, any>) => void;
 	updateSettings: (updates: Record<string, any>) => void;
+	updateActionFieldOptions: (params: { actionType: string; fieldKey: string; options: PluginActionFieldOption[] }) => Promise<boolean>;
 	setVariable: (name: string, value: any) => Promise<void>;
 	getVariable: (name: string) => any;
 	callCommand: (name: string, variableValues?: any) => Promise<any>;
@@ -310,6 +364,11 @@ export interface ILumiaAPI {
 		color?: string;
 		chatAsSelf?: boolean;
 	}) => Promise<boolean>;
+	refreshOAuthToken: (params: {
+		refreshToken: string;
+		applicationId?: number;
+		secondaryAccount?: boolean;
+	}) => Promise<{ accessToken?: string; refreshToken?: string; raw?: any }>;
 	integration: {
 		getId: () => string;
 		getConfig: () => Record<string, any>;
@@ -324,6 +383,7 @@ export interface PluginRuntime {
 	onunload(): Promise<void>;
 	onupdate?(oldVersion: string, newVersion: string): Promise<void>;
 	actions?(config: { actions: any[]; extraSettings?: any }): Promise<void>;
+	refreshActionOptions?(config: { actionType: string; values?: Record<string, any>; action?: any }): Promise<void>;
 	searchLights?(config?: Record<string, any>): Promise<any>;
 	addLight?(config: Record<string, any>): Promise<any>;
 	onLightChange?(config: {

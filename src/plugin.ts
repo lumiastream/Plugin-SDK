@@ -33,6 +33,12 @@ export abstract class Plugin {
   async actions(_config: { actions: any[]; extraSettings?: any }): Promise<void> {}
 
   /**
+   * Refresh dynamic action field options in the UI.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async refreshActionOptions(_config: { actionType: string; values?: Record<string, any>; action?: any }): Promise<void> {}
+
+  /**
    * Invoked whenever plugin settings are changed.
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
