@@ -101,6 +101,7 @@ If your plugin provides lights, add a `config.lights` block so the PluginAuth UI
 ```
 
 Runtime hooks for lights plugins:
+
 - Implement `searchLights` to return an array of discovered lights for the UI to save.
 - Implement `addLight` to handle manual-add requests and return the updated array.
 - Implement `onLightChange` to receive color/brightness/power updates for your lights.
@@ -292,11 +293,11 @@ Actions allow users to trigger plugin functionality manually:
 
 Action fields support the following input types:
 
-- **`text`** - Single-line text input. Supports variables.
-- **`email`** - Email address input with validation. Supports variables.
-- **`url`** - URL input with validation. Supports variables.
+- **`text`** - Single-line text input. Supports variables when `allowVariables` is true.
+- **`email`** - Email address input with validation. Supports variables when `allowVariables` is true.
+- **`url`** - URL input with validation. Supports variables when `allowVariables` is true.
 - **`number`** - Numeric input with optional min/max constraints.
-- **`textarea`** - Multi-line text input. Supports variables and configurable rows.
+- **`textarea`** - Multi-line text input. Supports variables when `allowVariables` is true and configurable rows.
 - **`color`** - Color picker that outputs hex color values (e.g., `#FF0000`).
 - **`select`** - Dropdown selection from predefined options.
 - **`checkbox`** - Boolean checkbox input.
@@ -388,6 +389,8 @@ Action fields support the following input types:
 ```
 
 Set `allowTyping` to let users type custom values in addition to the provided options. The dropdown list still appears as suggestions.
+
+Set `allowVariables: true` to enable template variables (e.g., `{{username}}`) for a specific action field. When omitted, variables are not enabled—even for `select` fields with `allowTyping`.
 
 **Checkbox**
 
@@ -485,7 +488,7 @@ Optional alert defaults can be provided under `defaults` to control how Lumia in
 ```json
 {
 	"title": "High CPU Usage",
-	"key": "unraid_cpu_high",
+	"key": "cpu_high",
 	"defaultMessage": "",
 	"defaults": {
 		"disableBaseAlert": true

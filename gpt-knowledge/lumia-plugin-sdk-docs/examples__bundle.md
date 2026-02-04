@@ -44,7 +44,6 @@ const DEFAULTS = {
 class ShowcasePluginTemplate extends Plugin {
 	async onload() {
 		const message = this._currentMessage();
-		await this._log("Plugin loaded");
 		await this._rememberMessage(message);
 
 		if (this.settings.autoAlert === "load") {
@@ -55,13 +54,7 @@ class ShowcasePluginTemplate extends Plugin {
 		}
 	}
 
-	async onunload() {
-		await this._log("Plugin unloaded");
-	}
-
 	async onsettingsupdate(settings, previous = {}) {
-		await this._log("Settings updated");
-
 		if (
 			settings?.welcomeMessage &&
 			settings.welcomeMessage !== previous?.welcomeMessage
@@ -89,7 +82,8 @@ class ShowcasePluginTemplate extends Plugin {
 					break;
 				default:
 					await this._log(
-						`Unknown action type: ${action?.type ?? "undefined"}`
+						`Unknown action type: ${action?.type ?? "undefined"}`,
+						"warn",
 					);
 			}
 		}
@@ -107,13 +101,17 @@ class ShowcasePluginTemplate extends Plugin {
 	}
 
 	async _log(message, severity = "info") {
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
+
 		const prefix = this._tag();
 		const decorated =
 			severity === "warn"
 				? `${prefix} ⚠️ ${message}`
 				: severity === "error"
-				? `${prefix} ❌ ${message}`
-				: `${prefix} ${message}`;
+					? `${prefix} ❌ ${message}`
+					: `${prefix} ${message}`;
 
 		await this.lumia.addLog(decorated);
 	}
@@ -166,12 +164,12 @@ class ShowcasePluginTemplate extends Plugin {
 
 			await this.lumia.setVariable(VARIABLE_NAMES.lastAlertColor, color);
 			await this._log(
-				`Triggered sample alert with color ${color} for ${duration}s`
+				`Triggered sample alert with color ${color} for ${duration}s`,
 			);
 		} catch (error) {
 			await this._log(
 				`Failed to trigger sample alert: ${error.message ?? error}`,
-				"error"
+				"error",
 			);
 		}
 	}
@@ -192,10 +190,11 @@ module.exports = ShowcasePluginTemplate;
 	"email": "",
 	"website": "",
 	"repository": "",
-	"description": "Sample plugin that demonstrates Lumia Stream logging, variables, alerts, and settings.",
+	"description": "Showcase plugin that demonstrates Lumia settings, actions, variables, alerts, and logging.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"category": "examples",
+	"category": "apps",
+	"keywords": "sample, demo, lumia, showcase, template",
 	"icon": "",
 	"changelog": "",
 	"config": {
@@ -328,7 +327,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.3"
 	}
 }
 
@@ -390,22 +389,22 @@ const DEFAULTS = {
 };
 
 const VARIABLE_NAMES = {
-	lastSync: "clickup_last_sync",
-	dueSoonCount: "clickup_due_soon_count",
-	overdueCount: "clickup_overdue_count",
-	taskName: "clickup_task_name",
-	taskId: "clickup_task_id",
-	taskDueDate: "clickup_task_due_date",
-	taskUrl: "clickup_task_url",
-	taskStatus: "clickup_task_status",
-	lastError: "clickup_last_error",
+	lastSync: "last_sync",
+	dueSoonCount: "due_soon_count",
+	overdueCount: "overdue_count",
+	taskName: "task_name",
+	taskId: "task_id",
+	taskDueDate: "task_due_date",
+	taskUrl: "task_url",
+	taskStatus: "task_status",
+	lastError: "last_error",
 };
 
 const ALERT_KEYS = {
-	dueSoon: "clickup_task_due_soon",
-	overdue: "clickup_task_overdue",
-	created: "clickup_task_created",
-	statusUpdated: "clickup_task_status_updated",
+	dueSoon: "task_due_soon",
+	overdue: "task_overdue",
+	created: "task_created",
+	statusUpdated: "task_status_updated",
 };
 
 class ClickUpTasksPlugin extends Plugin {
@@ -418,18 +417,14 @@ class ClickUpTasksPlugin extends Plugin {
 	}
 
 	async onload() {
-		await this._log("ClickUp plugin loaded");
 		await this._startPolling();
 	}
 
 	async onunload() {
 		this._stopPolling();
-		await this._log("ClickUp plugin unloaded");
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
-		await this._log("Settings updated");
-
 		if (
 			settings?.pollIntervalSeconds !== previous?.pollIntervalSeconds ||
 			settings?.listId !== previous?.listId ||
@@ -455,7 +450,7 @@ class ClickUpTasksPlugin extends Plugin {
 				default:
 					await this._log(
 						`Unknown action type: ${action?.type ?? "undefined"}`,
-						"warn"
+						"warn",
 					);
 			}
 		}
@@ -503,7 +498,7 @@ class ClickUpTasksPlugin extends Plugin {
 			if (!token || !listId) {
 				await this._log(
 					"Missing Personal API Token or List ID. Update settings and save.",
-					"warn"
+					"warn",
 				);
 				return;
 			}
@@ -538,15 +533,15 @@ class ClickUpTasksPlugin extends Plugin {
 
 			await this.lumia.setVariable(
 				VARIABLE_NAMES.lastSync,
-				new Date().toISOString()
+				new Date().toISOString(),
 			);
 			await this.lumia.setVariable(
 				VARIABLE_NAMES.dueSoonCount,
-				String(dueSoon.length)
+				String(dueSoon.length),
 			);
 			await this.lumia.setVariable(
 				VARIABLE_NAMES.overdueCount,
-				String(overdue.length)
+				String(overdue.length),
 			);
 			await this.lumia.setVariable(VARIABLE_NAMES.lastError, "");
 
@@ -554,7 +549,7 @@ class ClickUpTasksPlugin extends Plugin {
 				await this._log(
 					`Fetched ${tasks.length} tasks. Due soon: ${
 						dueSoon.length
-					}, overdue: ${overdue.length}.`
+					}, overdue: ${overdue.length}.`,
 				);
 			}
 
@@ -562,11 +557,11 @@ class ClickUpTasksPlugin extends Plugin {
 		} catch (error) {
 			await this.lumia.setVariable(
 				VARIABLE_NAMES.lastError,
-				String(error?.message ?? error)
+				String(error?.message ?? error),
 			);
 			await this._log(
 				`Failed to refresh tasks: ${error?.message ?? error}`,
-				"error"
+				"error",
 			);
 		} finally {
 			this._inFlight = false;
@@ -606,7 +601,7 @@ class ClickUpTasksPlugin extends Plugin {
 		if (!token || !listId) {
 			await this._log(
 				"Missing Personal API Token or List ID. Update settings and save.",
-				"warn"
+				"warn",
 			);
 			return;
 		}
@@ -654,7 +649,7 @@ class ClickUpTasksPlugin extends Plugin {
 		} catch (error) {
 			await this._log(
 				`Failed to create task: ${error?.message ?? error}`,
-				"error"
+				"error",
 			);
 		}
 	}
@@ -688,12 +683,12 @@ class ClickUpTasksPlugin extends Plugin {
 			await this.lumia.setVariable(VARIABLE_NAMES.taskStatus, status);
 			await this.lumia.triggerAlert({ alert: ALERT_KEYS.statusUpdated });
 			await this._log(
-				`Updated task ${task?.name ?? taskId} to status ${status}`
+				`Updated task ${task?.name ?? taskId} to status ${status}`,
 			);
 		} catch (error) {
 			await this._log(
 				`Failed to update task status: ${error?.message ?? error}`,
-				"error"
+				"error",
 			);
 		}
 	}
@@ -704,12 +699,12 @@ class ClickUpTasksPlugin extends Plugin {
 		await this.lumia.setVariable(VARIABLE_NAMES.taskId, task?.id ?? "");
 		await this.lumia.setVariable(
 			VARIABLE_NAMES.taskDueDate,
-			dueDate ? new Date(dueDate).toISOString() : ""
+			dueDate ? new Date(dueDate).toISOString() : "",
 		);
 		await this.lumia.setVariable(VARIABLE_NAMES.taskUrl, task?.url ?? "");
 		await this.lumia.setVariable(
 			VARIABLE_NAMES.taskStatus,
-			task?.status?.status ?? ""
+			task?.status?.status ?? "",
 		);
 	}
 
@@ -808,13 +803,17 @@ class ClickUpTasksPlugin extends Plugin {
 	}
 
 	async _log(message, severity = "info") {
-		const prefix = `[${this.manifest?.id ?? "clickup_tasks"}]`;
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
+
+		const prefix = `[${this.manifest?.id ?? "tasks"}]`;
 		const decorated =
 			severity === "warn"
 				? `${prefix} WARN: ${message}`
 				: severity === "error"
-				? `${prefix} ERROR: ${message}`
-				: `${prefix} ${message}`;
+					? `${prefix} ERROR: ${message}`
+					: `${prefix} ${message}`;
 
 		await this.lumia.addLog(decorated);
 	}
@@ -828,13 +827,16 @@ module.exports = ClickUpTasksPlugin;
 
 ```
 {
-	"id": "clickup_tasks",
+	"id": "tasks",
 	"name": "ClickUp Tasks",
 	"version": "1.0.0",
 	"author": "Lumia Stream",
-	"description": "Monitor ClickUp tasks, trigger Lumia alerts, and create actions for task workflows.",
+	"description": "Sync ClickUp list tasks into Lumia variables with due/overdue alerts and task actions.",
+	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "apps",
+	"keywords": "clickup, tasks, project management, productivity, alerts",
+	"icon": "clickup.png",
 	"config": {
 		"settings_tutorial": "---\n### Get a ClickUp Personal API Token\n1) In ClickUp, open **Settings**.\n2) Choose **Apps** in the left sidebar.\n3) Under **API Token**, click **Generate** and copy the token.\n4) Paste the token into **Personal API Token** below.\n---\n### Find a List ID\n1) Open the ClickUp List you want to monitor.\n2) Copy the List ID from the URL (the number after `/list/`).\n3) Paste it into **List ID** below.\n---\n### Polling\nSet how often the plugin checks ClickUp. Shorter intervals mean faster alerts but more API calls.\n---",
 		"actions_tutorial": "---\n### Actions\n- **Refresh Tasks**: Pull the latest tasks immediately.\n- **Create Task**: Create a task in the configured List.\n- **Update Task Status**: Move a task to a new status (ex: `complete`).\n---\n### Alerts\nAlerts fire when tasks are due soon, overdue, created, or updated. Use the variables in your overlay/message templates.\n---",
@@ -952,47 +954,47 @@ module.exports = ClickUpTasksPlugin;
 		],
 		"variables": [
 			{
-				"name": "clickup_last_sync",
+				"name": "last_sync",
 				"description": "Last time the plugin successfully synced tasks.",
 				"value": ""
 			},
 			{
-				"name": "clickup_due_soon_count",
+				"name": "due_soon_count",
 				"description": "Number of tasks due soon in the latest poll.",
 				"value": "0"
 			},
 			{
-				"name": "clickup_overdue_count",
+				"name": "overdue_count",
 				"description": "Number of overdue tasks in the latest poll.",
 				"value": "0"
 			},
 			{
-				"name": "clickup_task_name",
+				"name": "task_name",
 				"description": "Name of the task tied to the most recent alert/action.",
 				"value": ""
 			},
 			{
-				"name": "clickup_task_id",
+				"name": "task_id",
 				"description": "ClickUp task ID for the most recent alert/action.",
 				"value": ""
 			},
 			{
-				"name": "clickup_task_due_date",
+				"name": "task_due_date",
 				"description": "Due date (ISO) for the most recent alert/action.",
 				"value": ""
 			},
 			{
-				"name": "clickup_task_url",
+				"name": "task_url",
 				"description": "Task URL for the most recent alert/action.",
 				"value": ""
 			},
 			{
-				"name": "clickup_task_status",
+				"name": "task_status",
 				"description": "Status for the most recent alert/action.",
 				"value": ""
 			},
 			{
-				"name": "clickup_last_error",
+				"name": "last_error",
 				"description": "Most recent error message (if any).",
 				"value": ""
 			}
@@ -1000,49 +1002,775 @@ module.exports = ClickUpTasksPlugin;
 		"alerts": [
 			{
 				"title": "ClickUp Task Due Soon",
-				"key": "clickup_task_due_soon",
+				"key": "task_due_soon",
 				"acceptedVariables": [
-					"clickup_task_name",
-					"clickup_task_due_date",
-					"clickup_task_url",
-					"clickup_task_id"
+					"task_name",
+					"task_due_date",
+					"task_url",
+					"task_id"
 				],
-				"defaultMessage": "Task '{{clickup_task_name}}' is due soon ({{clickup_task_due_date}})."
+				"defaultMessage": "Task '{{task_name}}' is due soon ({{task_due_date}})."
 			},
 			{
 				"title": "ClickUp Task Overdue",
-				"key": "clickup_task_overdue",
+				"key": "task_overdue",
 				"acceptedVariables": [
-					"clickup_task_name",
-					"clickup_task_due_date",
-					"clickup_task_url",
-					"clickup_task_id"
+					"task_name",
+					"task_due_date",
+					"task_url",
+					"task_id"
 				],
-				"defaultMessage": "Task '{{clickup_task_name}}' is overdue ({{clickup_task_due_date}})."
+				"defaultMessage": "Task '{{task_name}}' is overdue ({{task_due_date}})."
 			},
 			{
 				"title": "ClickUp Task Created",
-				"key": "clickup_task_created",
-				"acceptedVariables": [
-					"clickup_task_name",
-					"clickup_task_url",
-					"clickup_task_id"
-				],
-				"defaultMessage": "Created ClickUp task '{{clickup_task_name}}'."
+				"key": "task_created",
+				"acceptedVariables": ["task_name", "task_url", "task_id"],
+				"defaultMessage": "Created ClickUp task '{{task_name}}'."
 			},
 			{
 				"title": "ClickUp Task Status Updated",
-				"key": "clickup_task_status_updated",
+				"key": "task_status_updated",
 				"acceptedVariables": [
-					"clickup_task_name",
-					"clickup_task_status",
-					"clickup_task_id",
-					"clickup_task_url"
+					"task_name",
+					"task_status",
+					"task_id",
+					"task_url"
 				],
-				"defaultMessage": "Updated '{{clickup_task_name}}' to status '{{clickup_task_status}}'."
+				"defaultMessage": "Updated '{{task_name}}' to status '{{task_status}}'."
 			}
 		]
 	}
+}
+
+```
+
+## destiny2/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const DEFAULTS = {
+	pollInterval: 120,
+	userAgent: "LumiaStream Destiny 2 Plugin/1.0.0",
+};
+
+const BUNGIE_API_BASE = "https://www.bungie.net/Platform";
+
+const VARIABLE_NAMES = {
+	displayName: "destiny2_display_name",
+	membershipId: "destiny2_membership_id",
+	membershipType: "destiny2_membership_type",
+	characterCount: "destiny2_character_count",
+	profileLastPlayed: "destiny2_profile_last_played",
+	primaryCharacterId: "destiny2_primary_character_id",
+	primaryCharacterLight: "destiny2_primary_character_light",
+	primaryCharacterLastPlayed: "destiny2_primary_character_last_played",
+	primaryCharacterClassHash: "destiny2_primary_character_class_hash",
+	lastUpdated: "destiny2_last_updated",
+	snapshot: "destiny2_snapshot_json",
+};
+
+class Destiny2Plugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._pollTimer = null;
+		this._refreshPromise = null;
+		this._tokenRefreshPromise = null;
+		this._lastConnectionState = null;
+		this._lastVariables = new Map();
+		this._globalBackoffUntil = 0;
+		this._authFailure = false;
+	}
+
+	async onload() {
+		await this._log("Destiny 2 plugin loaded.");
+
+		if (!this._apiKey()) {
+			await this._log("Missing Bungie API key.", "warn");
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		if (!this._hasAuthTokens()) {
+			await this._log("Missing Bungie OAuth tokens. Authorize to continue.", "warn");
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		await this._refreshData({ reason: "startup" });
+		this._schedulePolling();
+	}
+
+	async onunload() {
+		this._clearPolling();
+		await this._updateConnectionState(false);
+		await this._log("Destiny 2 plugin stopped.");
+	}
+
+	async onsettingsupdate(settings, previous = {}) {
+		const pollChanged =
+			this._pollInterval(settings) !== this._pollInterval(previous);
+		const keyChanged = (settings?.apiKey ?? "") !== (previous?.apiKey ?? "");
+		const authChanged =
+			(settings?.accessToken ?? "") !== (previous?.accessToken ?? "") ||
+			(settings?.refreshToken ?? "") !== (previous?.refreshToken ?? "");
+
+		if (pollChanged) {
+			this._schedulePolling();
+		}
+
+		if (keyChanged || authChanged) {
+			this._authFailure = false;
+			this._globalBackoffUntil = 0;
+		}
+
+		await this._refreshData({ reason: "settings-update" });
+	}
+
+	async validateAuth() {
+		if (!this._apiKey() || !this._hasAuthTokens()) {
+			await this._log("Validation failed: missing API key or OAuth tokens.", "warn");
+			return false;
+		}
+
+		try {
+			await this._fetchMemberships();
+			await this._log("Bungie authentication succeeded.");
+			return true;
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`Bungie validation failed: ${message}`, "error");
+			return false;
+		}
+	}
+
+	_tag() {
+		return `[${this.manifest?.id ?? "destiny2"}]`;
+	}
+
+	async _log(message, severity = "info") {
+		const prefix = this._tag();
+		const decorated =
+			severity === "warn"
+				? `${prefix} ⚠️ ${message}`
+				: severity === "error"
+				? `${prefix} ❌ ${message}`
+				: `${prefix} ${message}`;
+
+		await this.lumia.addLog(decorated);
+	}
+
+	async _refreshData({ reason } = {}) {
+		if (!this._apiKey() || !this._hasAuthTokens()) {
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		if (this._authFailure) {
+			return;
+		}
+
+		const now = Date.now();
+		if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
+			return;
+		}
+
+		if (this._refreshPromise) {
+			return this._refreshPromise;
+		}
+
+		this._refreshPromise = (async () => {
+			try {
+				const memberships = await this._safeFetch("memberships", () =>
+					this._fetchMemberships()
+				);
+				const membership = this._pickMembership(memberships.data);
+				if (!membership) {
+					throw new Error("No Destiny memberships found.");
+				}
+
+				const profileResult = await this._safeFetch("profile", () =>
+					this._fetchProfile(membership)
+				);
+
+				await this._applyMembership(membership);
+				await this._applyProfile(profileResult.data);
+
+				const snapshot = {
+					membership,
+					profile: profileResult.data,
+				};
+
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.snapshot,
+					JSON.stringify(snapshot)
+				);
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.lastUpdated,
+					new Date().toISOString()
+				);
+
+				const successCount = [memberships, profileResult].filter(
+					(result) => result.ok
+				).length;
+
+				await this._updateConnectionState(successCount > 0);
+				await this._log(
+					`Destiny data refreshed${reason ? ` (${reason})` : ""}.`
+				);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(`Failed to refresh Destiny data: ${message}`, "warn");
+				await this._updateConnectionState(false);
+			}
+			this._refreshPromise = null;
+		})();
+
+		return this._refreshPromise;
+	}
+
+	async _fetchMemberships() {
+		const url = `${BUNGIE_API_BASE}/User/GetMembershipsForCurrentUser/`;
+		return this._bungieRequest(url, { token: await this._ensureAccessToken() });
+	}
+
+	async _fetchProfile(membership) {
+		const membershipType = membership?.membershipType;
+		const membershipId = membership?.membershipId;
+		const components = [100, 200].join(",");
+		const url = `${BUNGIE_API_BASE}/Destiny2/${membershipType}/Profile/${membershipId}/?components=${components}`;
+		return this._bungieRequest(url, { token: await this._ensureAccessToken() });
+	}
+
+	async _bungieRequest(url, { token } = {}) {
+		let response = await this._request(url, token);
+
+		if (response.status === 401 && this._canRefreshTokens()) {
+			const refreshed = await this._refreshAccessToken();
+			response = await this._request(url, refreshed);
+		}
+
+		if (response.status === 401) {
+			this._authFailure = true;
+			this._clearPolling();
+			await this._showAuthFailureToast();
+			throw new Error("Unauthorized (401). Re-authorize the plugin.");
+		}
+
+		if (response.status === 429) {
+			const retryAfter = this._coerceNumber(
+				response.headers.get("Retry-After"),
+				60
+			);
+			this._applyGlobalBackoff(retryAfter);
+			throw new Error(`Rate limited (429). Backing off for ${retryAfter}s.`);
+		}
+
+		if (!response.ok) {
+			const body = await response.text();
+			const trimmed = this._truncateError(body);
+			throw new Error(
+				`Bungie API error (${response.status}) on ${url}: ${trimmed || "No response body"}`
+			);
+		}
+
+		const payload = await response.json();
+		if (!payload || payload.ErrorCode !== 1) {
+			const message = payload?.Message || "Unknown Bungie error";
+			throw new Error(`Bungie error: ${message}`);
+		}
+
+		return payload.Response;
+	}
+
+	async _request(url, token) {
+		const headers = {
+			Accept: "application/json",
+			"User-Agent": DEFAULTS.userAgent,
+			"X-API-Key": this._apiKey(),
+		};
+
+		if (token) {
+			headers.Authorization = `Bearer ${token}`;
+		}
+
+		return fetch(url, { headers });
+	}
+
+	_pickMembership(response) {
+		const memberships = Array.isArray(response?.destinyMemberships)
+			? response.destinyMemberships
+			: [];
+		if (!memberships.length) {
+			return null;
+		}
+
+		const primaryId = response?.primaryMembershipId;
+		if (primaryId) {
+			const primary = memberships.find(
+				(entry) => String(entry?.membershipId) === String(primaryId)
+			);
+			if (primary) {
+				return primary;
+			}
+		}
+
+		return memberships[0];
+	}
+
+	async _applyMembership(membership) {
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.displayName,
+			this._coerceString(membership?.displayName, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.membershipId,
+			this._coerceString(membership?.membershipId, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.membershipType,
+			this._coerceNumber(membership?.membershipType, 0)
+		);
+	}
+
+	async _applyProfile(profile) {
+		if (!profile) {
+			return;
+		}
+
+		const profileData = profile?.profile?.data ?? null;
+		const characters = profile?.characters?.data ?? {};
+		const characterList = Object.entries(characters).map(([id, data]) => ({
+			id,
+			data,
+		}));
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.profileLastPlayed,
+			this._coerceString(profileData?.dateLastPlayed, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.characterCount,
+			characterList.length
+		);
+
+		const primary = this._pickPrimaryCharacter(characterList);
+		if (primary) {
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterId,
+				this._coerceString(primary?.id, "")
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterLight,
+				this._coerceNumber(primary?.data?.light, 0)
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterLastPlayed,
+				this._coerceString(primary?.data?.dateLastPlayed, "")
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterClassHash,
+				this._coerceNumber(primary?.data?.classHash, 0)
+			);
+		}
+	}
+
+	_pickPrimaryCharacter(characters) {
+		if (!characters.length) {
+			return null;
+		}
+
+		const sorted = [...characters].sort((a, b) => {
+			const aDate = Date.parse(a?.data?.dateLastPlayed || "") || 0;
+			const bDate = Date.parse(b?.data?.dateLastPlayed || "") || 0;
+			if (aDate !== bDate) {
+				return bDate - aDate;
+			}
+			return this._coerceNumber(b?.data?.light, 0) - this._coerceNumber(a?.data?.light, 0);
+		});
+
+		return sorted[0];
+	}
+
+	_applyGlobalBackoff(seconds) {
+		const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
+		const until = Date.now() + delayMs;
+		if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
+			this._globalBackoffUntil = until;
+		}
+	}
+
+	async _showAuthFailureToast() {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message: "Bungie auth expired. Re-authorize the Destiny 2 plugin.",
+				time: 6,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	async _refreshAccessToken() {
+		if (this._tokenRefreshPromise) {
+			return this._tokenRefreshPromise;
+		}
+
+		const refreshToken = this._refreshToken();
+		if (!refreshToken) {
+			throw new Error("Missing refresh token.");
+		}
+
+		this._tokenRefreshPromise = (async () => {
+			if (typeof this.lumia?.refreshOAuthToken !== "function") {
+				throw new Error("Missing OAuth refresh support.");
+			}
+
+			const payload = await this.lumia.refreshOAuthToken({ refreshToken });
+			const accessToken = this._coerceString(payload?.accessToken, "");
+			const nextRefreshToken =
+				this._coerceString(payload?.refreshToken, "") || refreshToken;
+
+			if (!accessToken) {
+				throw new Error("OAuth refresh did not return an access token.");
+			}
+
+			this.updateSettings({
+				accessToken,
+				refreshToken: nextRefreshToken,
+			});
+
+			await this._log("Bungie access token refreshed.");
+			return accessToken;
+		})();
+
+		try {
+			return await this._tokenRefreshPromise;
+		} finally {
+			this._tokenRefreshPromise = null;
+		}
+	}
+
+	async _ensureAccessToken() {
+		const accessToken = this._accessToken();
+		const refreshToken = this._refreshToken();
+
+		if (!accessToken && !refreshToken) {
+			throw new Error("Missing Bungie access credentials.");
+		}
+
+		if (accessToken) {
+			return accessToken;
+		}
+
+		if (!refreshToken) {
+			throw new Error("Missing Bungie refresh token.");
+		}
+
+		return this._refreshAccessToken();
+	}
+
+	_schedulePolling() {
+		this._clearPolling();
+
+		const intervalSeconds = this._pollInterval(this.settings);
+		if (!this._apiKey() || !this._hasAuthTokens() || intervalSeconds <= 0) {
+			return;
+		}
+
+		this._pollTimer = setInterval(() => {
+			void this._refreshData({ reason: "poll" });
+		}, intervalSeconds * 1000);
+	}
+
+	_clearPolling() {
+		if (this._pollTimer) {
+			clearInterval(this._pollTimer);
+			this._pollTimer = null;
+		}
+	}
+
+	_hasAuthTokens() {
+		return Boolean(this._accessToken() || this._refreshToken());
+	}
+
+	_apiKey() {
+		return this._coerceString(this.settings?.apiKey, "");
+	}
+
+	_accessToken() {
+		return this._coerceString(this.settings?.accessToken, "");
+	}
+
+	_refreshToken() {
+		return this._coerceString(this.settings?.refreshToken, "");
+	}
+
+	_canRefreshTokens() {
+		return Boolean(
+			this._refreshToken() && typeof this.lumia?.refreshOAuthToken === "function"
+		);
+	}
+
+	_pollInterval(settings = this.settings) {
+		const interval = this._coerceNumber(
+			settings?.pollInterval,
+			DEFAULTS.pollInterval
+		);
+		return Number.isFinite(interval) ? interval : DEFAULTS.pollInterval;
+	}
+
+	async _updateConnectionState(state) {
+		if (this._lastConnectionState === state) {
+			return;
+		}
+
+		this._lastConnectionState = state;
+
+		if (typeof this.lumia.updateConnection === "function") {
+			try {
+				await this.lumia.updateConnection(state);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(
+					`Failed to update connection state: ${message}`,
+					"warn"
+				);
+			}
+		}
+	}
+
+	async _safeFetch(label, fn) {
+		try {
+			return { ok: true, data: await fn() };
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`${label} fetch failed: ${message}`, "warn");
+			return { ok: false, data: null };
+		}
+	}
+
+	async _setVariable(name, value) {
+		if (typeof this.lumia.setVariable !== "function") {
+			return;
+		}
+
+		await this.lumia.setVariable(name, value);
+	}
+
+	async _setVariableIfChanged(name, value) {
+		const normalized = this._normalizeValue(value);
+		const previous = this._lastVariables.get(name);
+		if (this._valuesEqual(previous, normalized)) {
+			return false;
+		}
+		this._lastVariables.set(name, normalized);
+		await this._setVariable(name, value);
+		return true;
+	}
+
+	_normalizeValue(value) {
+		if (value === null || value === undefined) {
+			return "";
+		}
+		if (typeof value === "object") {
+			try {
+				return JSON.stringify(value);
+			} catch (error) {
+				return String(value);
+			}
+		}
+		return String(value);
+	}
+
+	_valuesEqual(a, b) {
+		return a === b;
+	}
+
+	_errorMessage(error) {
+		if (!error) {
+			return "Unknown error";
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		return error?.message || String(error);
+	}
+
+	_truncateError(value) {
+		if (!value) {
+			return "";
+		}
+		const trimmed = String(value).replace(/\s+/g, " ").trim();
+		return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+	}
+
+	_coerceNumber(value, fallback = 0) {
+		const number = Number(value);
+		return Number.isFinite(number) ? number : fallback;
+	}
+
+	_coerceString(value, fallback = "") {
+		if (typeof value === "string") {
+			return value;
+		}
+		if (value === null || value === undefined) {
+			return fallback;
+		}
+		return String(value);
+	}
+}
+
+module.exports = Destiny2Plugin;
+
+```
+
+## destiny2/manifest.json
+
+```
+{
+	"id": "destiny2",
+	"name": "Destiny 2",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Pull Destiny 2 membership and character data into Lumia variables using the Bungie API.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "examples",
+	"icon": "",
+	"config": {
+		"oauth": {
+			"buttonLabel": "Authorize Bungie",
+			"helperText": "Connect your Bungie account to access Destiny 2 data.",
+			"openInBrowser": true,
+			"scopes": [
+				"ReadBasicUserProfile",
+				"ReadDestinyInventoryAndVault",
+				"offline_access"
+			],
+			"tokenKeys": {
+				"accessToken": "accessToken",
+				"refreshToken": "refreshToken",
+				"tokenSecret": "tokenSecret"
+			}
+		},
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Bungie API Key",
+				"type": "password",
+				"helperText": "Required for all Bungie API requests.",
+				"required": true
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 120,
+				"min": 60,
+				"max": 900,
+				"helperText": "How often to refresh Destiny data (60-900 seconds)."
+			},
+			{
+				"key": "accessToken",
+				"label": "Access Token",
+				"type": "password",
+				"helperText": "Auto-filled after OAuth completes.",
+				"disabled": true,
+				"required": false
+			},
+			{
+				"key": "refreshToken",
+				"label": "Refresh Token",
+				"type": "password",
+				"helperText": "Auto-filled after OAuth completes.",
+				"disabled": true,
+				"required": false
+			}
+		],
+		"settings_tutorial": "---\n### Bungie API Key\n1) Create a Bungie developer app and API key.\n2) Paste it into **Bungie API Key**.\n\n### Authorization\nClick **Authorize Bungie** to connect your account for Destiny 2 data.\n---",
+		"actions": [],
+		"variables": [
+			{
+				"name": "destiny2_display_name",
+				"description": "Bungie display name.",
+				"value": ""
+			},
+			{
+				"name": "destiny2_membership_id",
+				"description": "Destiny membership ID.",
+				"value": ""
+			},
+			{
+				"name": "destiny2_membership_type",
+				"description": "Destiny membership type.",
+				"value": 0
+			},
+			{
+				"name": "destiny2_character_count",
+				"description": "Number of Destiny characters.",
+				"value": 0
+			},
+			{
+				"name": "destiny2_profile_last_played",
+				"description": "Profile last played timestamp.",
+				"value": ""
+			},
+			{
+				"name": "destiny2_primary_character_id",
+				"description": "Primary character ID.",
+				"value": ""
+			},
+			{
+				"name": "destiny2_primary_character_light",
+				"description": "Primary character power level.",
+				"value": 0
+			},
+			{
+				"name": "destiny2_primary_character_last_played",
+				"description": "Primary character last played timestamp.",
+				"value": ""
+			},
+			{
+				"name": "destiny2_primary_character_class_hash",
+				"description": "Primary character class hash.",
+				"value": 0
+			},
+			{
+				"name": "destiny2_last_updated",
+				"description": "Timestamp when Destiny data was last refreshed.",
+				"value": ""
+			},
+			{
+				"name": "destiny2_snapshot_json",
+				"description": "JSON snapshot of the latest Destiny payloads.",
+				"value": ""
+			}
+		]
+	}
+}
+```
+
+## destiny2/package.json
+
+```
+{
+  "name": "lumia-example-destiny2",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Example Lumia Stream plugin that pulls Destiny 2 data from the Bungie API.",
+  "main": "main.js",
+  "scripts": {},
+  "dependencies": {
+    "@lumiastream/plugin": "^0.1.18"
+  }
 }
 
 ```
@@ -1212,10 +1940,6 @@ class DivoomPixooPlugin extends Plugin {
 	}
 
 	async refreshConnection() {
-		await this.lumia.addLog(
-			"[Divoom Pixoo] Refreshing connection to prevent device freeze...",
-		);
-
 		// Send a simple query to reset internal counter
 		const result = await this.sendCommand("Device/GetDeviceTime", {});
 
@@ -1839,10 +2563,11 @@ module.exports = DivoomPixooPlugin;
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "https://github.com/LumiaStream/divoom-pixoo-plugin",
-	"description": "Control Divoom Pixoo WIFI LED matrix displays with reliable communication. Supports text, GIFs, drawing, and more. Includes automatic connection refresh to prevent device freezing.",
+	"description": "Send text, GIFs, drawings, and device controls to Divoom Pixoo LED displays over Wi-Fi.",
 	"lumiaVersion": "^9.0.0",
 	"license": "MIT",
 	"category": "devices",
+	"keywords": "divoom, pixoo, led matrix, display, wifi",
 	"icon": "divoom.jpeg",
 	"config": {
 		"settings": [
@@ -2089,13 +2814,13 @@ module.exports = DivoomPixooPlugin;
 
 ```
 {
-	"name": "lumia-example-divoom-controller",
+	"name": "lumia_plugin-divoom-controller",
 	"version": "1.0.0",
 	"private": true,
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.3"
 	}
 }
 
@@ -2262,14 +2987,6 @@ const buildMusicFilename = (outputFormat) => {
 };
 
 class ElevenLabsTTSPlugin extends Plugin {
-	async onload() {
-		await this.lumia.addLog("[ElevenLabs] Plugin loaded");
-	}
-
-	async onunload() {
-		await this.lumia.addLog("[ElevenLabs] Plugin unloaded");
-	}
-
 	getSettingsSnapshot() {
 		const raw = this.settings || {};
 		return {
@@ -2332,9 +3049,6 @@ class ElevenLabsTTSPlugin extends Plugin {
 				modelLimit && userLimit
 					? `${effectiveLimit} (min of model ${modelLimit} and user ${userLimit})`
 					: `${effectiveLimit}`;
-			await this.lumia.addLog(
-				`[ElevenLabs] Message exceeded ${limitLabel} characters; truncated.`,
-			);
 		}
 		const outputFormat = DEFAULTS.outputFormat;
 		const stability = Number.isFinite(toNumber(data.stability, NaN))
@@ -2428,9 +3142,6 @@ class ElevenLabsTTSPlugin extends Plugin {
 			const truncatedPrompt = truncateText(prompt, promptLimit);
 			prompt = truncatedPrompt.text;
 			if (truncatedPrompt.truncated) {
-				await this.lumia.addLog(
-					`[ElevenLabs] Prompt exceeded ${promptLimit} characters; truncated.`,
-				);
 			}
 		}
 		const outputFormat = DEFAULTS.outputFormat;
@@ -2506,7 +3217,6 @@ class ElevenLabsTTSPlugin extends Plugin {
 			const filename = buildMusicFilename(outputFormat);
 			const filePath = path.join(desktopPath, filename);
 			await fs.writeFile(filePath, Buffer.from(audioBuffer));
-			await this.lumia.addLog(`[ElevenLabs] Saved music to ${filePath}`);
 		}
 	}
 }
@@ -2526,10 +3236,11 @@ module.exports = ElevenLabsTTSPlugin;
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
 	"repository": "",
-	"description": "Generate ElevenLabs text-to-speech audio and play it inside Lumia Stream.",
+	"description": "Generate ElevenLabs speech or music audio and play it through Lumia Stream.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"category": "examples",
+	"category": "audio",
+	"keywords": "elevenlabs, tts, text-to-speech, voice, audio",
 	"icon": "elevenlabs_icon.jpg",
 	"config": {
 		"settings": [
@@ -2554,7 +3265,8 @@ module.exports = ElevenLabsTTSPlugin;
 						"label": "Message",
 						"type": "text",
 						"defaultValue": "Hello from Lumia!",
-						"helperText": "Text to synthesize. Character limits vary per model; long messages will be truncated."
+						"helperText": "Text to synthesize. Character limits vary per model; long messages will be truncated.",
+						"allowVariables": true
 					},
 					{
 						"key": "maxChars",
@@ -2569,7 +3281,8 @@ module.exports = ElevenLabsTTSPlugin;
 						"label": "Voice ID",
 						"type": "text",
 						"defaultValue": "JBFqnCBsd6RMkjVDRZzb",
-						"helperText": "Find this in ElevenLabs Voice Lab or your Voices page."
+						"helperText": "Find this in ElevenLabs Voice Lab or your Voices page.",
+						"allowVariables": true
 					},
 					{
 						"key": "modelId",
@@ -2592,7 +3305,7 @@ module.exports = ElevenLabsTTSPlugin;
 						"key": "stability",
 						"label": "Stability (0-1)",
 						"type": "number",
-						"defaultValue": 0.5,
+						"defaultValue": 1,
 						"helperText": "Higher is more consistent; lower is more expressive.",
 						"min": 0,
 						"max": 1
@@ -2601,7 +3314,7 @@ module.exports = ElevenLabsTTSPlugin;
 						"key": "similarityBoost",
 						"label": "Similarity Boost (0-1)",
 						"type": "number",
-						"defaultValue": 0.5,
+						"defaultValue": 1,
 						"helperText": "Higher keeps closer to the original voice.",
 						"min": 0,
 						"max": 1
@@ -2713,7 +3426,7 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.3"
 	}
 }
 
@@ -2725,9 +3438,10 @@ module.exports = ElevenLabsTTSPlugin;
 const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULTS = {
-	pollInterval: 60,
+	pollInterval: 120,
 	compatibilityDate: "2026-02-03",
 	userAgent: "LumiaStream EVE Online Plugin/1.0.0",
+	walletAlertThreshold: 1000000,
 };
 
 const ESI_BASE_URL = "https://esi.evetech.net/latest";
@@ -2742,9 +3456,6 @@ const VARIABLE_NAMES = {
 	securityStatus: "eve_security_status",
 	walletBalance: "eve_wallet_balance",
 	online: "eve_online",
-	lastLogin: "eve_last_login",
-	lastLogout: "eve_last_logout",
-	logins: "eve_logins",
 	solarSystemId: "eve_solar_system_id",
 	stationId: "eve_station_id",
 	structureId: "eve_structure_id",
@@ -2763,8 +3474,18 @@ const VARIABLE_NAMES = {
 	industryJobsTotal: "eve_industry_jobs_total",
 	killmailsRecentCount: "eve_killmails_recent_count",
 	notificationsCount: "eve_notifications_count",
-	lastUpdated: "eve_last_updated",
-	snapshot: "eve_snapshot_json",
+};
+
+const ALERT_KEYS = {
+	online: "eve_online_status",
+	skillQueueEmpty: "eve_skillqueue_empty",
+	walletSpike: "eve_wallet_spike",
+	walletDrop: "eve_wallet_drop",
+	killmail: "eve_killmail_new",
+	notification: "eve_notification_new",
+	docked: "eve_docked",
+	undocked: "eve_undocked",
+	shipChanged: "eve_ship_changed",
 };
 
 class EveOnlinePlugin extends Plugin {
@@ -2776,17 +3497,20 @@ class EveOnlinePlugin extends Plugin {
 		this._lastConnectionState = null;
 		this._lastVariables = new Map();
 		this._etagCache = new Map();
+		this._cooldownUntil = new Map();
+		this._globalBackoffUntil = 0;
+		this._authFailure = false;
+		this._lastErrorLimitWarnAt = 0;
+		this._lastErrorLimitRemaining = null;
 		this._characterId = null;
 		this._characterName = null;
 	}
 
 	async onload() {
-		await this._log("EVE Online plugin loaded.");
-
 		if (!this._hasAuthTokens()) {
 			await this._log(
-				"Missing OAuth tokens. Authorize the plugin to begin.",
-				"warn"
+				"Missing OAuth tokens. Authorize the plugin in Connections to begin.",
+				"warn",
 			);
 			await this._updateConnectionState(false);
 			return;
@@ -2799,7 +3523,6 @@ class EveOnlinePlugin extends Plugin {
 	async onunload() {
 		this._clearPolling();
 		await this._updateConnectionState(false);
-		await this._log("EVE Online plugin stopped.");
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
@@ -2819,6 +3542,8 @@ class EveOnlinePlugin extends Plugin {
 			this._characterId = null;
 			this._characterName = null;
 			this._etagCache.clear();
+			this._cooldownUntil.clear();
+			this._authFailure = false;
 		}
 
 		if (authChanged || pollChanged) {
@@ -2839,7 +3564,6 @@ class EveOnlinePlugin extends Plugin {
 		try {
 			const token = await this._ensureAccessToken();
 			await this._verifyToken(token);
-			await this._log("EVE Online authentication succeeded.");
 			return true;
 		} catch (error) {
 			const message = this._errorMessage(error);
@@ -2853,21 +3577,33 @@ class EveOnlinePlugin extends Plugin {
 	}
 
 	async _log(message, severity = "info") {
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
+
 		const prefix = this._tag();
 		const decorated =
 			severity === "warn"
 				? `${prefix} ⚠️ ${message}`
 				: severity === "error"
-				? `${prefix} ❌ ${message}`
-				: `${prefix} ${message}`;
+					? `${prefix} ❌ ${message}`
+					: `${prefix} ${message}`;
 
 		await this.lumia.addLog(decorated);
 	}
 
-
 	async _refreshData({ reason } = {}) {
 		if (!this._hasAuthTokens()) {
 			await this._updateConnectionState(false);
+			return;
+		}
+
+		const now = Date.now();
+		if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
+			return;
+		}
+
+		if (this._authFailure) {
 			return;
 		}
 
@@ -2883,34 +3619,34 @@ class EveOnlinePlugin extends Plugin {
 
 				const results = await Promise.all([
 					this._safeFetch("character info", () =>
-						this._fetchCharacterInfo(characterId, accessToken)
+						this._fetchCharacterInfo(characterId, accessToken),
 					),
 					this._safeFetch("wallet", () =>
-						this._fetchWallet(characterId, accessToken)
+						this._fetchWallet(characterId, accessToken),
 					),
 					this._safeFetch("online status", () =>
-						this._fetchOnline(characterId, accessToken)
+						this._fetchOnline(characterId, accessToken),
 					),
 					this._safeFetch("location", () =>
-						this._fetchLocation(characterId, accessToken)
+						this._fetchLocation(characterId, accessToken),
 					),
 					this._safeFetch("ship", () =>
-						this._fetchShip(characterId, accessToken)
+						this._fetchShip(characterId, accessToken),
 					),
 					this._safeFetch("skill queue", () =>
-						this._fetchSkillQueue(characterId, accessToken)
+						this._fetchSkillQueue(characterId, accessToken),
 					),
 					this._safeFetch("industry jobs", () =>
-						this._fetchIndustryJobs(characterId, accessToken)
+						this._fetchIndustryJobs(characterId, accessToken),
 					),
 					this._safeFetch("market orders", () =>
-						this._fetchOrders(characterId, accessToken)
+						this._fetchOrders(characterId, accessToken),
 					),
 					this._safeFetch("killmails", () =>
-						this._fetchKillmails(characterId, accessToken)
+						this._fetchKillmails(characterId, accessToken),
 					),
 					this._safeFetch("notifications", () =>
-						this._fetchNotifications(characterId, accessToken)
+						this._fetchNotifications(characterId, accessToken),
 					),
 				]);
 
@@ -2952,20 +3688,8 @@ class EveOnlinePlugin extends Plugin {
 					notifications: notificationsResult.data,
 				};
 
-				await this._setVariableIfChanged(
-					VARIABLE_NAMES.snapshot,
-					JSON.stringify(snapshot)
-				);
-				await this._setVariableIfChanged(
-					VARIABLE_NAMES.lastUpdated,
-					new Date().toISOString()
-				);
-
 				const successCount = results.filter((result) => result.ok).length;
 				await this._updateConnectionState(successCount > 0);
-				await this._log(
-					`ESI data refreshed${reason ? ` (${reason})` : ""}.`
-				);
 			} catch (error) {
 				const message = this._errorMessage(error);
 				await this._log(`Failed to refresh ESI data: ${message}`, "warn");
@@ -2979,10 +3703,13 @@ class EveOnlinePlugin extends Plugin {
 
 	async _resolveCharacter(accessToken) {
 		if (this._characterId && this._characterName) {
-			return { characterId: this._characterId, characterName: this._characterName };
+			return {
+				characterId: this._characterId,
+				characterName: this._characterName,
+			};
 		}
 
-		const verify = await this._verifyToken(accessToken);
+		const verify = await this._verifyTokenWithRefresh(accessToken);
 		const characterId = this._coerceNumber(verify?.CharacterID, 0);
 		const characterName = this._coerceString(verify?.CharacterName, "");
 
@@ -2996,6 +3723,24 @@ class EveOnlinePlugin extends Plugin {
 		return { characterId, characterName };
 	}
 
+	async _verifyTokenWithRefresh(accessToken) {
+		try {
+			return await this._verifyToken(accessToken);
+		} catch (error) {
+			const message = this._errorMessage(error);
+			if (message.includes("401") && this._canRefreshTokens()) {
+				const refreshed = await this._refreshAccessToken();
+				return this._verifyToken(refreshed);
+			}
+			if (message.includes("401")) {
+				this._authFailure = true;
+				this._clearPolling();
+				await this._showAuthFailureToast();
+			}
+			throw error;
+		}
+	}
+
 	async _verifyToken(accessToken) {
 		const response = await fetch(SSO_VERIFY_URL, {
 			headers: {
@@ -3007,8 +3752,9 @@ class EveOnlinePlugin extends Plugin {
 
 		if (!response.ok) {
 			const body = await response.text();
+			const trimmed = this._truncateError(body);
 			throw new Error(
-				`SSO verify failed (${response.status}): ${body || "No response body"}`
+				`SSO verify failed (${response.status}): ${trimmed || "No response body"}`,
 			);
 		}
 
@@ -3050,7 +3796,10 @@ class EveOnlinePlugin extends Plugin {
 	}
 
 	async _fetchKillmails(characterId, token) {
-		return this._fetchJson(`/characters/${characterId}/killmails/recent/`, token);
+		return this._fetchJson(
+			`/characters/${characterId}/killmails/recent/`,
+			token,
+		);
 	}
 
 	async _fetchNotifications(characterId, token) {
@@ -3069,11 +3818,34 @@ class EveOnlinePlugin extends Plugin {
 
 	async _fetchJson(path, tokenOverride, query) {
 		const initialToken = tokenOverride ?? (await this._ensureAccessToken());
-		let response = await this._request(path, initialToken, query);
+		const url = this._buildUrl(path, query);
+		if (this._isOnCooldown(url)) {
+			return null;
+		}
+		let response = await this._request(url, initialToken);
 
 		if (response.status === 401 && this._canRefreshTokens()) {
 			const refreshed = await this._refreshAccessToken();
-			response = await this._request(path, refreshed, query);
+			response = await this._request(url, refreshed);
+		}
+		if (response.status === 401) {
+			this._authFailure = true;
+			this._clearPolling();
+			await this._showAuthFailureToast();
+			throw new Error(
+				"Unauthorized (401). Re-authorize the plugin in Connections.",
+			);
+		}
+
+		if (response.status === 429) {
+			const retryAfter = this._coerceNumber(
+				response.headers.get("Retry-After"),
+				60,
+			);
+			this._applyGlobalBackoff(retryAfter);
+			throw new Error(
+				`ESI rate limited (429). Backing off for ${retryAfter}s.`,
+			);
 		}
 
 		if (response.status === 304) {
@@ -3082,15 +3854,16 @@ class EveOnlinePlugin extends Plugin {
 
 		if (!response.ok) {
 			const body = await response.text();
+			const trimmed = this._truncateError(body);
 			throw new Error(
-				`ESI error (${response.status}) on ${path}: ${body || "No response body"}`
+				`ESI error (${response.status}) on ${path}: ${trimmed || "No response body"}`,
 			);
 		}
 
 		return response.json();
 	}
 
-	async _request(path, token, query) {
+	_buildUrl(path, query) {
 		const url = new URL(`${ESI_BASE_URL}${path}`);
 		url.searchParams.set("datasource", ESI_DATASOURCE);
 
@@ -3103,6 +3876,27 @@ class EveOnlinePlugin extends Plugin {
 			}
 		}
 
+		return url.toString();
+	}
+
+	_isOnCooldown(url) {
+		const until = this._cooldownUntil.get(url);
+		return Boolean(until && Date.now() < until);
+	}
+
+	_updateCooldown(url, response) {
+		const expiresHeader = response.headers.get("expires");
+		if (!expiresHeader) {
+			return;
+		}
+		const expiresAt = Date.parse(expiresHeader);
+		if (Number.isNaN(expiresAt)) {
+			return;
+		}
+		this._cooldownUntil.set(url, expiresAt);
+	}
+
+	async _request(url, token) {
 		const headers = {
 			Accept: "application/json",
 			"User-Agent": DEFAULTS.userAgent,
@@ -3113,27 +3907,38 @@ class EveOnlinePlugin extends Plugin {
 			headers.Authorization = `Bearer ${token}`;
 		}
 
-		const etag = this._etagCache.get(url.toString());
+		const etag = this._etagCache.get(url);
 		if (etag) {
 			headers["If-None-Match"] = etag;
 		}
 
-		const response = await fetch(url.toString(), { headers });
+		const response = await fetch(url, { headers });
 
 		const responseEtag = response.headers.get("etag");
+		this._updateCooldown(url, response);
 		if (responseEtag) {
-			this._etagCache.set(url.toString(), responseEtag);
+			this._etagCache.set(url, responseEtag);
 		}
 
 		const errorRemain = this._coerceNumber(
 			response.headers.get("X-ESI-Error-Limit-Remain"),
-			NaN
+			NaN,
 		);
-		if (!Number.isNaN(errorRemain) && errorRemain <= 5) {
-			await this._log(
-				`ESI error limit remaining is low (${errorRemain}).`,
-				"warn"
-			);
+		if (!Number.isNaN(errorRemain)) {
+			const now = Date.now();
+			const wasLow =
+				this._lastErrorLimitRemaining !== null &&
+				this._lastErrorLimitRemaining <= 5;
+			const isLow = errorRemain <= 5;
+			const shouldLog =
+				isLow && (!wasLow || now - this._lastErrorLimitWarnAt > 5 * 60 * 1000);
+			if (shouldLog) {
+				this._lastErrorLimitWarnAt = now;
+			}
+			if (!isLow) {
+				this._lastErrorLimitWarnAt = 0;
+			}
+			this._lastErrorLimitRemaining = errorRemain;
 		}
 
 		return response;
@@ -3168,7 +3973,6 @@ class EveOnlinePlugin extends Plugin {
 				refreshToken: nextRefreshToken,
 			});
 
-			await this._log("EVE access token refreshed.");
 			return accessToken;
 		})();
 
@@ -3201,11 +4005,11 @@ class EveOnlinePlugin extends Plugin {
 	async _applyCharacter(identity, characterInfo) {
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.characterId,
-			identity?.characterId ?? 0
+			identity?.characterId ?? 0,
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.characterName,
-			identity?.characterName ?? ""
+			identity?.characterName ?? "",
 		);
 
 		if (!characterInfo) {
@@ -3214,15 +4018,15 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.corporationId,
-			this._coerceNumber(characterInfo?.corporation_id, 0)
+			this._coerceNumber(characterInfo?.corporation_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.allianceId,
-			this._coerceNumber(characterInfo?.alliance_id, 0)
+			this._coerceNumber(characterInfo?.alliance_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.securityStatus,
-			this._coerceNumber(characterInfo?.security_status, 0)
+			this._coerceNumber(characterInfo?.security_status, 0),
 		);
 	}
 
@@ -3233,7 +4037,7 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.walletBalance,
-			this._coerceNumber(wallet, 0)
+			this._coerceNumber(wallet, 0),
 		);
 	}
 
@@ -3244,19 +4048,7 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.online,
-			Boolean(online?.online)
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.lastLogin,
-			this._coerceString(online?.last_login, "")
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.lastLogout,
-			this._coerceString(online?.last_logout, "")
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.logins,
-			this._coerceNumber(online?.logins, 0)
+			Boolean(online?.online),
 		);
 	}
 
@@ -3267,15 +4059,15 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.solarSystemId,
-			this._coerceNumber(location?.solar_system_id, 0)
+			this._coerceNumber(location?.solar_system_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.stationId,
-			this._coerceNumber(location?.station_id, 0)
+			this._coerceNumber(location?.station_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.structureId,
-			this._coerceNumber(location?.structure_id, 0)
+			this._coerceNumber(location?.structure_id, 0),
 		);
 	}
 
@@ -3286,15 +4078,15 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.shipName,
-			this._coerceString(ship?.ship_name, "")
+			this._coerceString(ship?.ship_name, ""),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.shipTypeId,
-			this._coerceNumber(ship?.ship_type_id, 0)
+			this._coerceNumber(ship?.ship_type_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.shipItemId,
-			this._coerceNumber(ship?.ship_item_id, 0)
+			this._coerceNumber(ship?.ship_item_id, 0),
 		);
 	}
 
@@ -3304,30 +4096,32 @@ class EveOnlinePlugin extends Plugin {
 		}
 
 		const sorted = [...queue].sort(
-			(a, b) => this._coerceNumber(a?.queue_position, 0) - this._coerceNumber(b?.queue_position, 0)
+			(a, b) =>
+				this._coerceNumber(a?.queue_position, 0) -
+				this._coerceNumber(b?.queue_position, 0),
 		);
 		const current = sorted[0] || null;
 		const last = sorted[sorted.length - 1] || null;
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueCount,
-			sorted.length
+			sorted.length,
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueCurrentSkillId,
-			this._coerceNumber(current?.skill_id, 0)
+			this._coerceNumber(current?.skill_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueCurrentLevel,
-			this._coerceNumber(current?.finished_level, 0)
+			this._coerceNumber(current?.finished_level, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueCurrentEnd,
-			this._coerceString(current?.finish_date, "")
+			this._coerceString(current?.finish_date, ""),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueEndsAt,
-			this._coerceString(last?.finish_date, "")
+			this._coerceString(last?.finish_date, ""),
 		);
 	}
 
@@ -3340,11 +4134,11 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.industryJobsActive,
-			activeCount
+			activeCount,
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.industryJobsTotal,
-			jobs.length
+			jobs.length,
 		);
 	}
 
@@ -3358,15 +4152,12 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.marketOrdersActive,
-			orders.length
+			orders.length,
 		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.marketOrdersBuy,
-			buyCount
-		);
+		await this._setVariableIfChanged(VARIABLE_NAMES.marketOrdersBuy, buyCount);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.marketOrdersSell,
-			sellCount
+			sellCount,
 		);
 	}
 
@@ -3377,7 +4168,7 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.killmailsRecentCount,
-			killmails.length
+			killmails.length,
 		);
 	}
 
@@ -3388,8 +4179,146 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.notificationsCount,
-			notifications.length
+			notifications.length,
 		);
+	}
+
+	_alertsEnabled() {
+		return this.settings?.enableAlerts !== false;
+	}
+
+	_walletAlertThreshold() {
+		const threshold = this._coerceNumber(
+			this.settings?.walletAlertThreshold,
+			DEFAULTS.walletAlertThreshold,
+		);
+		return Number.isFinite(threshold)
+			? threshold
+			: DEFAULTS.walletAlertThreshold;
+	}
+
+	_buildAlertSnapshot({
+		previous,
+		characterInfo,
+		wallet,
+		online,
+		location,
+		ship,
+		skillqueue,
+		killmails,
+		notifications,
+	}) {
+		const snapshot = {
+			online: previous?.online ?? false,
+			skillqueueCount: previous?.skillqueueCount ?? 0,
+			walletBalance: previous?.walletBalance ?? 0,
+			killmailsRecentCount: previous?.killmailsRecentCount ?? 0,
+			notificationsCount: previous?.notificationsCount ?? 0,
+			stationId: previous?.stationId ?? 0,
+			structureId: previous?.structureId ?? 0,
+			shipTypeId: previous?.shipTypeId ?? 0,
+		};
+
+		if (online) {
+			snapshot.online = Boolean(online?.online);
+		}
+
+		if (Array.isArray(skillqueue)) {
+			snapshot.skillqueueCount = skillqueue.length;
+		}
+
+		if (wallet !== null && wallet !== undefined) {
+			snapshot.walletBalance = this._coerceNumber(wallet, 0);
+		}
+
+		if (Array.isArray(killmails)) {
+			snapshot.killmailsRecentCount = killmails.length;
+		}
+
+		if (Array.isArray(notifications)) {
+			snapshot.notificationsCount = notifications.length;
+		}
+
+		if (location) {
+			snapshot.stationId = this._coerceNumber(location?.station_id, 0);
+			snapshot.structureId = this._coerceNumber(location?.structure_id, 0);
+		}
+
+		if (ship) {
+			snapshot.shipTypeId = this._coerceNumber(ship?.ship_type_id, 0);
+		}
+
+		return snapshot;
+	}
+
+	async _maybeTriggerAlerts({ previous, current }) {
+		if (!previous || !current) {
+			return;
+		}
+
+		if (previous.online !== current.online) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.online });
+		}
+
+		if (previous.skillqueueCount > 0 && current.skillqueueCount === 0) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.skillQueueEmpty });
+		}
+
+		const walletDelta = current.walletBalance - previous.walletBalance;
+		const threshold = this._walletAlertThreshold();
+		if (threshold > 0 && Math.abs(walletDelta) >= threshold) {
+			await this.lumia.triggerAlert({
+				alert:
+					walletDelta >= 0 ? ALERT_KEYS.walletSpike : ALERT_KEYS.walletDrop,
+			});
+		}
+
+		if (current.killmailsRecentCount > previous.killmailsRecentCount) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.killmail });
+		}
+
+		if (current.notificationsCount > previous.notificationsCount) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.notification });
+		}
+
+		const wasDocked = (previous.stationId || previous.structureId) > 0;
+		const isDocked = (current.stationId || current.structureId) > 0;
+		if (!wasDocked && isDocked) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.docked });
+		} else if (wasDocked && !isDocked) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.undocked });
+		}
+
+		if (
+			previous.shipTypeId &&
+			current.shipTypeId &&
+			previous.shipTypeId !== current.shipTypeId
+		) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.shipChanged });
+		}
+	}
+
+	async _showAuthFailureToast() {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message:
+					"EVE Online auth expired. Re-authorize the plugin in Connections.",
+				time: 6,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	_applyGlobalBackoff(seconds) {
+		const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
+		const until = Date.now() + delayMs;
+		if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
+			this._globalBackoffUntil = until;
+		}
 	}
 
 	_schedulePolling() {
@@ -3426,14 +4355,15 @@ class EveOnlinePlugin extends Plugin {
 
 	_canRefreshTokens() {
 		return Boolean(
-			this._refreshToken() && typeof this.lumia?.refreshOAuthToken === "function"
+			this._refreshToken() &&
+			typeof this.lumia?.refreshOAuthToken === "function",
 		);
 	}
 
 	_pollInterval(settings = this.settings) {
 		const interval = this._coerceNumber(
 			settings?.pollInterval,
-			DEFAULTS.pollInterval
+			DEFAULTS.pollInterval,
 		);
 		return Number.isFinite(interval) ? interval : DEFAULTS.pollInterval;
 	}
@@ -3449,11 +4379,7 @@ class EveOnlinePlugin extends Plugin {
 			try {
 				await this.lumia.updateConnection(state);
 			} catch (error) {
-				const message = this._errorMessage(error);
-				await this._log(
-					`Failed to update connection state: ${message}`,
-					"warn"
-				);
+				// const message = this._errorMessage(error);
 			}
 		}
 	}
@@ -3505,6 +4431,14 @@ class EveOnlinePlugin extends Plugin {
 		return error?.message || String(error);
 	}
 
+	_truncateError(value) {
+		if (!value) {
+			return "";
+		}
+		const trimmed = String(value).replace(/\s+/g, " ").trim();
+		return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+	}
+
 	_coerceNumber(value, fallback = 0) {
 		const number = Number(value);
 		return Number.isFinite(number) ? number : fallback;
@@ -3536,11 +4470,12 @@ module.exports = EveOnlinePlugin;
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "",
-	"description": "Pull EVE Online character stats into Lumia variables using ESI.",
+	"description": "Pull EVE Online character status, wallet, location, and activity from ESI into Lumia.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"category": "examples",
-	"icon": "",
+	"category": "games",
+	"keywords": "eve online, esi, character, stats, mmo, games",
+	"icon": "eveonline.png",
 	"config": {
 		"oauth": {
 			"buttonLabel": "Authorize EVE Online",
@@ -3568,10 +4503,25 @@ module.exports = EveOnlinePlugin;
 				"key": "pollInterval",
 				"label": "Poll Interval (seconds)",
 				"type": "number",
-				"defaultValue": 60,
-				"min": 30,
+				"defaultValue": 120,
+				"min": 60,
 				"max": 900,
-				"helperText": "How often to refresh ESI data (30-900 seconds)."
+				"helperText": "How often to refresh ESI data (60-900 seconds)."
+			},
+			{
+				"key": "enableAlerts",
+				"label": "Enable Alerts",
+				"type": "toggle",
+				"defaultValue": true,
+				"helperText": "Trigger Lumia alerts for EVE Online events."
+			},
+			{
+				"key": "walletAlertThreshold",
+				"label": "Wallet Alert Threshold (ISK)",
+				"type": "number",
+				"defaultValue": 1000000,
+				"min": 0,
+				"helperText": "Minimum ISK change to trigger wallet spike/drop alerts."
 			},
 			{
 				"key": "accessToken",
@@ -3594,154 +4544,211 @@ module.exports = EveOnlinePlugin;
 		"actions": [],
 		"variables": [
 			{
-				"name": "eve_character_id",
+				"name": "character_id",
 				"description": "Authenticated character ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_character_name",
+				"name": "character_name",
 				"description": "Authenticated character name.",
 				"value": ""
 			},
 			{
-				"name": "eve_corporation_id",
+				"name": "corporation_id",
 				"description": "Character corporation ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_alliance_id",
+				"name": "alliance_id",
 				"description": "Character alliance ID (0 if none).",
 				"value": 0
 			},
 			{
-				"name": "eve_security_status",
+				"name": "security_status",
 				"description": "Character security status.",
 				"value": 0
 			},
 			{
-				"name": "eve_wallet_balance",
+				"name": "wallet_balance",
 				"description": "Current wallet balance.",
 				"value": 0
 			},
 			{
-				"name": "eve_online",
+				"name": "online",
 				"description": "Whether the character is currently online.",
 				"value": false
 			},
 			{
-				"name": "eve_last_login",
-				"description": "Last login timestamp (ISO).",
-				"value": ""
-			},
-			{
-				"name": "eve_last_logout",
-				"description": "Last logout timestamp (ISO).",
-				"value": ""
-			},
-			{
-				"name": "eve_logins",
-				"description": "Login count returned by ESI online status.",
-				"value": 0
-			},
-			{
-				"name": "eve_solar_system_id",
+				"name": "solar_system_id",
 				"description": "Current solar system ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_station_id",
+				"name": "station_id",
 				"description": "Current station ID (0 if not docked).",
 				"value": 0
 			},
 			{
-				"name": "eve_structure_id",
+				"name": "structure_id",
 				"description": "Current structure ID (0 if none).",
 				"value": 0
 			},
 			{
-				"name": "eve_ship_name",
+				"name": "ship_name",
 				"description": "Current ship name.",
 				"value": ""
 			},
 			{
-				"name": "eve_ship_type_id",
+				"name": "ship_type_id",
 				"description": "Current ship type ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_ship_item_id",
+				"name": "ship_item_id",
 				"description": "Current ship item ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_skillqueue_count",
+				"name": "skillqueue_count",
 				"description": "Number of skills in the queue.",
 				"value": 0
 			},
 			{
-				"name": "eve_skillqueue_current_skill_id",
+				"name": "skillqueue_current_skill_id",
 				"description": "Skill ID currently training.",
 				"value": 0
 			},
 			{
-				"name": "eve_skillqueue_current_level",
+				"name": "skillqueue_current_level",
 				"description": "Training level for the current skill.",
 				"value": 0
 			},
 			{
-				"name": "eve_skillqueue_current_end",
+				"name": "skillqueue_current_end",
 				"description": "Finish time for the current skill (ISO).",
 				"value": ""
 			},
 			{
-				"name": "eve_skillqueue_ends_at",
+				"name": "skillqueue_ends_at",
 				"description": "Finish time for the last queued skill (ISO).",
 				"value": ""
 			},
 			{
-				"name": "eve_market_orders_active",
+				"name": "market_orders_active",
 				"description": "Number of active market orders.",
 				"value": 0
 			},
 			{
-				"name": "eve_market_orders_buy",
+				"name": "market_orders_buy",
 				"description": "Number of active buy orders.",
 				"value": 0
 			},
 			{
-				"name": "eve_market_orders_sell",
+				"name": "market_orders_sell",
 				"description": "Number of active sell orders.",
 				"value": 0
 			},
 			{
-				"name": "eve_industry_jobs_active",
+				"name": "industry_jobs_active",
 				"description": "Number of active industry jobs.",
 				"value": 0
 			},
 			{
-				"name": "eve_industry_jobs_total",
+				"name": "industry_jobs_total",
 				"description": "Total industry jobs returned by ESI.",
 				"value": 0
 			},
 			{
-				"name": "eve_killmails_recent_count",
+				"name": "killmails_recent_count",
 				"description": "Count of recent killmails.",
 				"value": 0
 			},
 			{
-				"name": "eve_notifications_count",
+				"name": "notifications_count",
 				"description": "Number of notifications returned by ESI.",
 				"value": 0
+			}
+		],
+		"alerts": [
+			{
+				"title": "Online Status Changed",
+				"key": "eve_online_status",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_online",
+					"eve_last_login",
+					"eve_last_logout"
+				],
+				"defaultMessage": "{{eve_character_name}} is now {{eve_online}}."
 			},
 			{
-				"name": "eve_last_updated",
-				"description": "Timestamp when ESI data was last refreshed.",
-				"value": ""
+				"title": "Skill Queue Empty",
+				"key": "eve_skillqueue_empty",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_skillqueue_count",
+					"eve_skillqueue_current_end"
+				],
+				"defaultMessage": "{{eve_character_name}}'s skill queue is empty."
 			},
 			{
-				"name": "eve_snapshot_json",
-				"description": "JSON snapshot of the latest ESI payloads.",
-				"value": ""
+				"title": "Wallet Spike",
+				"key": "eve_wallet_spike",
+				"acceptedVariables": ["eve_character_name", "eve_wallet_balance"],
+				"defaultMessage": "{{eve_character_name}} wallet increased ({{eve_wallet_balance}} ISK)."
+			},
+			{
+				"title": "Wallet Drop",
+				"key": "eve_wallet_drop",
+				"acceptedVariables": ["eve_character_name", "eve_wallet_balance"],
+				"defaultMessage": "{{eve_character_name}} wallet decreased ({{eve_wallet_balance}} ISK)."
+			},
+			{
+				"title": "New Killmail",
+				"key": "eve_killmail_new",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_killmails_recent_count"
+				],
+				"defaultMessage": "New killmail detected for {{eve_character_name}}."
+			},
+			{
+				"title": "New Notification",
+				"key": "eve_notification_new",
+				"acceptedVariables": ["eve_character_name", "eve_notifications_count"],
+				"defaultMessage": "New EVE notification for {{eve_character_name}}."
+			},
+			{
+				"title": "Docked",
+				"key": "eve_docked",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_station_id",
+					"eve_structure_id",
+					"eve_solar_system_id"
+				],
+				"defaultMessage": "{{eve_character_name}} docked."
+			},
+			{
+				"title": "Undocked",
+				"key": "eve_undocked",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_station_id",
+					"eve_structure_id",
+					"eve_solar_system_id"
+				],
+				"defaultMessage": "{{eve_character_name}} undocked."
+			},
+			{
+				"title": "Ship Changed",
+				"key": "eve_ship_changed",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_ship_type_id",
+					"eve_ship_name"
+				],
+				"defaultMessage": "{{eve_character_name}} switched ships ({{eve_ship_name}})."
 			}
 		]
 	}
@@ -3753,15 +4760,15 @@ module.exports = EveOnlinePlugin;
 
 ```
 {
-  "name": "lumia-example-eve-online",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Example Lumia Stream plugin that pulls EVE Online character data from ESI.",
-  "main": "main.js",
-  "scripts": {},
-  "dependencies": {
-    "@lumiastream/plugin": "^0.2.0"
-  }
+	"name": "lumia_plugin-eve-online",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that pulls EVE Online character data from ESI.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.2.3"
+	}
 }
 
 ```
@@ -4717,6 +5724,9 @@ class FitbitPlugin extends Plugin {
 		if (typeof this.lumia.addLog !== "function") {
 			return;
 		}
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
 
 		await this.lumia.addLog(`[Fitbit] ${message}`, severity);
 	}
@@ -4824,10 +5834,11 @@ module.exports = FitbitPlugin;
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "",
-	"description": "Pull Fitbit current active-session metrics (intraday) into Lumia variables for alerts and overlays.",
+	"description": "Fetch Fitbit intraday activity metrics into Lumia variables and alerts.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"category": "examples",
+	"category": "apps",
+	"keywords": "fitbit, fitness, activity, steps, heartrate",
 	"icon": "fitbit.jpg",
 	"config": {
 		"oauth": {
@@ -4945,14 +5956,809 @@ module.exports = FitbitPlugin;
 
 ```
 {
-  "name": "lumia-example-fitbit",
+	"name": "lumia_plugin-fitbit",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that pulls Fitbit activity and heart-rate metrics.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.2.3"
+	}
+}
+
+```
+
+## guildwars2/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const DEFAULTS = {
+	pollInterval: 120,
+	userAgent: "LumiaStream Guild Wars 2 Plugin/1.0.0",
+};
+
+const GW2_API_BASE = "https://api.guildwars2.com";
+
+const VARIABLE_NAMES = {
+	accountName: "gw2_account_name",
+	world: "gw2_world",
+	commander: "gw2_commander",
+	created: "gw2_created",
+	accessCount: "gw2_access_count",
+	characterCount: "gw2_character_count",
+	primaryCharacterName: "gw2_primary_character_name",
+	primaryCharacterProfession: "gw2_primary_character_profession",
+	primaryCharacterLevel: "gw2_primary_character_level",
+	primaryCharacterAge: "gw2_primary_character_age",
+	primaryCharacterRace: "gw2_primary_character_race",
+	primaryCharacterGender: "gw2_primary_character_gender",
+	primaryCharacterDeaths: "gw2_primary_character_deaths",
+	primaryCharacterCreated: "gw2_primary_character_created",
+	lastUpdated: "gw2_last_updated",
+	snapshot: "gw2_snapshot_json",
+	walletCoins: "gw2_wallet_coins",
+	walletGold: "gw2_wallet_gold",
+	walletCurrencyCount: "gw2_wallet_currency_count",
+	achievementTotal: "gw2_achievement_total",
+	achievementDone: "gw2_achievement_done",
+	achievementCompletionPct: "gw2_achievement_completion_pct",
+	masteryTracksUnlocked: "gw2_mastery_tracks_unlocked",
+	masteryPointsEarned: "gw2_mastery_points_earned",
+	masteryPointsSpent: "gw2_mastery_points_spent",
+	masteryPointsUnspent: "gw2_mastery_points_unspent",
+};
+
+class GuildWars2Plugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._pollTimer = null;
+		this._refreshPromise = null;
+		this._lastConnectionState = null;
+		this._lastVariables = new Map();
+		this._globalBackoffUntil = 0;
+		this._authFailure = false;
+	}
+
+	async onload() {
+		await this._log("Guild Wars 2 plugin loaded.");
+
+		if (!this._apiKey()) {
+			await this._log("Missing Guild Wars 2 API key.", "warn");
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		await this._refreshData({ reason: "startup" });
+		this._schedulePolling();
+	}
+
+	async onunload() {
+		this._clearPolling();
+		await this._updateConnectionState(false);
+		await this._log("Guild Wars 2 plugin stopped.");
+	}
+
+	async onsettingsupdate(settings, previous = {}) {
+		const pollChanged =
+			this._pollInterval(settings) !== this._pollInterval(previous);
+		const keyChanged = (settings?.apiKey ?? "") !== (previous?.apiKey ?? "");
+
+		if (pollChanged) {
+			this._schedulePolling();
+		}
+
+		if (keyChanged) {
+			this._authFailure = false;
+			this._globalBackoffUntil = 0;
+		}
+
+		await this._refreshData({ reason: "settings-update" });
+	}
+
+	async validateAuth() {
+		if (!this._apiKey()) {
+			await this._log("Validation failed: missing GW2 API key.", "warn");
+			return false;
+		}
+
+		try {
+			await this._fetchAccount();
+			await this._log("GW2 API validation succeeded.");
+			return true;
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`GW2 validation failed: ${message}`, "error");
+			return false;
+		}
+	}
+
+	_tag() {
+		return `[${this.manifest?.id ?? "guildwars2"}]`;
+	}
+
+	async _log(message, severity = "info") {
+		const prefix = this._tag();
+		const decorated =
+			severity === "warn"
+				? `${prefix} ⚠️ ${message}`
+				: severity === "error"
+				? `${prefix} ❌ ${message}`
+				: `${prefix} ${message}`;
+
+		await this.lumia.addLog(decorated);
+	}
+
+	async _refreshData({ reason } = {}) {
+		if (!this._apiKey()) {
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		if (this._authFailure) {
+			return;
+		}
+
+		const now = Date.now();
+		if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
+			return;
+		}
+
+		if (this._refreshPromise) {
+			return this._refreshPromise;
+		}
+
+		this._refreshPromise = (async () => {
+			try {
+				const [
+					accountResult,
+					characterResult,
+					walletResult,
+					achievementsResult,
+					masteriesResult,
+					masteryPointsResult,
+				] = await Promise.all([
+					this._safeFetch("account", () => this._fetchAccount()),
+					this._safeFetch("characters", () => this._fetchCharacters()),
+					this._safeFetch("wallet", () => this._fetchWallet()),
+					this._safeFetch("achievements", () => this._fetchAchievements()),
+					this._safeFetch("masteries", () => this._fetchMasteries()),
+					this._safeFetch("mastery-points", () => this._fetchMasteryPoints()),
+				]);
+
+				await this._applyAccount(accountResult.data);
+				await this._applyCharacters(characterResult.data);
+				await this._applyWallet(walletResult.data);
+				await this._applyAchievements(achievementsResult.data);
+				await this._applyMasteries(masteriesResult.data);
+				await this._applyMasteryPoints(masteryPointsResult.data);
+
+				const snapshot = {
+					account: accountResult.data,
+					characters: characterResult.data,
+					wallet: walletResult.data,
+					achievements: achievementsResult.data,
+					masteries: masteriesResult.data,
+					masteryPoints: masteryPointsResult.data,
+				};
+
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.snapshot,
+					JSON.stringify(snapshot)
+				);
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.lastUpdated,
+					new Date().toISOString()
+				);
+
+				const successCount = [
+					accountResult,
+					characterResult,
+					walletResult,
+					achievementsResult,
+					masteriesResult,
+					masteryPointsResult,
+				].filter((result) => result.ok).length;
+
+				await this._updateConnectionState(successCount > 0);
+				await this._log(
+					`GW2 data refreshed${reason ? ` (${reason})` : ""}.`
+				);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(`Failed to refresh GW2 data: ${message}`, "warn");
+				await this._updateConnectionState(false);
+			}
+			this._refreshPromise = null;
+		})();
+
+		return this._refreshPromise;
+	}
+
+	async _fetchAccount() {
+		const url = `${GW2_API_BASE}/v2/account`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchCharacters() {
+		const url = `${GW2_API_BASE}/v2/characters?ids=all`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchWallet() {
+		const url = `${GW2_API_BASE}/v2/account/wallet`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchAchievements() {
+		const url = `${GW2_API_BASE}/v2/account/achievements`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchMasteries() {
+		const url = `${GW2_API_BASE}/v2/account/masteries`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchMasteryPoints() {
+		const url = `${GW2_API_BASE}/v2/account/mastery/points`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchJson(url) {
+		let response = await this._request(url);
+
+		if (response.status === 429) {
+			const retryAfter = this._coerceNumber(
+				response.headers.get("Retry-After"),
+				60
+			);
+			this._applyGlobalBackoff(retryAfter);
+			throw new Error(`Rate limited (429). Backing off for ${retryAfter}s.`);
+		}
+
+		if (response.status === 401 || response.status === 403) {
+			this._authFailure = true;
+			this._clearPolling();
+			await this._showApiKeyFailureToast();
+			throw new Error("Unauthorized. Check your GW2 API key.");
+		}
+
+		if (!response.ok) {
+			const body = await response.text();
+			const trimmed = this._truncateError(body);
+			throw new Error(
+				`GW2 API error (${response.status}) on ${url}: ${trimmed || "No response body"}`
+			);
+		}
+
+		return response.json();
+	}
+
+	async _request(url) {
+		const headers = {
+			Accept: "application/json",
+			"User-Agent": DEFAULTS.userAgent,
+			Authorization: `Bearer ${this._apiKey()}`,
+		};
+
+		return fetch(url, { headers });
+	}
+
+	async _applyAccount(account) {
+		if (!account) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.accountName,
+			this._coerceString(account?.name, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.world,
+			this._coerceNumber(account?.world, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.commander,
+			Boolean(account?.commander)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.created,
+			this._coerceString(account?.created, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.accessCount,
+			Array.isArray(account?.access) ? account.access.length : 0
+		);
+	}
+
+	async _applyCharacters(characters) {
+		if (!Array.isArray(characters)) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.characterCount,
+			characters.length
+		);
+
+		const primary = this._pickPrimaryCharacter(characters);
+		if (primary) {
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterName,
+				this._coerceString(primary?.name, "")
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterProfession,
+				this._coerceString(primary?.profession, "")
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterLevel,
+				this._coerceNumber(primary?.level, 0)
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterAge,
+				this._coerceNumber(primary?.age, 0)
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterRace,
+				this._coerceString(primary?.race, "")
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterGender,
+				this._coerceString(primary?.gender, "")
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterDeaths,
+				this._coerceNumber(primary?.deaths, 0)
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.primaryCharacterCreated,
+				this._coerceString(primary?.created, "")
+			);
+		}
+	}
+
+	async _applyWallet(wallet) {
+		if (!Array.isArray(wallet)) {
+			return;
+		}
+
+		const coins = this._coerceNumber(
+			wallet.find((entry) => this._coerceNumber(entry?.id, -1) === 1)?.value,
+			0
+		);
+		const gold = this._toGold(coins);
+
+		await this._setVariableIfChanged(VARIABLE_NAMES.walletCoins, coins);
+		await this._setVariableIfChanged(VARIABLE_NAMES.walletGold, gold);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.walletCurrencyCount,
+			wallet.length
+		);
+	}
+
+	async _applyAchievements(achievements) {
+		if (!Array.isArray(achievements)) {
+			return;
+		}
+
+		const total = achievements.length;
+		const done = achievements.filter((entry) => entry?.done).length;
+		const pct =
+			total > 0 ? Number(((done / total) * 100).toFixed(2)) : 0;
+
+		await this._setVariableIfChanged(VARIABLE_NAMES.achievementTotal, total);
+		await this._setVariableIfChanged(VARIABLE_NAMES.achievementDone, done);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.achievementCompletionPct,
+			pct
+		);
+	}
+
+	async _applyMasteries(masteries) {
+		if (!Array.isArray(masteries)) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.masteryTracksUnlocked,
+			masteries.length
+		);
+	}
+
+	async _applyMasteryPoints(masteryPoints) {
+		if (!masteryPoints || typeof masteryPoints !== "object") {
+			return;
+		}
+
+		const totals = Array.isArray(masteryPoints?.totals)
+			? masteryPoints.totals
+			: [];
+		const earned = totals.reduce(
+			(sum, entry) => sum + this._coerceNumber(entry?.earned, 0),
+			0
+		);
+		const spent = totals.reduce(
+			(sum, entry) => sum + this._coerceNumber(entry?.spent, 0),
+			0
+		);
+		const unspent = Math.max(0, earned - spent);
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.masteryPointsEarned,
+			earned
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.masteryPointsSpent,
+			spent
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.masteryPointsUnspent,
+			unspent
+		);
+	}
+
+	_pickPrimaryCharacter(characters) {
+		if (!characters.length) {
+			return null;
+		}
+
+		return [...characters].sort((a, b) => {
+			return this._coerceNumber(b?.age, 0) - this._coerceNumber(a?.age, 0);
+		})[0];
+	}
+
+	_applyGlobalBackoff(seconds) {
+		const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
+		const until = Date.now() + delayMs;
+		if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
+			this._globalBackoffUntil = until;
+		}
+	}
+
+	async _showApiKeyFailureToast() {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message: "Invalid GW2 API key. Update the plugin settings.",
+				time: 6,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	_schedulePolling() {
+		this._clearPolling();
+
+		const intervalSeconds = this._pollInterval(this.settings);
+		if (!this._apiKey() || intervalSeconds <= 0) {
+			return;
+		}
+
+		this._pollTimer = setInterval(() => {
+			void this._refreshData({ reason: "poll" });
+		}, intervalSeconds * 1000);
+	}
+
+	_clearPolling() {
+		if (this._pollTimer) {
+			clearInterval(this._pollTimer);
+			this._pollTimer = null;
+		}
+	}
+
+	_apiKey() {
+		return this._coerceString(this.settings?.apiKey, "");
+	}
+
+	_pollInterval(settings = this.settings) {
+		const interval = this._coerceNumber(
+			settings?.pollInterval,
+			DEFAULTS.pollInterval
+		);
+		return Number.isFinite(interval) ? interval : DEFAULTS.pollInterval;
+	}
+
+	async _updateConnectionState(state) {
+		if (this._lastConnectionState === state) {
+			return;
+		}
+
+		this._lastConnectionState = state;
+
+		if (typeof this.lumia.updateConnection === "function") {
+			try {
+				await this.lumia.updateConnection(state);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(
+					`Failed to update connection state: ${message}`,
+					"warn"
+				);
+			}
+		}
+	}
+
+	async _safeFetch(label, fn) {
+		try {
+			return { ok: true, data: await fn() };
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`${label} fetch failed: ${message}`, "warn");
+			return { ok: false, data: null };
+		}
+	}
+
+	async _setVariable(name, value) {
+		if (typeof this.lumia.setVariable !== "function") {
+			return;
+		}
+
+		await this.lumia.setVariable(name, value);
+	}
+
+	async _setVariableIfChanged(name, value) {
+		const normalized = this._normalizeValue(value);
+		const previous = this._lastVariables.get(name);
+		if (this._valuesEqual(previous, normalized)) {
+			return false;
+		}
+		this._lastVariables.set(name, normalized);
+		await this._setVariable(name, value);
+		return true;
+	}
+
+	_normalizeValue(value) {
+		if (value === null || value === undefined) {
+			return "";
+		}
+		if (typeof value === "object") {
+			try {
+				return JSON.stringify(value);
+			} catch (error) {
+				return String(value);
+			}
+		}
+		return String(value);
+	}
+
+	_valuesEqual(a, b) {
+		return a === b;
+	}
+
+	_errorMessage(error) {
+		if (!error) {
+			return "Unknown error";
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		return error?.message || String(error);
+	}
+
+	_truncateError(value) {
+		if (!value) {
+			return "";
+		}
+		const trimmed = String(value).replace(/\s+/g, " ").trim();
+		return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+	}
+
+	_coerceNumber(value, fallback = 0) {
+		const number = Number(value);
+		return Number.isFinite(number) ? number : fallback;
+	}
+
+	_coerceString(value, fallback = "") {
+		if (typeof value === "string") {
+			return value;
+		}
+		if (value === null || value === undefined) {
+			return fallback;
+		}
+		return String(value);
+	}
+
+	_toGold(copper) {
+		const value = this._coerceNumber(copper, 0) / 10000;
+		return Number(value.toFixed(4));
+	}
+}
+
+module.exports = GuildWars2Plugin;
+
+```
+
+## guildwars2/manifest.json
+
+```
+{
+	"id": "guildwars2",
+	"name": "Guild Wars 2",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Pull Guild Wars 2 account and character data into Lumia variables.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "examples",
+	"icon": "",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Guild Wars 2 API Key",
+				"type": "password",
+				"helperText": "Required for account and character data.",
+				"required": true
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 120,
+				"min": 60,
+				"max": 900,
+				"helperText": "How often to refresh Guild Wars 2 data (60-900 seconds)."
+			}
+		],
+		"settings_tutorial": "---\n### GW2 API Key\n1) Create an API key with these permissions: **account**, **characters**, **progression**, **wallet**.\n2) Paste it into **Guild Wars 2 API Key**.\n---",
+		"actions": [],
+		"variables": [
+			{
+				"name": "gw2_account_name",
+				"description": "Account name.",
+				"value": ""
+			},
+			{
+				"name": "gw2_world",
+				"description": "Home world ID.",
+				"value": 0
+			},
+			{
+				"name": "gw2_commander",
+				"description": "Commander status.",
+				"value": false
+			},
+			{
+				"name": "gw2_created",
+				"description": "Account creation date.",
+				"value": ""
+			},
+			{
+				"name": "gw2_access_count",
+				"description": "Number of account access entries.",
+				"value": 0
+			},
+			{
+				"name": "gw2_character_count",
+				"description": "Number of characters on the account.",
+				"value": 0
+			},
+			{
+				"name": "gw2_primary_character_name",
+				"description": "Primary character name.",
+				"value": ""
+			},
+			{
+				"name": "gw2_primary_character_profession",
+				"description": "Primary character profession.",
+				"value": ""
+			},
+			{
+				"name": "gw2_primary_character_level",
+				"description": "Primary character level.",
+				"value": 0
+			},
+			{
+				"name": "gw2_primary_character_age",
+				"description": "Primary character age (seconds played).",
+				"value": 0
+			},
+			{
+				"name": "gw2_last_updated",
+				"description": "Timestamp when GW2 data was last refreshed.",
+				"value": ""
+			},
+			{
+				"name": "gw2_snapshot_json",
+				"description": "JSON snapshot of the latest GW2 payloads.",
+				"value": ""
+			},
+			{
+				"name": "gw2_wallet_coins",
+				"description": "Coin balance in copper.",
+				"value": 0
+			},
+			{
+				"name": "gw2_wallet_gold",
+				"description": "Coin balance in gold (decimal).",
+				"value": 0
+			},
+			{
+				"name": "gw2_wallet_currency_count",
+				"description": "Number of wallet currency entries.",
+				"value": 0
+			},
+			{
+				"name": "gw2_achievement_total",
+				"description": "Total achievements tracked by the account.",
+				"value": 0
+			},
+			{
+				"name": "gw2_achievement_done",
+				"description": "Completed achievements count.",
+				"value": 0
+			},
+			{
+				"name": "gw2_achievement_completion_pct",
+				"description": "Achievement completion percentage.",
+				"value": 0
+			},
+			{
+				"name": "gw2_mastery_tracks_unlocked",
+				"description": "Number of mastery tracks with progress.",
+				"value": 0
+			},
+			{
+				"name": "gw2_mastery_points_earned",
+				"description": "Total mastery points earned across regions.",
+				"value": 0
+			},
+			{
+				"name": "gw2_mastery_points_spent",
+				"description": "Total mastery points spent across regions.",
+				"value": 0
+			},
+			{
+				"name": "gw2_mastery_points_unspent",
+				"description": "Total mastery points unspent across regions.",
+				"value": 0
+			},
+			{
+				"name": "gw2_primary_character_race",
+				"description": "Primary character race.",
+				"value": ""
+			},
+			{
+				"name": "gw2_primary_character_gender",
+				"description": "Primary character gender.",
+				"value": ""
+			},
+			{
+				"name": "gw2_primary_character_deaths",
+				"description": "Primary character deaths.",
+				"value": 0
+			},
+			{
+				"name": "gw2_primary_character_created",
+				"description": "Primary character creation timestamp.",
+				"value": ""
+			}
+		]
+	}
+}
+```
+
+## guildwars2/package.json
+
+```
+{
+  "name": "lumia-example-guildwars2",
   "version": "1.0.0",
   "private": true,
-  "description": "Example Lumia Stream plugin that pulls Fitbit activity and heart-rate metrics.",
+  "description": "Example Lumia Stream plugin that pulls Guild Wars 2 data from the GW2 API.",
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.0"
+    "@lumiastream/plugin": "^0.1.18"
   }
 }
 
@@ -5453,6 +7259,9 @@ class HotNewsPlugin extends Plugin {
   }
 
   async _log(message, level = "info") {
+    if (level !== "warn" && level !== "error") {
+      return;
+    }
     const prefix = `[${this.manifest?.id ?? "hot_planet_news"}]`;
     const decorated =
       level === "warn"
@@ -5483,10 +7292,11 @@ module.exports = HotNewsPlugin;
   "author": "Lumia Stream",
   "email": "dev@lumiastream.com",
   "website": "https://lumiastream.com",
-  "description": "Fetch breaking headlines from NewsAPI.org, expose them as Lumia variables, and trigger alerts when fresh stories land on your chosen topic.",
+  "description": "Poll NewsAPI for topic headlines, store latest articles in variables, and trigger alerts.",
   "license": "MIT",
   "lumiaVersion": "^9.0.0",
   "category": "utilities",
+  "keywords": "news, headlines, newsapi, breaking, alerts",
   "icon": "hot_news.png",
   "externalHelpLink": "https://lumiastream.com/contact",
   "config": {
@@ -5717,15 +7527,15 @@ module.exports = HotNewsPlugin;
 
 ```
 {
-  "name": "lumia-example-hot-news",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Example Lumia Stream plugin that polls NewsAPI.org for the latest headlines and mirrors them into Lumia variables.",
-  "main": "main.js",
-  "scripts": {},
-  "dependencies": {
-    "@lumiastream/plugin": "^0.2.0"
-  }
+	"name": "lumia_plugin-hot-news",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that polls NewsAPI.org for the latest headlines and mirrors them into Lumia variables.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.2.3"
+	}
 }
 
 ```
@@ -6129,6 +7939,9 @@ class LaMetricPlugin extends Plugin {
 		if (typeof this.lumia.addLog !== "function") {
 			return;
 		}
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
 
 		await this.lumia.addLog(`[LaMetric] ${message}`, severity);
 	}
@@ -6174,10 +7987,12 @@ module.exports = LaMetricPlugin;
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "",
-	"description": "Control LaMetric Time devices on your local network with actions for apps, weather, and notifications.",
+	"description": "Control LaMetric Time devices by switching apps, sending notifications, and showing weather.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "devices",
+	"keywords": "lametric, smart clock, notifications, iot, display",
+	"icon": "lametric.png",
 	"config": {
 		"settings": [
 			{
@@ -6377,11 +8192,875 @@ module.exports = LaMetricPlugin;
 
 ```
 {
-  "name": "lumia-example-lametric",
+	"name": "lumia_plugin-lametric",
+	"version": "1.0.0",
+	"main": "main.js",
+	"private": true,
+	"license": "MIT"
+}
+
+```
+
+## leagueoflegends/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const DEFAULTS = {
+	pollInterval: 120,
+	userAgent: "LumiaStream League of Legends Plugin/1.0.0",
+};
+
+const VARIABLE_NAMES = {
+	riotId: "lol_riot_id",
+	puuid: "lol_puuid",
+	summonerId: "lol_summoner_id",
+	summonerLevel: "lol_summoner_level",
+	profileIconId: "lol_profile_icon_id",
+	rankedTier: "lol_ranked_tier",
+	rankedDivision: "lol_ranked_division",
+	rankedLp: "lol_ranked_lp",
+	rankedWins: "lol_ranked_wins",
+	rankedLosses: "lol_ranked_losses",
+	topChampionId: "lol_top_champion_id",
+	topChampionLevel: "lol_top_champion_level",
+	topChampionPoints: "lol_top_champion_points",
+	lastMatchId: "lol_last_match_id",
+	lastMatchQueue: "lol_last_match_queue",
+	lastMatchDuration: "lol_last_match_duration",
+	lastMatchWin: "lol_last_match_win",
+	lastUpdated: "lol_last_updated",
+	snapshot: "lol_snapshot_json",
+};
+
+class LeagueOfLegendsPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._pollTimer = null;
+		this._refreshPromise = null;
+		this._lastConnectionState = null;
+		this._lastVariables = new Map();
+		this._globalBackoffUntil = 0;
+		this._authFailure = false;
+	}
+
+	async onload() {
+		await this._log("League of Legends plugin loaded.");
+
+		if (!this._hasRequiredSettings()) {
+			await this._log("Missing Riot API key or Riot ID.", "warn");
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		await this._refreshData({ reason: "startup" });
+		this._schedulePolling();
+	}
+
+	async onunload() {
+		this._clearPolling();
+		await this._updateConnectionState(false);
+		await this._log("League of Legends plugin stopped.");
+	}
+
+	async onsettingsupdate(settings, previous = {}) {
+		const pollChanged =
+			this._pollInterval(settings) !== this._pollInterval(previous);
+		const keyChanged = (settings?.apiKey ?? "") !== (previous?.apiKey ?? "");
+		const riotIdChanged =
+			(settings?.riotGameName ?? "") !== (previous?.riotGameName ?? "") ||
+			(settings?.riotTagLine ?? "") !== (previous?.riotTagLine ?? "");
+
+		if (pollChanged) {
+			this._schedulePolling();
+		}
+
+		if (keyChanged || riotIdChanged) {
+			this._authFailure = false;
+			this._globalBackoffUntil = 0;
+		}
+
+		await this._refreshData({ reason: "settings-update" });
+	}
+
+	async validateAuth() {
+		if (!this._hasRequiredSettings()) {
+			await this._log("Validation failed: missing Riot API key or Riot ID.", "warn");
+			return false;
+		}
+
+		try {
+			await this._fetchAccount();
+			await this._log("Riot API validation succeeded.");
+			return true;
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`Riot validation failed: ${message}`, "error");
+			return false;
+		}
+	}
+
+	_tag() {
+		return `[${this.manifest?.id ?? "leagueoflegends"}]`;
+	}
+
+	async _log(message, severity = "info") {
+		const prefix = this._tag();
+		const decorated =
+			severity === "warn"
+				? `${prefix} ⚠️ ${message}`
+				: severity === "error"
+				? `${prefix} ❌ ${message}`
+				: `${prefix} ${message}`;
+
+		await this.lumia.addLog(decorated);
+	}
+
+	async _refreshData({ reason } = {}) {
+		if (!this._hasRequiredSettings()) {
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		if (this._authFailure) {
+			return;
+		}
+
+		const now = Date.now();
+		if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
+			return;
+		}
+
+		if (this._refreshPromise) {
+			return this._refreshPromise;
+		}
+
+		this._refreshPromise = (async () => {
+			try {
+				const accountResult = await this._safeFetch("account", () =>
+					this._fetchAccount()
+				);
+				const account = accountResult.data;
+				const puuid = this._coerceString(account?.puuid, "");
+				const riotId = this._formatRiotId(account);
+
+				const summonerResult = puuid
+					? await this._safeFetch("summoner", () =>
+							this._fetchSummoner(puuid)
+					  )
+					: { ok: false, data: null };
+
+				const summoner = summonerResult.data;
+				const summonerId = this._coerceString(summoner?.id, "");
+
+				const rankedResult = summonerId
+					? await this._safeFetch("ranked", () =>
+							this._fetchRanked(summonerId)
+					  )
+					: { ok: false, data: null };
+
+				const masteryResult = summonerId
+					? await this._safeFetch("mastery", () =>
+							this._fetchMastery(summonerId)
+					  )
+					: { ok: false, data: null };
+
+				const matchIdsResult = puuid
+					? await this._safeFetch("matches", () =>
+							this._fetchMatchIds(puuid)
+					  )
+					: { ok: false, data: null };
+
+				const matchId =
+					Array.isArray(matchIdsResult.data) && matchIdsResult.data.length
+						? matchIdsResult.data[0]
+						: "";
+
+				const matchResult = matchId
+					? await this._safeFetch("match", () => this._fetchMatch(matchId))
+					: { ok: false, data: null };
+
+				await this._applyAccount({ riotId, puuid, account });
+				await this._applySummoner(summoner);
+				await this._applyRanked(rankedResult.data);
+				await this._applyMastery(masteryResult.data);
+				await this._applyMatch(matchId, matchResult.data, puuid);
+
+				const snapshot = {
+					account: accountResult.data,
+					summoner,
+					ranked: rankedResult.data,
+					mastery: masteryResult.data,
+					matchIds: matchIdsResult.data,
+					match: matchResult.data,
+				};
+
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.snapshot,
+					JSON.stringify(snapshot)
+				);
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.lastUpdated,
+					new Date().toISOString()
+				);
+
+				const successCount = [
+					accountResult,
+					summonerResult,
+					rankedResult,
+					masteryResult,
+					matchIdsResult,
+					matchResult,
+				].filter((result) => result.ok).length;
+
+				await this._updateConnectionState(successCount > 0);
+				await this._log(
+					`League data refreshed${reason ? ` (${reason})` : ""}.`
+				);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(`Failed to refresh League data: ${message}`, "warn");
+				await this._updateConnectionState(false);
+			}
+			this._refreshPromise = null;
+		})();
+
+		return this._refreshPromise;
+	}
+
+	async _fetchAccount() {
+		const gameName = this._coerceString(this.settings?.riotGameName, "").trim();
+		const tagLine = this._coerceString(this.settings?.riotTagLine, "").trim();
+		if (!gameName || !tagLine) {
+			throw new Error("Missing Riot ID game name or tag line.");
+		}
+		const url = this._buildRoutingUrl(
+			`/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(
+				gameName
+			)}/${encodeURIComponent(tagLine)}`
+		);
+		return this._fetchJson(url);
+	}
+
+	async _fetchSummoner(puuid) {
+		const url = this._buildPlatformUrl(
+			`/lol/summoner/v4/summoners/by-puuid/${encodeURIComponent(puuid)}`
+		);
+		return this._fetchJson(url);
+	}
+
+	async _fetchRanked(summonerId) {
+		const url = this._buildPlatformUrl(
+			`/lol/league/v4/entries/by-summoner/${encodeURIComponent(summonerId)}`
+		);
+		return this._fetchJson(url);
+	}
+
+	async _fetchMastery(summonerId) {
+		const url = this._buildPlatformUrl(
+			`/lol/champion-mastery/v4/champion-masteries/by-summoner/${encodeURIComponent(
+				summonerId
+			)}`
+		);
+		return this._fetchJson(url);
+	}
+
+	async _fetchMatchIds(puuid) {
+		const url = this._buildRoutingUrl(
+			`/lol/match/v5/matches/by-puuid/${encodeURIComponent(
+				puuid
+			)}/ids?start=0&count=1`
+		);
+		return this._fetchJson(url);
+	}
+
+	async _fetchMatch(matchId) {
+		const url = this._buildRoutingUrl(
+			`/lol/match/v5/matches/${encodeURIComponent(matchId)}`
+		);
+		return this._fetchJson(url);
+	}
+
+	async _fetchJson(url) {
+		let response = await this._request(url);
+
+		if (response.status === 429) {
+			const retryAfter = this._coerceNumber(
+				response.headers.get("Retry-After"),
+				60
+			);
+			this._applyGlobalBackoff(retryAfter);
+			throw new Error(`Rate limited (429). Backing off for ${retryAfter}s.`);
+		}
+
+		if (response.status === 403 || response.status === 401) {
+			this._authFailure = true;
+			this._clearPolling();
+			await this._showApiKeyFailureToast();
+			throw new Error("Unauthorized. Check your Riot API key.");
+		}
+
+		if (!response.ok) {
+			const body = await response.text();
+			const trimmed = this._truncateError(body);
+			throw new Error(
+				`League API error (${response.status}) on ${url}: ${trimmed || "No response body"}`
+			);
+		}
+
+		return response.json();
+	}
+
+	async _request(url) {
+		const headers = {
+			Accept: "application/json",
+			"User-Agent": DEFAULTS.userAgent,
+			"X-Riot-Token": this._apiKey(),
+		};
+
+		return fetch(url, { headers });
+	}
+
+	_buildPlatformUrl(path) {
+		const region = this._platformRegion();
+		return `https://${region}.api.riotgames.com${path}`;
+	}
+
+	_buildRoutingUrl(path) {
+		const region = this._routingRegion();
+		return `https://${region}.api.riotgames.com${path}`;
+	}
+
+	_applyGlobalBackoff(seconds) {
+		const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
+		const until = Date.now() + delayMs;
+		if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
+			this._globalBackoffUntil = until;
+		}
+	}
+
+	async _showApiKeyFailureToast() {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message: "Invalid Riot API key. Update the League plugin settings.",
+				time: 6,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	async _applyAccount({ riotId, puuid, account }) {
+		await this._setVariableIfChanged(VARIABLE_NAMES.riotId, riotId);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.puuid,
+			this._coerceString(account?.puuid ?? puuid, "")
+		);
+	}
+
+	async _applySummoner(summoner) {
+		if (!summoner) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.summonerId,
+			this._coerceString(summoner?.id, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.summonerLevel,
+			this._coerceNumber(summoner?.summonerLevel, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.profileIconId,
+			this._coerceNumber(summoner?.profileIconId, 0)
+		);
+	}
+
+	async _applyRanked(entries) {
+		if (!Array.isArray(entries)) {
+			return;
+		}
+
+		const solo = entries.find(
+			(entry) => entry?.queueType === "RANKED_SOLO_5x5"
+		);
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.rankedTier,
+			this._coerceString(solo?.tier, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.rankedDivision,
+			this._coerceString(solo?.rank, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.rankedLp,
+			this._coerceNumber(solo?.leaguePoints, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.rankedWins,
+			this._coerceNumber(solo?.wins, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.rankedLosses,
+			this._coerceNumber(solo?.losses, 0)
+		);
+	}
+
+	async _applyMastery(mastery) {
+		if (!Array.isArray(mastery) || !mastery.length) {
+			return;
+		}
+
+		const top = mastery[0];
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.topChampionId,
+			this._coerceNumber(top?.championId, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.topChampionLevel,
+			this._coerceNumber(top?.championLevel, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.topChampionPoints,
+			this._coerceNumber(top?.championPoints, 0)
+		);
+	}
+
+	async _applyMatch(matchId, match, puuid) {
+		if (!matchId) {
+			await this._setVariableIfChanged(VARIABLE_NAMES.lastMatchId, "");
+			return;
+		}
+
+		await this._setVariableIfChanged(VARIABLE_NAMES.lastMatchId, matchId);
+
+		if (!match) {
+			return;
+		}
+
+		const info = match?.info ?? {};
+		const participants = Array.isArray(info?.participants)
+			? info.participants
+			: [];
+		const player = participants.find((p) => p?.puuid === puuid) ?? null;
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastMatchQueue,
+			this._coerceNumber(info?.queueId, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastMatchDuration,
+			this._coerceNumber(info?.gameDuration, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastMatchWin,
+			Boolean(player?.win)
+		);
+	}
+
+	_formatRiotId(account) {
+		const gameName = this._coerceString(account?.gameName, "");
+		const tagLine = this._coerceString(account?.tagLine, "");
+		return gameName && tagLine ? `${gameName}#${tagLine}` : "";
+	}
+
+	_schedulePolling() {
+		this._clearPolling();
+
+		const intervalSeconds = this._pollInterval(this.settings);
+		if (!this._hasRequiredSettings() || intervalSeconds <= 0) {
+			return;
+		}
+
+		this._pollTimer = setInterval(() => {
+			void this._refreshData({ reason: "poll" });
+		}, intervalSeconds * 1000);
+	}
+
+	_clearPolling() {
+		if (this._pollTimer) {
+			clearInterval(this._pollTimer);
+			this._pollTimer = null;
+		}
+	}
+
+	_hasRequiredSettings() {
+		return Boolean(
+			this._apiKey() &&
+			this._coerceString(this.settings?.riotGameName, "") &&
+			this._coerceString(this.settings?.riotTagLine, "")
+		);
+	}
+
+	_apiKey() {
+		return this._coerceString(this.settings?.apiKey, "");
+	}
+
+	_platformRegion() {
+		return this._coerceString(this.settings?.platformRegion, "na1");
+	}
+
+	_routingRegion() {
+		return this._coerceString(this.settings?.routingRegion, "americas");
+	}
+
+	_pollInterval(settings = this.settings) {
+		const interval = this._coerceNumber(
+			settings?.pollInterval,
+			DEFAULTS.pollInterval
+		);
+		return Number.isFinite(interval) ? interval : DEFAULTS.pollInterval;
+	}
+
+	async _updateConnectionState(state) {
+		if (this._lastConnectionState === state) {
+			return;
+		}
+
+		this._lastConnectionState = state;
+
+		if (typeof this.lumia.updateConnection === "function") {
+			try {
+				await this.lumia.updateConnection(state);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(
+					`Failed to update connection state: ${message}`,
+					"warn"
+				);
+			}
+		}
+	}
+
+	async _safeFetch(label, fn) {
+		try {
+			return { ok: true, data: await fn() };
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`${label} fetch failed: ${message}`, "warn");
+			return { ok: false, data: null };
+		}
+	}
+
+	async _setVariable(name, value) {
+		if (typeof this.lumia.setVariable !== "function") {
+			return;
+		}
+
+		await this.lumia.setVariable(name, value);
+	}
+
+	async _setVariableIfChanged(name, value) {
+		const normalized = this._normalizeValue(value);
+		const previous = this._lastVariables.get(name);
+		if (this._valuesEqual(previous, normalized)) {
+			return false;
+		}
+		this._lastVariables.set(name, normalized);
+		await this._setVariable(name, value);
+		return true;
+	}
+
+	_normalizeValue(value) {
+		if (value === null || value === undefined) {
+			return "";
+		}
+		if (typeof value === "object") {
+			try {
+				return JSON.stringify(value);
+			} catch (error) {
+				return String(value);
+			}
+		}
+		return String(value);
+	}
+
+	_valuesEqual(a, b) {
+		return a === b;
+	}
+
+	_errorMessage(error) {
+		if (!error) {
+			return "Unknown error";
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		return error?.message || String(error);
+	}
+
+	_truncateError(value) {
+		if (!value) {
+			return "";
+		}
+		const trimmed = String(value).replace(/\s+/g, " ").trim();
+		return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+	}
+
+	_coerceNumber(value, fallback = 0) {
+		const number = Number(value);
+		return Number.isFinite(number) ? number : fallback;
+	}
+
+	_coerceString(value, fallback = "") {
+		if (typeof value === "string") {
+			return value;
+		}
+		if (value === null || value === undefined) {
+			return fallback;
+		}
+		return String(value);
+	}
+}
+
+module.exports = LeagueOfLegendsPlugin;
+
+```
+
+## leagueoflegends/manifest.json
+
+```
+{
+	"id": "leagueoflegends",
+	"name": "League of Legends",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Pull League of Legends account, ranked, and match data into Lumia variables using Riot APIs.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "examples",
+	"icon": "",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Riot API Key",
+				"type": "password",
+				"helperText": "Required for all Riot API requests.",
+				"required": true
+			},
+			{
+				"key": "riotGameName",
+				"label": "Riot ID Game Name",
+				"type": "text",
+				"helperText": "Your Riot ID game name (case-sensitive).",
+				"required": true
+			},
+			{
+				"key": "riotTagLine",
+				"label": "Riot ID Tag Line",
+				"type": "text",
+				"helperText": "Your Riot ID tag line (no #).",
+				"required": true
+			},
+			{
+				"key": "platformRegion",
+				"label": "Platform Region",
+				"type": "select",
+				"defaultValue": "na1",
+				"options": [
+					{
+						"label": "NA1",
+						"value": "na1"
+					},
+					{
+						"label": "EUW1",
+						"value": "euw1"
+					},
+					{
+						"label": "EUN1",
+						"value": "eun1"
+					},
+					{
+						"label": "KR",
+						"value": "kr"
+					},
+					{
+						"label": "JP1",
+						"value": "jp1"
+					},
+					{
+						"label": "BR1",
+						"value": "br1"
+					},
+					{
+						"label": "LA1",
+						"value": "la1"
+					},
+					{
+						"label": "LA2",
+						"value": "la2"
+					},
+					{
+						"label": "OC1",
+						"value": "oc1"
+					},
+					{
+						"label": "TR1",
+						"value": "tr1"
+					},
+					{
+						"label": "RU",
+						"value": "ru"
+					}
+				],
+				"helperText": "Used for Summoner, League, and Mastery endpoints."
+			},
+			{
+				"key": "routingRegion",
+				"label": "Routing Region",
+				"type": "select",
+				"defaultValue": "americas",
+				"options": [
+					{
+						"label": "Americas",
+						"value": "americas"
+					},
+					{
+						"label": "Europe",
+						"value": "europe"
+					},
+					{
+						"label": "Asia",
+						"value": "asia"
+					}
+				],
+				"helperText": "Used for Account and Match endpoints (match-v5)."
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 120,
+				"min": 60,
+				"max": 900,
+				"helperText": "How often to refresh League data (60-900 seconds)."
+			}
+		],
+		"settings_tutorial": "---\n### Riot API Key\n1) Create a Riot developer account.\n2) Generate an API key.\n3) Paste it into **Riot API Key**.\n\n### Riot ID\nEnter your Riot ID game name and tag line (no #).\n\n### Regions\nUse the correct Platform Region for Summoner/League endpoints and Routing Region for Account/Match endpoints.\n---",
+		"actions": [],
+		"variables": [
+			{
+				"name": "lol_riot_id",
+				"description": "Riot ID (gameName#tagLine).",
+				"value": ""
+			},
+			{
+				"name": "lol_puuid",
+				"description": "PUUID for the Riot account.",
+				"value": ""
+			},
+			{
+				"name": "lol_summoner_id",
+				"description": "Summoner ID.",
+				"value": ""
+			},
+			{
+				"name": "lol_summoner_level",
+				"description": "Summoner level.",
+				"value": 0
+			},
+			{
+				"name": "lol_profile_icon_id",
+				"description": "Profile icon ID.",
+				"value": 0
+			},
+			{
+				"name": "lol_ranked_tier",
+				"description": "Ranked tier (solo queue).",
+				"value": ""
+			},
+			{
+				"name": "lol_ranked_division",
+				"description": "Ranked division.",
+				"value": ""
+			},
+			{
+				"name": "lol_ranked_lp",
+				"description": "Ranked league points.",
+				"value": 0
+			},
+			{
+				"name": "lol_ranked_wins",
+				"description": "Ranked wins.",
+				"value": 0
+			},
+			{
+				"name": "lol_ranked_losses",
+				"description": "Ranked losses.",
+				"value": 0
+			},
+			{
+				"name": "lol_top_champion_id",
+				"description": "Top mastery champion ID.",
+				"value": 0
+			},
+			{
+				"name": "lol_top_champion_level",
+				"description": "Top mastery champion level.",
+				"value": 0
+			},
+			{
+				"name": "lol_top_champion_points",
+				"description": "Top mastery champion points.",
+				"value": 0
+			},
+			{
+				"name": "lol_last_match_id",
+				"description": "Most recent match ID.",
+				"value": ""
+			},
+			{
+				"name": "lol_last_match_queue",
+				"description": "Queue ID for the latest match.",
+				"value": 0
+			},
+			{
+				"name": "lol_last_match_duration",
+				"description": "Duration of the latest match in seconds.",
+				"value": 0
+			},
+			{
+				"name": "lol_last_match_win",
+				"description": "Whether the latest match was a win.",
+				"value": false
+			},
+			{
+				"name": "lol_last_updated",
+				"description": "Timestamp when League data was last refreshed.",
+				"value": ""
+			},
+			{
+				"name": "lol_snapshot_json",
+				"description": "JSON snapshot of the latest League payloads.",
+				"value": ""
+			}
+		]
+	}
+}
+```
+
+## leagueoflegends/package.json
+
+```
+{
+  "name": "lumia-example-leagueoflegends",
   "version": "1.0.0",
-  "main": "main.js",
   "private": true,
-  "license": "MIT"
+  "description": "Example Lumia Stream plugin that pulls League of Legends data from Riot APIs.",
+  "main": "main.js",
+  "scripts": {},
+  "dependencies": {
+    "@lumiastream/plugin": "^0.1.18"
+  }
 }
 
 ```
@@ -6479,7 +9158,6 @@ class MinecraftServerPlugin extends Plugin {
 	}
 
 	async validateAuth(data = {}) {
-		await this.lumia.showToast({ message: "Validating auth", time: 4 });
 		const host = String(
 			data?.serverHost ?? this.settings?.serverHost ?? "",
 		).trim();
@@ -6589,7 +9267,8 @@ class MinecraftServerPlugin extends Plugin {
 					const queryPort = this.getQueryPort();
 					queryData = await this.queryServer(host, queryPort);
 				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
+					const message =
+						error instanceof Error ? error.message : String(error);
 					await this.lumia.addLog(
 						`[Minecraft Server] Query failed: ${message}`,
 					);
@@ -6616,11 +9295,7 @@ class MinecraftServerPlugin extends Plugin {
 		}
 
 		try {
-			const data = await this.serverListPing(host, port);
-
-			await this.lumia.showToast({
-				message: `✅ Connected to ${host}:${port}\n${data.players.online}/${data.players.max} players online`,
-			});
+			await this.serverListPing(host, port);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			await this.lumia.showToast({
@@ -6809,9 +9484,6 @@ class MinecraftServerPlugin extends Plugin {
 						}
 
 						// Step 2: Send full stat request
-						await this.lumia.addLog(
-							`[Minecraft Server] Query handshake successful, token: ${challengeToken}`,
-						);
 						const statRequest = this.createQueryStatRequest(
 							sessionId,
 							challengeToken,
@@ -6820,9 +9492,6 @@ class MinecraftServerPlugin extends Plugin {
 					} else {
 						// Parse stat response
 						const data = this.parseQueryResponse(msg);
-						await this.lumia.addLog(
-							`[Minecraft Server] Query stat received, players: ${data.players?.length ?? 0}`,
-						);
 						cleanup();
 						resolve(data);
 					}
@@ -6899,7 +9568,9 @@ class MinecraftServerPlugin extends Plugin {
 
 		// Skip player list padding: \x01player_\x00\x00 (10 bytes)
 		// Find the start of player names by looking for "player_\x00\x00"
-		const playerMarker = Buffer.from([0x01, 0x70, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x5f, 0x00, 0x00]);
+		const playerMarker = Buffer.from([
+			0x01, 0x70, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x5f, 0x00, 0x00,
+		]);
 		const markerIndex = msg.indexOf(playerMarker, offset);
 		if (markerIndex !== -1) {
 			offset = markerIndex + playerMarker.length;
@@ -7020,7 +9691,6 @@ class MinecraftServerPlugin extends Plugin {
 					await this.lumia.setVariable("last_player_joined", label);
 					await this.lumia.triggerAlert({
 						alert: ALERT_TYPES.PLAYER_JOINED,
-						showInEventList: true,
 						extraSettings: {
 							username: label,
 							last_player_joined: label,
@@ -7035,7 +9705,6 @@ class MinecraftServerPlugin extends Plugin {
 					await this.lumia.setVariable("last_player_left", label);
 					await this.lumia.triggerAlert({
 						alert: ALERT_TYPES.PLAYER_LEFT,
-						showInEventList: true,
 						extraSettings: {
 							username: label,
 							last_player_left: label,
@@ -7053,12 +9722,8 @@ class MinecraftServerPlugin extends Plugin {
 		for (const player of newPlayers) {
 			if (!oldPlayers.has(player)) {
 				await this.lumia.setVariable("last_player_joined", player);
-				await this.lumia.addLog(
-					`[Minecraft Server] 👤 ${player} joined (${newState.playersOnline}/${newState.playersMax})`,
-				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_JOINED,
-					showInEventList: true,
 					extraSettings: {
 						username: player,
 						last_player_joined: player,
@@ -7073,12 +9738,8 @@ class MinecraftServerPlugin extends Plugin {
 		for (const player of oldPlayers) {
 			if (!newPlayers.has(player)) {
 				await this.lumia.setVariable("last_player_left", player);
-				await this.lumia.addLog(
-					`[Minecraft Server] 👋 ${player} left (${newState.playersOnline}/${newState.playersMax})`,
-				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_LEFT,
-					showInEventList: true,
 					extraSettings: {
 						username: player,
 						last_player_left: player,
@@ -7230,17 +9891,17 @@ module.exports = MinecraftServerPlugin;
 {
 	"id": "minecraft_server",
 	"name": "Minecraft Server",
-	"version": "1.0.9",
+	"version": "1.0.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "https://github.com/LumiaStream/minecraft-server-plugin",
-	"description": "Monitor Minecraft Java Edition servers using Server List Ping and Query protocols. Track player count, server status, and trigger alerts based on server activity.",
+	"description": "Monitor Minecraft Java servers for status and player changes with alerts and variables.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"category": "platforms",
+	"category": "games",
+	"keywords": "minecraft, server, java edition, status, players, games",
 	"icon": "minecraft.png",
-	"changelog": "# Changelog\n\n## 1.0.0\n- Initial release\n- Server List Ping support (always available)\n- Query protocol support (requires enable-query=true)\n- Automatic polling with configurable interval\n- Player tracking and events\n- Server online/offline detection\n- Template variables for server stats\n- Manual poll and test actions",
 	"config": {
 		"settings": [
 			{
@@ -7462,7 +10123,7 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.3"
 	}
 }
 
@@ -7471,11 +10132,11 @@ module.exports = MinecraftServerPlugin;
 ## mock_lights_plugin/main.js
 
 ```
-const { Plugin } = require('@lumiastream/plugin');
+const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULT_LIGHTS = [
-	{ id: 'mock-1', name: 'Mock Panel A', ip: '10.0.0.11' },
-	{ id: 'mock-2', name: 'Mock Strip B', ip: '10.0.0.12' },
+	{ id: "mock-1", name: "Mock Panel A", ip: "10.0.0.11" },
+	{ id: "mock-2", name: "Mock Strip B", ip: "10.0.0.12" },
 ];
 
 class MockLightsPlugin extends Plugin {
@@ -7486,12 +10147,10 @@ class MockLightsPlugin extends Plugin {
 	}
 
 	async onload() {
-		await this._log('Mock lights plugin loaded');
 		await this.lumia.updateConnection(true);
 	}
 
 	async onunload() {
-		await this._log('Mock lights plugin unloaded');
 		await this.lumia.updateConnection(false);
 	}
 
@@ -7519,12 +10178,26 @@ class MockLightsPlugin extends Plugin {
 	}
 
 	async onLightChange(config = {}) {
-		const ids = Array.isArray(config.lights) ? config.lights.map((l) => l?.id || l).join(', ') : 'unknown';
-		const color = config.color ? `rgb(${config.color.r},${config.color.g},${config.color.b})` : 'no color';
-		const brightness = typeof config.brightness === 'number' ? `${config.brightness}%` : 'unchanged';
-		const power = typeof config.power === 'boolean' ? (config.power ? 'on' : 'off') : 'unchanged';
+		const ids = Array.isArray(config.lights)
+			? config.lights.map((l) => l?.id || l).join(", ")
+			: "unknown";
+		const color = config.color
+			? `rgb(${config.color.r},${config.color.g},${config.color.b})`
+			: "no color";
+		const brightness =
+			typeof config.brightness === "number"
+				? `${config.brightness}%`
+				: "unchanged";
+		const power =
+			typeof config.power === "boolean"
+				? config.power
+					? "on"
+					: "off"
+				: "unchanged";
 
-		await this._log(`onLightChange -> brand=${config.brand} lights=[${ids}] color=${color} brightness=${brightness} power=${power}`);
+		await this._log(
+			`onLightChange -> brand=${config.brand} lights=[${ids}] color=${color} brightness=${brightness} power=${power}`,
+		);
 	}
 
 	_mergeLights(newOnes = []) {
@@ -7537,7 +10210,10 @@ class MockLightsPlugin extends Plugin {
 		this._lights = Array.from(existing.values());
 	}
 
-	async _log(message) {
+	async _log(message, severity = "info") {
+		if (severity !== "error") {
+			return;
+		}
 		await this.lumia.addLog(`[${this.manifest.id}] ${message}`);
 	}
 }
@@ -7557,10 +10233,11 @@ module.exports = MockLightsPlugin;
   "email": "",
   "website": "",
   "repository": "",
-  "description": "Creates fake lights and logs when Lumia sends color/brightness updates.",
+  "description": "Mock light provider that simulates lights for testing Lumia device actions.",
   "license": "MIT",
   "lumiaVersion": "^9.0.0",
   "category": "lights",
+  "keywords": "mock, lights, testing, sample, debug",
   "icon": "",
   "changelog": "",
   "config": {
@@ -7603,7 +10280,7 @@ module.exports = MockLightsPlugin;
   "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
   "main": "main.js",
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.0"
+    "@lumiastream/plugin": "^0.2.3"
   }
 }
 
@@ -8123,6 +10800,10 @@ class OctoPrintPlugin extends Plugin {
 	}
 
 	async _log(message, severity = "info") {
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
+
 		const prefix = this._tag();
 		const decorated =
 			severity === "warn"
@@ -8171,11 +10852,12 @@ module.exports = OctoPrintPlugin;
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "",
-	"description": "Monitor OctoPrint jobs and printer state, expose status variables, and trigger alerts on print events.",
+	"description": "Poll OctoPrint for printer and job status, expose variables, and alert on print events.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "devices",
 	"keywords": "octoprint, octopi, 3d print, printer, job",
+	"icon": "octoprint.png",
 	"config": {
 		"settings": [
 			{
@@ -8406,10 +11088,10 @@ module.exports = OctoPrintPlugin;
 	"name": "lumia-octoprint-integration",
 	"version": "1.0.0",
 	"private": true,
-	"description": "OctoPrint integration example plugin for Lumia Stream.",
+	"description": "OctoPrint integration plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.3"
 	}
 }
 
@@ -8420,19 +11102,27 @@ module.exports = OctoPrintPlugin;
 ```
 # PlayStation Network Plugin (Example)
 
-This example plugin polls PlayStation Network trophy title updates using `psn-api` and exposes the latest title data as Lumia variables.
+This example plugin polls PlayStation Network trophy title updates and exposes the latest title data as Lumia variables.
 
 ## Setup
 
 1. Install dependencies:
    - `npm install`
 2. Open `manifest.json` and verify the settings and actions.
-3. In Lumia Stream, load the plugin folder and paste your NPSSO cookie value in settings.
+3. Capture your NPSSO cookie:
+   - Go to https://my.playstation.com/ and sign in.
+   - In the same signed-in browser, open https://ca.account.sony.com/api/v1/ssocookie.
+   - Copy the **npsso** value from the JSON response.
+4. In Lumia Stream, load the plugin folder and paste the NPSSO value in settings.
 
 ## Notes
 
-- The plugin exchanges NPSSO for access/refresh tokens and stores them in disabled settings fields.
+- The plugin exchanges NPSSO for access/refresh tokens and stores them in plugin settings (not shown in the UI).
 - Leave `Target Online ID` blank to use your own account ("me"). Use `Target Account ID` if lookup fails.
+
+## Fetch By Title Name Or NP Communication ID
+
+Use **Fetch Trophy Data For Title** with a game name or an NP Communication ID (for example `NPWR12345_00`). If you enter a name, the plugin searches your trophies and picks the closest match, then stores the search results in `title_search_results`.
 
 ```
 
@@ -8446,12 +11136,21 @@ const DEFAULTS = {
 };
 
 const VARIABLE_NAMES = {
-	accountId: "psn_account_id",
-	lastTitleName: "psn_last_title_name",
-	lastTitlePlatform: "psn_last_title_platform",
-	lastTitleProgress: "psn_last_title_progress",
-	lastTitleUpdated: "psn_last_title_last_updated",
-	lastUpdated: "psn_last_updated",
+	accountId: "account_id",
+	lastTitleId: "last_title_id",
+	lastTitleName: "last_title_name",
+	lastTitlePlatform: "last_title_platform",
+	lastTitleProgress: "last_title_progress",
+	lastTitleUpdated: "last_title_last_updated",
+	lastTitleTrophySummary: "last_title_trophy_summary",
+	lastTitleTrophies: "last_title_trophies",
+	titleSearchResults: "title_search_results",
+	requestedTitleTrophies: "requested_title_trophies",
+	requestedTitleId: "requested_title_id",
+	requestedTitleName: "requested_title_name",
+	requestedTitlePlatform: "requested_title_platform",
+	requestedTitleProgress: "requested_title_progress",
+	lastUpdated: "last_updated",
 };
 
 class PlaystationNetworkPlugin extends Plugin {
@@ -8468,13 +11167,17 @@ class PlaystationNetworkPlugin extends Plugin {
 	}
 
 	async onload() {
-		await this._log("PlayStation Network plugin loaded.");
-
 		if (!this._hasAuthInputs()) {
 			await this._log(
 				"Missing NPSSO or refresh token. Enter NPSSO in settings to begin.",
-				"warn"
+				"warn",
 			);
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		const authValid = await this.validateAuth();
+		if (!authValid) {
 			await this._updateConnectionState(false);
 			return;
 		}
@@ -8486,7 +11189,6 @@ class PlaystationNetworkPlugin extends Plugin {
 	async onunload() {
 		this._clearPolling();
 		await this._updateConnectionState(false);
-		await this._log("PlayStation Network plugin stopped.");
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
@@ -8530,23 +11232,18 @@ class PlaystationNetworkPlugin extends Plugin {
 		for (const action of actions) {
 			try {
 				switch (action?.type) {
-					case "psn_refresh":
+					case "refresh":
 						await this._refreshData({ reason: "manual-action" });
 						break;
-					case "psn_chat_latest":
-						await this._sendLatestTitleToChat(action);
+					case "fetch_title":
+						await this._fetchRequestedTitle(action);
 						break;
-					default:
-						await this._log(
-							`Unknown action type: ${action?.type ?? "undefined"}`,
-							"warn"
-						);
 				}
 			} catch (error) {
 				const message = this._errorMessage(error);
 				await this._log(
 					`Action ${action?.type ?? "unknown"} failed: ${message}`,
-					"error"
+					"error",
 				);
 			}
 		}
@@ -8554,7 +11251,10 @@ class PlaystationNetworkPlugin extends Plugin {
 
 	async validateAuth() {
 		if (!this._hasAuthInputs()) {
-			await this._log("Validation failed: missing NPSSO/refresh token.", "warn");
+			await this._log(
+				"Validation failed: missing NPSSO/refresh token.",
+				"warn",
+			);
 			return false;
 		}
 
@@ -8563,7 +11263,6 @@ class PlaystationNetworkPlugin extends Plugin {
 			const accountId = await this._resolveAccountId(authorization);
 			const { getUserTitles } = await this._loadPsnApi();
 			await getUserTitles(authorization, accountId, { limit: 1 });
-			await this._log("PSN authentication succeeded.");
 			return true;
 		} catch (error) {
 			const message = this._errorMessage(error);
@@ -8585,8 +11284,15 @@ class PlaystationNetworkPlugin extends Plugin {
 		this._refreshPromise = (async () => {
 			try {
 				const authorization = await this._ensureAuthorization();
+				const previousSnapshot = this._lastTitleSnapshot;
 				const accountId = await this._resolveAccountId(authorization);
-				const { getUserTitles } = await this._loadPsnApi();
+				const {
+					getUserTitles,
+					getUserTrophies,
+					getUserTrophiesEarnedForTitle,
+					getUserTrophyGroupEarningsForTitle,
+					getTitleTrophies,
+				} = await this._loadPsnApi();
 				const response = await getUserTitles(authorization, accountId, {
 					limit: 1,
 				});
@@ -8597,57 +11303,103 @@ class PlaystationNetworkPlugin extends Plugin {
 				const latest = titles[0] ?? null;
 
 				await this._setVariableIfChanged(VARIABLE_NAMES.accountId, accountId);
-				await this._setVariableIfChanged(
-					VARIABLE_NAMES.lastUpdated,
-					new Date().toISOString()
-				);
 
 				if (latest) {
+					const titleId =
+						latest?.npCommunicationId ??
+						latest?.trophyTitleId ??
+						latest?.npServiceName ??
+						"";
 					const titleName =
 						latest?.trophyTitleName ?? latest?.name ?? latest?.titleName ?? "";
 					const titlePlatform = Array.isArray(latest?.trophyTitlePlatform)
 						? latest.trophyTitlePlatform.join(", ")
-						: latest?.trophyTitlePlatform ?? "";
+						: (latest?.trophyTitlePlatform ?? "");
 					const titleProgress = this._coerceNumber(latest?.progress, 0);
 					const titleUpdated =
 						latest?.lastUpdatedDateTime ?? latest?.lastUpdated ?? "";
 
 					this._lastTitleSnapshot = {
+						id: titleId,
 						name: titleName,
 						platform: titlePlatform,
 						progress: titleProgress,
 						updated: titleUpdated,
 					};
 
+					await this._setVariableIfChanged(VARIABLE_NAMES.lastTitleId, titleId);
 					await this._setVariableIfChanged(
 						VARIABLE_NAMES.lastTitleName,
-						titleName
+						titleName,
 					);
 					await this._setVariableIfChanged(
 						VARIABLE_NAMES.lastTitlePlatform,
-						titlePlatform
+						titlePlatform,
 					);
 					await this._setVariableIfChanged(
 						VARIABLE_NAMES.lastTitleProgress,
-						titleProgress
+						titleProgress,
 					);
 					await this._setVariableIfChanged(
 						VARIABLE_NAMES.lastTitleUpdated,
-						titleUpdated
+						titleUpdated,
 					);
+					await this._refreshLatestTitleTrophies({
+						authorization,
+						accountId,
+						titleId,
+						platform: titlePlatform,
+						getUserTrophies,
+						getUserTrophiesEarnedForTitle,
+						getUserTrophyGroupEarningsForTitle,
+						getTitleTrophies,
+					});
+
+					if (previousSnapshot) {
+						const titleChanged =
+							(previousSnapshot.id &&
+								titleId &&
+								previousSnapshot.id !== titleId) ||
+							(!previousSnapshot.id &&
+								previousSnapshot.name !== titleName &&
+								titleName !== "");
+						const progressIncreased =
+							this._coerceNumber(titleProgress, 0) >
+							this._coerceNumber(previousSnapshot.progress, 0);
+
+						if (titleChanged) {
+							await this.lumia.triggerAlert({
+								alertId: "title_changed",
+							});
+						}
+
+						if (!titleChanged && progressIncreased) {
+							await this.lumia.triggerAlert({
+								alertId: "progress_updated",
+							});
+						}
+					}
 				} else {
 					this._lastTitleSnapshot = null;
+					await this._setVariableIfChanged(VARIABLE_NAMES.lastTitleId, "");
 					await this._setVariableIfChanged(VARIABLE_NAMES.lastTitleName, "");
-					await this._setVariableIfChanged(VARIABLE_NAMES.lastTitlePlatform, "");
+					await this._setVariableIfChanged(
+						VARIABLE_NAMES.lastTitlePlatform,
+						"",
+					);
 					await this._setVariableIfChanged(VARIABLE_NAMES.lastTitleProgress, 0);
 					await this._setVariableIfChanged(VARIABLE_NAMES.lastTitleUpdated, "");
+					await this._setVariableIfChanged(
+						VARIABLE_NAMES.lastTitleTrophySummary,
+						"",
+					);
+					await this._setVariableIfChanged(
+						VARIABLE_NAMES.lastTitleTrophies,
+						"",
+					);
 				}
 
 				await this._updateConnectionState(true);
-
-				if (reason) {
-					await this._log(`PSN data refreshed (${reason}).`);
-				}
 			} catch (error) {
 				const message = this._errorMessage(error);
 				await this._updateConnectionState(false);
@@ -8660,24 +11412,462 @@ class PlaystationNetworkPlugin extends Plugin {
 		return this._refreshPromise;
 	}
 
-	async _sendLatestTitleToChat(action = {}) {
-		const messageTemplate = this._coerceString(
-			action?.message,
-			"Latest PSN title: {{psn_last_title_name}}"
+	async _fetchRequestedTitle(action = {}) {
+		const titleOrId = this._coerceString(
+			action?.value?.title ?? action?.title,
+			"",
+		).trim();
+		const platform = this._coerceString(
+			action?.value?.platform ?? action?.platform,
+			"",
 		);
-		const titleName =
-			this._lastTitleSnapshot?.name ??
-			this.lumia.getVariable(VARIABLE_NAMES.lastTitleName) ??
-			"";
+		let resolvedId = this._isNpCommunicationId(titleOrId) ? titleOrId : "";
+		let resolvedPlatform = platform;
+		let selectedMatch = null;
 
-		const message = messageTemplate.replace(
-			"{{psn_last_title_name}}",
-			titleName || "Unknown"
-		);
+		if (!resolvedId && titleOrId) {
+			const matches = await this._searchTitlesInternal(titleOrId);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.titleSearchResults,
+				JSON.stringify({ query: titleOrId, matches }),
+			);
+			if (!matches.length) {
+				await this._log(`No titles found for "${titleOrId}".`, "warn");
+				return;
+			}
+			const exact = matches.find((match) => {
+				const name = this._normalizeTitle(match?.name);
+				const query = this._normalizeTitle(titleOrId);
+				return Boolean(name && query && name === query);
+			});
+			const selected = exact ?? matches[0];
+			selectedMatch = selected;
+			resolvedId = selected?.npCommunicationId ?? "";
+			resolvedPlatform = resolvedPlatform || selected?.platform || "";
+			if (resolvedId) {
+				await this._log(
+					`Using NP Communication ID ${resolvedId} for "${selected?.name ?? titleOrId}".`,
+				);
+			}
+		}
 
-		this.displayChat({
-			message,
+		if (!resolvedId) {
+			await this._log("Missing title or NP Communication ID.", "warn");
+			return;
+		}
+		if (resolvedId === titleOrId) {
+			await this._log(`Using NP Communication ID ${resolvedId}.`);
+		}
+
+		const authorization = await this._ensureAuthorization();
+		const accountId = await this._resolveAccountId(authorization);
+		const {
+			getUserTrophies,
+			getUserTrophiesEarnedForTitle,
+			getUserTrophyGroupEarningsForTitle,
+			getTitleTrophies,
+		} = await this._loadPsnApi();
+
+		const payload = await this._fetchTitleTrophies({
+			authorization,
+			accountId,
+			titleId: resolvedId,
+			platform: resolvedPlatform,
+			getUserTrophies,
+			getUserTrophiesEarnedForTitle,
+			getUserTrophyGroupEarningsForTitle,
+			getTitleTrophies,
 		});
+
+		if (!payload) {
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.requestedTitleTrophies,
+				"",
+			);
+			await this._setVariableIfChanged(VARIABLE_NAMES.requestedTitleId, "");
+			await this._setVariableIfChanged(VARIABLE_NAMES.requestedTitleName, "");
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.requestedTitlePlatform,
+				"",
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.requestedTitleProgress,
+				0,
+			);
+			await this._notify(
+				`Failed to fetch trophy data for ${resolvedId}.`,
+				"error",
+			);
+			return;
+		}
+
+		const requestedInfo = this._extractRequestedTitleInfo({
+			payload,
+			titleOrId,
+			resolvedId,
+			resolvedPlatform,
+			selectedMatch,
+		});
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.requestedTitleTrophies,
+			payload ? JSON.stringify(payload) : "",
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.requestedTitleId,
+			requestedInfo.id,
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.requestedTitleName,
+			requestedInfo.name,
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.requestedTitlePlatform,
+			requestedInfo.platform,
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.requestedTitleProgress,
+			requestedInfo.progress,
+		);
+
+		await this._notify(
+			`Fetched trophy data for ${requestedInfo.name || requestedInfo.id}.`,
+			"success",
+		);
+	}
+
+	async _refreshLatestTitleTrophies({
+		authorization,
+		accountId,
+		titleId,
+		platform,
+		getUserTrophies,
+		getUserTrophiesEarnedForTitle,
+		getUserTrophyGroupEarningsForTitle,
+		getTitleTrophies,
+	}) {
+		if (!titleId) {
+			return;
+		}
+		const payload = await this._fetchTitleTrophies({
+			authorization,
+			accountId,
+			titleId,
+			platform,
+			getUserTrophiesEarnedForTitle,
+			getUserTrophyGroupEarningsForTitle,
+			getTitleTrophies,
+		});
+
+		if (!payload) {
+			return;
+		}
+
+		const summary =
+			payload?.summary?.trophySummary ??
+			payload?.summary?.trophies ??
+			payload?.summary ??
+			null;
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastTitleTrophies,
+			JSON.stringify(payload),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastTitleTrophySummary,
+			summary ? JSON.stringify(summary) : "",
+		);
+	}
+
+	async _fetchTitleTrophies({
+		authorization,
+		accountId,
+		titleId,
+		platform,
+		getUserTrophies,
+		getUserTrophiesEarnedForTitle,
+		getUserTrophyGroupEarningsForTitle,
+		getTitleTrophies,
+	}) {
+		if (!titleId) {
+			return null;
+		}
+		const hasModern =
+			typeof getTitleTrophies === "function" &&
+			typeof getUserTrophiesEarnedForTitle === "function" &&
+			typeof getUserTrophyGroupEarningsForTitle === "function";
+		const hasLegacy =
+			typeof getTitleTrophies === "function" &&
+			typeof getUserTrophies === "function";
+
+		if (!hasModern && !hasLegacy) {
+			await this._log("Trophy endpoints unavailable in psn-api.", "warn");
+			return null;
+		}
+
+		const candidates = this._buildTrophyServiceCandidates(platform);
+
+		for (const npServiceName of candidates) {
+			try {
+				const options = npServiceName ? { npServiceName } : undefined;
+				if (hasModern) {
+					const [earned, title, summary] = await Promise.all([
+						getUserTrophiesEarnedForTitle(
+							authorization,
+							accountId,
+							titleId,
+							"all",
+							options,
+						),
+						getTitleTrophies(authorization, titleId, "all", options),
+						getUserTrophyGroupEarningsForTitle(
+							authorization,
+							accountId,
+							titleId,
+							options,
+						),
+					]);
+
+					return { earned, title, summary, npServiceName };
+				}
+
+				const [user, title] = await Promise.all([
+					getUserTrophies(authorization, accountId, titleId, options ?? {}),
+					getTitleTrophies(authorization, titleId, "all", options),
+				]);
+
+				return { user, title, npServiceName };
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(
+					`Trophy fetch failed for ${npServiceName ?? "default"}: ${message}`,
+					"warn",
+				);
+			}
+		}
+
+		return null;
+	}
+
+	_buildTrophyServiceCandidates(platform) {
+		const normalized = this._coerceString(platform, "").toUpperCase();
+		if (normalized.includes("PS5")) {
+			return ["trophy2", undefined];
+		}
+		if (
+			normalized.includes("PS4") ||
+			normalized.includes("PS3") ||
+			normalized.includes("VITA")
+		) {
+			return ["trophy"];
+		}
+
+		return [undefined, "trophy", "trophy2"];
+	}
+
+	async _searchTitles(action = {}) {
+		const query = this._coerceString(
+			action?.value?.query ?? action?.query,
+			"",
+		).trim();
+		if (!query) {
+			await this._log("Missing search query.", "warn");
+			return;
+		}
+		const matches = await this._searchTitlesInternal(query);
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.titleSearchResults,
+			JSON.stringify({ query, matches }),
+		);
+	}
+
+	async _searchTitlesInternal(query) {
+		const authorization = await this._ensureAuthorization();
+		const accountId = await this._resolveAccountId(authorization);
+		const { getUserTitles } = await this._loadPsnApi();
+		const limit = 200;
+		const maxPages = 4;
+		const maxResults = 10;
+		const matches = [];
+		const queryLower = query.toLowerCase();
+		const queryNormalized = this._normalizeTitle(query);
+		let offset = 0;
+
+		for (let page = 0; page < maxPages; page += 1) {
+			const response = await getUserTitles(authorization, accountId, {
+				limit,
+				offset,
+			});
+			const titles = Array.isArray(response?.trophyTitles)
+				? response.trophyTitles
+				: [];
+
+			for (const title of titles) {
+				const name =
+					title?.trophyTitleName ?? title?.name ?? title?.titleName ?? "";
+				if (!name) {
+					continue;
+				}
+				const score = this._scoreTitleMatch(queryLower, queryNormalized, name);
+				if (score < 0.35) {
+					continue;
+				}
+				matches.push({
+					name,
+					score,
+					npCommunicationId:
+						title?.npCommunicationId ??
+						title?.trophyTitleId ??
+						title?.npServiceName ??
+						"",
+					platform: Array.isArray(title?.trophyTitlePlatform)
+						? title.trophyTitlePlatform.join(", ")
+						: (title?.trophyTitlePlatform ?? ""),
+					progress: this._coerceNumber(title?.progress, 0),
+					lastUpdated: title?.lastUpdatedDateTime ?? title?.lastUpdated ?? "",
+				});
+			}
+
+			matches.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+			if (matches.length > maxResults) {
+				matches.length = maxResults;
+			}
+
+			if (matches.length >= maxResults || titles.length < limit) {
+				break;
+			}
+			offset += limit;
+		}
+
+		matches.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+		return matches;
+	}
+
+	_isNpCommunicationId(value) {
+		const candidate = this._coerceString(value, "").trim().toUpperCase();
+		if (!candidate) {
+			return false;
+		}
+		return candidate.startsWith("NP") && candidate.includes("_");
+	}
+
+	_extractRequestedTitleInfo({
+		payload,
+		titleOrId,
+		resolvedId,
+		resolvedPlatform,
+		selectedMatch,
+	}) {
+		const title =
+			payload?.title ?? payload?.user?.title ?? payload?.summary ?? {};
+		const name =
+			selectedMatch?.name ??
+			title?.trophyTitleName ??
+			title?.titleName ??
+			title?.name ??
+			titleOrId ??
+			"";
+		const platform =
+			selectedMatch?.platform ??
+			(Array.isArray(title?.trophyTitlePlatform)
+				? title.trophyTitlePlatform.join(", ")
+				: title?.trophyTitlePlatform) ??
+			resolvedPlatform ??
+			"";
+		const progress = this._coerceNumber(
+			selectedMatch?.progress ??
+				payload?.summary?.progress ??
+				payload?.earned?.progress ??
+				title?.progress ??
+				0,
+			0,
+		);
+
+		return {
+			id: resolvedId || "",
+			name,
+			platform,
+			progress,
+		};
+	}
+
+	_normalizeTitle(value) {
+		return this._coerceString(value, "")
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, " ")
+			.trim();
+	}
+
+	_scoreTitleMatch(queryLower, queryNormalized, title) {
+		if (!title) {
+			return 0;
+		}
+		const titleLower = title.toLowerCase();
+		const titleNormalized = this._normalizeTitle(title);
+		if (!queryNormalized || !titleNormalized) {
+			return 0;
+		}
+
+		if (titleNormalized === queryNormalized) {
+			return 1;
+		}
+
+		let score = 0;
+		if (titleLower === queryLower) {
+			score = Math.max(score, 0.95);
+		}
+		if (titleLower.startsWith(queryLower)) {
+			score = Math.max(score, 0.9);
+		} else if (titleLower.includes(queryLower)) {
+			score = Math.max(score, 0.75);
+		}
+
+		const queryTokens = queryNormalized.split(" ").filter(Boolean);
+		const titleTokens = titleNormalized.split(" ").filter(Boolean);
+		if (queryTokens.length && titleTokens.length) {
+			const titleTokenSet = new Set(titleTokens);
+			const overlap = queryTokens.filter((token) =>
+				titleTokenSet.has(token),
+			).length;
+			const overlapRatio = overlap / queryTokens.length;
+			score = Math.max(score, 0.55 + overlapRatio * 0.35);
+		}
+
+		const distance = this._levenshtein(queryNormalized, titleNormalized);
+		const maxLen = Math.max(queryNormalized.length, titleNormalized.length, 1);
+		const similarity = 1 - distance / maxLen;
+		score = Math.max(score, similarity * 0.8);
+
+		return Math.min(1, Math.max(score, 0));
+	}
+
+	_levenshtein(a, b) {
+		if (a === b) {
+			return 0;
+		}
+		const aLen = a.length;
+		const bLen = b.length;
+		if (!aLen) {
+			return bLen;
+		}
+		if (!bLen) {
+			return aLen;
+		}
+		const row = new Array(bLen + 1);
+		for (let j = 0; j <= bLen; j += 1) {
+			row[j] = j;
+		}
+		for (let i = 1; i <= aLen; i += 1) {
+			let prev = row[0];
+			row[0] = i;
+			for (let j = 1; j <= bLen; j += 1) {
+				const tmp = row[j];
+				const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+				row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+				prev = tmp;
+			}
+		}
+		return row[bLen];
 	}
 
 	_schedulePolling() {
@@ -8707,12 +11897,18 @@ class PlaystationNetworkPlugin extends Plugin {
 		const refreshToken = this._coerceString(settings.refreshToken, "");
 		const npsso = this._coerceString(settings.npsso, "");
 
-		if (accessToken && (!accessTokenExpiresAt || accessTokenExpiresAt > Date.now())) {
+		if (
+			accessToken &&
+			(!accessTokenExpiresAt || accessTokenExpiresAt > Date.now())
+		) {
 			return { accessToken };
 		}
 
-		const { exchangeAccessCodeForAuthTokens, exchangeNpssoForAccessCode, exchangeRefreshTokenForAuthTokens } =
-			await this._loadPsnApi();
+		const {
+			exchangeAccessCodeForAuthTokens,
+			exchangeNpssoForAccessCode,
+			exchangeRefreshTokenForAuthTokens,
+		} = await this._loadPsnApi();
 
 		if (refreshToken) {
 			try {
@@ -8741,13 +11937,10 @@ class PlaystationNetworkPlugin extends Plugin {
 		}
 
 		const now = Date.now();
-		const accessTokenExpiresAt = this._calculateExpiry(
-			now,
-			auth.expiresIn
-		);
+		const accessTokenExpiresAt = this._calculateExpiry(now, auth.expiresIn);
 		const refreshTokenExpiresAt = this._calculateExpiry(
 			now,
-			auth.refreshTokenExpiresIn
+			auth.refreshTokenExpiresIn,
 		);
 
 		this.updateSettings({
@@ -8784,7 +11977,7 @@ class PlaystationNetworkPlugin extends Plugin {
 			const search = await makeUniversalSearch(
 				authorization,
 				targetOnlineId,
-				"SocialAllAccounts"
+				"SocialAllAccounts",
 			);
 			accountId = this._findAccountId(search);
 		} catch (error) {
@@ -8795,7 +11988,7 @@ class PlaystationNetworkPlugin extends Plugin {
 			try {
 				const profileResponse = await getProfileFromUserName(
 					authorization,
-					targetOnlineId
+					targetOnlineId,
 				);
 				const profile = profileResponse?.profile ?? profileResponse ?? {};
 				accountId = profile?.accountId ?? null;
@@ -8805,7 +11998,9 @@ class PlaystationNetworkPlugin extends Plugin {
 		}
 
 		if (!accountId) {
-			throw new Error("Unable to resolve account ID. Try using the Account ID.");
+			throw new Error(
+				"Unable to resolve account ID. Try using the Account ID.",
+			);
 		}
 
 		this._cachedAccountId = accountId;
@@ -8815,9 +12010,63 @@ class PlaystationNetworkPlugin extends Plugin {
 
 	async _loadPsnApi() {
 		if (!this._psnApiPromise) {
-			this._psnApiPromise = import("psn-api");
+			this._psnApiPromise = Promise.resolve().then(() => {
+				this._normalizeFetch();
+				return require("psn-api");
+			});
 		}
 		return this._psnApiPromise;
+	}
+
+	_normalizeFetch() {
+		const root = globalThis;
+		const bindFetch = (fetchFn, ctx) => {
+			if (typeof fetchFn !== "function") {
+				return fetchFn;
+			}
+			if (fetchFn.__lumiaBound) {
+				return fetchFn;
+			}
+			const bound = (...args) => fetchFn.call(ctx, ...args);
+			Object.defineProperty(bound, "__lumiaBound", { value: true });
+			return bound;
+		};
+
+		const tryDefineFetch = (target, fetchFn) => {
+			if (!target) {
+				return;
+			}
+			const bound = bindFetch(fetchFn, target);
+			try {
+				Object.defineProperty(target, "fetch", {
+					value: bound,
+					writable: true,
+					configurable: true,
+				});
+			} catch (error) {
+				try {
+					target.fetch = bound;
+				} catch (assignError) {
+					// Ignore if we cannot override fetch
+				}
+			}
+		};
+
+		const mainFetch = root.__lumiaMainFetch;
+		if (typeof mainFetch === "function") {
+			if (root?.window) {
+				tryDefineFetch(root.window, mainFetch);
+			}
+			tryDefineFetch(root, mainFetch);
+			return;
+		}
+
+		if (root?.window?.fetch) {
+			tryDefineFetch(root.window, root.window.fetch);
+			tryDefineFetch(root, root.window.fetch);
+		} else if (root?.fetch) {
+			tryDefineFetch(root, root.fetch);
+		}
 	}
 
 	async _updateConnectionState(state) {
@@ -8872,14 +12121,17 @@ class PlaystationNetworkPlugin extends Plugin {
 	}
 
 	_pollInterval() {
-		return this._coerceNumber(this.settings?.pollInterval, DEFAULTS.pollInterval);
+		return this._coerceNumber(
+			this.settings?.pollInterval,
+			DEFAULTS.pollInterval,
+		);
 	}
 
 	_hasAuthInputs() {
 		return Boolean(
 			this._coerceString(this.settings?.npsso, "") ||
-				this._coerceString(this.settings?.refreshToken, "") ||
-				this._coerceString(this.settings?.accessToken, "")
+			this._coerceString(this.settings?.refreshToken, "") ||
+			this._coerceString(this.settings?.accessToken, ""),
 		);
 	}
 
@@ -8923,7 +12175,25 @@ class PlaystationNetworkPlugin extends Plugin {
 		if (typeof this.lumia.addLog !== "function") {
 			return;
 		}
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
 		await this.lumia.addLog(`[PSN] ${message}`, severity);
+	}
+
+	async _notify(message, level = "info") {
+		if (typeof this.lumia.showToast === "function") {
+			const prefix =
+				level === "error" ? "Error: " : level === "warn" ? "Warning: " : "";
+			await this.lumia.showToast({ message: `${prefix}${message}` });
+			return;
+		}
+
+		if (typeof this.lumia.addLog === "function") {
+			const severity =
+				level === "error" ? "error" : level === "warn" ? "warn" : "info";
+			await this.lumia.addLog(`[PSN] ${message}`, severity);
+		}
 	}
 }
 
@@ -8939,14 +12209,12 @@ module.exports = PlaystationNetworkPlugin;
 	"name": "PlayStation Network",
 	"version": "1.0.0",
 	"author": "Lumia Stream",
-	"email": "",
-	"website": "",
-	"repository": "",
-	"description": "Pull PSN trophy title updates into Lumia variables using psn-api.",
+	"description": "Fetch PSN trophy title progress and expose the latest title stats in Lumia variables.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "apps",
-	"icon": "",
+	"keywords": "playstation, psn, trophies, gaming, psn-api",
+	"icon": "psn.jpg",
 	"config": {
 		"settings": [
 			{
@@ -8979,95 +12247,290 @@ module.exports = PlaystationNetworkPlugin;
 				"min": 30,
 				"max": 3600,
 				"helperText": "How often to refresh PSN data."
-			},
-			{
-				"key": "accessToken",
-				"label": "Access Token",
-				"type": "password",
-				"helperText": "Auto-filled after the plugin exchanges NPSSO.",
-				"disabled": true,
-				"required": false
-			},
-			{
-				"key": "refreshToken",
-				"label": "Refresh Token",
-				"type": "password",
-				"helperText": "Auto-filled after the plugin exchanges NPSSO.",
-				"disabled": true,
-				"required": false
-			},
-			{
-				"key": "accessTokenExpiresAt",
-				"label": "Access Token Expires At (UTC)",
-				"type": "text",
-				"helperText": "Auto-filled after authentication.",
-				"disabled": true,
-				"required": false
-			},
-			{
-				"key": "refreshTokenExpiresAt",
-				"label": "Refresh Token Expires At (UTC)",
-				"type": "text",
-				"helperText": "Auto-filled after authentication.",
-				"disabled": true,
-				"required": false
 			}
 		],
-		"settings_tutorial": "---\n### Connect Your Account\n1) Follow the psn-api NPSSO instructions to capture your NPSSO cookie value.\n2) Paste it into the **NPSSO Cookie** field above.\n3) Click Save so the plugin can exchange tokens.\n---\n### Monitoring Another Account\n- Fill **Target Online ID** to monitor another public profile.\n- If lookup fails, provide the numeric **Target Account ID** instead.\n---\n",
-		"actions_tutorial": "---\n### Refresh Data\nUse **Refresh PSN Data** to fetch the latest title update immediately.\n---\n",
+		"settings_tutorial": "---\n### Connect Your Account (NPSSO)\n1) Open a browser and sign in at https://my.playstation.com/.\n2) In the same signed-in browser, open https://ca.account.sony.com/api/v1/ssocookie.\n3) You will see a JSON response. Copy the **npsso** value.\n4) Paste it into the **NPSSO Cookie** field above and click **Save**.\n---\n### If The Endpoint Does Not Load\n- Make sure you are signed in to PlayStation in the same browser session.\n- Try opening the URL in a new tab after re-authenticating.\n---\n### Monitoring Another Account\n- Fill **Target Online ID** to monitor another public profile.\n- If lookup fails, provide the numeric **Target Account ID** instead.\n---\n",
+		"actions_tutorial": "---\n### Refresh Data\nUse **Refresh PSN Data** to fetch the latest title update immediately.\n---\n### Fetch Trophy Data\nEnter a game name or NP Communication ID in **Fetch Trophy Data For Title**.\n- If you enter a name, the plugin searches your trophies and picks the best match.\n- If you enter an NP ID (example: NPWR12345_00), it uses it directly.\nThe search results are stored in the `title_search_results` variable (JSON).\n---\n",
 		"actions": [
 			{
-				"type": "psn_refresh",
+				"type": "refresh",
 				"label": "Refresh PSN Data",
 				"description": "Fetch the latest PSN trophy title update now.",
 				"fields": []
 			},
 			{
-				"type": "psn_chat_latest",
-				"label": "Share Latest Title in Chat",
-				"description": "Post the most recent title update into Lumia chat.",
+				"type": "fetch_title",
+				"label": "Fetch Trophy Data For Title",
+				"description": "Fetch trophy details by game name or NP communication ID.",
 				"fields": [
 					{
-						"key": "message",
-						"label": "Message",
+						"key": "title",
+						"label": "Title Or NP Communication ID",
 						"type": "text",
-						"defaultValue": "Latest PSN title: {{psn_last_title_name}}"
+						"placeholder": "ex: God of War",
+						"helperText": "Enter a game name or an NP ID like NPWR12345_00."
+					},
+					{
+						"key": "platform",
+						"label": "Platform (Optional)",
+						"type": "select",
+						"allowTyping": true,
+						"options": [
+							{ "label": "PS5", "value": "PS5" },
+							{ "label": "PS4", "value": "PS4" },
+							{ "label": "PS3", "value": "PS3" },
+							{ "label": "PS Vita", "value": "PSVITA" }
+						],
+						"helperText": "Helps pick the correct trophy service if the title is not PS5."
 					}
 				]
 			}
 		],
 		"variables": [
 			{
-				"name": "psn_account_id",
+				"name": "account_id",
 				"description": "Account ID used for the latest query.",
 				"value": ""
 			},
 			{
-				"name": "psn_last_title_name",
+				"name": "last_title_id",
+				"description": "NP communication ID for the latest title.",
+				"value": ""
+			},
+			{
+				"name": "last_title_name",
 				"description": "Most recently updated trophy title name.",
 				"value": ""
 			},
 			{
-				"name": "psn_last_title_platform",
+				"name": "last_title_platform",
 				"description": "Platform string for the latest title.",
 				"value": ""
 			},
 			{
-				"name": "psn_last_title_progress",
+				"name": "last_title_progress",
 				"description": "Trophy completion progress for the latest title.",
 				"value": 0
 			},
 			{
-				"name": "psn_last_title_last_updated",
+				"name": "last_title_last_updated",
 				"description": "Timestamp for the latest title update.",
 				"value": ""
 			},
 			{
-				"name": "psn_last_updated",
+				"name": "last_title_trophy_summary",
+				"description": "JSON summary of trophy counts for the latest title.",
+				"value": ""
+			},
+			{
+				"name": "last_title_trophies",
+				"description": "JSON payload of trophy data for the latest title.",
+				"value": ""
+			},
+			{
+				"name": "title_search_results",
+				"description": "JSON list of title matches from the latest search action.",
+				"value": ""
+			},
+			{
+				"name": "requested_title_trophies",
+				"description": "JSON payload of trophy data for the last requested title action.",
+				"value": ""
+			},
+			{
+				"name": "requested_title_id",
+				"description": "NP communication ID used for the last requested title.",
+				"value": ""
+			},
+			{
+				"name": "requested_title_name",
+				"description": "Title name used for the last requested title.",
+				"value": ""
+			},
+			{
+				"name": "requested_title_platform",
+				"description": "Platform string for the last requested title.",
+				"value": ""
+			},
+			{
+				"name": "requested_title_progress",
+				"description": "Progress for the last requested title.",
+				"value": 0
+			},
+			{
+				"name": "last_updated",
 				"description": "Timestamp when the plugin last refreshed PSN data.",
 				"value": ""
 			}
+		],
+		"alerts": [
+			{
+				"title": "PSN Title Changed",
+				"key": "title_changed",
+				"acceptedVariables": [
+					"last_title_name",
+					"last_title_platform",
+					"last_title_progress",
+					"last_title_last_updated"
+				],
+				"defaultMessage": "Now tracking {{last_title_name}} ({{last_title_platform}}).",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Randomized message style",
+						"selections": [
+							{
+								"label": "Standard",
+								"value": "standard",
+								"message": "Now tracking {{last_title_name}} ({{last_title_platform}})."
+							},
+							{
+								"label": "Hype",
+								"value": "hype",
+								"message": "New focus: {{last_title_name}} on {{last_title_platform}}!"
+							},
+							{
+								"label": "Quiet",
+								"value": "quiet",
+								"message": "Switched to {{last_title_name}}."
+							}
+						]
+					}
+				]
+			},
+			{
+				"title": "PSN Progress Updated",
+				"key": "progress_updated",
+				"acceptedVariables": [
+					"last_title_name",
+					"last_title_progress",
+					"last_title_last_updated"
+				],
+				"defaultMessage": "{{last_title_name}} progress is now {{last_title_progress}}%.",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Randomized progress update",
+						"selections": [
+							{
+								"label": "Standard",
+								"value": "standard",
+								"message": "{{last_title_name}} progress is now {{last_title_progress}}%."
+							},
+							{
+								"label": "Milestone",
+								"value": "milestone",
+								"message": "{{last_title_name}} hit {{last_title_progress}}%!"
+							},
+							{
+								"label": "Short",
+								"value": "short",
+								"message": "{{last_title_name}}: {{last_title_progress}}%."
+							}
+						]
+					}
+				]
+			}
 		]
+	}
+}
+
+```
+
+## playstation_network/package-lock.json
+
+```
+{
+	"name": "lumia_plugin-playstation-network",
+	"version": "1.0.0",
+	"lockfileVersion": 3,
+	"requires": true,
+	"packages": {
+		"": {
+			"name": "lumia_plugin-playstation-network",
+			"version": "1.0.0",
+			"dependencies": {
+				"@lumiastream/plugin": "^0.2.3",
+				"psn-api": "^2.11.0"
+			}
+		},
+		"node_modules/@lumiastream/plugin": {
+			"version": "0.2.3",
+			"resolved": "https://registry.npmjs.org/@lumiastream/plugin/-/plugin-0.2.3.tgz",
+			"integrity": "sha512-YnpghyreFcYrI1FBPXD1MZbxTVaN0hrQaGH/mid0BSwCXyxG3WXGCFyy7nkPgqOMsxiFl07/8SEvdRkKJxXPUw==",
+			"license": "MIT"
+		},
+		"node_modules/isomorphic-unfetch": {
+			"version": "3.1.0",
+			"resolved": "https://registry.npmjs.org/isomorphic-unfetch/-/isomorphic-unfetch-3.1.0.tgz",
+			"integrity": "sha512-geDJjpoZ8N0kWexiwkX8F9NkTsXhetLPVbZFQ+JTW239QNOwvB0gniuR1Wc6f0AMTn7/mFGyXvHTifrCp/GH8Q==",
+			"license": "MIT",
+			"dependencies": {
+				"node-fetch": "^2.6.1",
+				"unfetch": "^4.2.0"
+			}
+		},
+		"node_modules/node-fetch": {
+			"version": "2.7.0",
+			"resolved": "https://registry.npmjs.org/node-fetch/-/node-fetch-2.7.0.tgz",
+			"integrity": "sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==",
+			"license": "MIT",
+			"dependencies": {
+				"whatwg-url": "^5.0.0"
+			},
+			"engines": {
+				"node": "4.x || >=6.0.0"
+			},
+			"peerDependencies": {
+				"encoding": "^0.1.0"
+			},
+			"peerDependenciesMeta": {
+				"encoding": {
+					"optional": true
+				}
+			}
+		},
+		"node_modules/psn-api": {
+			"version": "2.17.0",
+			"resolved": "https://registry.npmjs.org/psn-api/-/psn-api-2.17.0.tgz",
+			"integrity": "sha512-zWNEF1kd/kze/0iGeN1QGpvyDykdncvXROvhgKNfDZZQ0rVd7rJ2egiCAKX0wgUslCyOsVzWhH4dZjZoU3wXGQ==",
+			"license": "MIT",
+			"dependencies": {
+				"isomorphic-unfetch": "^3.1.0"
+			},
+			"engines": {
+				"node": ">=20",
+				"pnpm": ">=10"
+			}
+		},
+		"node_modules/tr46": {
+			"version": "0.0.3",
+			"resolved": "https://registry.npmjs.org/tr46/-/tr46-0.0.3.tgz",
+			"integrity": "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==",
+			"license": "MIT"
+		},
+		"node_modules/unfetch": {
+			"version": "4.2.0",
+			"resolved": "https://registry.npmjs.org/unfetch/-/unfetch-4.2.0.tgz",
+			"integrity": "sha512-F9p7yYCn6cIW9El1zi0HI6vqpeIvBsr3dSuRO6Xuppb1u5rXpCPmMvLSyECLhybr9isec8Ohl0hPekMVrEinDA==",
+			"license": "MIT"
+		},
+		"node_modules/webidl-conversions": {
+			"version": "3.0.1",
+			"resolved": "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-3.0.1.tgz",
+			"integrity": "sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==",
+			"license": "BSD-2-Clause"
+		},
+		"node_modules/whatwg-url": {
+			"version": "5.0.0",
+			"resolved": "https://registry.npmjs.org/whatwg-url/-/whatwg-url-5.0.0.tgz",
+			"integrity": "sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==",
+			"license": "MIT",
+			"dependencies": {
+				"tr46": "~0.0.3",
+				"webidl-conversions": "^3.0.0"
+			}
+		}
 	}
 }
 
@@ -9077,16 +12540,16 @@ module.exports = PlaystationNetworkPlugin;
 
 ```
 {
-  "name": "lumia-example-playstation-network",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Example Lumia Stream plugin that pulls PlayStation Network trophy activity via psn-api.",
-  "main": "main.js",
-  "scripts": {},
-  "dependencies": {
-    "@lumiastream/plugin": "^0.2.0",
-    "psn-api": "^2.11.0"
-  }
+	"name": "lumia_plugin-playstation-network",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that pulls PlayStation Network trophy activity via psn-api.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.2.3",
+		"psn-api": "^2.11.0"
+	}
 }
 
 ```
@@ -9379,17 +12842,17 @@ function buildAlertVariables(state) {
 		return {};
 	}
 	return {
-		rumble_live: state.live,
-		rumble_viewers: state.viewers,
-		rumble_title: state.title,
-		rumble_stream_url: state.streamUrl,
-		rumble_followers: state.followers,
-		rumble_likes: state.likes,
-		rumble_dislikes: state.dislikes,
-		rumble_subs: state.subs,
-		rumble_sub_gifts: state.subGifts,
-		rumble_rants: state.rants,
-		rumble_rant_amount: roundToTwo(state.rantAmount),
+		live: state.live,
+		viewers: state.viewers,
+		title: state.title,
+		stream_url: state.streamUrl,
+		followers: state.followers,
+		likes: state.likes,
+		dislikes: state.dislikes,
+		subs: state.subs,
+		sub_gifts: state.subGifts,
+		rants: state.rants,
+		rant_amount: roundToTwo(state.rantAmount),
 	};
 }
 
@@ -9507,19 +12970,13 @@ class RumblePlugin extends Plugin {
 	}
 
 	async onload() {
-		await this.lumia.addLog("[Rumble] Plugin loading...");
-
 		if (this.apiKey) {
 			await this.startPolling({ showToast: false });
 		}
-
-		await this.lumia.addLog("[Rumble] Plugin loaded");
 	}
 
 	async onunload() {
-		await this.lumia.addLog("[Rumble] Plugin unloading...");
 		await this.stopPolling(false);
-		await this.lumia.addLog("[Rumble] Plugin unloaded");
 	}
 
 	async onsettingsupdate(settings, previousSettings) {
@@ -9563,7 +13020,6 @@ class RumblePlugin extends Plugin {
 				switch (action.type) {
 					case "manual_poll": {
 						await this.pollAPI();
-						await this.lumia.addLog("[Rumble] Manual poll triggered");
 						break;
 					}
 
@@ -9579,14 +13035,7 @@ class RumblePlugin extends Plugin {
 								streamUrl: this.lastKnownState.streamUrl,
 							},
 						});
-						await this.lumia.addLog("[Rumble] Manual alert triggered");
 						break;
-					}
-
-					default: {
-						await this.lumia.addLog(
-							`[Rumble] Unknown action type: ${action.type}`,
-						);
 					}
 				}
 			} catch (error) {
@@ -9670,12 +13119,6 @@ class RumblePlugin extends Plugin {
 			void this.pollAPI();
 		}, normalizedInterval * 1000);
 
-		if (showToast) {
-			await this.lumia.showToast({
-				message: `Started polling Rumble API (${normalizedInterval}s)`,
-			});
-		}
-
 		await this.lumia.updateConnection(true);
 	}
 
@@ -9686,10 +13129,6 @@ class RumblePlugin extends Plugin {
 			this.pollIntervalId = null;
 		}
 
-		if (showToast) {
-			await this.lumia.showToast({ message: "Stopped polling Rumble API" });
-		}
-
 		await this.lumia.updateConnection(false);
 	}
 
@@ -9698,9 +13137,6 @@ class RumblePlugin extends Plugin {
 		try {
 			const apiKey = this.apiKey;
 			if (!apiKey) {
-				await this.lumia.addLog(
-					"[Rumble] Poll skipped: API key not configured",
-				);
 				return;
 			}
 
@@ -9821,55 +13257,35 @@ class RumblePlugin extends Plugin {
 			}
 		};
 
-		setIfChanged("rumble_live", state.live, previousState?.live);
-		setIfChanged("rumble_viewers", state.viewers, previousState?.viewers);
-		setIfChanged("rumble_joined", state.joined, previousState?.joined);
-		setIfChanged("rumble_title", state.title, previousState?.title);
-		setIfChanged("rumble_thumbnail", state.thumbnail, previousState?.thumbnail);
+		setIfChanged("live", state.live, previousState?.live);
+		setIfChanged("viewers", state.viewers, previousState?.viewers);
+		setIfChanged("joined", state.joined, previousState?.joined);
+		setIfChanged("title", state.title, previousState?.title);
+		setIfChanged("thumbnail", state.thumbnail, previousState?.thumbnail);
+		setIfChanged("stream_url", state.streamUrl, previousState?.streamUrl);
+		setIfChanged("video_id", state.videoId, previousState?.videoId);
+		setIfChanged("rumbles", state.rumbles, previousState?.rumbles);
+		setIfChanged("followers", state.followers, previousState?.followers);
+		setIfChanged("likes", state.likes, previousState?.likes);
+		setIfChanged("dislikes", state.dislikes, previousState?.dislikes);
+		setIfChanged("subs", state.subs, previousState?.subs);
+		setIfChanged("sub_gifts", state.subGifts, previousState?.subGifts);
+		setIfChanged("rants", state.rants, previousState?.rants);
+		setIfChanged("rant_amount", roundToTwo(state.rantAmount), prevRantAmount);
+		setIfChanged("chat_members", state.chatMembers, previousState?.chatMembers);
+		setIfChanged("category", state.category, previousState?.category);
+		setIfChanged("description", state.description, previousState?.description);
+		setIfChanged("language", state.language, previousState?.language);
+		setIfChanged("chat_url", state.chatUrl, previousState?.chatUrl);
+		setIfChanged("channel_name", state.channelName, previousState?.channelName);
 		setIfChanged(
-			"rumble_stream_url",
-			state.streamUrl,
-			previousState?.streamUrl,
-		);
-		setIfChanged("rumble_video_id", state.videoId, previousState?.videoId);
-		setIfChanged("rumble_rumbles", state.rumbles, previousState?.rumbles);
-		setIfChanged("rumble_followers", state.followers, previousState?.followers);
-		setIfChanged("rumble_likes", state.likes, previousState?.likes);
-		setIfChanged("rumble_dislikes", state.dislikes, previousState?.dislikes);
-		setIfChanged("rumble_subs", state.subs, previousState?.subs);
-		setIfChanged("rumble_sub_gifts", state.subGifts, previousState?.subGifts);
-		setIfChanged("rumble_rants", state.rants, previousState?.rants);
-		setIfChanged(
-			"rumble_rant_amount",
-			roundToTwo(state.rantAmount),
-			prevRantAmount,
-		);
-		setIfChanged(
-			"rumble_chat_members",
-			state.chatMembers,
-			previousState?.chatMembers,
-		);
-		setIfChanged("rumble_category", state.category, previousState?.category);
-		setIfChanged(
-			"rumble_description",
-			state.description,
-			previousState?.description,
-		);
-		setIfChanged("rumble_language", state.language, previousState?.language);
-		setIfChanged("rumble_chat_url", state.chatUrl, previousState?.chatUrl);
-		setIfChanged(
-			"rumble_channel_name",
-			state.channelName,
-			previousState?.channelName,
-		);
-		setIfChanged(
-			"rumble_channel_image",
+			"channel_image",
 			state.channelImage,
 			previousState?.channelImage,
 		);
-		setIfChanged("rumble_started_at", startedIso, prevStartedIso);
-		setIfChanged("rumble_scheduled_start", scheduledIso, prevScheduledIso);
-		setIfChanged("rumble_last_polled", nowIso, previousState?.lastPolledIso);
+		setIfChanged("started_at", startedIso, prevStartedIso);
+		setIfChanged("scheduled_start", scheduledIso, prevScheduledIso);
+		setIfChanged("last_polled", nowIso, previousState?.lastPolledIso);
 
 		if (updates.length) {
 			await Promise.all(updates);
@@ -10268,18 +13684,18 @@ module.exports = RumblePlugin;
 ```
 {
 	"id": "rumble",
-	"name": "Rumble Livestream",
+	"name": "Rumble",
 	"version": "1.0.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "https://github.com/LumiaStream/rumble-plugin",
-	"description": "Monitor Rumble livestream status, surface follower/rant/reaction/subscription activity, and display chat messages inside Lumia.",
+	"description": "Track Rumble livestream state and engagement with alerts, variables, and chat display.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "platforms",
-	"icon": "rumble-icon.png",
-	"changelog": "# Changelog\n\n## 1.0.0\n- Simplified alerts to focus on followers, rants, likes, dislikes, subs, and sub gifts\n- Added variables for subs, sub gifts, likes, dislikes, and follower deltas\n- Removed milestone and peak-based alerts\n- Aligned alert identifiers with Lumia defaults (for example `rumble-follower`, `rumble-sub`)\n\n## 1.1.0\n- Added variables for chat members, followers, rumbles, rants, and scheduling info\n- New alerts for viewer milestones, new peak viewers, rumbles, rants, follower milestones, and chat spikes\n- Improved stream session tracking and alert payloads\n\n## 1.0.0\n- Initial release\n- Rumble API polling\n- Stream start/end detection\n- Viewer count change tracking\n- Template variable updates\n- Manual action handlers",
+	"keywords": "rumble, livestream, chat, followers, alerts",
+	"icon": "rumble.png",
 	"config": {
 		"settings": [
 			{
@@ -10316,127 +13732,127 @@ module.exports = RumblePlugin;
 		],
 		"variables": [
 			{
-				"name": "rumble_live",
+				"name": "live",
 				"description": "Whether the Rumble stream is currently live",
 				"value": false
 			},
 			{
-				"name": "rumble_viewers",
+				"name": "viewers",
 				"description": "Current number of concurrent viewers watching the stream",
 				"value": 0
 			},
 			{
-				"name": "rumble_joined",
+				"name": "joined",
 				"description": "Total viewers that have joined the stream session",
 				"value": 0
 			},
 			{
-				"name": "rumble_title",
+				"name": "title",
 				"description": "Current stream title",
 				"value": ""
 			},
 			{
-				"name": "rumble_thumbnail",
+				"name": "thumbnail",
 				"description": "Stream thumbnail URL",
 				"value": ""
 			},
 			{
-				"name": "rumble_stream_url",
+				"name": "stream_url",
 				"description": "Public URL to the livestream",
 				"value": ""
 			},
 			{
-				"name": "rumble_video_id",
+				"name": "video_id",
 				"description": "Underlying Rumble video ID",
 				"value": ""
 			},
 			{
-				"name": "rumble_rumbles",
+				"name": "rumbles",
 				"description": "Current Rumble reaction count on the stream",
 				"value": 0
 			},
 			{
-				"name": "rumble_followers",
+				"name": "followers",
 				"description": "Current follower count of the channel",
 				"value": 0
 			},
 			{
-				"name": "rumble_likes",
+				"name": "likes",
 				"description": "Thumbs-up reactions on the stream",
 				"value": 0
 			},
 			{
-				"name": "rumble_dislikes",
+				"name": "dislikes",
 				"description": "Thumbs-down reactions on the stream",
 				"value": 0
 			},
 			{
-				"name": "rumble_subs",
+				"name": "subs",
 				"description": "Total paid subscriptions/memberships for the channel",
 				"value": 0
 			},
 			{
-				"name": "rumble_sub_gifts",
+				"name": "sub_gifts",
 				"description": "Gifted subscriptions/memberships received during the stream",
 				"value": 0
 			},
 			{
-				"name": "rumble_rants",
+				"name": "rants",
 				"description": "Number of Rants received this stream",
 				"value": 0
 			},
 			{
-				"name": "rumble_rant_amount",
+				"name": "rant_amount",
 				"description": "Total value of Rants received this stream",
 				"value": 0
 			},
 			{
-				"name": "rumble_chat_members",
+				"name": "chat_members",
 				"description": "Active chat members in the livestream chat",
 				"value": 0
 			},
 			{
-				"name": "rumble_category",
+				"name": "category",
 				"description": "Category assigned to the livestream",
 				"value": ""
 			},
 			{
-				"name": "rumble_description",
+				"name": "description",
 				"description": "Short description of the livestream",
 				"value": ""
 			},
 			{
-				"name": "rumble_language",
+				"name": "language",
 				"description": "Language reported by Rumble for the stream",
 				"value": ""
 			},
 			{
-				"name": "rumble_chat_url",
+				"name": "chat_url",
 				"description": "Direct URL to the livestream chat",
 				"value": ""
 			},
 			{
-				"name": "rumble_channel_name",
+				"name": "channel_name",
 				"description": "Rumble channel display name",
 				"value": ""
 			},
 			{
-				"name": "rumble_channel_image",
+				"name": "channel_image",
 				"description": "Avatar image URL for the Rumble channel",
 				"value": ""
 			},
 			{
-				"name": "rumble_started_at",
+				"name": "started_at",
 				"description": "Timestamp of when the stream went live (ISO 8601)",
 				"value": ""
 			},
 			{
-				"name": "rumble_scheduled_start",
+				"name": "scheduled_start",
 				"description": "Scheduled start time for the stream (ISO 8601)",
 				"value": ""
 			},
 			{
-				"name": "rumble_last_polled",
+				"name": "last_polled",
 				"description": "Timestamp (ISO 8601) of the most recent Rumble API poll",
 				"value": ""
 			}
@@ -10446,17 +13862,17 @@ module.exports = RumblePlugin;
 				"title": "Stream Started",
 				"key": "streamStarted",
 				"acceptedVariables": [
-					"rumble_live",
-					"rumble_viewers",
-					"rumble_title",
-					"rumble_stream_url",
-					"rumble_followers",
-					"rumble_likes",
-					"rumble_dislikes",
-					"rumble_subs",
-					"rumble_sub_gifts",
-					"rumble_rants",
-					"rumble_rant_amount"
+					"live",
+					"viewers",
+					"title",
+					"stream_url",
+					"followers",
+					"likes",
+					"dislikes",
+					"subs",
+					"sub_gifts",
+					"rants",
+					"rant_amount"
 				],
 				"defaultMessage": "{{username}} has started streaming on Rumble!",
 				"variationConditions": [
@@ -10470,16 +13886,16 @@ module.exports = RumblePlugin;
 				"title": "Stream Ended",
 				"key": "streamEnded",
 				"acceptedVariables": [
-					"rumble_live",
-					"rumble_viewers",
-					"rumble_title",
-					"rumble_followers",
-					"rumble_likes",
-					"rumble_dislikes",
-					"rumble_subs",
-					"rumble_sub_gifts",
-					"rumble_rants",
-					"rumble_rant_amount"
+					"live",
+					"viewers",
+					"title",
+					"followers",
+					"likes",
+					"dislikes",
+					"subs",
+					"sub_gifts",
+					"rants",
+					"rant_amount"
 				],
 				"defaultMessage": "{{username}} has ended their Rumble stream.",
 				"variationConditions": [
@@ -10492,12 +13908,8 @@ module.exports = RumblePlugin;
 			{
 				"title": "Follower",
 				"key": "follower",
-				"acceptedVariables": [
-					"rumble_followers",
-					"rumble_stream_url",
-					"rumble_title"
-				],
-				"defaultMessage": "New followers! Total is now {{rumble_followers}}.",
+				"acceptedVariables": ["followers", "stream_url", "title"],
+				"defaultMessage": "New followers! Total is now {{followers}}.",
 				"variationConditions": [
 					{
 						"type": "GREATER_NUMBER",
@@ -10512,13 +13924,8 @@ module.exports = RumblePlugin;
 			{
 				"title": "Rant",
 				"key": "rant",
-				"acceptedVariables": [
-					"rumble_rants",
-					"rumble_rant_amount",
-					"rumble_viewers",
-					"rumble_title"
-				],
-				"defaultMessage": "New rant received! Total rants: {{rumble_rants}} ({{rumble_rant_amount}})",
+				"acceptedVariables": ["rants", "rant_amount", "viewers", "title"],
+				"defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
 				"variationConditions": [
 					{
 						"type": "GREATER_NUMBER",
@@ -10533,12 +13940,8 @@ module.exports = RumblePlugin;
 			{
 				"title": "Like",
 				"key": "like",
-				"acceptedVariables": [
-					"rumble_likes",
-					"rumble_stream_url",
-					"rumble_title"
-				],
-				"defaultMessage": "Another thumbs-up! Likes: {{rumble_likes}}",
+				"acceptedVariables": ["likes", "stream_url", "title"],
+				"defaultMessage": "Another thumbs-up! Likes: {{likes}}",
 				"variationConditions": [
 					{
 						"type": "GREATER_NUMBER",
@@ -10553,12 +13956,8 @@ module.exports = RumblePlugin;
 			{
 				"title": "Dislike",
 				"key": "dislike",
-				"acceptedVariables": [
-					"rumble_dislikes",
-					"rumble_stream_url",
-					"rumble_title"
-				],
-				"defaultMessage": "Someone hit dislike. Total dislikes: {{rumble_dislikes}}",
+				"acceptedVariables": ["dislikes", "stream_url", "title"],
+				"defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
 				"variationConditions": [
 					{
 						"type": "GREATER_NUMBER",
@@ -10573,12 +13972,8 @@ module.exports = RumblePlugin;
 			{
 				"title": "Subscriber",
 				"key": "sub",
-				"acceptedVariables": [
-					"rumble_subs",
-					"rumble_stream_url",
-					"rumble_title"
-				],
-				"defaultMessage": "New subscription! Subs total: {{rumble_subs}}",
+				"acceptedVariables": ["subs", "stream_url", "title"],
+				"defaultMessage": "New subscription! Subs total: {{subs}}",
 				"variationConditions": [
 					{
 						"type": "GREATER_NUMBER",
@@ -10593,12 +13988,8 @@ module.exports = RumblePlugin;
 			{
 				"title": "Gift Subscription",
 				"key": "subGift",
-				"acceptedVariables": [
-					"rumble_sub_gifts",
-					"rumble_stream_url",
-					"rumble_title"
-				],
-				"defaultMessage": "Gifted subs came through! Gift total: {{rumble_sub_gifts}}",
+				"acceptedVariables": ["sub_gifts", "stream_url", "title"],
+				"defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
 				"variationConditions": [
 					{
 						"type": "GREATER_NUMBER",
@@ -10627,8 +14018,704 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.3"
 	}
+}
+
+```
+
+## steam/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const DEFAULTS = {
+	pollInterval: 120,
+	userAgent: "LumiaStream Steam Plugin/1.0.0",
+};
+
+const STEAM_API_BASE = "https://partner.steam-api.com";
+
+const VARIABLE_NAMES = {
+	steamId: "steam_steamid",
+	personaName: "steam_persona_name",
+	personaState: "steam_persona_state",
+	lastLogoff: "steam_last_logoff",
+	profileUrl: "steam_profile_url",
+	avatar: "steam_avatar",
+	gameCount: "steam_game_count",
+	recentGameName: "steam_recent_game_name",
+	recentGameAppId: "steam_recent_game_appid",
+	recentGamePlaytime: "steam_recent_game_playtime_2weeks",
+	achievementCount: "steam_achievement_count",
+	achievementUnlocked: "steam_achievement_unlocked_count",
+	lastUpdated: "steam_last_updated",
+	snapshot: "steam_snapshot_json",
+};
+
+class SteamPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._pollTimer = null;
+		this._refreshPromise = null;
+		this._lastConnectionState = null;
+		this._lastVariables = new Map();
+		this._globalBackoffUntil = 0;
+		this._authFailure = false;
+		this._resolvedSteamId = "";
+	}
+
+	async onload() {
+		await this._log("Steam plugin loaded.");
+
+		if (!this._hasRequiredSettings()) {
+			await this._log("Missing Steam API key or Steam ID.", "warn");
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		await this._refreshData({ reason: "startup" });
+		this._schedulePolling();
+	}
+
+	async onunload() {
+		this._clearPolling();
+		await this._updateConnectionState(false);
+		await this._log("Steam plugin stopped.");
+	}
+
+	async onsettingsupdate(settings, previous = {}) {
+		const pollChanged =
+			this._pollInterval(settings) !== this._pollInterval(previous);
+		const keyChanged = (settings?.apiKey ?? "") !== (previous?.apiKey ?? "");
+		const idChanged =
+			(settings?.steamIdOrVanity ?? "") !== (previous?.steamIdOrVanity ?? "");
+
+		if (pollChanged) {
+			this._schedulePolling();
+		}
+
+		if (keyChanged || idChanged) {
+			this._authFailure = false;
+			this._globalBackoffUntil = 0;
+			this._resolvedSteamId = "";
+		}
+
+		await this._refreshData({ reason: "settings-update" });
+	}
+
+	async validateAuth() {
+		if (!this._hasRequiredSettings()) {
+			await this._log("Validation failed: missing Steam API key or Steam ID.", "warn");
+			return false;
+		}
+
+		try {
+			const steamId = await this._resolveSteamId();
+			await this._fetchPlayerSummary(steamId);
+			await this._log("Steam API validation succeeded.");
+			return true;
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`Steam validation failed: ${message}`, "error");
+			return false;
+		}
+	}
+
+	_tag() {
+		return `[${this.manifest?.id ?? "steam"}]`;
+	}
+
+	async _log(message, severity = "info") {
+		const prefix = this._tag();
+		const decorated =
+			severity === "warn"
+				? `${prefix} ⚠️ ${message}`
+				: severity === "error"
+				? `${prefix} ❌ ${message}`
+				: `${prefix} ${message}`;
+
+		await this.lumia.addLog(decorated);
+	}
+
+	async _refreshData({ reason } = {}) {
+		if (!this._hasRequiredSettings()) {
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		if (this._authFailure) {
+			return;
+		}
+
+		const now = Date.now();
+		if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
+			return;
+		}
+
+		if (this._refreshPromise) {
+			return this._refreshPromise;
+		}
+
+		this._refreshPromise = (async () => {
+			try {
+				const steamId = await this._resolveSteamId();
+				const summaryResult = await this._safeFetch("summary", () =>
+					this._fetchPlayerSummary(steamId)
+				);
+				const ownedResult = await this._safeFetch("owned games", () =>
+					this._fetchOwnedGames(steamId)
+				);
+				const recentResult = await this._safeFetch("recent games", () =>
+					this._fetchRecentGames(steamId)
+				);
+				const achievementsResult = await this._safeFetch("achievements", () =>
+					this._fetchAchievements(steamId)
+				);
+
+				await this._applySummary(summaryResult.data, steamId);
+				await this._applyOwnedGames(ownedResult.data);
+				await this._applyRecentGames(recentResult.data);
+				await this._applyAchievements(achievementsResult.data);
+
+				const snapshot = {
+					summary: summaryResult.data,
+					owned: ownedResult.data,
+					recent: recentResult.data,
+					achievements: achievementsResult.data,
+				};
+
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.snapshot,
+					JSON.stringify(snapshot)
+				);
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.lastUpdated,
+					new Date().toISOString()
+				);
+
+				const successCount = [
+					summaryResult,
+					ownedResult,
+					recentResult,
+					achievementsResult,
+				].filter((result) => result.ok).length;
+
+				await this._updateConnectionState(successCount > 0);
+				await this._log(
+					`Steam data refreshed${reason ? ` (${reason})` : ""}.`
+				);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(`Failed to refresh Steam data: ${message}`, "warn");
+				await this._updateConnectionState(false);
+			}
+			this._refreshPromise = null;
+		})();
+
+		return this._refreshPromise;
+	}
+
+	async _resolveSteamId() {
+		if (this._resolvedSteamId) {
+			return this._resolvedSteamId;
+		}
+
+		const input = this._coerceString(this.settings?.steamIdOrVanity, "").trim();
+		if (!input) {
+			throw new Error("Missing Steam ID or vanity name.");
+		}
+
+		if (/^\d{17}$/.test(input)) {
+			this._resolvedSteamId = input;
+			return input;
+		}
+
+		const resolved = await this._fetchResolveVanity(input);
+		const steamId = this._coerceString(resolved?.steamid, "");
+		if (!steamId) {
+			throw new Error("Could not resolve vanity URL.");
+		}
+
+		this._resolvedSteamId = steamId;
+		return steamId;
+	}
+
+	async _fetchResolveVanity(vanity) {
+		const url = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v1/?key=${encodeURIComponent(
+			this._apiKey()
+		)}&vanityurl=${encodeURIComponent(vanity)}&url_type=1`;
+		const response = await this._fetchJson(url);
+		return response?.response ?? null;
+	}
+
+	async _fetchPlayerSummary(steamId) {
+		const url = `${STEAM_API_BASE}/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(
+			this._apiKey()
+		)}&steamids=${encodeURIComponent(steamId)}`;
+		const response = await this._fetchJson(url);
+		return response?.response?.players?.[0] ?? null;
+	}
+
+	async _fetchOwnedGames(steamId) {
+		const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
+			this._apiKey()
+		)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=0&include_played_free_games=1`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchRecentGames(steamId) {
+		const url = `${STEAM_API_BASE}/IPlayerService/GetRecentlyPlayedGames/v1/?key=${encodeURIComponent(
+			this._apiKey()
+		)}&steamid=${encodeURIComponent(steamId)}&count=1`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchAchievements(steamId) {
+		const appId = this._coerceNumber(this.settings?.appId, 0);
+		if (!appId) {
+			return null;
+		}
+
+		const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?key=${encodeURIComponent(
+			this._apiKey()
+		)}&steamid=${encodeURIComponent(steamId)}&appid=${appId}`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchJson(url) {
+		let response = await this._request(url);
+
+		if (response.status === 429) {
+			const retryAfter = this._coerceNumber(
+				response.headers.get("Retry-After"),
+				60
+			);
+			this._applyGlobalBackoff(retryAfter);
+			throw new Error(`Rate limited (429). Backing off for ${retryAfter}s.`);
+		}
+
+		if (response.status === 401 || response.status === 403) {
+			this._authFailure = true;
+			this._clearPolling();
+			await this._showApiKeyFailureToast();
+			throw new Error("Unauthorized. Check your Steam API key.");
+		}
+
+		if (!response.ok) {
+			const body = await response.text();
+			const trimmed = this._truncateError(body);
+			throw new Error(
+				`Steam API error (${response.status}) on ${url}: ${trimmed || "No response body"}`
+			);
+		}
+
+		return response.json();
+	}
+
+	async _request(url) {
+		const headers = {
+			Accept: "application/json",
+			"User-Agent": DEFAULTS.userAgent,
+		};
+
+		return fetch(url, { headers });
+	}
+
+	async _applySummary(summary, steamId) {
+		if (!summary) {
+			await this._setVariableIfChanged(VARIABLE_NAMES.steamId, steamId);
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.steamId,
+			this._coerceString(summary?.steamid ?? steamId, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.personaName,
+			this._coerceString(summary?.personaname, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.personaState,
+			this._coerceNumber(summary?.personastate, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastLogoff,
+			this._coerceNumber(summary?.lastlogoff, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.profileUrl,
+			this._coerceString(summary?.profileurl, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.avatar,
+			this._coerceString(summary?.avatarfull, "")
+		);
+	}
+
+	async _applyOwnedGames(owned) {
+		if (!owned) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.gameCount,
+			this._coerceNumber(owned?.response?.game_count, 0)
+		);
+	}
+
+	async _applyRecentGames(recent) {
+		if (!recent) {
+			return;
+		}
+
+		const games = Array.isArray(recent?.response?.games)
+			? recent.response.games
+			: [];
+		const latest = games[0] ?? null;
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.recentGameName,
+			this._coerceString(latest?.name, "")
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.recentGameAppId,
+			this._coerceNumber(latest?.appid, 0)
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.recentGamePlaytime,
+			this._coerceNumber(latest?.playtime_2weeks, 0)
+		);
+	}
+
+	async _applyAchievements(payload) {
+		if (!payload) {
+			return;
+		}
+
+		const achievements = Array.isArray(payload?.playerstats?.achievements)
+			? payload.playerstats.achievements
+			: [];
+		const unlocked = achievements.filter((a) => a?.achieved === 1).length;
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.achievementCount,
+			achievements.length
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.achievementUnlocked,
+			unlocked
+		);
+	}
+
+	_applyGlobalBackoff(seconds) {
+		const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
+		const until = Date.now() + delayMs;
+		if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
+			this._globalBackoffUntil = until;
+		}
+	}
+
+	async _showApiKeyFailureToast() {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message: "Invalid Steam API key. Update the plugin settings.",
+				time: 6,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	_schedulePolling() {
+		this._clearPolling();
+
+		const intervalSeconds = this._pollInterval(this.settings);
+		if (!this._hasRequiredSettings() || intervalSeconds <= 0) {
+			return;
+		}
+
+		this._pollTimer = setInterval(() => {
+			void this._refreshData({ reason: "poll" });
+		}, intervalSeconds * 1000);
+	}
+
+	_clearPolling() {
+		if (this._pollTimer) {
+			clearInterval(this._pollTimer);
+			this._pollTimer = null;
+		}
+	}
+
+	_hasRequiredSettings() {
+		return Boolean(this._apiKey() && this._steamIdInput());
+	}
+
+	_apiKey() {
+		return this._coerceString(this.settings?.apiKey, "");
+	}
+
+	_steamIdInput() {
+		return this._coerceString(this.settings?.steamIdOrVanity, "");
+	}
+
+	_pollInterval(settings = this.settings) {
+		const interval = this._coerceNumber(
+			settings?.pollInterval,
+			DEFAULTS.pollInterval
+		);
+		return Number.isFinite(interval) ? interval : DEFAULTS.pollInterval;
+	}
+
+	async _updateConnectionState(state) {
+		if (this._lastConnectionState === state) {
+			return;
+		}
+
+		this._lastConnectionState = state;
+
+		if (typeof this.lumia.updateConnection === "function") {
+			try {
+				await this.lumia.updateConnection(state);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(
+					`Failed to update connection state: ${message}`,
+					"warn"
+				);
+			}
+		}
+	}
+
+	async _safeFetch(label, fn) {
+		try {
+			return { ok: true, data: await fn() };
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`${label} fetch failed: ${message}`, "warn");
+			return { ok: false, data: null };
+		}
+	}
+
+	async _setVariable(name, value) {
+		if (typeof this.lumia.setVariable !== "function") {
+			return;
+		}
+
+		await this.lumia.setVariable(name, value);
+	}
+
+	async _setVariableIfChanged(name, value) {
+		const normalized = this._normalizeValue(value);
+		const previous = this._lastVariables.get(name);
+		if (this._valuesEqual(previous, normalized)) {
+			return false;
+		}
+		this._lastVariables.set(name, normalized);
+		await this._setVariable(name, value);
+		return true;
+	}
+
+	_normalizeValue(value) {
+		if (value === null || value === undefined) {
+			return "";
+		}
+		if (typeof value === "object") {
+			try {
+				return JSON.stringify(value);
+			} catch (error) {
+				return String(value);
+			}
+		}
+		return String(value);
+	}
+
+	_valuesEqual(a, b) {
+		return a === b;
+	}
+
+	_errorMessage(error) {
+		if (!error) {
+			return "Unknown error";
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		return error?.message || String(error);
+	}
+
+	_truncateError(value) {
+		if (!value) {
+			return "";
+		}
+		const trimmed = String(value).replace(/\s+/g, " ").trim();
+		return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+	}
+
+	_coerceNumber(value, fallback = 0) {
+		const number = Number(value);
+		return Number.isFinite(number) ? number : fallback;
+	}
+
+	_coerceString(value, fallback = "") {
+		if (typeof value === "string") {
+			return value;
+		}
+		if (value === null || value === undefined) {
+			return fallback;
+		}
+		return String(value);
+	}
+}
+
+module.exports = SteamPlugin;
+
+```
+
+## steam/manifest.json
+
+```
+{
+	"id": "steam",
+	"name": "Steam",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Pull Steam profile and game data into Lumia variables using the Steam Web API.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "examples",
+	"icon": "",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Steam Web API Key",
+				"type": "password",
+				"helperText": "Required for all Steam Web API requests.",
+				"required": true
+			},
+			{
+				"key": "steamIdOrVanity",
+				"label": "Steam ID or Vanity Name",
+				"type": "text",
+				"helperText": "Enter a SteamID64 or a vanity URL name.",
+				"required": true
+			},
+			{
+				"key": "appId",
+				"label": "App ID (optional)",
+				"type": "number",
+				"helperText": "Used to fetch achievement data for a specific game.",
+				"required": false
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 120,
+				"min": 60,
+				"max": 900,
+				"helperText": "How often to refresh Steam data (60-900 seconds)."
+			}
+		],
+		"settings_tutorial": "---\n### Steam Web API Key\n1) Visit [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey).\n2) Create a Steam Web API key.\n3) Paste it into **Steam Web API Key**.\n\n### Steam ID\nEnter your SteamID64 or your vanity URL name.\n---",
+		"actions": [],
+		"variables": [
+			{
+				"name": "steam_steamid",
+				"description": "SteamID64.",
+				"value": ""
+			},
+			{
+				"name": "steam_persona_name",
+				"description": "Persona name.",
+				"value": ""
+			},
+			{
+				"name": "steam_persona_state",
+				"description": "Persona state.",
+				"value": 0
+			},
+			{
+				"name": "steam_last_logoff",
+				"description": "Last logoff timestamp (Unix).",
+				"value": 0
+			},
+			{
+				"name": "steam_profile_url",
+				"description": "Profile URL.",
+				"value": ""
+			},
+			{
+				"name": "steam_avatar",
+				"description": "Avatar URL.",
+				"value": ""
+			},
+			{
+				"name": "steam_game_count",
+				"description": "Owned games count.",
+				"value": 0
+			},
+			{
+				"name": "steam_recent_game_name",
+				"description": "Most recent game name.",
+				"value": ""
+			},
+			{
+				"name": "steam_recent_game_appid",
+				"description": "Most recent game app ID.",
+				"value": 0
+			},
+			{
+				"name": "steam_recent_game_playtime_2weeks",
+				"description": "Playtime (2 weeks) in minutes for most recent game.",
+				"value": 0
+			},
+			{
+				"name": "steam_achievement_count",
+				"description": "Total achievements returned for the selected App ID.",
+				"value": 0
+			},
+			{
+				"name": "steam_achievement_unlocked_count",
+				"description": "Unlocked achievements for the selected App ID.",
+				"value": 0
+			},
+			{
+				"name": "steam_last_updated",
+				"description": "Timestamp when Steam data was last refreshed.",
+				"value": ""
+			},
+			{
+				"name": "steam_snapshot_json",
+				"description": "JSON snapshot of the latest Steam payloads.",
+				"value": ""
+			}
+		]
+	}
+}
+```
+
+## steam/package.json
+
+```
+{
+  "name": "lumia-example-steam",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Example Lumia Stream plugin that pulls Steam data from the Steam Web API.",
+  "main": "main.js",
+  "scripts": {},
+  "dependencies": {
+    "@lumiastream/plugin": "^0.1.18"
+  }
 }
 
 ```
@@ -10737,7 +14824,6 @@ class StripePaymentsPlugin extends Plugin {
 	}
 
 	async onload() {
-		await this._log("Stripe plugin loaded");
 		this._loadLastEventState();
 		await this._primeEventsIfNeeded();
 		await this._startPolling();
@@ -10745,12 +14831,9 @@ class StripePaymentsPlugin extends Plugin {
 
 	async onunload() {
 		this._stopPolling();
-		await this._log("Stripe plugin unloaded");
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
-		await this._log("Settings updated");
-
 		if (settings?.alertOnStartup && !previous?.alertOnStartup) {
 			this._resetEventState();
 		}
@@ -10786,7 +14869,7 @@ class StripePaymentsPlugin extends Plugin {
 				default:
 					await this._log(
 						`Unknown action type: ${action?.type ?? "undefined"}`,
-						"warn"
+						"warn",
 					);
 			}
 		}
@@ -10828,9 +14911,7 @@ class StripePaymentsPlugin extends Plugin {
 	_eventTypes() {
 		const raw = this.settings?.eventTypes;
 		if (Array.isArray(raw)) {
-			const list = raw
-				.map((entry) => String(entry).trim())
-				.filter(Boolean);
+			const list = raw.map((entry) => String(entry).trim()).filter(Boolean);
 			return list;
 		}
 
@@ -10899,7 +14980,7 @@ class StripePaymentsPlugin extends Plugin {
 		} catch (error) {
 			await this._log(
 				`Unable to prime events: ${error?.message ?? error}`,
-				"warn"
+				"warn",
 			);
 		}
 	}
@@ -10913,7 +14994,7 @@ class StripePaymentsPlugin extends Plugin {
 			if (!secretKey) {
 				await this._log(
 					"Missing Stripe Secret API Key. Update settings and save.",
-					"warn"
+					"warn",
 				);
 				return;
 			}
@@ -10968,7 +15049,9 @@ class StripePaymentsPlugin extends Plugin {
 
 	_filterNewEvents(events) {
 		if (!Array.isArray(events) || !events.length) return [];
-		const sorted = [...events].sort((a, b) => (a?.created ?? 0) - (b?.created ?? 0));
+		const sorted = [...events].sort(
+			(a, b) => (a?.created ?? 0) - (b?.created ?? 0),
+		);
 		const results = [];
 
 		for (const event of sorted) {
@@ -11057,12 +15140,12 @@ class StripePaymentsPlugin extends Plugin {
 			const url = paymentLink?.url ?? "";
 			await this.lumia.setVariable(VARIABLE_NAMES.lastPaymentLinkUrl, url);
 			await this._log(
-				url ? `Created Payment Link: ${url}` : "Created Payment Link."
+				url ? `Created Payment Link: ${url}` : "Created Payment Link.",
 			);
 		} catch (error) {
 			await this._log(
 				`Failed to create Payment Link: ${error?.message ?? error}`,
-				"error"
+				"error",
 			);
 		}
 	}
@@ -11098,7 +15181,7 @@ class StripePaymentsPlugin extends Plugin {
 		} catch (error) {
 			await this._log(
 				`Failed to create customer: ${error?.message ?? error}`,
-				"error"
+				"error",
 			);
 		}
 	}
@@ -11115,30 +15198,32 @@ class StripePaymentsPlugin extends Plugin {
 			const available = Array.isArray(balance?.available)
 				? balance.available[0]
 				: null;
-			const pending = Array.isArray(balance?.pending) ? balance.pending[0] : null;
+			const pending = Array.isArray(balance?.pending)
+				? balance.pending[0]
+				: null;
 
 			await this.lumia.setVariable(
 				VARIABLE_NAMES.balanceAvailableAmount,
-				available?.amount ?? ""
+				available?.amount ?? "",
 			);
 			await this.lumia.setVariable(
 				VARIABLE_NAMES.balanceAvailableCurrency,
-				available?.currency ?? ""
+				available?.currency ?? "",
 			);
 			await this.lumia.setVariable(
 				VARIABLE_NAMES.balancePendingAmount,
-				pending?.amount ?? ""
+				pending?.amount ?? "",
 			);
 			await this.lumia.setVariable(
 				VARIABLE_NAMES.balancePendingCurrency,
-				pending?.currency ?? ""
+				pending?.currency ?? "",
 			);
 
 			await this._log("Stripe balance refreshed.");
 		} catch (error) {
 			await this._log(
 				`Failed to refresh balance: ${error?.message ?? error}`,
-				"error"
+				"error",
 			);
 		}
 	}
@@ -11168,31 +15253,25 @@ class StripePaymentsPlugin extends Plugin {
 		await this.lumia.setVariable(VARIABLE_NAMES.lastEventId, event?.id ?? "");
 		await this.lumia.setVariable(
 			VARIABLE_NAMES.lastEventType,
-			event?.type ?? ""
+			event?.type ?? "",
 		);
 		await this.lumia.setVariable(VARIABLE_NAMES.lastEventCreated, created);
-		await this.lumia.setVariable(
-			VARIABLE_NAMES.lastEventObject,
-			objectId
-		);
-		await this.lumia.setVariable(
-			VARIABLE_NAMES.lastEventAmount,
-			amount ?? ""
-		);
+		await this.lumia.setVariable(VARIABLE_NAMES.lastEventObject, objectId);
+		await this.lumia.setVariable(VARIABLE_NAMES.lastEventAmount, amount ?? "");
 		await this.lumia.setVariable(
 			VARIABLE_NAMES.lastEventCurrency,
-			currency ?? ""
+			currency ?? "",
 		);
 		await this.lumia.setVariable(
 			VARIABLE_NAMES.lastEventCustomer,
-			customerValue ?? ""
+			customerValue ?? "",
 		);
 	}
 
 	async _setLastSync() {
 		await this.lumia.setVariable(
 			VARIABLE_NAMES.lastSync,
-			new Date().toISOString()
+			new Date().toISOString(),
 		);
 	}
 
@@ -11292,13 +15371,17 @@ class StripePaymentsPlugin extends Plugin {
 	}
 
 	async _log(message, severity = "info") {
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
+
 		const prefix = `[${this.manifest?.id ?? "stripe_payments"}]`;
 		const decorated =
 			severity === "warn"
 				? `${prefix} WARN: ${message}`
 				: severity === "error"
-				? `${prefix} ERROR: ${message}`
-				: `${prefix} ${message}`;
+					? `${prefix} ERROR: ${message}`
+					: `${prefix} ${message}`;
 
 		await this.lumia.addLog(decorated);
 	}
@@ -11316,9 +15399,12 @@ module.exports = StripePaymentsPlugin;
 	"name": "Stripe Payments",
 	"version": "1.0.0",
 	"author": "Lumia Stream",
-	"description": "Monitor Stripe events, trigger Lumia alerts, and create Payment Links.",
+	"description": "Monitor Stripe events, surface balances and customers, and create Payment Links via actions.",
+	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "apps",
+	"keywords": "stripe, payments, payment links, events, alerts",
+	"icon": "stripe.png",
 	"config": {
 		"settings_tutorial": "---\n### Get a Stripe Secret Key\n1) Open Stripe Dashboard -> Developers -> API keys.\n2) Copy your Secret key (starts with `sk_test_` or `sk_live_`).\n3) Paste it into **Secret API Key** below and click Save.\n---\n### Event Filters\nAdd one or more event types to monitor (example: `payment_intent.succeeded`, `checkout.session.completed`).\nLeave the list empty to receive all events.\n---\n### Polling\nSet how often the plugin checks Stripe for new events. Shorter intervals mean faster alerts but more API calls.\n---",
 		"actions_tutorial": "---\n### Actions\n- **Refresh Events**: Poll Stripe immediately and fire alerts for new events.\n- **Create Payment Link**: Generate a Stripe Payment Link from a Price ID.\n- **Create Customer**: Create a Stripe Customer record.\n- **Refresh Balance**: Pull the latest Stripe balance summary.\n---",
@@ -11549,10 +15635,10 @@ module.exports = StripePaymentsPlugin;
 	"name": "lumia-stripe-payments-plugin",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Stripe payments plugin example for Lumia Stream.",
+	"description": "Stripe payments plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.3"
 	}
 }
 
@@ -11722,20 +15808,14 @@ class TikfinityPlugin extends Plugin {
 	}
 
 	async onload() {
-		await this.lumia.addLog("[Tikfinity] Plugin loading...");
-
 		if (this.username) {
 			await this.connect({ showToast: false });
 		}
-
-		await this.lumia.addLog("[Tikfinity] Plugin loaded");
 	}
 
 	async onunload() {
-		await this.lumia.addLog("[Tikfinity] Plugin unloading...");
 		this.isManuallyDisconnected = true;
 		await this.disconnect(false);
-		await this.lumia.addLog("[Tikfinity] Plugin unloaded");
 	}
 
 	async onsettingsupdate(settings, previousSettings) {
@@ -11779,14 +15859,12 @@ class TikfinityPlugin extends Plugin {
 				switch (action.type) {
 					case "manual_connect": {
 						await this.connect({ showToast: true });
-						await this.lumia.addLog("[Tikfinity] Manual connect triggered");
 						break;
 					}
 
 					case "manual_disconnect": {
 						this.isManuallyDisconnected = true;
 						await this.disconnect(true);
-						await this.lumia.addLog("[Tikfinity] Manual disconnect triggered");
 						break;
 					}
 
@@ -11799,7 +15877,6 @@ class TikfinityPlugin extends Plugin {
 								viewers: this.sessionData.viewers,
 							},
 						});
-						await this.lumia.addLog("[Tikfinity] Test alert triggered");
 						break;
 					}
 
@@ -11856,7 +15933,6 @@ class TikfinityPlugin extends Plugin {
 		const { showToast = true } = options;
 
 		if (this.isConnecting) {
-			await this.lumia.addLog("[Tikfinity] Connection already in progress");
 			return;
 		}
 
@@ -11871,7 +15947,6 @@ class TikfinityPlugin extends Plugin {
 		}
 
 		if (this.ws && this.ws.readyState === 1) {
-			await this.lumia.addLog("[Tikfinity] Already connected");
 			return;
 		}
 
@@ -11880,7 +15955,6 @@ class TikfinityPlugin extends Plugin {
 			this.isManuallyDisconnected = false;
 
 			const wsUrl = this.buildWebSocketUrl();
-			await this.lumia.addLog(`[Tikfinity] Connecting to ${wsUrl}`);
 
 			this.ws = new WebSocket(wsUrl);
 
@@ -11941,7 +16015,6 @@ class TikfinityPlugin extends Plugin {
 
 	async handleOpen(showToast = true) {
 		this.isConnecting = false;
-		await this.lumia.addLog("[Tikfinity] WebSocket connected");
 
 		if (showToast) {
 			await this.lumia.showToast({
@@ -11971,7 +16044,6 @@ class TikfinityPlugin extends Plugin {
 	}
 
 	async handleClose() {
-		await this.lumia.addLog("[Tikfinity] WebSocket disconnected");
 		await this.lumia.updateConnection(false);
 		await this.updateVariable("tikfinity_connected", false);
 
@@ -11988,10 +16060,6 @@ class TikfinityPlugin extends Plugin {
 
 		const interval = this.normalizeReconnectInterval(
 			this.currentSettings.reconnectInterval,
-		);
-
-		await this.lumia.addLog(
-			`[Tikfinity] Scheduling reconnect in ${interval} seconds`,
 		);
 
 		this.reconnectTimeoutId = setTimeout(() => {
@@ -12426,10 +16494,11 @@ module.exports = TikfinityPlugin;
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "https://github.com/LumiaStream/tikfinity-plugin",
-	"description": "Connect to TikTok LIVE streams via Tikfinity Desktop WebSocket service to receive real-time events like chat, gifts, follows, shares, likes, and more.",
+	"description": "Connect to Tikfinity WebSocket to ingest TikTok LIVE events and trigger Lumia alerts.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "platforms",
+	"keywords": "tiktok, live, tikfinity, chat, gifts",
 	"icon": "tikfinity-icon.png",
 	"changelog": "# Changelog\n\n## 1.0.0\n- Initial release\n- WebSocket connection to Tikfinity API\n- Real-time event processing for chat, gifts, follows, shares, likes\n- Stream start/end detection\n- Viewer count tracking\n- Template variable updates\n- Manual connection/disconnection handlers",
 	"config": {
@@ -12674,7 +16743,7 @@ module.exports = TikfinityPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.3"
 	}
 }
 
@@ -12689,11 +16758,11 @@ This example plugin polls the Unraid GraphQL API and exposes array + Docker stat
 
 ## Setup
 
-1) Enable the Unraid API and create an API key in the Unraid web UI (Settings > Management Access).
-2) Configure the plugin settings:
+1. Enable the Unraid API and create an API key in the Unraid web UI (Settings > Management Access).
+2. Configure the plugin settings:
    - `Server Base URL`: e.g. `http://tower.local` or `http://192.168.1.10`
    - `API Key`: the key you generated in Unraid
-3) (Optional) Adjust the polling interval and timeout.
+3. (Optional) Adjust the polling interval and timeout.
 
 ## Actions
 
@@ -12705,6 +16774,7 @@ This example plugin polls the Unraid GraphQL API and exposes array + Docker stat
 - `Send Unraid Notification` - create an Unraid notification.
 
 Tips:
+
 - Names can be taken from the Unraid UI (Docker tab / VMs tab).
 - Prefixed IDs can be queried via GraphQL:
   - Docker: `docker { containers { id names } }`
@@ -12714,31 +16784,31 @@ Tips:
 
 ## Variables
 
-- `unraid_array_state`
-- `unraid_array_total_bytes`
-- `unraid_array_used_bytes`
-- `unraid_array_free_bytes`
-- `unraid_disk_count`
-- `unraid_disk_total_count`
-- `unraid_disk_temp_max_c`
-- `unraid_disk_temp_avg_c`
-- `unraid_disk_smart_unknown_count`
-- `unraid_disk_spinning_count`
-- `unraid_disks_json`
-- `unraid_docker_total`
-- `unraid_docker_running`
-- `unraid_docker_stopped`
-- `unraid_docker_stopped_names`
-- `unraid_os_release`
-- `unraid_os_uptime` (seconds or formatted string, depending on API)
-- `unraid_cpu_brand`
-- `unraid_cpu_percent`
-- `unraid_mem_percent`
-- `unraid_mem_total_bytes`
-- `unraid_mem_used_bytes`
-- `unraid_mem_free_bytes`
-- `unraid_mem_available_bytes`
-- `unraid_last_updated`
+- `array_state`
+- `array_total_bytes`
+- `array_used_bytes`
+- `array_free_bytes`
+- `disk_count`
+- `disk_total_count`
+- `disk_temp_max_c`
+- `disk_temp_avg_c`
+- `disk_smart_unknown_count`
+- `disk_spinning_count`
+- `disks_json`
+- `docker_total`
+- `docker_running`
+- `docker_stopped`
+- `docker_stopped_names`
+- `os_release`
+- `os_uptime` (seconds or formatted string, depending on API)
+- `cpu_brand`
+- `cpu_percent`
+- `mem_percent`
+- `mem_total_bytes`
+- `mem_used_bytes`
+- `mem_free_bytes`
+- `mem_available_bytes`
+- `last_updated`
 
 ## Notes
 
@@ -12761,43 +16831,30 @@ const DEFAULTS = {
 	requestTimeoutMs: 8000,
 };
 
+const MAX_BACKOFF_SECONDS = 600;
+const BACKOFF_FACTOR = 2;
+
 const ALERT_COOLDOWN_SECONDS = 300;
 
 const VARIABLE_NAMES = {
-	arrayState: "unraid_array_state",
-	arrayTotal: "unraid_array_total_bytes",
-	arrayUsed: "unraid_array_used_bytes",
-	arrayFree: "unraid_array_free_bytes",
-	diskCount: "unraid_disk_count",
-	diskTotalCount: "unraid_disk_total_count",
-	diskTempMax: "unraid_disk_temp_max_c",
-	diskTempAvg: "unraid_disk_temp_avg_c",
-	diskSmartUnknownCount: "unraid_disk_smart_unknown_count",
-	diskSpinningCount: "unraid_disk_spinning_count",
-	disksJson: "unraid_disks_json",
-	dockerTotal: "unraid_docker_total",
-	dockerRunning: "unraid_docker_running",
-	dockerStopped: "unraid_docker_stopped",
-	dockerStoppedNames: "unraid_docker_stopped_names",
-	osRelease: "unraid_os_release",
-	osUptime: "unraid_os_uptime",
-	cpuBrand: "unraid_cpu_brand",
-	cpuPercent: "unraid_cpu_percent",
-	memPercent: "unraid_mem_percent",
-	memTotal: "unraid_mem_total_bytes",
-	memUsed: "unraid_mem_used_bytes",
-	memFree: "unraid_mem_free_bytes",
-	memAvailable: "unraid_mem_available_bytes",
-	lastUpdated: "unraid_last_updated",
-};
-
-const ALERT_KEYS = {
-	cpuHigh: "unraid_cpu_high",
-	memHigh: "unraid_mem_high",
-	diskTempHigh: "unraid_disk_temp_high",
-	diskSmart: "unraid_disk_smart",
-	dockerStopped: "unraid_docker_stopped",
-	arrayState: "unraid_array_state_change",
+	arrayState: "array_state",
+	diskCount: "disk_count",
+	diskTotalCount: "disk_total_count",
+	diskTempMax: "disk_temp_max_c",
+	diskTempAvg: "disk_temp_avg_c",
+	dockerTotal: "docker_total",
+	dockerRunning: "docker_running",
+	dockerStopped: "docker_stopped",
+	dockerStoppedNames: "docker_stopped_names",
+	osRelease: "os_release",
+	osUptime: "os_uptime",
+	cpuBrand: "cpu_brand",
+	cpuPercent: "cpu_percent",
+	memPercent: "mem_percent",
+	memTotal: "mem_total_bytes",
+	memUsed: "mem_used_bytes",
+	memFree: "mem_free_bytes",
+	memAvailable: "mem_available_bytes",
 };
 
 class UnraidPlugin extends Plugin {
@@ -12806,7 +16863,6 @@ class UnraidPlugin extends Plugin {
 		this._pollTimer = null;
 		this._refreshPromise = null;
 		this._lastConnectionState = null;
-		this._lastArrayState = null;
 		this._lastVariables = new Map();
 		this._dockerInfo = null;
 		this._dockerIndex = new Map();
@@ -12817,10 +16873,12 @@ class UnraidPlugin extends Plugin {
 		this._arrayStateOptions = null;
 		this._notificationImportance = null;
 		this._alertState = new Map();
+		this._failureCount = 0;
+		this._lastPollMs = null;
+		this._lastBackoffSeconds = 0;
 	}
 
 	async onload() {
-		await this._log("Unraid plugin loaded.");
 		await this._refresh({ reason: "startup" });
 		this._schedulePolling();
 	}
@@ -12828,7 +16886,6 @@ class UnraidPlugin extends Plugin {
 	async onunload() {
 		this._clearPolling();
 		await this._updateConnectionState(false);
-		await this._log("Unraid plugin stopped.");
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
@@ -12838,8 +16895,7 @@ class UnraidPlugin extends Plugin {
 
 		const baseUrlChanged =
 			(settings?.baseUrl || "") !== (previous?.baseUrl || "");
-		const apiKeyChanged =
-			(settings?.apiKey || "") !== (previous?.apiKey || "");
+		const apiKeyChanged = (settings?.apiKey || "") !== (previous?.apiKey || "");
 
 		if (pollChanged || baseUrlChanged || apiKeyChanged) {
 			this._schedulePolling();
@@ -12851,48 +16907,41 @@ class UnraidPlugin extends Plugin {
 		const actions = Array.isArray(config.actions) ? config.actions : [];
 		for (const action of actions) {
 			switch (action?.type) {
-				case "unraid_refresh":
+				case "refresh":
 					await this._refresh({ reason: "manual-action" });
 					break;
-				case "unraid_docker_action":
+				case "docker_action":
 					await this._handleDockerAction(action.data);
 					break;
-				case "unraid_vm_action":
+				case "vm_action":
 					await this._handleVmAction(action.data);
 					break;
-				case "unraid_parity_action":
-					await this._handleParityAction(action.data);
-					break;
-				case "unraid_array_state":
-					await this._handleArrayStateAction(action.data);
-					break;
-				case "unraid_notify":
+				case "notify":
 					await this._handleNotificationAction(action.data);
 					break;
-				default:
-					await this._log(
-						`Unknown action type: ${action?.type ?? "undefined"}`,
-						"warn"
-					);
 			}
 		}
 	}
 
 	async validateAuth() {
 		if (!this._hasCredentials()) {
-			await this._log("Validation failed: missing base URL or API key.", "warn");
+			await this._log(
+				"Validation failed: missing base URL or API key.",
+				"warn",
+			);
 			return false;
 		}
 
 		try {
 			await this._fetchSummary();
-			await this._log("Unraid authentication succeeded.");
 			return true;
 		} catch (error) {
-			await this._log(
-				`Unraid validation failed: ${this._errorMessage(error)}`,
-				"error"
-			);
+			if (!this._isTransientNetworkError(error)) {
+				await this._log(
+					`Unraid validation failed: ${this._errorMessage(error)}`,
+					"error",
+				);
+			}
 			return false;
 		}
 	}
@@ -12912,12 +16961,13 @@ class UnraidPlugin extends Plugin {
 				const data = await this._fetchSummary();
 				await this._handleSummary(data, reason);
 				await this._updateConnectionState(true);
+				if (this._failureCount) {
+					this._failureCount = 0;
+					this._lastBackoffSeconds = 0;
+					this._schedulePolling();
+				}
 			} catch (error) {
-				await this._log(
-					`Refresh failed: ${this._errorMessage(error)}`,
-					"error"
-				);
-				await this._updateConnectionState(false);
+				await this._handleRefreshFailure(error);
 			}
 		})().finally(() => {
 			this._refreshPromise = null;
@@ -12953,7 +17003,7 @@ class UnraidPlugin extends Plugin {
 			? dockerContainers.filter((container) => {
 					const state = (container?.state || "").toString().toLowerCase();
 					return state === "running";
-			  }).length
+				}).length
 			: 0;
 
 		const dockerTotal = Array.isArray(dockerContainers)
@@ -12965,13 +17015,11 @@ class UnraidPlugin extends Plugin {
 		const dockerStoppedNames = Array.isArray(dockerContainers)
 			? dockerContainers
 					.filter((container) => {
-						const state = (container?.state || "")
-							.toString()
-							.toLowerCase();
+						const state = (container?.state || "").toString().toLowerCase();
 						return state && state !== "running";
 					})
 					.flatMap((container) =>
-						Array.isArray(container?.names) ? container.names : []
+						Array.isArray(container?.names) ? container.names : [],
 					)
 					.map((name) => (name || "").toString().replace(/^\/+/, ""))
 					.filter(Boolean)
@@ -12985,23 +17033,11 @@ class UnraidPlugin extends Plugin {
 		}
 
 		await this._setVariable(VARIABLE_NAMES.arrayState, arrayState);
-		await this._setVariable(
-			VARIABLE_NAMES.arrayTotal,
-			this._toNumber(capacity?.total)
-		);
-		await this._setVariable(
-			VARIABLE_NAMES.arrayUsed,
-			this._toNumber(capacity?.used)
-		);
-		await this._setVariable(
-			VARIABLE_NAMES.arrayFree,
-			this._toNumber(capacity?.free)
-		);
 		await this._setVariable(VARIABLE_NAMES.diskCount, disks.length);
 		if (Array.isArray(diskInventory)) {
 			await this._setVariable(
 				VARIABLE_NAMES.diskTotalCount,
-				diskInventory.length
+				diskInventory.length,
 			);
 		}
 		if (Array.isArray(dockerContainers)) {
@@ -13010,108 +17046,59 @@ class UnraidPlugin extends Plugin {
 			await this._setVariable(VARIABLE_NAMES.dockerStopped, dockerStopped);
 			await this._setVariable(
 				VARIABLE_NAMES.dockerStoppedNames,
-				dockerStoppedNames.join(", ")
+				dockerStoppedNames.join(", "),
 			);
 		}
 		await this._setVariable(
 			VARIABLE_NAMES.osRelease,
-			data?.info?.os?.release ?? ""
+			data?.info?.os?.release ?? "",
 		);
 		await this._setVariable(
 			VARIABLE_NAMES.osUptime,
-			this._coerceUptime(data?.info?.os?.uptime)
+			this._coerceUptime(data?.info?.os?.uptime),
 		);
 		await this._setVariable(
 			VARIABLE_NAMES.cpuBrand,
-			data?.info?.cpu?.brand ?? ""
+			data?.info?.cpu?.brand ?? "",
 		);
 		if (data?.metrics?.cpu?.percentTotal != null) {
 			await this._setVariable(
 				VARIABLE_NAMES.cpuPercent,
-				this._toNumber(data?.metrics?.cpu?.percentTotal)
+				this._toNumber(data?.metrics?.cpu?.percentTotal),
 			);
 		}
 		if (data?.metrics?.memory) {
 			await this._setVariable(
 				VARIABLE_NAMES.memPercent,
-				this._toNumber(memory?.percentTotal)
+				this._toNumber(memory?.percentTotal),
 			);
 			await this._setVariable(
 				VARIABLE_NAMES.memTotal,
-				this._toNumber(memory?.total)
+				this._toNumber(memory?.total),
 			);
 			await this._setVariable(
 				VARIABLE_NAMES.memUsed,
-				this._toNumber(memory?.used)
+				this._toNumber(memory?.used),
 			);
 			await this._setVariable(
 				VARIABLE_NAMES.memFree,
-				this._toNumber(memory?.free)
+				this._toNumber(memory?.free),
 			);
 			await this._setVariable(
 				VARIABLE_NAMES.memAvailable,
-				this._toNumber(memory?.available)
+				this._toNumber(memory?.available),
 			);
 		}
 		if (Array.isArray(diskInventory)) {
 			await this._updateDiskMetrics(diskInventory);
 		}
-		await this._setVariable(
-			VARIABLE_NAMES.lastUpdated,
-			new Date().toISOString()
-		);
-
-		// Alerts temporarily disabled.
-		// await this._maybeTriggerAlerts({
-		// 	arrayState,
-		// 	cpuPercent,
-		// 	memPercent,
-		// 	diskMetrics: Array.isArray(diskInventory)
-		// 		? {
-		// 				tempMax: this._toNumber(
-		// 					this._lastVariables.get(VARIABLE_NAMES.diskTempMax)
-		// 				),
-		// 				tempAvg: this._toNumber(
-		// 					this._lastVariables.get(VARIABLE_NAMES.diskTempAvg)
-		// 				),
-		// 				smartUnknownCount: this._toNumber(
-		// 					this._lastVariables.get(
-		// 						VARIABLE_NAMES.diskSmartUnknownCount
-		// 					)
-		// 				),
-		// 		  }
-		// 		: null,
-		// 	docker: Array.isArray(dockerContainers)
-		// 		? {
-		// 				stopped: dockerStopped,
-		// 				running: dockerRunning,
-		// 				total: dockerTotal,
-		// 				stoppedNames: dockerStoppedNames,
-		// 		  }
-		// 		: null,
-		// });
-
-		if (this.settings?.logArrayStateChanges) {
-			if (this._lastArrayState && this._lastArrayState !== arrayState) {
-				await this._log(
-					`Array state changed from ${this._lastArrayState} to ${arrayState}.`
-				);
-			}
-			this._lastArrayState = arrayState;
-		}
-
-		if (reason === "manual-action") {
-			await this._log("Manual refresh complete.");
-		}
+		// last_updated variable removed from manifest; keep logic minimal.
 	}
 
 	async _updateDiskMetrics(disks = []) {
 		if (!disks.length) {
 			await this._setVariable(VARIABLE_NAMES.diskTempMax, 0);
 			await this._setVariable(VARIABLE_NAMES.diskTempAvg, 0);
-			await this._setVariable(VARIABLE_NAMES.diskSmartUnknownCount, 0);
-			await this._setVariable(VARIABLE_NAMES.diskSpinningCount, 0);
-			await this._setVariable(VARIABLE_NAMES.disksJson, "[]");
 			return;
 		}
 
@@ -13123,37 +17110,8 @@ class UnraidPlugin extends Plugin {
 			? temps.reduce((sum, value) => sum + value, 0) / temps.length
 			: 0;
 
-		const smartUnknownCount = disks.filter(
-			(disk) => (disk?.smartStatus || "").toString() !== "OK"
-		).length;
-		const spinningCount = disks.filter((disk) => disk?.isSpinning).length;
-
 		await this._setVariable(VARIABLE_NAMES.diskTempMax, tempMax);
 		await this._setVariable(VARIABLE_NAMES.diskTempAvg, tempAvg);
-		await this._setVariable(
-			VARIABLE_NAMES.diskSmartUnknownCount,
-			smartUnknownCount
-		);
-		await this._setVariable(
-			VARIABLE_NAMES.diskSpinningCount,
-			spinningCount
-		);
-
-		const compact = disks.map((disk) => ({
-			name: disk?.name ?? "",
-			device: disk?.device ?? "",
-			vendor: disk?.vendor ?? "",
-			size: this._toNumber(disk?.size),
-			smartStatus: disk?.smartStatus ?? "",
-			temperature: Number.isFinite(Number(disk?.temperature))
-				? Number(disk.temperature)
-				: null,
-			isSpinning: Boolean(disk?.isSpinning),
-		}));
-		await this._setVariable(
-			VARIABLE_NAMES.disksJson,
-			JSON.stringify(compact)
-		);
 	}
 
 	_getAlertCooldownMs() {
@@ -13212,107 +17170,8 @@ class UnraidPlugin extends Plugin {
 		return false;
 	}
 
-	async _maybeTriggerAlerts(payload = {}) {
-		if (Number.isFinite(payload.cpuPercent)) {
-			if (this._shouldTriggerCooldown(ALERT_KEYS.cpuHigh)) {
-				await this.lumia.triggerAlert({
-					alert: ALERT_KEYS.cpuHigh,
-					dynamic: { value: payload.cpuPercent },
-					extraSettings: {
-						unraid_cpu_percent: payload.cpuPercent,
-					},
-				});
-			}
-		}
-
-		if (Number.isFinite(payload.memPercent)) {
-			if (this._shouldTriggerCooldown(ALERT_KEYS.memHigh)) {
-				await this.lumia.triggerAlert({
-					alert: ALERT_KEYS.memHigh,
-					dynamic: { value: payload.memPercent },
-					extraSettings: {
-						unraid_mem_percent: payload.memPercent,
-						unraid_mem_total_bytes: this._toNumber(
-							this._lastVariables.get(VARIABLE_NAMES.memTotal)
-						),
-						unraid_mem_used_bytes: this._toNumber(
-							this._lastVariables.get(VARIABLE_NAMES.memUsed)
-						),
-					},
-				});
-			}
-		}
-
-		if (payload.diskMetrics?.tempMax != null) {
-			if (this._shouldTriggerCooldown(ALERT_KEYS.diskTempHigh)) {
-				await this.lumia.triggerAlert({
-					alert: ALERT_KEYS.diskTempHigh,
-					dynamic: { value: payload.diskMetrics.tempMax },
-					extraSettings: {
-						unraid_disk_temp_max_c: payload.diskMetrics.tempMax,
-						unraid_disk_temp_avg_c: payload.diskMetrics.tempAvg,
-						unraid_disks_json: this._lastVariables.get(
-							VARIABLE_NAMES.disksJson
-						),
-					},
-				});
-			}
-		}
-
-		if (payload.diskMetrics) {
-			const active = payload.diskMetrics.smartUnknownCount > 0;
-			if (this._shouldTriggerPresenceAlert(ALERT_KEYS.diskSmart, active)) {
-				await this.lumia.triggerAlert({
-					alert: ALERT_KEYS.diskSmart,
-					dynamic: { value: payload.diskMetrics.smartUnknownCount },
-					extraSettings: {
-						unraid_disk_smart_unknown_count:
-							payload.diskMetrics.smartUnknownCount,
-						unraid_disks_json: this._lastVariables.get(
-							VARIABLE_NAMES.disksJson
-						),
-					},
-				});
-			}
-		}
-
-		if (payload.docker) {
-			const active = payload.docker.stopped > 0;
-			if (this._shouldTriggerPresenceAlert(ALERT_KEYS.dockerStopped, active)) {
-				await this.lumia.triggerAlert({
-					alert: ALERT_KEYS.dockerStopped,
-					dynamic: { value: payload.docker.stopped },
-					extraSettings: {
-						unraid_docker_stopped: payload.docker.stopped,
-						unraid_docker_running: payload.docker.running,
-						unraid_docker_total: payload.docker.total,
-						unraid_docker_stopped_names: payload.docker.stoppedNames.join(
-							", "
-						),
-					},
-				});
-			}
-		}
-
-		if (payload.arrayState) {
-			if (this._shouldTriggerChangeAlert(ALERT_KEYS.arrayState, payload.arrayState)) {
-				await this.lumia.triggerAlert({
-					alert: ALERT_KEYS.arrayState,
-					dynamic: { value: payload.arrayState },
-					extraSettings: {
-						unraid_array_state: payload.arrayState,
-					},
-				});
-			}
-		}
-	}
-
 	_normalizeName(value) {
-		return (value || "")
-			.toString()
-			.trim()
-			.replace(/^\/+/, "")
-			.toLowerCase();
+		return (value || "").toString().trim().replace(/^\/+/, "").toLowerCase();
 	}
 
 	_updateDockerIndex(containers = []) {
@@ -13398,7 +17257,10 @@ class UnraidPlugin extends Plugin {
 	async _handleDockerAction(data = {}) {
 		const operation = (data?.operation || "").toLowerCase();
 		if (!["start", "stop"].includes(operation)) {
-			await this._log("Docker action requires operation start or stop.", "warn");
+			await this._log(
+				"Docker action requires operation start or stop.",
+				"warn",
+			);
 			return;
 		}
 
@@ -13413,7 +17275,7 @@ class UnraidPlugin extends Plugin {
 		if (!fieldInfo) {
 			await this._log(
 				"Docker actions are not available in this Unraid API schema.",
-				"warn"
+				"warn",
 			);
 			return;
 		}
@@ -13424,7 +17286,7 @@ class UnraidPlugin extends Plugin {
 			if (!name) {
 				await this._log(
 					"Docker action requires a container id or name.",
-					"warn"
+					"warn",
 				);
 				return;
 			}
@@ -13439,8 +17301,6 @@ class UnraidPlugin extends Plugin {
 			await this._log("Docker container not found for the given name.", "warn");
 			return;
 		}
-
-		await this._log(`Running Docker ${operation} for ${id}.`);
 
 		const selection = this._requiresSelection(fieldInfo?.type);
 		const queryWithSelection = `
@@ -13490,7 +17350,7 @@ class UnraidPlugin extends Plugin {
 		if (!fieldInfo) {
 			await this._log(
 				"VM actions are not available in this Unraid API schema.",
-				"warn"
+				"warn",
 			);
 			return;
 		}
@@ -13514,8 +17374,6 @@ class UnraidPlugin extends Plugin {
 			await this._log("VM not found for the given name.", "warn");
 			return;
 		}
-
-		await this._log(`Running VM ${operation} for ${id}.`);
 
 		const selection = this._requiresSelection(fieldInfo?.type);
 		const queryWithSelection = `
@@ -13556,7 +17414,7 @@ class UnraidPlugin extends Plugin {
 		if (!fieldInfo) {
 			await this._log(
 				"Parity actions are not available in this Unraid API schema.",
-				"warn"
+				"warn",
 			);
 			return;
 		}
@@ -13622,7 +17480,7 @@ class UnraidPlugin extends Plugin {
 		if (!fieldInfo) {
 			await this._log(
 				"Array state actions are not available in this Unraid API schema.",
-				"warn"
+				"warn",
 			);
 			return;
 		}
@@ -13631,7 +17489,7 @@ class UnraidPlugin extends Plugin {
 		if (options.length && !options.includes(desiredState)) {
 			await this._log(
 				`Array state '${desiredState}' is not valid for this server.`,
-				"warn"
+				"warn",
 			);
 			return;
 		}
@@ -13653,7 +17511,12 @@ class UnraidPlugin extends Plugin {
 		`;
 		const primary = selection ? queryWithSelection : queryWithoutSelection;
 		const fallback = selection ? queryWithoutSelection : queryWithSelection;
-		await this._runMutation(primary, { state: desiredState }, "Array state", fallback);
+		await this._runMutation(
+			primary,
+			{ state: desiredState },
+			"Array state",
+			fallback,
+		);
 	}
 
 	async _handleNotificationAction(data = {}) {
@@ -13666,7 +17529,7 @@ class UnraidPlugin extends Plugin {
 		if (!title || !subject || !description || !importance) {
 			await this._log(
 				"Notification action requires title, subject, description, and importance.",
-				"warn"
+				"warn",
 			);
 			return;
 		}
@@ -13680,7 +17543,7 @@ class UnraidPlugin extends Plugin {
 		if (!createNotification) {
 			await this._log(
 				"Notifications are not available in this Unraid API schema.",
-				"warn"
+				"warn",
 			);
 			return;
 		}
@@ -13689,7 +17552,7 @@ class UnraidPlugin extends Plugin {
 		if (options.length && !options.includes(importance)) {
 			await this._log(
 				`Notification importance '${importance}' is not valid for this server.`,
-				"warn"
+				"warn",
 			);
 			return;
 		}
@@ -13698,8 +17561,6 @@ class UnraidPlugin extends Plugin {
 		if (link) {
 			input.link = link;
 		}
-
-		await this._log(`Creating Unraid notification (${importance}).`);
 
 		const selection = this._requiresSelection(createNotification?.type);
 		const queryWithSelection = `
@@ -13714,7 +17575,12 @@ class UnraidPlugin extends Plugin {
 		`;
 		const primary = selection ? queryWithSelection : queryWithoutSelection;
 		const fallback = selection ? queryWithoutSelection : queryWithSelection;
-		await this._runMutation(primary, { input }, "Create notification", fallback);
+		await this._runMutation(
+			primary,
+			{ input },
+			"Create notification",
+			fallback,
+		);
 	}
 
 	async _runMutation(query, variables, label, fallbackQuery) {
@@ -13748,11 +17614,10 @@ class UnraidPlugin extends Plugin {
 				const messages = result.messages.join("; ");
 				await this._log(
 					`${label} failed: ${messages || "unknown error"}`,
-					"warn"
+					"warn",
 				);
 				return false;
 			}
-			await this._log(`${label} completed.`);
 			return true;
 		} catch (error) {
 			await this._log(`${label} failed: ${this._errorMessage(error)}`, "warn");
@@ -13802,7 +17667,7 @@ class UnraidPlugin extends Plugin {
 			if (payload?.errors?.length) {
 				await this._log(
 					"Unable to inspect API schema. Using minimal queries.",
-					"warn"
+					"warn",
 				);
 				this._rootInfo = { available: false };
 				return this._rootInfo;
@@ -13821,9 +17686,13 @@ class UnraidPlugin extends Plugin {
 				fieldMap,
 			};
 		} catch (error) {
+			if (await this._handleTransientFailure(error)) {
+				this._rootInfo = { available: false };
+				return this._rootInfo;
+			}
 			await this._log(
 				`Unable to inspect API schema: ${this._errorMessage(error)}`,
-				"warn"
+				"warn",
 			);
 			this._rootInfo = { available: false };
 		}
@@ -13854,14 +17723,7 @@ class UnraidPlugin extends Plugin {
 			})
 			.map((field) => field.name);
 
-		const preferred = [
-			"id",
-			"name",
-			"domainName",
-			"state",
-			"status",
-			"uuid",
-		];
+		const preferred = ["id", "name", "domainName", "state", "status", "uuid"];
 		const selected = preferred.filter((name) => scalarFields.includes(name));
 		if (!selected.includes("id") && scalarFields.includes("id")) {
 			selected.unshift("id");
@@ -13910,7 +17772,7 @@ class UnraidPlugin extends Plugin {
 			if (payload?.errors?.length) {
 				await this._log(
 					"Unable to inspect mutation schema. Actions will be disabled.",
-					"warn"
+					"warn",
 				);
 				this._mutationInfo = {};
 				return this._mutationInfo;
@@ -13933,7 +17795,7 @@ class UnraidPlugin extends Plugin {
 						(await this._loadTypeFields(dockerType?.name)).map((field) => [
 							field.name,
 							field,
-						])
+						]),
 					),
 				};
 			}
@@ -13946,7 +17808,7 @@ class UnraidPlugin extends Plugin {
 						(await this._loadTypeFields(vmType?.name)).map((field) => [
 							field.name,
 							field,
-						])
+						]),
 					),
 				};
 			}
@@ -13959,7 +17821,7 @@ class UnraidPlugin extends Plugin {
 						(await this._loadTypeFields(arrayType?.name)).map((field) => [
 							field.name,
 							field,
-						])
+						]),
 					),
 				};
 			}
@@ -13972,7 +17834,7 @@ class UnraidPlugin extends Plugin {
 						(await this._loadTypeFields(parityType?.name)).map((field) => [
 							field.name,
 							field,
-						])
+						]),
 					),
 				};
 			}
@@ -13984,9 +17846,13 @@ class UnraidPlugin extends Plugin {
 
 			this._mutationInfo = info;
 		} catch (error) {
+			if (await this._handleTransientFailure(error)) {
+				this._mutationInfo = {};
+				return this._mutationInfo;
+			}
 			await this._log(
 				`Unable to inspect mutation schema: ${this._errorMessage(error)}`,
-				"warn"
+				"warn",
 			);
 			this._mutationInfo = {};
 		}
@@ -14055,7 +17921,8 @@ class UnraidPlugin extends Plugin {
 
 	async _fetchSummary() {
 		const rootInfo = await this._ensureRootInfo();
-		const hasField = (name) => rootInfo?.available && rootInfo.fieldMap?.has(name);
+		const hasField = (name) =>
+			rootInfo?.available && rootInfo.fieldMap?.has(name);
 		const baseBlocks = [];
 		if (!rootInfo?.available || hasField("info")) {
 			baseBlocks.push(`
@@ -14126,7 +17993,7 @@ class UnraidPlugin extends Plugin {
 			} catch (error) {
 				await this._log(
 					`Metrics unavailable: ${this._errorMessage(error)}`,
-					"warn"
+					"warn",
 				);
 			}
 		}
@@ -14153,7 +18020,7 @@ class UnraidPlugin extends Plugin {
 			} catch (error) {
 				await this._log(
 					`Disk inventory unavailable: ${this._errorMessage(error)}`,
-					"warn"
+					"warn",
 				);
 			}
 		}
@@ -14176,7 +18043,7 @@ class UnraidPlugin extends Plugin {
 				} catch (error) {
 					await this._log(
 						`VM list unavailable: ${this._errorMessage(error)}`,
-						"warn"
+						"warn",
 					);
 				}
 			}
@@ -14228,7 +18095,7 @@ class UnraidPlugin extends Plugin {
 				.join("; ");
 			await this._log(
 				`Docker query failed (${message || "unknown error"}). Skipping Docker metrics.`,
-				"warn"
+				"warn",
 			);
 			this._dockerInfo = { mode: "none" };
 			return null;
@@ -14281,7 +18148,7 @@ class UnraidPlugin extends Plugin {
 		if (payload?.errors?.length) {
 			await this._log(
 				"Unable to inspect Docker schema. Skipping Docker metrics.",
-				"warn"
+				"warn",
 			);
 			this._dockerInfo = { mode: "none" };
 			return this._dockerInfo;
@@ -14289,18 +18156,18 @@ class UnraidPlugin extends Plugin {
 
 		const fields = payload?.data?.__schema?.queryType?.fields || [];
 		const dockerContainersRoot = fields.find(
-			(field) => field?.name === "dockerContainers"
+			(field) => field?.name === "dockerContainers",
 		);
 		if (dockerContainersRoot) {
 			const containerType = this._unwrapType(dockerContainersRoot.type);
 			const containerFields = await this._loadContainerFields(
-				containerType?.name
+				containerType?.name,
 			);
 			this._dockerInfo = containerFields?.length
 				? {
 						mode: "dockerContainers",
 						containerFields,
-				  }
+					}
 				: { mode: "none" };
 			return this._dockerInfo;
 		}
@@ -14309,7 +18176,7 @@ class UnraidPlugin extends Plugin {
 		if (!dockerRoot) {
 			await this._log(
 				"Docker query field not available in this Unraid API schema.",
-				"warn"
+				"warn",
 			);
 			this._dockerInfo = { mode: "none" };
 			return this._dockerInfo;
@@ -14321,7 +18188,7 @@ class UnraidPlugin extends Plugin {
 		if (!containerField) {
 			await this._log(
 				"Docker containers field not available in this Unraid API schema.",
-				"warn"
+				"warn",
 			);
 			this._dockerInfo = { mode: "none" };
 			return this._dockerInfo;
@@ -14329,7 +18196,7 @@ class UnraidPlugin extends Plugin {
 
 		const containerType = this._unwrapType(containerField.type);
 		const containerFields = await this._loadContainerFields(
-			containerType?.name
+			containerType?.name,
 		);
 
 		this._dockerInfo = containerFields?.length
@@ -14337,7 +18204,7 @@ class UnraidPlugin extends Plugin {
 					mode: "docker",
 					containerField: containerField.name,
 					containerFields,
-			  }
+				}
 			: { mode: "none" };
 
 		return this._dockerInfo;
@@ -14348,7 +18215,7 @@ class UnraidPlugin extends Plugin {
 			(field) =>
 				field?.name === "containers" ||
 				field?.name === "dockerContainers" ||
-				(field?.name || "").toLowerCase().includes("container")
+				(field?.name || "").toLowerCase().includes("container"),
 		);
 		return containerField || null;
 	}
@@ -14446,33 +18313,41 @@ class UnraidPlugin extends Plugin {
 			throw new Error("Missing Unraid base URL or API key.");
 		}
 
-		const url = `${baseUrl}/graphql`;
-		const controller = new AbortController();
-		const timeout = setTimeout(() => {
-			controller.abort();
-		}, this._coerceNumber(this.settings?.requestTimeoutMs, DEFAULTS.requestTimeoutMs));
+		const url = this._buildGraphqlUrl(baseUrl);
+		const timeoutMs = this._coerceNumber(
+			this.settings?.requestTimeoutMs,
+			DEFAULTS.requestTimeoutMs,
+		);
+		let timeout;
 
 		try {
-			const response = await fetch(url, {
+			const fetchPromise = fetch(url, {
 				method: "POST",
 				headers: {
 					"content-type": "application/json",
 					"x-api-key": apiKey,
 				},
 				body: JSON.stringify({ query, variables }),
-				signal: controller.signal,
 			});
+			const timeoutPromise = new Promise((_, reject) => {
+				timeout = setTimeout(() => {
+					reject(new Error(`Request timed out after ${timeoutMs}ms`));
+				}, timeoutMs);
+			});
+			const response = await Promise.race([fetchPromise, timeoutPromise]);
 
 			if (!response.ok) {
 				const message = await this._readResponseText(response);
 				throw new Error(
-					`HTTP ${response.status} ${response.statusText}: ${message}`
+					`HTTP ${response.status} ${response.statusText}: ${message}`,
 				);
 			}
 
 			return await response.json();
 		} finally {
-			clearTimeout(timeout);
+			if (timeout) {
+				clearTimeout(timeout);
+			}
 		}
 	}
 
@@ -14495,7 +18370,9 @@ class UnraidPlugin extends Plugin {
 	}
 
 	_normalizeBaseUrl(value) {
-		const trimmed = (value || "").trim();
+		const raw =
+			typeof value === "string" ? value : value == null ? "" : String(value);
+		const trimmed = raw.trim();
 		if (!trimmed) {
 			return "";
 		}
@@ -14503,6 +18380,17 @@ class UnraidPlugin extends Plugin {
 			return trimmed.replace(/\/+$/, "");
 		}
 		return `http://${trimmed}`.replace(/\/+$/, "");
+	}
+
+	_buildGraphqlUrl(baseUrl) {
+		if (typeof baseUrl !== "string" || !baseUrl) {
+			throw new Error("Base URL is not a string.");
+		}
+		if (!/^https?:\/\//i.test(baseUrl)) {
+			throw new Error("Base URL must include http or https.");
+		}
+		const normalized = baseUrl.replace(/\/+$/, "");
+		return new URL("/graphql", normalized).toString();
 	}
 
 	_coerceNumber(value, fallback) {
@@ -14530,6 +18418,10 @@ class UnraidPlugin extends Plugin {
 	}
 
 	async _setVariable(name, value) {
+		if (!name || typeof name !== "string") {
+			await this._log("Skipping variable update with invalid name.", "warn");
+			return;
+		}
 		if (this._lastVariables.get(name) === value) {
 			return;
 		}
@@ -14550,29 +18442,31 @@ class UnraidPlugin extends Plugin {
 	}
 
 	async _log(message, severity = "info") {
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
+
 		const prefix = this._tag();
 		const decorated =
 			severity === "warn"
 				? `${prefix} [WARN] ${message}`
 				: severity === "error"
-				? `${prefix} [ERROR] ${message}`
-				: `${prefix} ${message}`;
+					? `${prefix} [ERROR] ${message}`
+					: `${prefix} ${message}`;
 
 		await this.lumia.addLog(decorated);
 	}
 
 	_schedulePolling() {
 		this._clearPolling();
-		const intervalSeconds = this._coerceNumber(
-			this.settings?.pollInterval,
-			DEFAULTS.pollInterval
-		);
-		if (!intervalSeconds || intervalSeconds <= 0) {
+		const intervalMs = this._getPollIntervalMs();
+		if (!intervalMs) {
 			return;
 		}
+		this._lastPollMs = intervalMs;
 		this._pollTimer = setInterval(() => {
 			this._refresh({ reason: "poll" });
-		}, intervalSeconds * 1000);
+		}, intervalMs);
 	}
 
 	_clearPolling() {
@@ -14580,6 +18474,63 @@ class UnraidPlugin extends Plugin {
 			clearInterval(this._pollTimer);
 			this._pollTimer = null;
 		}
+	}
+
+	_getPollIntervalMs() {
+		const baseSeconds = this._coerceNumber(
+			this.settings?.pollInterval,
+			DEFAULTS.pollInterval,
+		);
+		if (!baseSeconds || baseSeconds <= 0) {
+			return 0;
+		}
+		if (!this._failureCount) {
+			return baseSeconds * 1000;
+		}
+		const maxSeconds = Math.max(baseSeconds, MAX_BACKOFF_SECONDS);
+		const multiplier = Math.pow(BACKOFF_FACTOR, this._failureCount);
+		const intervalSeconds = Math.min(baseSeconds * multiplier, maxSeconds);
+		return intervalSeconds * 1000;
+	}
+
+	_isTransientNetworkError(error) {
+		const message = this._errorMessage(error).toLowerCase();
+		return (
+			message.includes("timed out") ||
+			message.includes("timeout") ||
+			message.includes("fetch failed") ||
+			message.includes("failed to fetch") ||
+			message.includes("network") ||
+			message.includes("offline") ||
+			message.includes("socket") ||
+			message.includes("econn") ||
+			message.includes("enotfound")
+		);
+	}
+
+	async _handleRefreshFailure(error) {
+		const isTransient = this._isTransientNetworkError(error);
+		await this._updateConnectionState(false);
+
+		if (!isTransient) {
+			await this._log(`Refresh failed: ${this._errorMessage(error)}`, "error");
+			return;
+		}
+
+		this._failureCount = Math.min(this._failureCount + 1, 10);
+		const nextIntervalSeconds = Math.round(this._getPollIntervalMs() / 1000);
+		if (nextIntervalSeconds !== this._lastBackoffSeconds) {
+			this._lastBackoffSeconds = nextIntervalSeconds;
+		}
+		this._schedulePolling();
+	}
+
+	async _handleTransientFailure(error) {
+		if (!this._isTransientNetworkError(error)) {
+			return false;
+		}
+		await this._handleRefreshFailure(error);
+		return true;
 	}
 }
 
@@ -14598,11 +18549,12 @@ module.exports = UnraidPlugin;
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "",
-	"description": "Pull Unraid array and Docker status into Lumia variables for overlays and automations.",
+	"description": "Monitor Unraid array, Docker, and VM status with variables and control actions.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "devices",
 	"keywords": "unraid, nas, server, array, docker",
+	"icon": "unraid.png",
 	"config": {
 		"settings": [
 			{
@@ -14640,25 +18592,13 @@ module.exports = UnraidPlugin;
 					"min": 1000,
 					"max": 30000
 				}
-			},
-			{
-				"key": "logArrayStateChanges",
-				"label": "Log Array State Changes",
-				"type": "toggle",
-				"defaultValue": true
 			}
 		],
 		"settings_tutorial": "---\n### Connect Unraid\n1) In the Unraid web UI, enable the API and create an API key (Settings > Management Access).\n2) Copy the API key into the **API Key** field.\n3) Enter the base URL for your Unraid server (for example: `http://tower.local` or `http://192.168.1.10`).\n---\n### Notes\n- The plugin uses the Unraid GraphQL endpoint at `/graphql`.\n- If you use HTTPS with a self-signed certificate, the request may fail unless your environment trusts it.\n---",
 		"actions_tutorial": "---\n### Refresh Now\nUse **Refresh Status** to pull the latest Unraid data immediately.\n---\n### Docker/VM Actions\n- You can use the container or VM name from the Unraid UI (Docker tab or VMs tab).\n- If a name does not resolve, use the PrefixedID from the API instead.\n- Example GraphQL to list Docker container IDs + names:\n```\n{\n  docker {\n    containers {\n      id\n      names\n    }\n  }\n}\n```\n- Example GraphQL to list VM IDs + names:\n```\n{\n  vms {\n    id\n    name\n  }\n}\n```\n- If you use a container name, pick one of the values in `names` (remove any leading `/`).\n---\n### Notifications + Permissions\n- The API key must allow write access to Docker/VM/Array/Notifications. Read-only keys can refresh status but will block actions.\n- Notification `importance` must be one of: ALERT, WARNING, INFO (use the schema enum if your server differs).\n---",
 		"actions": [
 			{
-				"type": "unraid_refresh",
-				"label": "Refresh Status",
-				"description": "Fetch the latest Unraid summary data.",
-				"fields": []
-			},
-			{
-				"type": "unraid_docker_action",
+				"type": "docker_action",
 				"label": "Docker Action",
 				"description": "Start or stop a Docker container.",
 				"fields": [
@@ -14687,7 +18627,7 @@ module.exports = UnraidPlugin;
 				]
 			},
 			{
-				"type": "unraid_vm_action",
+				"type": "vm_action",
 				"label": "VM Action",
 				"description": "Start, stop, or control a VM.",
 				"fields": [
@@ -14721,50 +18661,7 @@ module.exports = UnraidPlugin;
 				]
 			},
 			{
-				"type": "unraid_parity_action",
-				"label": "Parity Check",
-				"description": "Start, pause, resume, or cancel a parity check.",
-				"fields": [
-					{
-						"key": "operation",
-						"label": "Operation",
-						"type": "select",
-						"options": [
-							{ "label": "Start", "value": "start" },
-							{ "label": "Pause", "value": "pause" },
-							{ "label": "Resume", "value": "resume" },
-							{ "label": "Cancel", "value": "cancel" }
-						],
-						"required": true
-					},
-					{
-						"key": "correct",
-						"label": "Correct Errors (start only)",
-						"type": "toggle",
-						"defaultValue": false
-					}
-				]
-			},
-			{
-				"type": "unraid_array_state",
-				"label": "Set Array State",
-				"description": "Start or stop the array.",
-				"fields": [
-					{
-						"key": "desiredState",
-						"label": "Desired State",
-						"type": "select",
-						"allowTyping": true,
-						"options": [
-							{ "label": "STARTED", "value": "STARTED" },
-							{ "label": "STOPPED", "value": "STOPPED" }
-						],
-						"required": true
-					}
-				]
-			},
-			{
-				"type": "unraid_notify",
+				"type": "notify",
 				"label": "Send Unraid Notification",
 				"description": "Create a notification in Unraid.",
 				"fields": [
@@ -14807,131 +18704,123 @@ module.exports = UnraidPlugin;
 		],
 		"variables": [
 			{
-				"name": "unraid_array_state",
+				"name": "array_state",
 				"description": "Current array state (e.g., STARTED, STOPPED).",
 				"value": ""
 			},
 			{
-				"name": "unraid_array_total_bytes",
-				"description": "Total array capacity (bytes).",
-				"value": 0
-			},
-			{
-				"name": "unraid_array_used_bytes",
-				"description": "Used array capacity (bytes).",
-				"value": 0
-			},
-			{
-				"name": "unraid_array_free_bytes",
-				"description": "Free array capacity (bytes).",
-				"value": 0
-			},
-			{
-				"name": "unraid_disk_count",
+				"name": "disk_count",
 				"description": "Number of disks reported in the array.",
 				"value": 0
 			},
 			{
-				"name": "unraid_disk_total_count",
+				"name": "disk_total_count",
 				"description": "Total number of disks in the system.",
 				"value": 0
 			},
 			{
-				"name": "unraid_disk_temp_max_c",
+				"name": "disk_temp_max_c",
 				"description": "Maximum disk temperature in Celsius.",
 				"value": 0
 			},
 			{
-				"name": "unraid_disk_temp_avg_c",
+				"name": "disk_temp_avg_c",
 				"description": "Average disk temperature in Celsius.",
 				"value": 0
 			},
 			{
-				"name": "unraid_disk_smart_unknown_count",
-				"description": "Disks with SMART status other than OK.",
-				"value": 0
-			},
-			{
-				"name": "unraid_disk_spinning_count",
-				"description": "Disks currently spinning.",
-				"value": 0
-			},
-			{
-				"name": "unraid_disks_json",
-				"description": "JSON array of disk summary data (name, device, vendor, size, smartStatus, temperature, isSpinning).",
-				"value": ""
-			},
-			{
-				"name": "unraid_docker_total",
+				"name": "docker_total",
 				"description": "Total Docker containers.",
 				"value": 0
 			},
 			{
-				"name": "unraid_docker_running",
+				"name": "docker_running",
 				"description": "Running Docker containers.",
 				"value": 0
 			},
 			{
-				"name": "unraid_docker_stopped",
+				"name": "docker_stopped",
 				"description": "Stopped Docker containers.",
 				"value": 0
 			},
 			{
-				"name": "unraid_docker_stopped_names",
+				"name": "docker_stopped_names",
 				"description": "Comma-separated names of stopped Docker containers.",
 				"value": ""
 			},
 			{
-				"name": "unraid_os_release",
+				"name": "os_release",
 				"description": "Unraid OS release string.",
 				"value": ""
 			},
 			{
-				"name": "unraid_os_uptime",
+				"name": "os_uptime",
 				"description": "Unraid OS uptime as reported by the API (seconds or formatted string).",
 				"value": ""
 			},
 			{
-				"name": "unraid_cpu_brand",
+				"name": "cpu_brand",
 				"description": "CPU brand/model string.",
 				"value": ""
 			},
 			{
-				"name": "unraid_cpu_percent",
+				"name": "cpu_percent",
 				"description": "CPU utilization percent.",
 				"value": 0
 			},
 			{
-				"name": "unraid_mem_percent",
+				"name": "mem_percent",
 				"description": "Memory utilization percent.",
 				"value": 0
 			},
 			{
-				"name": "unraid_mem_total_bytes",
+				"name": "mem_total_bytes",
 				"description": "Total system memory (bytes).",
 				"value": 0
 			},
 			{
-				"name": "unraid_mem_used_bytes",
+				"name": "mem_used_bytes",
 				"description": "Used system memory (bytes).",
 				"value": 0
 			},
 			{
-				"name": "unraid_mem_free_bytes",
+				"name": "mem_free_bytes",
 				"description": "Free system memory (bytes).",
 				"value": 0
 			},
 			{
-				"name": "unraid_mem_available_bytes",
+				"name": "mem_available_bytes",
 				"description": "Available system memory (bytes).",
 				"value": 0
-			},
-			{
-				"name": "unraid_last_updated",
-				"description": "ISO timestamp for the last refresh.",
-				"value": ""
 			}
 		]
+	}
+}
+
+```
+
+## unraid/package-lock.json
+
+```
+{
+	"name": "lumia-unraid-integration",
+	"version": "1.0.0",
+	"lockfileVersion": 3,
+	"requires": true,
+	"packages": {
+		"": {
+			"name": "lumia-unraid-integration",
+			"version": "1.0.0",
+			"dependencies": {
+				"@lumiastream/plugin": "^0.2.3"
+			}
+		},
+		"node_modules/@lumiastream/plugin": {
+			"version": "0.2.3",
+			"resolved": "https://registry.npmjs.org/@lumiastream/plugin/-/plugin-0.2.3.tgz",
+			"integrity": "sha512-YnpghyreFcYrI1FBPXD1MZbxTVaN0hrQaGH/mid0BSwCXyxG3WXGCFyy7nkPgqOMsxiFl07/8SEvdRkKJxXPUw==",
+			"license": "MIT"
+		}
 	}
 }
 
@@ -14944,11 +18833,758 @@ module.exports = UnraidPlugin;
 	"name": "lumia-unraid-integration",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Unraid integration example plugin for Lumia Stream.",
+	"description": "Unraid integration plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.3"
 	}
+}
+
+```
+
+## valorant/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const DEFAULTS = {
+	pollInterval: 120,
+	userAgent: "LumiaStream VALORANT Plugin/1.0.0",
+};
+
+const VARIABLE_NAMES = {
+	riotId: "valorant_riot_id",
+	puuid: "valorant_puuid",
+	statusMaintenances: "valorant_status_maintenances",
+	statusIncidents: "valorant_status_incidents",
+	statusMessage: "valorant_status_message",
+	lastUpdated: "valorant_last_updated",
+	snapshot: "valorant_snapshot_json",
+};
+
+class ValorantPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._pollTimer = null;
+		this._refreshPromise = null;
+		this._tokenRefreshPromise = null;
+		this._lastConnectionState = null;
+		this._lastVariables = new Map();
+		this._globalBackoffUntil = 0;
+		this._authFailure = false;
+	}
+
+	async onload() {
+		await this._log("VALORANT plugin loaded.");
+
+		if (!this._hasApiKey()) {
+			await this._log("Missing Riot API key.", "warn");
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		await this._refreshData({ reason: "startup" });
+		this._schedulePolling();
+	}
+
+	async onunload() {
+		this._clearPolling();
+		await this._updateConnectionState(false);
+		await this._log("VALORANT plugin stopped.");
+	}
+
+	async onsettingsupdate(settings, previous = {}) {
+		const pollChanged =
+			this._pollInterval(settings) !== this._pollInterval(previous);
+		const apiKeyChanged = (settings?.apiKey ?? "") !== (previous?.apiKey ?? "");
+		const authChanged =
+			(settings?.accessToken ?? "") !== (previous?.accessToken ?? "") ||
+			(settings?.refreshToken ?? "") !== (previous?.refreshToken ?? "");
+
+		if (pollChanged) {
+			this._schedulePolling();
+		}
+
+		if (apiKeyChanged || authChanged) {
+			this._authFailure = false;
+			this._globalBackoffUntil = 0;
+		}
+
+		await this._refreshData({ reason: "settings-update" });
+	}
+
+	async validateAuth() {
+		if (!this._hasApiKey()) {
+			await this._log("Validation failed: missing Riot API key.", "warn");
+			return false;
+		}
+
+		try {
+			await this._fetchStatus();
+			await this._log("VALORANT API key validation succeeded.");
+			return true;
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`VALORANT validation failed: ${message}`, "error");
+			return false;
+		}
+	}
+
+	_tag() {
+		return `[${this.manifest?.id ?? "valorant"}]`;
+	}
+
+	async _log(message, severity = "info") {
+		const prefix = this._tag();
+		const decorated =
+			severity === "warn"
+				? `${prefix} ⚠️ ${message}`
+				: severity === "error"
+				? `${prefix} ❌ ${message}`
+				: `${prefix} ${message}`;
+
+		await this.lumia.addLog(decorated);
+	}
+
+	async _refreshData({ reason } = {}) {
+		if (!this._hasApiKey()) {
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		if (this._authFailure) {
+			return;
+		}
+
+		const now = Date.now();
+		if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
+			return;
+		}
+
+		if (this._refreshPromise) {
+			return this._refreshPromise;
+		}
+
+		this._refreshPromise = (async () => {
+			try {
+				const statusResult = await this._safeFetch("status", () =>
+					this._fetchStatus()
+				);
+				const accountResult = await this._safeFetch("account", () =>
+					this._fetchAccount()
+				);
+
+				await this._applyStatus(statusResult.data);
+				await this._applyAccount(accountResult.data);
+
+				const snapshot = {
+					status: statusResult.data,
+					account: accountResult.data,
+				};
+
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.snapshot,
+					JSON.stringify(snapshot)
+				);
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.lastUpdated,
+					new Date().toISOString()
+				);
+
+				const successCount = [statusResult, accountResult].filter(
+					(result) => result.ok
+				).length;
+				await this._updateConnectionState(successCount > 0);
+				await this._log(
+					`VALORANT data refreshed${reason ? ` (${reason})` : ""}.`
+				);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(`Failed to refresh VALORANT data: ${message}`, "warn");
+				await this._updateConnectionState(false);
+			}
+			this._refreshPromise = null;
+		})();
+
+		return this._refreshPromise;
+	}
+
+	async _fetchStatus() {
+		const url = this._buildPlatformUrl("/val/status/v1/platform-data");
+		return this._fetchJson(url, { apiKey: this._apiKey() });
+	}
+
+	async _fetchAccount() {
+		const accessToken = await this._ensureAccessToken();
+		if (!accessToken) {
+			return null;
+		}
+		const url = this._buildRoutingUrl("/riot/account/v1/accounts/me");
+		return this._fetchJson(url, { accessToken });
+	}
+
+	async _fetchJson(url, { apiKey, accessToken } = {}) {
+		let response = await this._request(url, { apiKey, accessToken });
+
+		if (response.status === 401 && this._canRefreshTokens()) {
+			const refreshed = await this._refreshAccessToken();
+			response = await this._request(url, { apiKey, accessToken: refreshed });
+		}
+
+		if (response.status === 401) {
+			if (accessToken) {
+				this._authFailure = true;
+				this._clearPolling();
+				await this._showAuthFailureToast();
+				throw new Error("Unauthorized (401). Re-authorize the plugin.");
+			}
+			this._authFailure = true;
+			this._clearPolling();
+			await this._showApiKeyFailureToast();
+			throw new Error("Unauthorized (401). Check your Riot API key.");
+		}
+
+		if (response.status === 429) {
+			const retryAfter = this._coerceNumber(
+				response.headers.get("Retry-After"),
+				60
+			);
+			this._applyGlobalBackoff(retryAfter);
+			throw new Error(`Rate limited (429). Backing off for ${retryAfter}s.`);
+		}
+
+		if (response.status === 403) {
+			if (accessToken) {
+				this._authFailure = true;
+				this._clearPolling();
+				await this._showAuthFailureToast();
+				throw new Error("Forbidden (403). Re-authorize the plugin.");
+			}
+			this._authFailure = true;
+			this._clearPolling();
+			await this._showApiKeyFailureToast();
+			throw new Error("Forbidden (403). Check your Riot API key.");
+		}
+
+		if (!response.ok) {
+			const body = await response.text();
+			const trimmed = this._truncateError(body);
+			throw new Error(
+				`VALORANT API error (${response.status}) on ${url}: ${trimmed || "No response body"}`
+			);
+		}
+
+		return response.json();
+	}
+
+	async _request(url, { apiKey, accessToken } = {}) {
+		const headers = {
+			Accept: "application/json",
+			"User-Agent": DEFAULTS.userAgent,
+		};
+
+		if (apiKey) {
+			headers["X-Riot-Token"] = apiKey;
+		}
+
+		if (accessToken) {
+			headers.Authorization = `Bearer ${accessToken}`;
+		}
+
+		return fetch(url, { headers });
+	}
+
+	_buildPlatformUrl(path) {
+		const region = this._platformRegion();
+		return `https://${region}.api.riotgames.com${path}`;
+	}
+
+	_buildRoutingUrl(path) {
+		const region = this._routingRegion();
+		return `https://${region}.api.riotgames.com${path}`;
+	}
+
+	_applyGlobalBackoff(seconds) {
+		const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
+		const until = Date.now() + delayMs;
+		if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
+			this._globalBackoffUntil = until;
+		}
+	}
+
+	async _showAuthFailureToast() {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message: "Riot auth expired. Re-authorize the VALORANT plugin.",
+				time: 6,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	async _showApiKeyFailureToast() {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message: "Invalid Riot API key. Update the VALORANT plugin settings.",
+				time: 6,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	async _refreshAccessToken() {
+		if (this._tokenRefreshPromise) {
+			return this._tokenRefreshPromise;
+		}
+
+		const refreshToken = this._refreshToken();
+		if (!refreshToken) {
+			throw new Error("Missing refresh token.");
+		}
+
+		this._tokenRefreshPromise = (async () => {
+			if (typeof this.lumia?.refreshOAuthToken !== "function") {
+				throw new Error("Missing OAuth refresh support.");
+			}
+
+			const payload = await this.lumia.refreshOAuthToken({ refreshToken });
+			const accessToken = this._coerceString(payload?.accessToken, "");
+			const nextRefreshToken =
+				this._coerceString(payload?.refreshToken, "") || refreshToken;
+
+			if (!accessToken) {
+				throw new Error("OAuth refresh did not return an access token.");
+			}
+
+			this.updateSettings({
+				accessToken,
+				refreshToken: nextRefreshToken,
+			});
+
+			await this._log("Riot access token refreshed.");
+			return accessToken;
+		})();
+
+		try {
+			return await this._tokenRefreshPromise;
+		} finally {
+			this._tokenRefreshPromise = null;
+		}
+	}
+
+	async _ensureAccessToken() {
+		const accessToken = this._accessToken();
+		const refreshToken = this._refreshToken();
+
+		if (!accessToken && !refreshToken) {
+			return "";
+		}
+
+		if (accessToken) {
+			return accessToken;
+		}
+
+		if (!refreshToken) {
+			return "";
+		}
+
+		return this._refreshAccessToken();
+	}
+
+	async _applyStatus(status) {
+		if (!status) {
+			return;
+		}
+
+		const maintenances = Array.isArray(status?.maintenances)
+			? status.maintenances.length
+			: 0;
+		const incidents = Array.isArray(status?.incidents)
+			? status.incidents.length
+			: 0;
+		let message = "";
+		const incident = Array.isArray(status?.incidents)
+			? status.incidents[0]
+			: null;
+		if (incident && Array.isArray(incident?.updates) && incident.updates[0]) {
+			message = incident.updates[0]?.translations?.[0]?.content ?? "";
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.statusMaintenances,
+			maintenances
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.statusIncidents,
+			incidents
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.statusMessage,
+			message
+		);
+	}
+
+	async _applyAccount(account) {
+		if (!account) {
+			return;
+		}
+
+		const gameName = this._coerceString(account?.gameName, "");
+		const tagLine = this._coerceString(account?.tagLine, "");
+		const riotId = gameName && tagLine ? `${gameName}#${tagLine}` : "";
+		await this._setVariableIfChanged(VARIABLE_NAMES.riotId, riotId);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.puuid,
+			this._coerceString(account?.puuid, "")
+		);
+	}
+
+	_schedulePolling() {
+		this._clearPolling();
+
+		const intervalSeconds = this._pollInterval(this.settings);
+		if (!this._hasApiKey() || intervalSeconds <= 0) {
+			return;
+		}
+
+		this._pollTimer = setInterval(() => {
+			void this._refreshData({ reason: "poll" });
+		}, intervalSeconds * 1000);
+	}
+
+	_clearPolling() {
+		if (this._pollTimer) {
+			clearInterval(this._pollTimer);
+			this._pollTimer = null;
+		}
+	}
+
+	_hasApiKey() {
+		return Boolean(this._apiKey());
+	}
+
+	_apiKey() {
+		return this._coerceString(this.settings?.apiKey, "");
+	}
+
+	_accessToken() {
+		return this._coerceString(this.settings?.accessToken, "");
+	}
+
+	_refreshToken() {
+		return this._coerceString(this.settings?.refreshToken, "");
+	}
+
+	_canRefreshTokens() {
+		return Boolean(
+			this._refreshToken() && typeof this.lumia?.refreshOAuthToken === "function"
+		);
+	}
+
+	_platformRegion() {
+		return this._coerceString(this.settings?.platformRegion, "na");
+	}
+
+	_routingRegion() {
+		return this._coerceString(this.settings?.routingRegion, "americas");
+	}
+
+	_pollInterval(settings = this.settings) {
+		const interval = this._coerceNumber(
+			settings?.pollInterval,
+			DEFAULTS.pollInterval
+		);
+		return Number.isFinite(interval) ? interval : DEFAULTS.pollInterval;
+	}
+
+	async _updateConnectionState(state) {
+		if (this._lastConnectionState === state) {
+			return;
+		}
+
+		this._lastConnectionState = state;
+
+		if (typeof this.lumia.updateConnection === "function") {
+			try {
+				await this.lumia.updateConnection(state);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(
+					`Failed to update connection state: ${message}`,
+					"warn"
+				);
+			}
+		}
+	}
+
+	async _safeFetch(label, fn) {
+		try {
+			return { ok: true, data: await fn() };
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`${label} fetch failed: ${message}`, "warn");
+			return { ok: false, data: null };
+		}
+	}
+
+	async _setVariable(name, value) {
+		if (typeof this.lumia.setVariable !== "function") {
+			return;
+		}
+
+		await this.lumia.setVariable(name, value);
+	}
+
+	async _setVariableIfChanged(name, value) {
+		const normalized = this._normalizeValue(value);
+		const previous = this._lastVariables.get(name);
+		if (this._valuesEqual(previous, normalized)) {
+			return false;
+		}
+		this._lastVariables.set(name, normalized);
+		await this._setVariable(name, value);
+		return true;
+	}
+
+	_normalizeValue(value) {
+		if (value === null || value === undefined) {
+			return "";
+		}
+		if (typeof value === "object") {
+			try {
+				return JSON.stringify(value);
+			} catch (error) {
+				return String(value);
+			}
+		}
+		return String(value);
+	}
+
+	_valuesEqual(a, b) {
+		return a === b;
+	}
+
+	_errorMessage(error) {
+		if (!error) {
+			return "Unknown error";
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		return error?.message || String(error);
+	}
+
+	_truncateError(value) {
+		if (!value) {
+			return "";
+		}
+		const trimmed = String(value).replace(/\s+/g, " ").trim();
+		return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+	}
+
+	_coerceNumber(value, fallback = 0) {
+		const number = Number(value);
+		return Number.isFinite(number) ? number : fallback;
+	}
+
+	_coerceString(value, fallback = "") {
+		if (typeof value === "string") {
+			return value;
+		}
+		if (value === null || value === undefined) {
+			return fallback;
+		}
+		return String(value);
+	}
+}
+
+module.exports = ValorantPlugin;
+
+```
+
+## valorant/manifest.json
+
+```
+{
+	"id": "valorant",
+	"name": "VALORANT",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Pull VALORANT status and player data into Lumia variables using Riot APIs.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "examples",
+	"icon": "",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Riot API Key",
+				"type": "password",
+				"helperText": "Used for public VALORANT endpoints (status/content).",
+				"required": true
+			},
+			{
+				"key": "platformRegion",
+				"label": "Platform Region",
+				"type": "select",
+				"defaultValue": "na",
+				"options": [
+					{
+						"label": "NA",
+						"value": "na"
+					},
+					{
+						"label": "EU",
+						"value": "eu"
+					},
+					{
+						"label": "AP",
+						"value": "ap"
+					},
+					{
+						"label": "KR",
+						"value": "kr"
+					},
+					{
+						"label": "LATAM",
+						"value": "latam"
+					},
+					{
+						"label": "BR",
+						"value": "br"
+					}
+				],
+				"helperText": "Used for VALORANT platform endpoints (status, matches)."
+			},
+			{
+				"key": "routingRegion",
+				"label": "Routing Region",
+				"type": "select",
+				"defaultValue": "americas",
+				"options": [
+					{
+						"label": "Americas",
+						"value": "americas"
+					},
+					{
+						"label": "Europe",
+						"value": "europe"
+					},
+					{
+						"label": "Asia",
+						"value": "asia"
+					}
+				],
+				"helperText": "Used for Riot Account endpoints (accounts/me)."
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 120,
+				"min": 60,
+				"max": 900,
+				"helperText": "How often to refresh VALORANT data (60-900 seconds)."
+			},
+			{
+				"key": "accessToken",
+				"label": "Access Token",
+				"type": "password",
+				"helperText": "Auto-filled after OAuth completes.",
+				"disabled": true,
+				"required": false
+			},
+			{
+				"key": "refreshToken",
+				"label": "Refresh Token",
+				"type": "password",
+				"helperText": "Auto-filled after OAuth completes.",
+				"disabled": true,
+				"required": false
+			}
+		],
+		"settings_tutorial": "---\n### Riot API Key (Public Endpoints)\n1) Create a Riot developer account.\n2) Generate an API key.\n3) Paste it into **Riot API Key**.\n\n### Riot Account Authorization (Private Endpoints)\nClick **Authorize Riot Account** to connect your Riot account for private VALORANT data.\n---",
+		"actions": [],
+		"variables": [
+			{
+				"name": "valorant_riot_id",
+				"description": "Riot ID from accounts/me (gameName#tagLine).",
+				"value": ""
+			},
+			{
+				"name": "valorant_puuid",
+				"description": "PUUID from accounts/me.",
+				"value": ""
+			},
+			{
+				"name": "valorant_status_maintenances",
+				"description": "Count of current maintenance items.",
+				"value": 0
+			},
+			{
+				"name": "valorant_status_incidents",
+				"description": "Count of current incident items.",
+				"value": 0
+			},
+			{
+				"name": "valorant_status_message",
+				"description": "Latest status message (if any).",
+				"value": ""
+			},
+			{
+				"name": "valorant_last_updated",
+				"description": "Timestamp when VALORANT data was last refreshed.",
+				"value": ""
+			},
+			{
+				"name": "valorant_snapshot_json",
+				"description": "JSON snapshot of the latest VALORANT payloads.",
+				"value": ""
+			}
+		],
+		"oauth": {
+			"buttonLabel": "Authorize Riot Account",
+			"helperText": "Connect a Riot account to access private VALORANT data.",
+			"openInBrowser": true,
+			"scopes": [
+				"openid",
+				"offline_access"
+			],
+			"tokenKeys": {
+				"accessToken": "accessToken",
+				"refreshToken": "refreshToken",
+				"tokenSecret": "tokenSecret"
+			}
+		}
+	}
+}
+```
+
+## valorant/package.json
+
+```
+{
+  "name": "lumia-example-valorant",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Example Lumia Stream plugin that pulls VALORANT data from Riot APIs.",
+  "main": "main.js",
+  "scripts": {},
+  "dependencies": {
+    "@lumiastream/plugin": "^0.1.18"
+  }
 }
 
 ```

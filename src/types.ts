@@ -23,12 +23,16 @@ export enum PluginCategory {
 	SYSTEM = "system",
 	PLATFORMS = "platforms",
 	APPS = "apps",
+	AUDIO = "audio",
+	VIDEO = "video",
 	LIGHTS = "lights",
 	SWITCH = "switch",
 	DECK = "deck",
 	PROTOCOLS = "protocols",
 	KEYLIGHT = "keylight",
 	DEVICES = "devices",
+	GAMES = "games",
+	UTILITIES = "utilities",
 }
 
 export interface PluginVariableDefinition {
@@ -132,6 +136,10 @@ export interface PluginActionField {
 	rows?: number;
 	allowTyping?: boolean;
 	defaultValue?: any;
+	/**
+	 * When true, allow template variables (e.g. {{username}}) in this field.
+	 */
+	allowVariables?: boolean;
 	/**
 	 * When true, changing this field triggers refreshActionOptions in the UI.
 	 */

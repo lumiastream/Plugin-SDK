@@ -89,7 +89,6 @@ export default class MyFirstPlugin extends Plugin {
 
 	async onload(): Promise<void> {
 		const message = this.settings.message ?? "Hello from my plugin!";
-		await this.lumia.addLog(`Plugin loaded: ${message}`);
 
 		this.interval = setInterval(() => {
 			const timestamp = new Date().toISOString();
@@ -101,14 +100,12 @@ export default class MyFirstPlugin extends Plugin {
 		if (this.interval) {
 			clearInterval(this.interval);
 		}
-		await this.lumia.addLog("Plugin unloaded");
 	}
 
 	async actions(config: { actions: any[] }): Promise<void> {
 		for (const action of config.actions) {
 			if (action.type === "say_hello") {
 				const name = action.data?.name ?? "World";
-				await this.lumia.addLog(`Hello, ${name}!`);
 
 				await this.lumia.triggerAlert({
 					alert: "custom-hello",
@@ -121,9 +118,7 @@ export default class MyFirstPlugin extends Plugin {
 		}
 	}
 
-	async onsettingsupdate(settings: Record<string, any>): Promise<void> {
-		await this.lumia.addLog(`Settings updated: ${JSON.stringify(settings)}`);
-	}
+	async onsettingsupdate(settings: Record<string, any>): Promise<void> {}
 }
 ```
 
@@ -316,7 +311,6 @@ export default class EventPlugin extends Plugin {
 	}
 
 	private async handleManualTrigger(data: any): Promise<void> {
-		await this.lumia.addLog("Manual trigger executed");
 		await this.lumia.triggerAlert({
 			alert: "manual-event",
 			extraSettings: { username: data?.username ?? "Unknown" },
@@ -325,7 +319,6 @@ export default class EventPlugin extends Plugin {
 
 	private async resetCounters(): Promise<void> {
 		await this.lumia.setVariable("counter", 0);
-		await this.lumia.addLog("Counters reset");
 	}
 }
 ```

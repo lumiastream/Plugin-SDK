@@ -25,11 +25,11 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async onload(): Promise<void> {
-		this.lumia.addLog("Plugin loaded successfully!");
+		// Plugin loaded
 	}
 
 	async onunload(): Promise<void> {
-		this.lumia.addLog("Plugin unloaded");
+		// Plugin unloaded
 	}
 }
 ```

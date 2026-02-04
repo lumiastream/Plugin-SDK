@@ -11,7 +11,7 @@ Both `settings` and `actions` in your plugin manifest support various field type
 ### Text Input Types
 
 #### `text`
-Single-line text input with variable support.
+Single-line text input with optional variable support (set `allowVariables: true`).
 
 ```json
 {
@@ -32,7 +32,7 @@ Single-line text input with variable support.
 ---
 
 #### `email`
-Email address input with built-in validation and variable support.
+Email address input with built-in validation and optional variable support (set `allowVariables: true`).
 
 ```json
 {
@@ -50,7 +50,7 @@ Email address input with built-in validation and variable support.
 ---
 
 #### `url`
-URL input with built-in validation and variable support.
+URL input with built-in validation and optional variable support (set `allowVariables: true`).
 
 ```json
 {
@@ -87,7 +87,7 @@ Password input with hidden characters.
 ---
 
 #### `textarea`
-Multi-line text input with variable support and configurable rows.
+Multi-line text input with optional variable support (set `allowVariables: true`) and configurable rows.
 
 ```json
 {
@@ -278,19 +278,19 @@ File path input with file browser dialog.
 
 | Type | Settings | Actions | Variables | Validation | Notes |
 |------|----------|---------|-----------|------------|-------|
-| `text` | ✅ | ✅ | ✅ | pattern, length | Single-line input |
-| `email` | ✅ | ✅ | ✅ | auto | Email validation |
-| `url` | ✅ | ✅ | ✅ | auto | URL validation |
+| `text` | ✅ | ✅ | With `allowVariables` | pattern, length | Single-line input |
+| `email` | ✅ | ✅ | With `allowVariables` | auto | Email validation |
+| `url` | ✅ | ✅ | With `allowVariables` | auto | URL validation |
 | `password` | ✅ | ❌ | ❌ | pattern, length | Hidden characters |
-| `textarea` | ✅ | ✅ | ✅ | length | Multi-line, rows configurable |
+| `textarea` | ✅ | ✅ | With `allowVariables` | length | Multi-line, rows configurable |
 | `text_list` | ✅ | ❌ | ❌ | - | Array of strings |
-| `number` | ✅ | ✅ | ❌ | min, max | Numeric input |
+| `number` | ✅ | ✅ | With `allowVariables` | min, max | Numeric input |
 | `slider` | ✅ | ✅ | ❌ | min, max, step | Visual slider |
-| `select` | ✅ | ✅ | ❌ | - | Dropdown menu |
+| `select` | ✅ | ✅ | With `allowVariables` | - | Dropdown menu |
 | `checkbox` | ✅ | ✅ | ❌ | - | Boolean checkbox |
 | `switch`/`toggle` | ✅ | ✅ | ❌ | - | Toggle switch |
 | `color` | ✅ | ✅ | ❌ | - | Color picker |
-| `file` | ✅ | ✅ | ❌ | - | File browser |
+| `file` | ✅ | ✅ | With `allowVariables` | - | File browser |
 
 ## Common Properties
 
@@ -335,11 +335,11 @@ Different field types support different validation options:
 
 ## Variable Support
 
-The following field types support Lumia variable substitution (e.g., `{{username}}`):
-- `text`
-- `email`
-- `url`
-- `textarea`
+Variable support for **action fields** is controlled by `allowVariables`.
+- Set `allowVariables: true` to enable variables for any field.
+- When omitted, variables are not enabled (including `select` fields with `allowTyping`).
+
+Settings fields do not expose variable insertion in the UI.
 
 ## Example: Complete Action with Multiple Field Types
 
