@@ -23,12 +23,16 @@ export enum PluginCategory {
 	SYSTEM = "system",
 	PLATFORMS = "platforms",
 	APPS = "apps",
+	AUDIO = "audio",
+	VIDEO = "video",
 	LIGHTS = "lights",
 	SWITCH = "switch",
 	DECK = "deck",
 	PROTOCOLS = "protocols",
 	KEYLIGHT = "keylight",
 	DEVICES = "devices",
+	GAMES = "games",
+	UTILITIES = "utilities",
 }
 
 export interface PluginVariableDefinition {
