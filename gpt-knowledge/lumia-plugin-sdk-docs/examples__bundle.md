@@ -2043,7 +2043,6 @@ class FitbitPlugin extends Plugin {
 
 	async onload() {
 		await this._primeVariables();
-		await this._log("Fitbit plugin loaded.");
 
 		if (!this._hasAuthTokens()) {
 			await this._log(
@@ -2061,7 +2060,6 @@ class FitbitPlugin extends Plugin {
 	async onunload() {
 		this._clearPolling();
 		await this._updateConnectionState(false);
-		await this._log("Fitbit plugin stopped.");
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
@@ -2079,10 +2077,6 @@ class FitbitPlugin extends Plugin {
 
 		if (authChanged) {
 			if (!this._hasAuthTokens()) {
-				await this._log(
-					"Fitbit tokens cleared; polling paused until re-authorized.",
-					"warn",
-				);
 				await this._updateConnectionState(false);
 				return;
 			}
@@ -2105,11 +2099,6 @@ class FitbitPlugin extends Plugin {
 					case "fitbit_refresh":
 						await this._refreshMetrics({ reason: "manual-action" });
 						break;
-					default:
-						await this._log(
-							`Unknown action type: ${action?.type ?? "undefined"}`,
-							"warn",
-						);
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
@@ -2133,7 +2122,6 @@ class FitbitPlugin extends Plugin {
 				this._fetchIntradayResource("steps", today),
 				this._fetchHeartRateIntraday(today),
 			]);
-			await this._log("Fitbit authentication succeeded.");
 			return true;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -2820,7 +2808,6 @@ class FitbitPlugin extends Plugin {
 				refreshToken: nextRefreshToken,
 			});
 
-			await this._log("Fitbit access token refreshed.");
 			return accessToken;
 		})();
 

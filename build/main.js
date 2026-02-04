@@ -14,7 +14,6 @@ const DEFAULTS = {
 class Build extends Plugin {
 	async onload() {
 		const message = this._currentMessage();
-		await this._log("Plugin loaded");
 		await this._rememberMessage(message);
 
 		if (this.settings.autoAlert === "load") {
@@ -26,12 +25,10 @@ class Build extends Plugin {
 	}
 
 	async onunload() {
-		await this._log("Plugin unloaded");
+		// Plugin unloaded
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
-		await this._log("Settings updated");
-
 		if (
 			settings?.welcomeMessage &&
 			settings.welcomeMessage !== previous?.welcomeMessage
@@ -57,10 +54,6 @@ class Build extends Plugin {
 				case "trigger_alert":
 					await this._triggerSampleAlert(action.data);
 					break;
-				default:
-					await this._log(
-						`Unknown action type: ${action?.type ?? "undefined"}`
-					);
 			}
 		}
 	}
@@ -82,8 +75,8 @@ class Build extends Plugin {
 			severity === "warn"
 				? `${prefix} ⚠️ ${message}`
 				: severity === "error"
-				? `${prefix} ❌ ${message}`
-				: `${prefix} ${message}`;
+					? `${prefix} ❌ ${message}`
+					: `${prefix} ${message}`;
 
 		await this.lumia.addLog(decorated);
 	}
@@ -116,7 +109,6 @@ class Build extends Plugin {
 	async _handleUpdateVariable(data = {}) {
 		const value = data?.value ?? new Date().toISOString();
 		await this._rememberMessage(value);
-		await this._log(`Stored variable value: ${value}`);
 	}
 
 	async _triggerSampleAlert(data = {}) {
@@ -135,13 +127,10 @@ class Build extends Plugin {
 			}
 
 			await this.lumia.setVariable(VARIABLE_NAMES.lastAlertColor, color);
-			await this._log(
-				`Triggered sample alert with color ${color} for ${duration}s`
-			);
 		} catch (error) {
 			await this._log(
 				`Failed to trigger sample alert: ${error.message ?? error}`,
-				"error"
+				"error",
 			);
 		}
 	}
