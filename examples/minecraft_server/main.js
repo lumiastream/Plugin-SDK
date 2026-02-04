@@ -38,32 +38,27 @@ class MinecraftServerPlugin extends Plugin {
 	}
 
 	async onload() {
-		await this.lumia.addLog("[Minecraft Server] Plugin loaded");
-
-		if (this.settings?.enablePolling && this.settings?.serverHost) {
+		if (this.settings?.serverHost) {
 			await this.startPolling();
 		} else if (!this.settings?.serverHost) {
 			await this.lumia.addLog(
-				"[Minecraft Server] Server address not configured. Please configure in settings."
+				"[Minecraft Server] Server address not configured. Please configure in settings.",
 			);
 		}
 	}
 
 	async onunload() {
-		await this.lumia.addLog("[Minecraft Server] Plugin unloaded");
 		await this.stopPolling();
 	}
 
 	async onsettingsupdate(settings, previousSettings) {
 		const hostChanged = settings?.serverHost !== previousSettings?.serverHost;
 		const portChanged = settings?.serverPort !== previousSettings?.serverPort;
-		const pollingChanged =
-			settings?.enablePolling !== previousSettings?.enablePolling;
 
-		if (hostChanged || portChanged || pollingChanged) {
+		if (hostChanged || portChanged) {
 			await this.stopPolling();
 
-			if (settings?.enablePolling && settings?.serverHost) {
+			if (settings?.serverHost) {
 				await this.startPolling();
 			}
 		}
@@ -76,31 +71,85 @@ class MinecraftServerPlugin extends Plugin {
 			try {
 				switch (action.type) {
 					case "manual_poll":
-						await this.lumia.addLog(
-							"[Minecraft Server] Manual poll triggered"
-						);
 						await this.pollServer();
 						break;
 
 					case "test_connection":
-						await this.lumia.addLog(
-							"[Minecraft Server] Testing connection..."
-						);
 						await this.testConnection();
 						break;
-
-					default:
-						await this.lumia.addLog(
-							`[Minecraft Server] Unknown action: ${action.type}`
-						);
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				await this.lumia.addLog(
-					`[Minecraft Server] Error in action ${action.type}: ${message}`
+					`[Minecraft Server] Error in action ${action.type}: ${message}`,
 				);
 			}
 		}
+	}
+
+	async validateAuth(data = {}) {
+		await this.lumia.showToast({ message: "Validating auth", time: 4 });
+		const host = String(
+			data?.serverHost ?? this.settings?.serverHost ?? "",
+		).trim();
+		const parsePort = (value, fallback) => {
+			const port = Number(value);
+			return Number.isInteger(port) && port > 0 && port <= 65535
+				? port
+				: fallback;
+		};
+		const port = parsePort(
+			data?.serverPort ?? this.settings?.serverPort,
+			25565,
+		);
+		const queryPort = parsePort(
+			data?.queryPort ?? this.settings?.queryPort,
+			port,
+		);
+		const useQuery = Boolean(
+			data?.useQuery ?? this.settings?.useQuery ?? false,
+		);
+
+		if (!host) {
+			return { ok: false, message: "Server address is required." };
+		}
+
+		try {
+			await this.serverListPing(host, port);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`[Minecraft Server] Auth validation failed: ${message}`,
+			);
+			return {
+				ok: false,
+				message: `Unable to reach ${host}:${port}. ${message}`,
+			};
+		}
+
+		if (!useQuery) {
+			return {
+				ok: true,
+				message:
+					"Connected. Query is disabled, so player list/username alerts will be generic. Enable enable-query=true for full tracking.",
+			};
+		}
+
+		try {
+			await this.queryServer(host, queryPort);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`[Minecraft Server] Query validation failed: ${message}`,
+			);
+			return {
+				ok: true,
+				message:
+					"Connected, but Query is not reachable. Player list/username alerts will be generic. Ensure enable-query=true and UDP query.port is open.",
+			};
+		}
+
+		return { ok: true, message: "Connection verified. Query is enabled." };
 	}
 
 	// ============================================================================
@@ -113,9 +162,6 @@ class MinecraftServerPlugin extends Plugin {
 		}
 
 		const interval = this.getPollInterval();
-		await this.lumia.addLog(
-			`[Minecraft Server] Starting polling (every ${interval}s)`
-		);
 
 		// Initial poll
 		await this.pollServer();
@@ -130,7 +176,6 @@ class MinecraftServerPlugin extends Plugin {
 		if (this.pollInterval) {
 			clearInterval(this.pollInterval);
 			this.pollInterval = null;
-			await this.lumia.addLog("[Minecraft Server] Stopped polling");
 		}
 	}
 
@@ -153,9 +198,10 @@ class MinecraftServerPlugin extends Plugin {
 					const queryPort = this.getQueryPort();
 					queryData = await this.queryServer(host, queryPort);
 				} catch (error) {
-					// Query failed, but that's okay - we have ping data
+					const message =
+						error instanceof Error ? error.message : String(error);
 					await this.lumia.addLog(
-						`[Minecraft Server] Query failed: ${error.message}`
+						`[Minecraft Server] Query failed: ${message}`,
 					);
 				}
 			}
@@ -163,11 +209,6 @@ class MinecraftServerPlugin extends Plugin {
 			// Process the combined data
 			await this.processServerData(pingData, queryData);
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
-				`[Minecraft Server] Poll failed: ${message}`
-			);
-
 			// Server is offline
 			await this.processServerData(null, null);
 		}
@@ -190,21 +231,11 @@ class MinecraftServerPlugin extends Plugin {
 			await this.lumia.showToast({
 				message: `✅ Connected to ${host}:${port}\n${data.players.online}/${data.players.max} players online`,
 			});
-
-			await this.lumia.addLog(
-				`[Minecraft Server] ✅ Connection successful!\n` +
-					`Version: ${data.version.name}\n` +
-					`Players: ${data.players.online}/${data.players.max}\n` +
-					`MOTD: ${this.cleanMOTD(data.description)}`
-			);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			await this.lumia.showToast({
 				message: `❌ Connection failed: ${message}`,
 			});
-			await this.lumia.addLog(
-				`[Minecraft Server] ❌ Connection failed: ${message}`
-			);
 		}
 	}
 
@@ -267,14 +298,15 @@ class MinecraftServerPlugin extends Plugin {
 					// Read JSON length
 					const jsonLengthResult = this.readVarInt(
 						buffer,
-						dataStart + idResult.length
+						dataStart + idResult.length,
 					);
 					const jsonLength = jsonLengthResult.value;
-					const jsonStart = dataStart + idResult.length + jsonLengthResult.length;
+					const jsonStart =
+						dataStart + idResult.length + jsonLengthResult.length;
 
 					// Extract JSON string
 					const jsonString = buffer
-						.slice(jsonStart, jsonStart + jsonLength)
+						.subarray(jsonStart, jsonStart + jsonLength)
 						.toString("utf8");
 
 					cleanup();
@@ -341,7 +373,8 @@ class MinecraftServerPlugin extends Plugin {
 			}, timeout * 1000);
 
 			// Step 1: Send handshake
-			sessionId = Math.floor(Math.random() * 0x7fffffff);
+			// Session ID must be masked with 0x0F0F0F0F per Minecraft Query Protocol
+			sessionId = Math.floor(Math.random() * 0x0f0f0f0f) & 0x0f0f0f0f;
 			const handshake = this.createQueryHandshake(sessionId);
 
 			client.send(handshake, port, host, (error) => {
@@ -356,25 +389,39 @@ class MinecraftServerPlugin extends Plugin {
 			client.on("message", async (msg) => {
 				try {
 					if (challengeToken === null) {
-						// Parse handshake response
-						const type = msg.readUInt8(0);
+						// Parse handshake response (some servers include 0xFEFD prefix)
+						let offset = 0;
+						if (msg.length >= 2 && msg.readUInt16BE(0) === 0xfefd) {
+							offset = 2;
+						}
+
+						const type = msg.readUInt8(offset);
 						if (type !== 0x09) {
 							throw new Error("Invalid handshake response");
 						}
 
-						const responseSessionId = msg.readInt32BE(1);
-						if (responseSessionId !== sessionId) {
-							throw new Error("Session ID mismatch");
-						}
+						const responseSessionId = msg.readInt32BE(offset + 1);
+						sessionId = responseSessionId;
 
 						// Extract challenge token
-						const tokenString = msg.slice(5, msg.length - 1).toString("utf8");
+						const tokenStart = offset + 5;
+						const tokenEnd = msg.indexOf(0, tokenStart);
+						const tokenSliceEnd = tokenEnd === -1 ? msg.length : tokenEnd;
+						const tokenString = msg
+							.subarray(tokenStart, tokenSliceEnd)
+							.toString("utf8")
+							.trim();
 						challengeToken = parseInt(tokenString, 10);
+						if (Number.isNaN(challengeToken)) {
+							throw new Error(
+								`Invalid challenge token response: "${tokenString}"`,
+							);
+						}
 
 						// Step 2: Send full stat request
 						const statRequest = this.createQueryStatRequest(
 							sessionId,
-							challengeToken
+							challengeToken,
 						);
 						client.send(statRequest, port, host);
 					} else {
@@ -415,13 +462,18 @@ class MinecraftServerPlugin extends Plugin {
 	}
 
 	parseQueryResponse(msg) {
-		const type = msg.readUInt8(0);
+		let offset = 0;
+		if (msg.length >= 2 && msg.readUInt16BE(0) === 0xfefd) {
+			offset = 2;
+		}
+
+		const type = msg.readUInt8(offset);
 		if (type !== 0x00) {
 			throw new Error("Invalid stat response");
 		}
 
 		// Skip header
-		let offset = 5;
+		offset += 5;
 
 		// Skip padding
 		offset += 11;
@@ -432,22 +484,31 @@ class MinecraftServerPlugin extends Plugin {
 			// Read key
 			let keyEnd = msg.indexOf(0, offset);
 			if (keyEnd === -1) break;
-			const key = msg.slice(offset, keyEnd).toString("utf8");
+			const key = msg.subarray(offset, keyEnd).toString("utf8");
 			offset = keyEnd + 1;
 
 			// Read value
 			let valueEnd = msg.indexOf(0, offset);
 			if (valueEnd === -1) break;
-			const value = msg.slice(offset, valueEnd).toString("utf8");
+			const value = msg.subarray(offset, valueEnd).toString("utf8");
 			offset = valueEnd + 1;
 
-			if (key.length === 0 && value.length === 0) {
+			if (key.length === 0) {
 				// End of key-value section
-				offset++;
 				break;
 			}
 
 			data[key] = value;
+		}
+
+		// Skip player list padding: \x01player_\x00\x00 (10 bytes)
+		// Find the start of player names by looking for "player_\x00\x00"
+		const playerMarker = Buffer.from([
+			0x01, 0x70, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x5f, 0x00, 0x00,
+		]);
+		const markerIndex = msg.indexOf(playerMarker, offset);
+		if (markerIndex !== -1) {
+			offset = markerIndex + playerMarker.length;
 		}
 
 		// Parse player list
@@ -455,7 +516,7 @@ class MinecraftServerPlugin extends Plugin {
 		while (offset < msg.length) {
 			let playerEnd = msg.indexOf(0, offset);
 			if (playerEnd === -1) break;
-			const player = msg.slice(offset, playerEnd).toString("utf8");
+			const player = msg.subarray(offset, playerEnd).toString("utf8");
 			offset = playerEnd + 1;
 
 			if (player.length > 0) {
@@ -510,15 +571,15 @@ class MinecraftServerPlugin extends Plugin {
 
 	async updateVariables(state) {
 		const updates = [
-			this.lumia.setVariable("mc_online", state.online),
-			this.lumia.setVariable("mc_players_online", state.playersOnline),
-			this.lumia.setVariable("mc_players_max", state.playersMax),
-			this.lumia.setVariable("mc_version", state.version),
-			this.lumia.setVariable("mc_motd", state.motd),
-			this.lumia.setVariable("mc_protocol_version", state.protocolVersion),
-			this.lumia.setVariable("mc_player_list", state.playerList.join(", ")),
-			this.lumia.setVariable("mc_map", state.map),
-			this.lumia.setVariable("mc_game_type", state.gameType),
+			this.lumia.setVariable("online", state.online),
+			this.lumia.setVariable("players_online", state.playersOnline),
+			this.lumia.setVariable("players_max", state.playersMax),
+			this.lumia.setVariable("version", state.version),
+			this.lumia.setVariable("motd", state.motd),
+			this.lumia.setVariable("protocol_version", state.protocolVersion),
+			this.lumia.setVariable("player_list", state.playerList.join(", ")),
+			this.lumia.setVariable("map", state.map),
+			this.lumia.setVariable("game_type", state.gameType),
 		];
 
 		await Promise.all(updates);
@@ -527,19 +588,17 @@ class MinecraftServerPlugin extends Plugin {
 	async checkServerOnlineOffline(newState, oldState) {
 		if (newState.online && !oldState.online) {
 			// Server came online
-			await this.lumia.addLog("[Minecraft Server] ✅ Server is now ONLINE");
 			await this.lumia.triggerAlert({
 				alert: ALERT_TYPES.SERVER_ONLINE,
 				extraSettings: {
-					mc_online: true,
-					mc_version: newState.version,
-					mc_motd: newState.motd,
-					mc_players_max: newState.playersMax,
+					online: true,
+					version: newState.version,
+					motd: newState.motd,
+					players_max: newState.playersMax,
 				},
 			});
 		} else if (!newState.online && oldState.online) {
 			// Server went offline
-			await this.lumia.addLog("[Minecraft Server] ❌ Server is now OFFLINE");
 			await this.lumia.triggerAlert({
 				alert: ALERT_TYPES.SERVER_OFFLINE,
 				extraSettings: {},
@@ -555,20 +614,56 @@ class MinecraftServerPlugin extends Plugin {
 		const newPlayers = new Set(newState.playerList);
 		const oldPlayers = this.previousPlayers;
 
+		const hasPlayerList =
+			(Array.isArray(newState.playerList) && newState.playerList.length > 0) ||
+			(Array.isArray(oldState.playerList) && oldState.playerList.length > 0);
+
+		if (!hasPlayerList) {
+			const delta = newState.playersOnline - oldState.playersOnline;
+			if (delta > 0) {
+				for (let i = 0; i < delta; i += 1) {
+					const label = "Player";
+					await this.lumia.setVariable("last_player_joined", label);
+					await this.lumia.triggerAlert({
+						alert: ALERT_TYPES.PLAYER_JOINED,
+						extraSettings: {
+							username: label,
+							last_player_joined: label,
+							players_online: newState.playersOnline,
+							players_max: newState.playersMax,
+						},
+					});
+				}
+			} else if (delta < 0) {
+				for (let i = 0; i < Math.abs(delta); i += 1) {
+					const label = "Player";
+					await this.lumia.setVariable("last_player_left", label);
+					await this.lumia.triggerAlert({
+						alert: ALERT_TYPES.PLAYER_LEFT,
+						extraSettings: {
+							username: label,
+							last_player_left: label,
+							players_online: newState.playersOnline,
+							players_max: newState.playersMax,
+						},
+					});
+				}
+			}
+
+			this.previousPlayers = newPlayers;
+			return;
+		}
 		// Check for joins
 		for (const player of newPlayers) {
 			if (!oldPlayers.has(player)) {
-				await this.lumia.setVariable("mc_last_player_joined", player);
-				await this.lumia.addLog(
-					`[Minecraft Server] 👤 ${player} joined (${newState.playersOnline}/${newState.playersMax})`
-				);
+				await this.lumia.setVariable("last_player_joined", player);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_JOINED,
 					extraSettings: {
 						username: player,
-						mc_last_player_joined: player,
-						mc_players_online: newState.playersOnline,
-						mc_players_max: newState.playersMax,
+						last_player_joined: player,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
 					},
 				});
 			}
@@ -577,17 +672,14 @@ class MinecraftServerPlugin extends Plugin {
 		// Check for leaves
 		for (const player of oldPlayers) {
 			if (!newPlayers.has(player)) {
-				await this.lumia.setVariable("mc_last_player_left", player);
-				await this.lumia.addLog(
-					`[Minecraft Server] 👋 ${player} left (${newState.playersOnline}/${newState.playersMax})`
-				);
+				await this.lumia.setVariable("last_player_left", player);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_LEFT,
 					extraSettings: {
 						username: player,
-						mc_last_player_left: player,
-						mc_players_online: newState.playersOnline,
-						mc_players_max: newState.playersMax,
+						last_player_left: player,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
 					},
 				});
 			}
@@ -603,15 +695,12 @@ class MinecraftServerPlugin extends Plugin {
 		for (const milestone of milestones) {
 			if (count >= milestone && !this.milestonesReached.has(milestone)) {
 				this.milestonesReached.add(milestone);
-				await this.lumia.addLog(
-					`[Minecraft Server] 🎉 Player milestone reached: ${milestone} players!`
-				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_MILESTONE,
 					dynamic: { value: count },
 					extraSettings: {
-						mc_players_online: count,
-						mc_players_max: newState.playersMax,
+						players_online: count,
+						players_max: newState.playersMax,
 					},
 				});
 			}
@@ -634,14 +723,11 @@ class MinecraftServerPlugin extends Plugin {
 				!this.lastState ||
 				this.lastState.playersOnline < this.lastState.playersMax
 			) {
-				await this.lumia.addLog(
-					`[Minecraft Server] 🔴 Server is FULL (${newState.playersMax}/${newState.playersMax})`
-				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.SERVER_FULL,
 					extraSettings: {
-						mc_players_online: newState.playersOnline,
-						mc_players_max: newState.playersMax,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
 					},
 				});
 			}
@@ -651,7 +737,6 @@ class MinecraftServerPlugin extends Plugin {
 	// ============================================================================
 	// Helper Methods
 	// ============================================================================
-
 	getServerHost() {
 		const host = (this.settings?.serverHost ?? "").trim();
 		return host.length > 0 ? host : null;
@@ -677,10 +762,7 @@ class MinecraftServerPlugin extends Plugin {
 	}
 
 	getTimeout() {
-		const timeout = Number(this.settings?.timeout);
-		return Number.isInteger(timeout) && timeout >= 1 && timeout <= 30
-			? timeout
-			: 5;
+		return 5;
 	}
 
 	cleanMOTD(description) {
