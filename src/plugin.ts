@@ -1,4 +1,4 @@
-import { type PluginManifest, type PluginContext, type ILumiaAPI, type PluginDisplayChatOptions } from './types';
+import { type PluginManifest, type PluginContext, type ILumiaAPI, type PluginDisplayChatOptions, type PluginAuthValidationResponse } from './types';
 
 /**
  * Base Plugin Class - every Lumia Stream plugin should extend this class.
@@ -76,7 +76,7 @@ export abstract class Plugin {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async validateAuth(_data: any): Promise<boolean> {
+  async validateAuth(_data: any): Promise<PluginAuthValidationResponse> {
     return true;
   }
 

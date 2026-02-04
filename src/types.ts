@@ -455,6 +455,16 @@ export interface PluginLightDisplayField {
 	fallback?: string;
 }
 
+export interface PluginAuthValidationResult {
+	ok: boolean;
+	message?: string;
+}
+
+export type PluginAuthValidationResponse =
+	| boolean
+	| PluginAuthValidationResult
+	| string;
+
 export interface PluginLightSearchConfig {
 	label?: string;
 	helperText?: string;
