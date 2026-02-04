@@ -101,6 +101,7 @@ If your plugin provides lights, add a `config.lights` block so the PluginAuth UI
 ```
 
 Runtime hooks for lights plugins:
+
 - Implement `searchLights` to return an array of discovered lights for the UI to save.
 - Implement `addLight` to handle manual-add requests and return the updated array.
 - Implement `onLightChange` to receive color/brightness/power updates for your lights.
@@ -487,7 +488,7 @@ Optional alert defaults can be provided under `defaults` to control how Lumia in
 ```json
 {
 	"title": "High CPU Usage",
-	"key": "unraid_cpu_high",
+	"key": "cpu_high",
 	"defaultMessage": "",
 	"defaults": {
 		"disableBaseAlert": true
