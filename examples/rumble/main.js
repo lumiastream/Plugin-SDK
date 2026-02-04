@@ -283,17 +283,17 @@ function buildAlertVariables(state) {
 		return {};
 	}
 	return {
-		rumble_live: state.live,
-		rumble_viewers: state.viewers,
-		rumble_title: state.title,
-		rumble_stream_url: state.streamUrl,
-		rumble_followers: state.followers,
-		rumble_likes: state.likes,
-		rumble_dislikes: state.dislikes,
-		rumble_subs: state.subs,
-		rumble_sub_gifts: state.subGifts,
-		rumble_rants: state.rants,
-		rumble_rant_amount: roundToTwo(state.rantAmount),
+		live: state.live,
+		viewers: state.viewers,
+		title: state.title,
+		stream_url: state.streamUrl,
+		followers: state.followers,
+		likes: state.likes,
+		dislikes: state.dislikes,
+		subs: state.subs,
+		sub_gifts: state.subGifts,
+		rants: state.rants,
+		rant_amount: roundToTwo(state.rantAmount),
 	};
 }
 
@@ -411,19 +411,13 @@ class RumblePlugin extends Plugin {
 	}
 
 	async onload() {
-		await this.lumia.addLog("[Rumble] Plugin loading...");
-
 		if (this.apiKey) {
 			await this.startPolling({ showToast: false });
 		}
-
-		await this.lumia.addLog("[Rumble] Plugin loaded");
 	}
 
 	async onunload() {
-		await this.lumia.addLog("[Rumble] Plugin unloading...");
 		await this.stopPolling(false);
-		await this.lumia.addLog("[Rumble] Plugin unloaded");
 	}
 
 	async onsettingsupdate(settings, previousSettings) {
@@ -467,7 +461,6 @@ class RumblePlugin extends Plugin {
 				switch (action.type) {
 					case "manual_poll": {
 						await this.pollAPI();
-						await this.lumia.addLog("[Rumble] Manual poll triggered");
 						break;
 					}
 
@@ -483,14 +476,7 @@ class RumblePlugin extends Plugin {
 								streamUrl: this.lastKnownState.streamUrl,
 							},
 						});
-						await this.lumia.addLog("[Rumble] Manual alert triggered");
 						break;
-					}
-
-					default: {
-						await this.lumia.addLog(
-							`[Rumble] Unknown action type: ${action.type}`,
-						);
 					}
 				}
 			} catch (error) {
@@ -574,12 +560,6 @@ class RumblePlugin extends Plugin {
 			void this.pollAPI();
 		}, normalizedInterval * 1000);
 
-		if (showToast) {
-			await this.lumia.showToast({
-				message: `Started polling Rumble API (${normalizedInterval}s)`,
-			});
-		}
-
 		await this.lumia.updateConnection(true);
 	}
 
@@ -590,10 +570,6 @@ class RumblePlugin extends Plugin {
 			this.pollIntervalId = null;
 		}
 
-		if (showToast) {
-			await this.lumia.showToast({ message: "Stopped polling Rumble API" });
-		}
-
 		await this.lumia.updateConnection(false);
 	}
 
@@ -602,9 +578,6 @@ class RumblePlugin extends Plugin {
 		try {
 			const apiKey = this.apiKey;
 			if (!apiKey) {
-				await this.lumia.addLog(
-					"[Rumble] Poll skipped: API key not configured",
-				);
 				return;
 			}
 
@@ -725,55 +698,35 @@ class RumblePlugin extends Plugin {
 			}
 		};
 
-		setIfChanged("rumble_live", state.live, previousState?.live);
-		setIfChanged("rumble_viewers", state.viewers, previousState?.viewers);
-		setIfChanged("rumble_joined", state.joined, previousState?.joined);
-		setIfChanged("rumble_title", state.title, previousState?.title);
-		setIfChanged("rumble_thumbnail", state.thumbnail, previousState?.thumbnail);
+		setIfChanged("live", state.live, previousState?.live);
+		setIfChanged("viewers", state.viewers, previousState?.viewers);
+		setIfChanged("joined", state.joined, previousState?.joined);
+		setIfChanged("title", state.title, previousState?.title);
+		setIfChanged("thumbnail", state.thumbnail, previousState?.thumbnail);
+		setIfChanged("stream_url", state.streamUrl, previousState?.streamUrl);
+		setIfChanged("video_id", state.videoId, previousState?.videoId);
+		setIfChanged("rumbles", state.rumbles, previousState?.rumbles);
+		setIfChanged("followers", state.followers, previousState?.followers);
+		setIfChanged("likes", state.likes, previousState?.likes);
+		setIfChanged("dislikes", state.dislikes, previousState?.dislikes);
+		setIfChanged("subs", state.subs, previousState?.subs);
+		setIfChanged("sub_gifts", state.subGifts, previousState?.subGifts);
+		setIfChanged("rants", state.rants, previousState?.rants);
+		setIfChanged("rant_amount", roundToTwo(state.rantAmount), prevRantAmount);
+		setIfChanged("chat_members", state.chatMembers, previousState?.chatMembers);
+		setIfChanged("category", state.category, previousState?.category);
+		setIfChanged("description", state.description, previousState?.description);
+		setIfChanged("language", state.language, previousState?.language);
+		setIfChanged("chat_url", state.chatUrl, previousState?.chatUrl);
+		setIfChanged("channel_name", state.channelName, previousState?.channelName);
 		setIfChanged(
-			"rumble_stream_url",
-			state.streamUrl,
-			previousState?.streamUrl,
-		);
-		setIfChanged("rumble_video_id", state.videoId, previousState?.videoId);
-		setIfChanged("rumble_rumbles", state.rumbles, previousState?.rumbles);
-		setIfChanged("rumble_followers", state.followers, previousState?.followers);
-		setIfChanged("rumble_likes", state.likes, previousState?.likes);
-		setIfChanged("rumble_dislikes", state.dislikes, previousState?.dislikes);
-		setIfChanged("rumble_subs", state.subs, previousState?.subs);
-		setIfChanged("rumble_sub_gifts", state.subGifts, previousState?.subGifts);
-		setIfChanged("rumble_rants", state.rants, previousState?.rants);
-		setIfChanged(
-			"rumble_rant_amount",
-			roundToTwo(state.rantAmount),
-			prevRantAmount,
-		);
-		setIfChanged(
-			"rumble_chat_members",
-			state.chatMembers,
-			previousState?.chatMembers,
-		);
-		setIfChanged("rumble_category", state.category, previousState?.category);
-		setIfChanged(
-			"rumble_description",
-			state.description,
-			previousState?.description,
-		);
-		setIfChanged("rumble_language", state.language, previousState?.language);
-		setIfChanged("rumble_chat_url", state.chatUrl, previousState?.chatUrl);
-		setIfChanged(
-			"rumble_channel_name",
-			state.channelName,
-			previousState?.channelName,
-		);
-		setIfChanged(
-			"rumble_channel_image",
+			"channel_image",
 			state.channelImage,
 			previousState?.channelImage,
 		);
-		setIfChanged("rumble_started_at", startedIso, prevStartedIso);
-		setIfChanged("rumble_scheduled_start", scheduledIso, prevScheduledIso);
-		setIfChanged("rumble_last_polled", nowIso, previousState?.lastPolledIso);
+		setIfChanged("started_at", startedIso, prevStartedIso);
+		setIfChanged("scheduled_start", scheduledIso, prevScheduledIso);
+		setIfChanged("last_polled", nowIso, previousState?.lastPolledIso);
 
 		if (updates.length) {
 			await Promise.all(updates);

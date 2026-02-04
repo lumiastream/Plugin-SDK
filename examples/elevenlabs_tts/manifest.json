@@ -6,10 +6,11 @@
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
 	"repository": "",
-	"description": "Generate ElevenLabs text-to-speech audio and play it inside Lumia Stream.",
+	"description": "Generate ElevenLabs speech or music audio and play it through Lumia Stream.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"category": "examples",
+	"category": "audio",
+	"keywords": "elevenlabs, tts, text-to-speech, voice, audio",
 	"icon": "elevenlabs_icon.jpg",
 	"config": {
 		"settings": [
@@ -34,7 +35,8 @@
 						"label": "Message",
 						"type": "text",
 						"defaultValue": "Hello from Lumia!",
-						"helperText": "Text to synthesize. Character limits vary per model; long messages will be truncated."
+						"helperText": "Text to synthesize. Character limits vary per model; long messages will be truncated.",
+						"allowVariables": true
 					},
 					{
 						"key": "maxChars",
@@ -49,7 +51,8 @@
 						"label": "Voice ID",
 						"type": "text",
 						"defaultValue": "JBFqnCBsd6RMkjVDRZzb",
-						"helperText": "Find this in ElevenLabs Voice Lab or your Voices page."
+						"helperText": "Find this in ElevenLabs Voice Lab or your Voices page.",
+						"allowVariables": true
 					},
 					{
 						"key": "modelId",
@@ -72,7 +75,7 @@
 						"key": "stability",
 						"label": "Stability (0-1)",
 						"type": "number",
-						"defaultValue": 0.5,
+						"defaultValue": 1,
 						"helperText": "Higher is more consistent; lower is more expressive.",
 						"min": 0,
 						"max": 1
@@ -81,7 +84,7 @@
 						"key": "similarityBoost",
 						"label": "Similarity Boost (0-1)",
 						"type": "number",
-						"defaultValue": 0.5,
+						"defaultValue": 1,
 						"helperText": "Higher keeps closer to the original voice.",
 						"min": 0,
 						"max": 1

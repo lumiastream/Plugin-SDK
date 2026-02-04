@@ -5,6 +5,6 @@
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.1.18"
+		"@lumiastream/plugin": "^0.2.3"
 	}
 }

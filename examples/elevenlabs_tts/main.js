@@ -156,14 +156,6 @@ const buildMusicFilename = (outputFormat) => {
 };
 
 class ElevenLabsTTSPlugin extends Plugin {
-	async onload() {
-		await this.lumia.addLog("[ElevenLabs] Plugin loaded");
-	}
-
-	async onunload() {
-		await this.lumia.addLog("[ElevenLabs] Plugin unloaded");
-	}
-
 	getSettingsSnapshot() {
 		const raw = this.settings || {};
 		return {
@@ -226,9 +218,6 @@ class ElevenLabsTTSPlugin extends Plugin {
 				modelLimit && userLimit
 					? `${effectiveLimit} (min of model ${modelLimit} and user ${userLimit})`
 					: `${effectiveLimit}`;
-			await this.lumia.addLog(
-				`[ElevenLabs] Message exceeded ${limitLabel} characters; truncated.`,
-			);
 		}
 		const outputFormat = DEFAULTS.outputFormat;
 		const stability = Number.isFinite(toNumber(data.stability, NaN))
@@ -322,9 +311,6 @@ class ElevenLabsTTSPlugin extends Plugin {
 			const truncatedPrompt = truncateText(prompt, promptLimit);
 			prompt = truncatedPrompt.text;
 			if (truncatedPrompt.truncated) {
-				await this.lumia.addLog(
-					`[ElevenLabs] Prompt exceeded ${promptLimit} characters; truncated.`,
-				);
 			}
 		}
 		const outputFormat = DEFAULTS.outputFormat;
@@ -400,7 +386,6 @@ class ElevenLabsTTSPlugin extends Plugin {
 			const filename = buildMusicFilename(outputFormat);
 			const filePath = path.join(desktopPath, filename);
 			await fs.writeFile(filePath, Buffer.from(audioBuffer));
-			await this.lumia.addLog(`[ElevenLabs] Saved music to ${filePath}`);
 		}
 	}
 }

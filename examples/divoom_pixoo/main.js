@@ -160,10 +160,6 @@ class DivoomPixooPlugin extends Plugin {
 	}
 
 	async refreshConnection() {
-		await this.lumia.addLog(
-			"[Divoom Pixoo] Refreshing connection to prevent device freeze...",
-		);
-
 		// Send a simple query to reset internal counter
 		const result = await this.sendCommand("Device/GetDeviceTime", {});
 
