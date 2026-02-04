@@ -327,7 +327,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -1378,7 +1378,7 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -1984,7 +1984,7 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -3167,7 +3167,7 @@ module.exports = FitbitPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -3943,7 +3943,7 @@ module.exports = HotNewsPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -5007,7 +5007,7 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -5164,7 +5164,7 @@ module.exports = MockLightsPlugin;
   "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
   "main": "main.js",
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.3"
+    "@lumiastream/plugin": "^0.2.4"
   }
 }
 
@@ -6633,7 +6633,7 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
