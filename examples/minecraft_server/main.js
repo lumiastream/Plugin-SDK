@@ -88,7 +88,6 @@ class MinecraftServerPlugin extends Plugin {
 	}
 
 	async validateAuth(data = {}) {
-		await this.lumia.showToast({ message: "Validating auth", time: 4 });
 		const host = String(
 			data?.serverHost ?? this.settings?.serverHost ?? "",
 		).trim();
@@ -226,11 +225,7 @@ class MinecraftServerPlugin extends Plugin {
 		}
 
 		try {
-			const data = await this.serverListPing(host, port);
-
-			await this.lumia.showToast({
-				message: `✅ Connected to ${host}:${port}\n${data.players.online}/${data.players.max} players online`,
-			});
+			await this.serverListPing(host, port);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			await this.lumia.showToast({

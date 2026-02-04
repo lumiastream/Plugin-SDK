@@ -5,10 +5,11 @@
   "author": "Lumia Stream",
   "email": "dev@lumiastream.com",
   "website": "https://lumiastream.com",
-  "description": "Fetch breaking headlines from NewsAPI.org, expose them as Lumia variables, and trigger alerts when fresh stories land on your chosen topic.",
+  "description": "Poll NewsAPI for topic headlines, store latest articles in variables, and trigger alerts.",
   "license": "MIT",
   "lumiaVersion": "^9.0.0",
   "category": "utilities",
+  "keywords": "news, headlines, newsapi, breaking, alerts",
   "icon": "hot_news.png",
   "externalHelpLink": "https://lumiastream.com/contact",
   "config": {

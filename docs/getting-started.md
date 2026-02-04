@@ -120,6 +120,10 @@ export default class MyFirstPlugin extends Plugin {
 
 	async onsettingsupdate(settings: Record<string, any>): Promise<void> {}
 }
+
+### Module Loading Note
+
+Plugins are executed in a CommonJS context. Use `require()` for external dependencies in runtime code (for example, `const api = require("some-lib")`). Avoid dynamic `import()` because the plugin runtime does not resolve browser-style module specifiers.
 ```
 
 ## 4. Build Configuration

@@ -6,10 +6,11 @@
   "email": "",
   "website": "",
   "repository": "",
-  "description": "Creates fake lights and logs when Lumia sends color/brightness updates.",
+  "description": "Mock light provider that simulates lights for testing Lumia device actions.",
   "license": "MIT",
   "lumiaVersion": "^9.0.0",
   "category": "lights",
+  "keywords": "mock, lights, testing, sample, debug",
   "icon": "",
   "changelog": "",
   "config": {

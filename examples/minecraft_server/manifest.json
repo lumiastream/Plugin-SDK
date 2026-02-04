@@ -1,15 +1,16 @@
 {
 	"id": "minecraft_server",
 	"name": "Minecraft Server",
-	"version": "1.0.1",
+	"version": "1.0.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "https://github.com/LumiaStream/minecraft-server-plugin",
-	"description": "Monitor Minecraft Java Edition servers using Server List Ping and Query protocols. Track player count, server status, and trigger alerts based on server activity.",
+	"description": "Monitor Minecraft Java servers for status and player changes with alerts and variables.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
-	"category": "platforms",
+	"category": "games",
+	"keywords": "minecraft, server, java edition, status, players, games",
 	"icon": "minecraft.png",
 	"config": {
 		"settings": [

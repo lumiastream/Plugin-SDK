@@ -490,6 +490,9 @@ class HotNewsPlugin extends Plugin {
   }
 
   async _log(message, level = "info") {
+    if (level !== "warn" && level !== "error") {
+      return;
+    }
     const prefix = `[${this.manifest?.id ?? "hot_planet_news"}]`;
     const decorated =
       level === "warn"

@@ -14,7 +14,6 @@ const DEFAULTS = {
 class ShowcasePluginTemplate extends Plugin {
 	async onload() {
 		const message = this._currentMessage();
-		await this._log("Plugin loaded");
 		await this._rememberMessage(message);
 
 		if (this.settings.autoAlert === "load") {
@@ -25,13 +24,7 @@ class ShowcasePluginTemplate extends Plugin {
 		}
 	}
 
-	async onunload() {
-		await this._log("Plugin unloaded");
-	}
-
 	async onsettingsupdate(settings, previous = {}) {
-		await this._log("Settings updated");
-
 		if (
 			settings?.welcomeMessage &&
 			settings.welcomeMessage !== previous?.welcomeMessage
@@ -59,7 +52,8 @@ class ShowcasePluginTemplate extends Plugin {
 					break;
 				default:
 					await this._log(
-						`Unknown action type: ${action?.type ?? "undefined"}`
+						`Unknown action type: ${action?.type ?? "undefined"}`,
+						"warn",
 					);
 			}
 		}
@@ -77,13 +71,17 @@ class ShowcasePluginTemplate extends Plugin {
 	}
 
 	async _log(message, severity = "info") {
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
+
 		const prefix = this._tag();
 		const decorated =
 			severity === "warn"
 				? `${prefix} ⚠️ ${message}`
 				: severity === "error"
-				? `${prefix} ❌ ${message}`
-				: `${prefix} ${message}`;
+					? `${prefix} ❌ ${message}`
+					: `${prefix} ${message}`;
 
 		await this.lumia.addLog(decorated);
 	}
@@ -136,12 +134,12 @@ class ShowcasePluginTemplate extends Plugin {
 
 			await this.lumia.setVariable(VARIABLE_NAMES.lastAlertColor, color);
 			await this._log(
-				`Triggered sample alert with color ${color} for ${duration}s`
+				`Triggered sample alert with color ${color} for ${duration}s`,
 			);
 		} catch (error) {
 			await this._log(
 				`Failed to trigger sample alert: ${error.message ?? error}`,
-				"error"
+				"error",
 			);
 		}
 	}
