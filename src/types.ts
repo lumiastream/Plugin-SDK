@@ -133,6 +133,10 @@ export interface PluginActionField {
 	allowTyping?: boolean;
 	defaultValue?: any;
 	/**
+	 * When true, allow template variables (e.g. {{username}}) in this field.
+	 */
+	allowVariables?: boolean;
+	/**
 	 * When true, changing this field triggers refreshActionOptions in the UI.
 	 */
 	refreshOnChange?: boolean;

@@ -292,11 +292,11 @@ Actions allow users to trigger plugin functionality manually:
 
 Action fields support the following input types:
 
-- **`text`** - Single-line text input. Supports variables.
-- **`email`** - Email address input with validation. Supports variables.
-- **`url`** - URL input with validation. Supports variables.
+- **`text`** - Single-line text input. Supports variables when `allowVariables` is true.
+- **`email`** - Email address input with validation. Supports variables when `allowVariables` is true.
+- **`url`** - URL input with validation. Supports variables when `allowVariables` is true.
 - **`number`** - Numeric input with optional min/max constraints.
-- **`textarea`** - Multi-line text input. Supports variables and configurable rows.
+- **`textarea`** - Multi-line text input. Supports variables when `allowVariables` is true and configurable rows.
 - **`color`** - Color picker that outputs hex color values (e.g., `#FF0000`).
 - **`select`** - Dropdown selection from predefined options.
 - **`checkbox`** - Boolean checkbox input.
@@ -388,6 +388,8 @@ Action fields support the following input types:
 ```
 
 Set `allowTyping` to let users type custom values in addition to the provided options. The dropdown list still appears as suggestions.
+
+Set `allowVariables: true` to enable template variables (e.g., `{{username}}`) for a specific action field. When omitted, variables are not enabled—even for `select` fields with `allowTyping`.
 
 **Checkbox**
 

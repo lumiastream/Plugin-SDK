@@ -328,7 +328,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.1"
 	}
 }
 
@@ -2095,7 +2095,7 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.1"
 	}
 }
 
@@ -2713,7 +2713,7 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.1"
 	}
 }
 
@@ -2728,6 +2728,7 @@ const DEFAULTS = {
 	pollInterval: 60,
 	compatibilityDate: "2026-02-03",
 	userAgent: "LumiaStream EVE Online Plugin/1.0.0",
+	walletAlertThreshold: 1000000,
 };
 
 const ESI_BASE_URL = "https://esi.evetech.net/latest";
@@ -2767,6 +2768,18 @@ const VARIABLE_NAMES = {
 	snapshot: "eve_snapshot_json",
 };
 
+const ALERT_KEYS = {
+	online: "eve_online_status",
+	skillQueueEmpty: "eve_skillqueue_empty",
+	walletSpike: "eve_wallet_spike",
+	walletDrop: "eve_wallet_drop",
+	killmail: "eve_killmail_new",
+	notification: "eve_notification_new",
+	docked: "eve_docked",
+	undocked: "eve_undocked",
+	shipChanged: "eve_ship_changed",
+};
+
 class EveOnlinePlugin extends Plugin {
 	constructor(manifest, context) {
 		super(manifest, context);
@@ -2778,6 +2791,7 @@ class EveOnlinePlugin extends Plugin {
 		this._etagCache = new Map();
 		this._characterId = null;
 		this._characterName = null;
+		this._lastAlertSnapshot = null;
 	}
 
 	async onload() {
@@ -2786,7 +2800,7 @@ class EveOnlinePlugin extends Plugin {
 		if (!this._hasAuthTokens()) {
 			await this._log(
 				"Missing OAuth tokens. Authorize the plugin to begin.",
-				"warn"
+				"warn",
 			);
 			await this._updateConnectionState(false);
 			return;
@@ -2858,12 +2872,11 @@ class EveOnlinePlugin extends Plugin {
 			severity === "warn"
 				? `${prefix} ⚠️ ${message}`
 				: severity === "error"
-				? `${prefix} ❌ ${message}`
-				: `${prefix} ${message}`;
+					? `${prefix} ❌ ${message}`
+					: `${prefix} ${message}`;
 
 		await this.lumia.addLog(decorated);
 	}
-
 
 	async _refreshData({ reason } = {}) {
 		if (!this._hasAuthTokens()) {
@@ -2883,34 +2896,34 @@ class EveOnlinePlugin extends Plugin {
 
 				const results = await Promise.all([
 					this._safeFetch("character info", () =>
-						this._fetchCharacterInfo(characterId, accessToken)
+						this._fetchCharacterInfo(characterId, accessToken),
 					),
 					this._safeFetch("wallet", () =>
-						this._fetchWallet(characterId, accessToken)
+						this._fetchWallet(characterId, accessToken),
 					),
 					this._safeFetch("online status", () =>
-						this._fetchOnline(characterId, accessToken)
+						this._fetchOnline(characterId, accessToken),
 					),
 					this._safeFetch("location", () =>
-						this._fetchLocation(characterId, accessToken)
+						this._fetchLocation(characterId, accessToken),
 					),
 					this._safeFetch("ship", () =>
-						this._fetchShip(characterId, accessToken)
+						this._fetchShip(characterId, accessToken),
 					),
 					this._safeFetch("skill queue", () =>
-						this._fetchSkillQueue(characterId, accessToken)
+						this._fetchSkillQueue(characterId, accessToken),
 					),
 					this._safeFetch("industry jobs", () =>
-						this._fetchIndustryJobs(characterId, accessToken)
+						this._fetchIndustryJobs(characterId, accessToken),
 					),
 					this._safeFetch("market orders", () =>
-						this._fetchOrders(characterId, accessToken)
+						this._fetchOrders(characterId, accessToken),
 					),
 					this._safeFetch("killmails", () =>
-						this._fetchKillmails(characterId, accessToken)
+						this._fetchKillmails(characterId, accessToken),
 					),
 					this._safeFetch("notifications", () =>
-						this._fetchNotifications(characterId, accessToken)
+						this._fetchNotifications(characterId, accessToken),
 					),
 				]);
 
@@ -2954,18 +2967,16 @@ class EveOnlinePlugin extends Plugin {
 
 				await this._setVariableIfChanged(
 					VARIABLE_NAMES.snapshot,
-					JSON.stringify(snapshot)
+					JSON.stringify(snapshot),
 				);
 				await this._setVariableIfChanged(
 					VARIABLE_NAMES.lastUpdated,
-					new Date().toISOString()
+					new Date().toISOString(),
 				);
 
 				const successCount = results.filter((result) => result.ok).length;
 				await this._updateConnectionState(successCount > 0);
-				await this._log(
-					`ESI data refreshed${reason ? ` (${reason})` : ""}.`
-				);
+				await this._log(`ESI data refreshed${reason ? ` (${reason})` : ""}.`);
 			} catch (error) {
 				const message = this._errorMessage(error);
 				await this._log(`Failed to refresh ESI data: ${message}`, "warn");
@@ -2979,7 +2990,10 @@ class EveOnlinePlugin extends Plugin {
 
 	async _resolveCharacter(accessToken) {
 		if (this._characterId && this._characterName) {
-			return { characterId: this._characterId, characterName: this._characterName };
+			return {
+				characterId: this._characterId,
+				characterName: this._characterName,
+			};
 		}
 
 		const verify = await this._verifyToken(accessToken);
@@ -3008,7 +3022,7 @@ class EveOnlinePlugin extends Plugin {
 		if (!response.ok) {
 			const body = await response.text();
 			throw new Error(
-				`SSO verify failed (${response.status}): ${body || "No response body"}`
+				`SSO verify failed (${response.status}): ${body || "No response body"}`,
 			);
 		}
 
@@ -3050,7 +3064,10 @@ class EveOnlinePlugin extends Plugin {
 	}
 
 	async _fetchKillmails(characterId, token) {
-		return this._fetchJson(`/characters/${characterId}/killmails/recent/`, token);
+		return this._fetchJson(
+			`/characters/${characterId}/killmails/recent/`,
+			token,
+		);
 	}
 
 	async _fetchNotifications(characterId, token) {
@@ -3083,7 +3100,7 @@ class EveOnlinePlugin extends Plugin {
 		if (!response.ok) {
 			const body = await response.text();
 			throw new Error(
-				`ESI error (${response.status}) on ${path}: ${body || "No response body"}`
+				`ESI error (${response.status}) on ${path}: ${body || "No response body"}`,
 			);
 		}
 
@@ -3127,12 +3144,12 @@ class EveOnlinePlugin extends Plugin {
 
 		const errorRemain = this._coerceNumber(
 			response.headers.get("X-ESI-Error-Limit-Remain"),
-			NaN
+			NaN,
 		);
 		if (!Number.isNaN(errorRemain) && errorRemain <= 5) {
 			await this._log(
 				`ESI error limit remaining is low (${errorRemain}).`,
-				"warn"
+				"warn",
 			);
 		}
 
@@ -3201,11 +3218,11 @@ class EveOnlinePlugin extends Plugin {
 	async _applyCharacter(identity, characterInfo) {
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.characterId,
-			identity?.characterId ?? 0
+			identity?.characterId ?? 0,
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.characterName,
-			identity?.characterName ?? ""
+			identity?.characterName ?? "",
 		);
 
 		if (!characterInfo) {
@@ -3214,15 +3231,15 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.corporationId,
-			this._coerceNumber(characterInfo?.corporation_id, 0)
+			this._coerceNumber(characterInfo?.corporation_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.allianceId,
-			this._coerceNumber(characterInfo?.alliance_id, 0)
+			this._coerceNumber(characterInfo?.alliance_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.securityStatus,
-			this._coerceNumber(characterInfo?.security_status, 0)
+			this._coerceNumber(characterInfo?.security_status, 0),
 		);
 	}
 
@@ -3233,7 +3250,7 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.walletBalance,
-			this._coerceNumber(wallet, 0)
+			this._coerceNumber(wallet, 0),
 		);
 	}
 
@@ -3244,19 +3261,19 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.online,
-			Boolean(online?.online)
+			Boolean(online?.online),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.lastLogin,
-			this._coerceString(online?.last_login, "")
+			this._coerceString(online?.last_login, ""),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.lastLogout,
-			this._coerceString(online?.last_logout, "")
+			this._coerceString(online?.last_logout, ""),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.logins,
-			this._coerceNumber(online?.logins, 0)
+			this._coerceNumber(online?.logins, 0),
 		);
 	}
 
@@ -3267,15 +3284,15 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.solarSystemId,
-			this._coerceNumber(location?.solar_system_id, 0)
+			this._coerceNumber(location?.solar_system_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.stationId,
-			this._coerceNumber(location?.station_id, 0)
+			this._coerceNumber(location?.station_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.structureId,
-			this._coerceNumber(location?.structure_id, 0)
+			this._coerceNumber(location?.structure_id, 0),
 		);
 	}
 
@@ -3286,15 +3303,15 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.shipName,
-			this._coerceString(ship?.ship_name, "")
+			this._coerceString(ship?.ship_name, ""),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.shipTypeId,
-			this._coerceNumber(ship?.ship_type_id, 0)
+			this._coerceNumber(ship?.ship_type_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.shipItemId,
-			this._coerceNumber(ship?.ship_item_id, 0)
+			this._coerceNumber(ship?.ship_item_id, 0),
 		);
 	}
 
@@ -3304,30 +3321,32 @@ class EveOnlinePlugin extends Plugin {
 		}
 
 		const sorted = [...queue].sort(
-			(a, b) => this._coerceNumber(a?.queue_position, 0) - this._coerceNumber(b?.queue_position, 0)
+			(a, b) =>
+				this._coerceNumber(a?.queue_position, 0) -
+				this._coerceNumber(b?.queue_position, 0),
 		);
 		const current = sorted[0] || null;
 		const last = sorted[sorted.length - 1] || null;
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueCount,
-			sorted.length
+			sorted.length,
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueCurrentSkillId,
-			this._coerceNumber(current?.skill_id, 0)
+			this._coerceNumber(current?.skill_id, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueCurrentLevel,
-			this._coerceNumber(current?.finished_level, 0)
+			this._coerceNumber(current?.finished_level, 0),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueCurrentEnd,
-			this._coerceString(current?.finish_date, "")
+			this._coerceString(current?.finish_date, ""),
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.skillqueueEndsAt,
-			this._coerceString(last?.finish_date, "")
+			this._coerceString(last?.finish_date, ""),
 		);
 	}
 
@@ -3340,11 +3359,11 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.industryJobsActive,
-			activeCount
+			activeCount,
 		);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.industryJobsTotal,
-			jobs.length
+			jobs.length,
 		);
 	}
 
@@ -3358,15 +3377,12 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.marketOrdersActive,
-			orders.length
+			orders.length,
 		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.marketOrdersBuy,
-			buyCount
-		);
+		await this._setVariableIfChanged(VARIABLE_NAMES.marketOrdersBuy, buyCount);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.marketOrdersSell,
-			sellCount
+			sellCount,
 		);
 	}
 
@@ -3377,7 +3393,7 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.killmailsRecentCount,
-			killmails.length
+			killmails.length,
 		);
 	}
 
@@ -3388,8 +3404,116 @@ class EveOnlinePlugin extends Plugin {
 
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.notificationsCount,
-			notifications.length
+			notifications.length,
 		);
+	}
+
+	_alertsEnabled() {
+		return this.settings?.enableAlerts !== false;
+	}
+
+	_walletAlertThreshold() {
+		const threshold = this._coerceNumber(
+			this.settings?.walletAlertThreshold,
+			DEFAULTS.walletAlertThreshold
+		);
+		return Number.isFinite(threshold) ? threshold : DEFAULTS.walletAlertThreshold;
+	}
+
+	_buildAlertSnapshot({
+		previous,
+		characterInfo,
+		wallet,
+		online,
+		location,
+		ship,
+		skillqueue,
+		killmails,
+		notifications,
+	}) {
+		const snapshot = {
+			online: previous?.online ?? false,
+			skillqueueCount: previous?.skillqueueCount ?? 0,
+			walletBalance: previous?.walletBalance ?? 0,
+			killmailsRecentCount: previous?.killmailsRecentCount ?? 0,
+			notificationsCount: previous?.notificationsCount ?? 0,
+			stationId: previous?.stationId ?? 0,
+			structureId: previous?.structureId ?? 0,
+			shipTypeId: previous?.shipTypeId ?? 0,
+		};
+
+		if (online) {
+			snapshot.online = Boolean(online?.online);
+		}
+
+		if (Array.isArray(skillqueue)) {
+			snapshot.skillqueueCount = skillqueue.length;
+		}
+
+		if (wallet !== null && wallet !== undefined) {
+			snapshot.walletBalance = this._coerceNumber(wallet, 0);
+		}
+
+		if (Array.isArray(killmails)) {
+			snapshot.killmailsRecentCount = killmails.length;
+		}
+
+		if (Array.isArray(notifications)) {
+			snapshot.notificationsCount = notifications.length;
+		}
+
+		if (location) {
+			snapshot.stationId = this._coerceNumber(location?.station_id, 0);
+			snapshot.structureId = this._coerceNumber(location?.structure_id, 0);
+		}
+
+		if (ship) {
+			snapshot.shipTypeId = this._coerceNumber(ship?.ship_type_id, 0);
+		}
+
+		return snapshot;
+	}
+
+	async _maybeTriggerAlerts({ previous, current }) {
+		if (!previous || !current) {
+			return;
+		}
+
+		if (previous.online !== current.online) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.online });
+		}
+
+		if (previous.skillqueueCount > 0 && current.skillqueueCount === 0) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.skillQueueEmpty });
+		}
+
+		const walletDelta = current.walletBalance - previous.walletBalance;
+		const threshold = this._walletAlertThreshold();
+		if (threshold > 0 && Math.abs(walletDelta) >= threshold) {
+			await this.lumia.triggerAlert({
+				alert: walletDelta >= 0 ? ALERT_KEYS.walletSpike : ALERT_KEYS.walletDrop,
+			});
+		}
+
+		if (current.killmailsRecentCount > previous.killmailsRecentCount) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.killmail });
+		}
+
+		if (current.notificationsCount > previous.notificationsCount) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.notification });
+		}
+
+		const wasDocked = (previous.stationId || previous.structureId) > 0;
+		const isDocked = (current.stationId || current.structureId) > 0;
+		if (!wasDocked && isDocked) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.docked });
+		} else if (wasDocked && !isDocked) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.undocked });
+		}
+
+		if (previous.shipTypeId && current.shipTypeId && previous.shipTypeId !== current.shipTypeId) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.shipChanged });
+		}
 	}
 
 	_schedulePolling() {
@@ -3426,14 +3550,15 @@ class EveOnlinePlugin extends Plugin {
 
 	_canRefreshTokens() {
 		return Boolean(
-			this._refreshToken() && typeof this.lumia?.refreshOAuthToken === "function"
+			this._refreshToken() &&
+			typeof this.lumia?.refreshOAuthToken === "function",
 		);
 	}
 
 	_pollInterval(settings = this.settings) {
 		const interval = this._coerceNumber(
 			settings?.pollInterval,
-			DEFAULTS.pollInterval
+			DEFAULTS.pollInterval,
 		);
 		return Number.isFinite(interval) ? interval : DEFAULTS.pollInterval;
 	}
@@ -3452,7 +3577,7 @@ class EveOnlinePlugin extends Plugin {
 				const message = this._errorMessage(error);
 				await this._log(
 					`Failed to update connection state: ${message}`,
-					"warn"
+					"warn",
 				);
 			}
 		}
@@ -3574,6 +3699,21 @@ module.exports = EveOnlinePlugin;
 				"helperText": "How often to refresh ESI data (30-900 seconds)."
 			},
 			{
+				"key": "enableAlerts",
+				"label": "Enable Alerts",
+				"type": "toggle",
+				"defaultValue": true,
+				"helperText": "Trigger Lumia alerts for EVE Online events."
+			},
+			{
+				"key": "walletAlertThreshold",
+				"label": "Wallet Alert Threshold (ISK)",
+				"type": "number",
+				"defaultValue": 1000000,
+				"min": 0,
+				"helperText": "Minimum ISK change to trigger wallet spike/drop alerts."
+			},
+			{
 				"key": "accessToken",
 				"label": "Access Token",
 				"type": "password",
@@ -3594,159 +3734,249 @@ module.exports = EveOnlinePlugin;
 		"actions": [],
 		"variables": [
 			{
-				"name": "eve_character_id",
+				"name": "character_id",
 				"description": "Authenticated character ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_character_name",
+				"name": "character_name",
 				"description": "Authenticated character name.",
 				"value": ""
 			},
 			{
-				"name": "eve_corporation_id",
+				"name": "corporation_id",
 				"description": "Character corporation ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_alliance_id",
+				"name": "alliance_id",
 				"description": "Character alliance ID (0 if none).",
 				"value": 0
 			},
 			{
-				"name": "eve_security_status",
+				"name": "security_status",
 				"description": "Character security status.",
 				"value": 0
 			},
 			{
-				"name": "eve_wallet_balance",
+				"name": "wallet_balance",
 				"description": "Current wallet balance.",
 				"value": 0
 			},
 			{
-				"name": "eve_online",
+				"name": "online",
 				"description": "Whether the character is currently online.",
 				"value": false
 			},
 			{
-				"name": "eve_last_login",
+				"name": "last_login",
 				"description": "Last login timestamp (ISO).",
 				"value": ""
 			},
 			{
-				"name": "eve_last_logout",
+				"name": "last_logout",
 				"description": "Last logout timestamp (ISO).",
 				"value": ""
 			},
 			{
-				"name": "eve_logins",
+				"name": "logins",
 				"description": "Login count returned by ESI online status.",
 				"value": 0
 			},
 			{
-				"name": "eve_solar_system_id",
+				"name": "solar_system_id",
 				"description": "Current solar system ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_station_id",
+				"name": "station_id",
 				"description": "Current station ID (0 if not docked).",
 				"value": 0
 			},
 			{
-				"name": "eve_structure_id",
+				"name": "structure_id",
 				"description": "Current structure ID (0 if none).",
 				"value": 0
 			},
 			{
-				"name": "eve_ship_name",
+				"name": "ship_name",
 				"description": "Current ship name.",
 				"value": ""
 			},
 			{
-				"name": "eve_ship_type_id",
+				"name": "ship_type_id",
 				"description": "Current ship type ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_ship_item_id",
+				"name": "ship_item_id",
 				"description": "Current ship item ID.",
 				"value": 0
 			},
 			{
-				"name": "eve_skillqueue_count",
+				"name": "skillqueue_count",
 				"description": "Number of skills in the queue.",
 				"value": 0
 			},
 			{
-				"name": "eve_skillqueue_current_skill_id",
+				"name": "skillqueue_current_skill_id",
 				"description": "Skill ID currently training.",
 				"value": 0
 			},
 			{
-				"name": "eve_skillqueue_current_level",
+				"name": "skillqueue_current_level",
 				"description": "Training level for the current skill.",
 				"value": 0
 			},
 			{
-				"name": "eve_skillqueue_current_end",
+				"name": "skillqueue_current_end",
 				"description": "Finish time for the current skill (ISO).",
 				"value": ""
 			},
 			{
-				"name": "eve_skillqueue_ends_at",
+				"name": "skillqueue_ends_at",
 				"description": "Finish time for the last queued skill (ISO).",
 				"value": ""
 			},
 			{
-				"name": "eve_market_orders_active",
+				"name": "market_orders_active",
 				"description": "Number of active market orders.",
 				"value": 0
 			},
 			{
-				"name": "eve_market_orders_buy",
+				"name": "market_orders_buy",
 				"description": "Number of active buy orders.",
 				"value": 0
 			},
 			{
-				"name": "eve_market_orders_sell",
+				"name": "market_orders_sell",
 				"description": "Number of active sell orders.",
 				"value": 0
 			},
 			{
-				"name": "eve_industry_jobs_active",
+				"name": "industry_jobs_active",
 				"description": "Number of active industry jobs.",
 				"value": 0
 			},
 			{
-				"name": "eve_industry_jobs_total",
+				"name": "industry_jobs_total",
 				"description": "Total industry jobs returned by ESI.",
 				"value": 0
 			},
 			{
-				"name": "eve_killmails_recent_count",
+				"name": "killmails_recent_count",
 				"description": "Count of recent killmails.",
 				"value": 0
 			},
 			{
-				"name": "eve_notifications_count",
+				"name": "notifications_count",
 				"description": "Number of notifications returned by ESI.",
 				"value": 0
 			},
 			{
-				"name": "eve_last_updated",
+				"name": "last_updated",
 				"description": "Timestamp when ESI data was last refreshed.",
 				"value": ""
 			},
 			{
-				"name": "eve_snapshot_json",
+				"name": "snapshot_json",
 				"description": "JSON snapshot of the latest ESI payloads.",
 				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Online Status Changed",
+				"key": "eve_online_status",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_online",
+					"eve_last_login",
+					"eve_last_logout"
+				],
+				"defaultMessage": "{{eve_character_name}} is now {{eve_online}}."
+			},
+			{
+				"title": "Skill Queue Empty",
+				"key": "eve_skillqueue_empty",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_skillqueue_count",
+					"eve_skillqueue_current_end"
+				],
+				"defaultMessage": "{{eve_character_name}}'s skill queue is empty."
+			},
+			{
+				"title": "Wallet Spike",
+				"key": "eve_wallet_spike",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_wallet_balance"
+				],
+				"defaultMessage": "{{eve_character_name}} wallet increased ({{eve_wallet_balance}} ISK)."
+			},
+			{
+				"title": "Wallet Drop",
+				"key": "eve_wallet_drop",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_wallet_balance"
+				],
+				"defaultMessage": "{{eve_character_name}} wallet decreased ({{eve_wallet_balance}} ISK)."
+			},
+			{
+				"title": "New Killmail",
+				"key": "eve_killmail_new",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_killmails_recent_count"
+				],
+				"defaultMessage": "New killmail detected for {{eve_character_name}}."
+			},
+			{
+				"title": "New Notification",
+				"key": "eve_notification_new",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_notifications_count"
+				],
+				"defaultMessage": "New EVE notification for {{eve_character_name}}."
+			},
+			{
+				"title": "Docked",
+				"key": "eve_docked",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_station_id",
+					"eve_structure_id",
+					"eve_solar_system_id"
+				],
+				"defaultMessage": "{{eve_character_name}} docked."
+			},
+			{
+				"title": "Undocked",
+				"key": "eve_undocked",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_station_id",
+					"eve_structure_id",
+					"eve_solar_system_id"
+				],
+				"defaultMessage": "{{eve_character_name}} undocked."
+			},
+			{
+				"title": "Ship Changed",
+				"key": "eve_ship_changed",
+				"acceptedVariables": [
+					"eve_character_name",
+					"eve_ship_type_id",
+					"eve_ship_name"
+				],
+				"defaultMessage": "{{eve_character_name}} switched ships ({{eve_ship_name}})."
 			}
 		]
 	}
 }
-
 ```
 
 ## eveonline/package.json
@@ -3760,7 +3990,7 @@ module.exports = EveOnlinePlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.0"
+    "@lumiastream/plugin": "^0.2.1"
   }
 }
 
@@ -4952,7 +5182,7 @@ module.exports = FitbitPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.0"
+    "@lumiastream/plugin": "^0.2.1"
   }
 }
 
@@ -5724,7 +5954,7 @@ module.exports = HotNewsPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.0"
+    "@lumiastream/plugin": "^0.2.1"
   }
 }
 
@@ -6589,7 +6819,8 @@ class MinecraftServerPlugin extends Plugin {
 					const queryPort = this.getQueryPort();
 					queryData = await this.queryServer(host, queryPort);
 				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
+					const message =
+						error instanceof Error ? error.message : String(error);
 					await this.lumia.addLog(
 						`[Minecraft Server] Query failed: ${message}`,
 					);
@@ -6809,9 +7040,6 @@ class MinecraftServerPlugin extends Plugin {
 						}
 
 						// Step 2: Send full stat request
-						await this.lumia.addLog(
-							`[Minecraft Server] Query handshake successful, token: ${challengeToken}`,
-						);
 						const statRequest = this.createQueryStatRequest(
 							sessionId,
 							challengeToken,
@@ -6820,9 +7048,6 @@ class MinecraftServerPlugin extends Plugin {
 					} else {
 						// Parse stat response
 						const data = this.parseQueryResponse(msg);
-						await this.lumia.addLog(
-							`[Minecraft Server] Query stat received, players: ${data.players?.length ?? 0}`,
-						);
 						cleanup();
 						resolve(data);
 					}
@@ -6899,7 +7124,9 @@ class MinecraftServerPlugin extends Plugin {
 
 		// Skip player list padding: \x01player_\x00\x00 (10 bytes)
 		// Find the start of player names by looking for "player_\x00\x00"
-		const playerMarker = Buffer.from([0x01, 0x70, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x5f, 0x00, 0x00]);
+		const playerMarker = Buffer.from([
+			0x01, 0x70, 0x6c, 0x61, 0x79, 0x65, 0x72, 0x5f, 0x00, 0x00,
+		]);
 		const markerIndex = msg.indexOf(playerMarker, offset);
 		if (markerIndex !== -1) {
 			offset = markerIndex + playerMarker.length;
@@ -7020,7 +7247,6 @@ class MinecraftServerPlugin extends Plugin {
 					await this.lumia.setVariable("last_player_joined", label);
 					await this.lumia.triggerAlert({
 						alert: ALERT_TYPES.PLAYER_JOINED,
-						showInEventList: true,
 						extraSettings: {
 							username: label,
 							last_player_joined: label,
@@ -7035,7 +7261,6 @@ class MinecraftServerPlugin extends Plugin {
 					await this.lumia.setVariable("last_player_left", label);
 					await this.lumia.triggerAlert({
 						alert: ALERT_TYPES.PLAYER_LEFT,
-						showInEventList: true,
 						extraSettings: {
 							username: label,
 							last_player_left: label,
@@ -7053,12 +7278,8 @@ class MinecraftServerPlugin extends Plugin {
 		for (const player of newPlayers) {
 			if (!oldPlayers.has(player)) {
 				await this.lumia.setVariable("last_player_joined", player);
-				await this.lumia.addLog(
-					`[Minecraft Server] 👤 ${player} joined (${newState.playersOnline}/${newState.playersMax})`,
-				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_JOINED,
-					showInEventList: true,
 					extraSettings: {
 						username: player,
 						last_player_joined: player,
@@ -7073,12 +7294,8 @@ class MinecraftServerPlugin extends Plugin {
 		for (const player of oldPlayers) {
 			if (!newPlayers.has(player)) {
 				await this.lumia.setVariable("last_player_left", player);
-				await this.lumia.addLog(
-					`[Minecraft Server] 👋 ${player} left (${newState.playersOnline}/${newState.playersMax})`,
-				);
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_LEFT,
-					showInEventList: true,
 					extraSettings: {
 						username: player,
 						last_player_left: player,
@@ -7230,7 +7447,7 @@ module.exports = MinecraftServerPlugin;
 {
 	"id": "minecraft_server",
 	"name": "Minecraft Server",
-	"version": "1.0.9",
+	"version": "1.0.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -7240,7 +7457,6 @@ module.exports = MinecraftServerPlugin;
 	"lumiaVersion": "^9.0.0",
 	"category": "platforms",
 	"icon": "minecraft.png",
-	"changelog": "# Changelog\n\n## 1.0.0\n- Initial release\n- Server List Ping support (always available)\n- Query protocol support (requires enable-query=true)\n- Automatic polling with configurable interval\n- Player tracking and events\n- Server online/offline detection\n- Template variables for server stats\n- Manual poll and test actions",
 	"config": {
 		"settings": [
 			{
@@ -7462,7 +7678,7 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.1"
 	}
 }
 
@@ -7603,7 +7819,7 @@ module.exports = MockLightsPlugin;
   "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
   "main": "main.js",
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.0"
+    "@lumiastream/plugin": "^0.2.1"
   }
 }
 
@@ -8409,7 +8625,7 @@ module.exports = OctoPrintPlugin;
 	"description": "OctoPrint integration example plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.1"
 	}
 }
 
@@ -9084,7 +9300,7 @@ module.exports = PlaystationNetworkPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.0",
+    "@lumiastream/plugin": "^0.2.1",
     "psn-api": "^2.11.0"
   }
 }
@@ -10627,7 +10843,7 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.1"
 	}
 }
 
@@ -11552,7 +11768,7 @@ module.exports = StripePaymentsPlugin;
 	"description": "Stripe payments plugin example for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.1"
 	}
 }
 
@@ -12674,7 +12890,7 @@ module.exports = TikfinityPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.1"
 	}
 }
 
@@ -14947,7 +15163,7 @@ module.exports = UnraidPlugin;
 	"description": "Unraid integration example plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.0"
+		"@lumiastream/plugin": "^0.2.1"
 	}
 }
 
