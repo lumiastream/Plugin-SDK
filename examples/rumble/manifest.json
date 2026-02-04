@@ -5,7 +5,6 @@
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
-	"repository": "https://github.com/LumiaStream/rumble-plugin",
 	"description": "Track Rumble livestream state and engagement with alerts, variables, and chat display.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
