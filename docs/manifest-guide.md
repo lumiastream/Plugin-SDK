@@ -297,7 +297,7 @@ Actions allow users to trigger plugin functionality manually:
 }
 ```
 
-To auto-refresh dynamic options when a user selects the action type (and when action fields change), set `refreshOnChange` on the action.
+To auto-refresh dynamic options when a user selects the action type, set `refreshOnChange` on the action.
 
 ```json
 {

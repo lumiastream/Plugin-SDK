@@ -162,8 +162,7 @@ export interface PluginActionDefinition {
 	description?: string;
 	icon?: string;
 	/**
-	 * When true, the UI refreshes dynamic options when the action is selected
-	 * and when action fields change (debounced).
+	 * When true, the UI refreshes dynamic options when the action is selected.
 	 */
 	refreshOnChange?: boolean;
 	fields: PluginActionField[];

@@ -18,7 +18,9 @@ This template demonstrates a handful of common Lumia Stream plugin capabilities:
 Use the CLI to copy and customise the template:
 
 ```
+
 npx lumia-plugin create my_plugin
+
 ```
 
 After scaffolding you can tailor the manifest, code, and README to match your idea.
@@ -4982,7 +4984,7 @@ module.exports = MinecraftServerPlugin;
 			"name": "lumia-minecraft-server",
 			"version": "1.0.0",
 			"dependencies": {
-				"@lumiastream/plugin": "^0.1.18"
+				"@lumiastream/plugin": "^0.2.4"
 			}
 		},
 		"node_modules/@lumiastream/plugin": {
