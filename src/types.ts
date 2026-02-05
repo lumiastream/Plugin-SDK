@@ -168,6 +168,26 @@ export interface PluginActionDefinition {
 	fields: PluginActionField[];
 }
 
+export interface PluginVariableFunctionDefinition {
+	key: string;
+	label?: string;
+	description?: string;
+	fields?: PluginActionField[];
+}
+
+export interface PluginVariableFunctionContext {
+	key: string;
+	value?: string;
+	raw?: string;
+	args?: string[];
+	allVariables?: Record<string, any>;
+}
+
+export interface PluginVariableFunctionResult {
+	value: string;
+	variables?: Record<string, any>;
+}
+
 export interface PluginOAuthTokenKeys {
 	accessToken?: string;
 	refreshToken?: string;
@@ -212,6 +232,7 @@ export interface PluginIntegrationConfig {
 	variables?: PluginVariableDefinition[];
 	alerts?: PluginAlertDefinition[];
 	actions?: PluginActionDefinition[];
+	variableFunctions?: PluginVariableFunctionDefinition[];
 	lights?: PluginLightsConfig;
 	oauth?: PluginOAuthConfig;
 	[key: string]: any;
@@ -391,6 +412,9 @@ export interface PluginRuntime {
 	onunload(): Promise<void>;
 	onupdate?(oldVersion: string, newVersion: string): Promise<void>;
 	actions?(config: { actions: any[]; extraSettings?: any }): Promise<void>;
+	variableFunction?(
+		config: PluginVariableFunctionContext,
+	): Promise<string | PluginVariableFunctionResult | undefined>;
 	refreshActionOptions?(config: { actionType: string; values?: Record<string, any>; action?: any }): Promise<void>;
 	searchLights?(config?: Record<string, any>): Promise<any>;
 	addLight?(config: Record<string, any>): Promise<any>;

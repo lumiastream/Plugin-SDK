@@ -192,6 +192,34 @@ const current = Number(this.lumia.getVariable("counter") ?? 0);
 await this.lumia.setVariable("counter", current + 1);
 ```
 
+### HTTP Requests and Timeouts
+
+The plugin runtime does **not** support `AbortController` / `AbortSignal` in `fetch`. Passing a `signal` option will throw:
+
+```
+Failed to construct 'Request': member signal is not of type AbortSignal.
+```
+
+Use a timeout wrapper instead:
+
+```js
+const timeoutMs = 60000;
+const timeoutPromise = new Promise((_, reject) => {
+	setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
+});
+
+const response = await Promise.race([fetch(url, options), timeoutPromise]);
+if (!response || !response.ok) {
+	const text = response ? await response.text() : "";
+	throw new Error(
+		`Request failed (${response?.status ?? "unknown"}): ${text || response?.statusText || "No response"}`,
+	);
+}
+const data = await response.json();
+```
+
+Keep timeouts reasonable and avoid aggressive retries.
+
 ### Alerts
 
 ```ts

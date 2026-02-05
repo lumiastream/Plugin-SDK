@@ -24,6 +24,25 @@ Store any dependencies, initialise locals, and always pass the parameters to the
 
 - **`actions(config: { actions: any[]; extraSettings?: any }): Promise<void>`** – process action executions defined in the manifest. Optional.
 
+### Variable Functions
+
+- **`variableFunction(config: PluginVariableFunctionContext): Promise<string | PluginVariableFunctionResult | undefined>`** – resolve a template variable function defined in `config.variableFunctions`. Return a string to replace the template, or `{ value, variables }` to also expose extra values.
+
+```ts
+interface PluginVariableFunctionContext {
+	key: string;
+	value?: string;
+	raw?: string;
+	args?: string[];
+	allVariables?: Record<string, any>;
+}
+
+interface PluginVariableFunctionResult {
+	value: string;
+	variables?: Record<string, any>;
+}
+```
+
 ### Convenience Properties
 
 - **`settings`** – getter/setter for all plugin settings. Setting this replaces the entire settings object.
