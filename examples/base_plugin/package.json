@@ -2,9 +2,9 @@
 	"name": "lumia-showcase-plugin-template",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
+	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.2.5"
 	}
 }

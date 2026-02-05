@@ -149,9 +149,13 @@ Settings create a configuration UI for users:
 }
 ```
 
+Avoid adding settings that exist only for testing or debugging. Keep settings user-facing and essential.
+
 If you provide `settings_tutorial` (markdown), it renders as a setup guide in the auth screen.
 
 To provide a tutorial that is specific to actions, use `actions_tutorial`. When present, it renders in the Actions editor.
+
+Populate both tutorials with clear, step-by-step instructions that a first-time user can follow without guesswork.
 
 Tutorials can include local images bundled with the plugin. Reference them with a relative path and they will resolve from the plugin root at runtime:
 
@@ -206,7 +210,7 @@ Plugins can request OAuth via Lumia's auth service so users can authorize in-app
 
 Notes:
 
-- The OAuth provider is always the plugin ID within Lumia. If you need a new OAuth 2.0 integration, contact Lumia Stream support so we can enable it for your plugin.
+- The OAuth provider is always the plugin ID within Lumia. If you need a new OAuth 2.0 integration, contact Lumia Stream on Discord or email dev@lumiastream.com so we can enable it for your plugin.
 - `serviceUrl` can be provided to override the default auth URL entirely.
 - `scopes` are provider-specific. When set, they are sent to Lumia's OAuth service as a comma-separated list.
 - Tokens are stored into your plugin settings using the `tokenKeys` mapping and are available via `this.settings` in your plugin.
@@ -265,12 +269,6 @@ Actions allow users to trigger plugin functionality manually:
 	"config": {
 		"actions": [
 			{
-				"type": "manual_poll",
-				"label": "Poll Now",
-				"description": "Manually trigger an API poll",
-				"fields": []
-			},
-			{
 				"type": "send_message",
 				"label": "Send Custom Message",
 				"description": "Send a custom message to the service",
@@ -291,11 +289,26 @@ Actions allow users to trigger plugin functionality manually:
 						]
 					}
 				]
+			},
+			{
+				"type": "update_status",
+				"label": "Update Status",
+				"description": "Update the current status message",
+				"fields": [
+					{
+						"key": "status",
+						"label": "Status",
+						"type": "text",
+						"required": true
+					}
+				]
 			}
 		]
 	}
 }
 ```
+
+Avoid test-only actions (for example, test connection or refetch). Actions should map to real user workflows.
 
 To auto-refresh dynamic options when a user selects the action type, set `refreshOnChange` on the action.
 
@@ -310,7 +323,7 @@ To auto-refresh dynamic options when a user selects the action type, set `refres
 
 #### Logging Guidance
 
-Avoid excessive logging. High-frequency logs can quickly fill the user's Logs dashboard. Prefer concise logs and only emit details for errors, manual actions, or explicit debug modes.
+Avoid excessive logging. High-frequency logs can quickly fill the user's Logs dashboard. Prefer concise logs and only emit details for errors or explicit user actions. Avoid per-plugin log wrappers unless they add real value.
 
 #### Action Field Types
 
@@ -453,6 +466,8 @@ Set `allowVariables: true` to enable template variables (e.g., `{{username}}`) f
 
 Variables define data that your plugin provides to Lumia Stream:
 
+Do not prefix variable names with your plugin name. Lumia automatically namespaces them.
+
 ```json
 {
 	"config": {
@@ -464,7 +479,7 @@ Variables define data that your plugin provides to Lumia Stream:
 				"allowedPlaces": ["chat", "overlay"],
 				"description": "Current number of followers",
 				"value": 0,
-				"example": "twitch_follower_count"
+				"example": "follower_count"
 			},
 			{
 				"name": "last_follower",
@@ -473,7 +488,7 @@ Variables define data that your plugin provides to Lumia Stream:
 				"allowedPlaces": ["chat", "overlay", "alert"],
 				"description": "Username of the most recent follower",
 				"value": "",
-				"example": "twitch_last_follower"
+				"example": "last_follower"
 			}
 		]
 	}
@@ -491,15 +506,15 @@ Alerts define events that your plugin can trigger:
 			{
 				"title": "New Follower",
 				"key": "follow",
-				"acceptedVariables": ["twitch_follower_count", "twitch_last_follower"],
-				"defaultMessage": "{{username}} just followed! Welcome!",
+				"acceptedVariables": ["follower_count", "last_follower"],
+				"defaultMessage": "{{last_follower}} just followed! Welcome!",
 				"variationConditions": []
 			},
 			{
 				"title": "Stream Started",
 				"key": "streamStart",
-				"acceptedVariables": ["twitch_stream_title", "twitch_game"],
-				"defaultMessage": "Stream is now live! Playing {{twitch_game}}"
+				"acceptedVariables": ["stream_title", "game"],
+				"defaultMessage": "Stream is now live! Playing {{game}}"
 			}
 		]
 	}
@@ -575,6 +590,9 @@ await this.lumia.triggerAlert({
 		value: "Tier2", // checked by EQUAL_SELECTION
 		isGift: true,
 		giftAmount: 5, // checked by GIFT_SUB_EQUAL / GIFT_SUB_GREATER
+		gifter: "StreamerFan42",
+		recipient: "LuckyViewer",
+		gift_count: 5,
 	},
 	extraSettings: {
 		gifter: "StreamerFan42",
@@ -583,6 +601,8 @@ await this.lumia.triggerAlert({
 	},
 });
 ```
+
+Pass alert variables through both `dynamic` and `extraSettings` so templates and variations have the same data.
 
 If no matching selection is found for the provided condition values (or no `dynamic` payload is supplied), Lumia falls back to the base alert configuration and `defaultMessage`.
 
@@ -619,7 +639,13 @@ At runtime, trigger the alert with the variation value that matches one of the c
 ```ts
 await this.lumia.triggerAlert({
 	alert: "giftedMembership",
-	dynamic: { name: "giftCount", value: 5 },
+	dynamic: {
+		name: "giftCount",
+		value: 5,
+		gifter: "StreamerFan42",
+		recipient: "LuckyViewer",
+		gift_count: 5
+	},
 	extraSettings: {
 		gifter: "StreamerFan42",
 		recipient: "LuckyViewer",
@@ -754,7 +780,7 @@ Here's a complete manifest for a hypothetical Discord integration plugin:
 				"allowedPlaces": ["chat", "overlay"],
 				"description": "Total number of server members",
 				"value": 0,
-				"example": "discord_member_count"
+				"example": "member_count"
 			},
 			{
 				"name": "online_count",
@@ -763,7 +789,7 @@ Here's a complete manifest for a hypothetical Discord integration plugin:
 				"allowedPlaces": ["chat", "overlay"],
 				"description": "Number of online members",
 				"value": 0,
-				"example": "discord_online_count"
+				"example": "online_count"
 			},
 			{
 				"name": "voice_count",
@@ -772,7 +798,7 @@ Here's a complete manifest for a hypothetical Discord integration plugin:
 				"allowedPlaces": ["chat", "overlay"],
 				"description": "Number of members in voice channels",
 				"value": 0,
-				"example": "discord_voice_count"
+				"example": "voice_count"
 			},
 			{
 				"name": "last_message",
@@ -781,7 +807,7 @@ Here's a complete manifest for a hypothetical Discord integration plugin:
 				"allowedPlaces": ["chat", "overlay", "alert"],
 				"description": "Content of the most recent message",
 				"value": "",
-				"example": "discord_last_message"
+				"example": "last_message"
 			},
 			{
 				"name": "last_user",
@@ -790,27 +816,27 @@ Here's a complete manifest for a hypothetical Discord integration plugin:
 				"allowedPlaces": ["chat", "overlay", "alert"],
 				"description": "Username of the last message author",
 				"value": "",
-				"example": "discord_last_user"
+				"example": "last_user"
 			}
 		],
 		"alerts": [
 			{
 				"title": "New Message",
 				"key": "message",
-				"acceptedVariables": ["discord_last_message", "discord_last_user"],
-				"defaultMessage": "{{discord_last_user}}: {{discord_last_message}}"
+				"acceptedVariables": ["last_message", "last_user"],
+				"defaultMessage": "{{last_user}}: {{last_message}}"
 			},
 			{
 				"title": "Member Joined",
 				"key": "memberJoin",
-				"acceptedVariables": ["discord_member_count", "discord_last_user"],
-				"defaultMessage": "{{discord_last_user}} joined the Discord! ({{discord_member_count}} total)"
+				"acceptedVariables": ["member_count", "last_user"],
+				"defaultMessage": "{{last_user}} joined the Discord! ({{member_count}} total)"
 			},
 			{
 				"title": "Voice Channel Activity",
 				"key": "voiceActivity",
-				"acceptedVariables": ["discord_voice_count", "discord_last_user"],
-				"defaultMessage": "{{discord_last_user}} joined voice ({{discord_voice_count}} in voice)"
+				"acceptedVariables": ["voice_count", "last_user"],
+				"defaultMessage": "{{last_user}} joined voice ({{voice_count}} in voice)"
 			}
 		]
 	}
@@ -837,6 +863,10 @@ The SDK includes manifest validation. Common validation errors:
 5. **Validation**: Use validation rules to prevent user errors
 6. **Documentation**: Include comprehensive descriptions and examples
 7. **Testing**: Test your manifest with the validation tools
+8. **Tutorials**: Provide clear `settings_tutorial` and `actions_tutorial` steps
+9. **No Test Controls**: Avoid test-only settings and actions
+10. **Retry Discipline**: Use exponential backoff and stop rapid retry loops
+11. **Minimal Logs**: Log errors and explicit user actions only
 
 ## Localization
 

@@ -1,14 +1,13 @@
 # Showcase Plugin Template
 
-This template demonstrates a handful of common Lumia Stream plugin capabilities:
+This template demonstrates a minimal, production-friendly Lumia Stream plugin workflow:
 
-- Logs lifecycle events and recent actions
-- Stores and updates variables that other Lumia features can consume
-- Responds to custom actions for logging, variable updates, and alert triggering
-- Triggers a sample alert effect using configurable colors and duration
-- Shows how to react to setting changes inside `onsettingsupdate`
+- Defines a small set of settings with a short setup tutorial
+- Exposes a single action that triggers an alert
+- Updates a few variables that alerts and other Lumia features can use
+- Keeps logging to errors only
 
-Use the CLI to copy and customise the template:
+Use the CLI to copy and customize the template:
 
 ```
 npx lumia-plugin create my_plugin

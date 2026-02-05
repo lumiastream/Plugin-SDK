@@ -64,29 +64,6 @@ class MinecraftServerPlugin extends Plugin {
 		}
 	}
 
-	async actions(config = {}) {
-		const actionList = Array.isArray(config.actions) ? config.actions : [];
-
-		for (const action of actionList) {
-			try {
-				switch (action.type) {
-					case "manual_poll":
-						await this.pollServer();
-						break;
-
-					case "test_connection":
-						await this.testConnection();
-						break;
-				}
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.addLog(
-					`[Minecraft Server] Error in action ${action.type}: ${message}`,
-				);
-			}
-		}
-	}
-
 	async validateAuth(data = {}) {
 		const host = String(
 			data?.serverHost ?? this.settings?.serverHost ?? "",
@@ -210,27 +187,6 @@ class MinecraftServerPlugin extends Plugin {
 		} catch (error) {
 			// Server is offline
 			await this.processServerData(null, null);
-		}
-	}
-
-	async testConnection() {
-		const host = this.getServerHost();
-		const port = this.getServerPort();
-
-		if (!host) {
-			await this.lumia.showToast({
-				message: "Please configure server address in settings",
-			});
-			return;
-		}
-
-		try {
-			await this.serverListPing(host, port);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.showToast({
-				message: `❌ Connection failed: ${message}`,
-			});
 		}
 	}
 
@@ -580,23 +536,31 @@ class MinecraftServerPlugin extends Plugin {
 		await Promise.all(updates);
 	}
 
+	_buildAlertPayload(vars = {}) {
+		return {
+			dynamic: { ...vars },
+			extraSettings: { ...vars },
+		};
+	}
+
 	async checkServerOnlineOffline(newState, oldState) {
 		if (newState.online && !oldState.online) {
 			// Server came online
+			const alertVars = {
+				online: true,
+				version: newState.version,
+				motd: newState.motd,
+				players_max: newState.playersMax,
+			};
 			await this.lumia.triggerAlert({
 				alert: ALERT_TYPES.SERVER_ONLINE,
-				extraSettings: {
-					online: true,
-					version: newState.version,
-					motd: newState.motd,
-					players_max: newState.playersMax,
-				},
+				...this._buildAlertPayload(alertVars),
 			});
 		} else if (!newState.online && oldState.online) {
 			// Server went offline
 			await this.lumia.triggerAlert({
 				alert: ALERT_TYPES.SERVER_OFFLINE,
-				extraSettings: {},
+				...this._buildAlertPayload({}),
 			});
 
 			// Clear player tracking
@@ -619,28 +583,30 @@ class MinecraftServerPlugin extends Plugin {
 				for (let i = 0; i < delta; i += 1) {
 					const label = "Player";
 					await this.lumia.setVariable("last_player_joined", label);
+					const alertVars = {
+						username: label,
+						last_player_joined: label,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
+					};
 					await this.lumia.triggerAlert({
 						alert: ALERT_TYPES.PLAYER_JOINED,
-						extraSettings: {
-							username: label,
-							last_player_joined: label,
-							players_online: newState.playersOnline,
-							players_max: newState.playersMax,
-						},
+						...this._buildAlertPayload(alertVars),
 					});
 				}
 			} else if (delta < 0) {
 				for (let i = 0; i < Math.abs(delta); i += 1) {
 					const label = "Player";
 					await this.lumia.setVariable("last_player_left", label);
+					const alertVars = {
+						username: label,
+						last_player_left: label,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
+					};
 					await this.lumia.triggerAlert({
 						alert: ALERT_TYPES.PLAYER_LEFT,
-						extraSettings: {
-							username: label,
-							last_player_left: label,
-							players_online: newState.playersOnline,
-							players_max: newState.playersMax,
-						},
+						...this._buildAlertPayload(alertVars),
 					});
 				}
 			}
@@ -652,14 +618,15 @@ class MinecraftServerPlugin extends Plugin {
 		for (const player of newPlayers) {
 			if (!oldPlayers.has(player)) {
 				await this.lumia.setVariable("last_player_joined", player);
+				const alertVars = {
+					username: player,
+					last_player_joined: player,
+					players_online: newState.playersOnline,
+					players_max: newState.playersMax,
+				};
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_JOINED,
-					extraSettings: {
-						username: player,
-						last_player_joined: player,
-						players_online: newState.playersOnline,
-						players_max: newState.playersMax,
-					},
+					...this._buildAlertPayload(alertVars),
 				});
 			}
 		}
@@ -668,14 +635,15 @@ class MinecraftServerPlugin extends Plugin {
 		for (const player of oldPlayers) {
 			if (!newPlayers.has(player)) {
 				await this.lumia.setVariable("last_player_left", player);
+				const alertVars = {
+					username: player,
+					last_player_left: player,
+					players_online: newState.playersOnline,
+					players_max: newState.playersMax,
+				};
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_LEFT,
-					extraSettings: {
-						username: player,
-						last_player_left: player,
-						players_online: newState.playersOnline,
-						players_max: newState.playersMax,
-					},
+					...this._buildAlertPayload(alertVars),
 				});
 			}
 		}
@@ -690,13 +658,14 @@ class MinecraftServerPlugin extends Plugin {
 		for (const milestone of milestones) {
 			if (count >= milestone && !this.milestonesReached.has(milestone)) {
 				this.milestonesReached.add(milestone);
+				const alertVars = {
+					players_online: count,
+					players_max: newState.playersMax,
+				};
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_MILESTONE,
-					dynamic: { value: count },
-					extraSettings: {
-						players_online: count,
-						players_max: newState.playersMax,
-					},
+					dynamic: { value: count, ...alertVars },
+					extraSettings: { ...alertVars },
 				});
 			}
 		}
@@ -718,12 +687,13 @@ class MinecraftServerPlugin extends Plugin {
 				!this.lastState ||
 				this.lastState.playersOnline < this.lastState.playersMax
 			) {
+				const alertVars = {
+					players_online: newState.playersOnline,
+					players_max: newState.playersMax,
+				};
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.SERVER_FULL,
-					extraSettings: {
-						players_online: newState.playersOnline,
-						players_max: newState.playersMax,
-					},
+					...this._buildAlertPayload(alertVars),
 				});
 			}
 		}

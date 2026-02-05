@@ -1,123 +1,121 @@
 {
-	"id": "fitbit",
-	"name": "Fitbit",
-	"version": "1.0.6",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"repository": "",
-	"description": "Fetch Fitbit intraday activity metrics into Lumia variables and alerts.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "apps",
-	"keywords": "fitbit, fitness, activity, steps, heartrate",
-	"icon": "fitbit.jpg",
-	"config": {
-		"oauth": {
-			"buttonLabel": "Authorize Fitbit",
-			"helperText": "Connect your Fitbit account to pull current activity metrics (intraday access required for server apps).",
-			"openInBrowser": true,
-			"scopes": ["activity", "heartrate", "profile", "settings"],
-			"tokenKeys": {
-				"accessToken": "accessToken",
-				"refreshToken": "refreshToken",
-				"tokenSecret": "tokenSecret"
-			}
-		},
-		"settings": [
-			{
-				"key": "accessToken",
-				"label": "Access Token",
-				"type": "password",
-				"helperText": "Auto-filled after OAuth completes.",
-				"disabled": true,
-				"required": false
-			},
-			{
-				"key": "refreshToken",
-				"label": "Refresh Token",
-				"type": "password",
-				"helperText": "Auto-filled after OAuth completes.",
-				"disabled": true,
-				"required": false
-			}
-		],
-		"settings_tutorial": "---\n### Authorize This Plugin\n1) Click **Authorize Fitbit** in the OAuth section.\n2) Complete the login and grant access.\n---\n### Notes\n- Metrics reflect your current active session using intraday time series.\n- Server apps need Fitbit intraday access enabled.\n- Distance and pace use Fitbit's user unit settings.\n---",
-		"actions_tutorial": "---\n### Refresh Metrics\nUse **Refresh Metrics** to pull the current active session right away.\n---",
-		"actions": [
-			{
-				"type": "fitbit_refresh",
-				"label": "Refresh Metrics",
-				"description": "Fetch Fitbit metrics for the current active session.",
-				"fields": []
-			}
-		],
-		"variables": [
-			{
-				"name": "fitbit_date",
-				"description": "Date of the current session (YYYY-MM-DD).",
-				"value": ""
-			},
-			{
-				"name": "fitbit_steps",
-				"description": "Steps in the current active session.",
-				"value": 0
-			},
-			{
-				"name": "fitbit_distance",
-				"description": "Distance in the current active session (Fitbit user units).",
-				"value": 0
-			},
-			{
-				"name": "fitbit_calories",
-				"description": "Calories burned in the current active session.",
-				"value": 0
-			},
-			{
-				"name": "fitbit_resting_heart_rate",
-				"description": "Current heart rate (latest intraday reading).",
-				"value": 0
-			},
-			{
-				"name": "fitbit_activity_duration_secs",
-				"description": "Active duration (seconds) for the current session.",
-				"value": 0
-			},
-			{
-				"name": "fitbit_activity_duration_min",
-				"description": "Active duration (minutes) for the current session.",
-				"value": 0
-			},
-			{
-				"name": "fitbit_cadence",
-				"description": "Cadence for the current active session (steps per minute).",
-				"value": 0
-			},
-			{
-				"name": "fitbit_pace",
-				"description": "Pace computed from the current active session (minutes per distance unit).",
-				"value": 0
-			},
-			{
-				"name": "fitbit_pace_source",
-				"description": "Source for pace: computed or none.",
-				"value": ""
-			},
-			{
-				"name": "fitbit_latest_activity_name",
-				"description": "Label for the current active session.",
-				"value": ""
-			},
-			{
-				"name": "fitbit_latest_activity_start",
-				"description": "Start time of the current active session.",
-				"value": ""
-			},
-			{
-				"name": "fitbit_last_updated",
-				"description": "ISO timestamp when the Fitbit data was last refreshed.",
-				"value": ""
-			}
-		]
-	}
+  "id": "fitbit",
+  "name": "Fitbit",
+  "version": "1.0.6",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "repository": "",
+  "description": "Fetch Fitbit intraday activity metrics into Lumia variables and alerts.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "apps",
+  "keywords": "fitbit, fitness, activity, steps, heartrate",
+  "icon": "fitbit.jpg",
+  "config": {
+    "oauth": {
+      "buttonLabel": "Authorize Fitbit",
+      "helperText": "Connect your Fitbit account to pull current activity metrics (intraday access required for server apps).",
+      "openInBrowser": true,
+      "scopes": [
+        "activity",
+        "heartrate",
+        "profile",
+        "settings"
+      ],
+      "tokenKeys": {
+        "accessToken": "accessToken",
+        "refreshToken": "refreshToken",
+        "tokenSecret": "tokenSecret"
+      }
+    },
+    "settings": [
+      {
+        "key": "accessToken",
+        "label": "Access Token",
+        "type": "password",
+        "helperText": "Auto-filled after OAuth completes.",
+        "disabled": true,
+        "required": false
+      },
+      {
+        "key": "refreshToken",
+        "label": "Refresh Token",
+        "type": "password",
+        "helperText": "Auto-filled after OAuth completes.",
+        "disabled": true,
+        "required": false
+      }
+    ],
+    "settings_tutorial": "---\n### Authorize This Plugin\n1) Click **Authorize Fitbit** in the OAuth section.\n2) Complete the login and grant access.\n---\n### Notes\n- Metrics reflect your current active session using intraday time series.\n- Server apps need Fitbit intraday access enabled.\n- Distance and pace use Fitbit's user unit settings.\n---",
+    "actions_tutorial": "---\n### Actions\nThis plugin refreshes metrics automatically after OAuth and on the poll interval. There are no actions to run.\n---",
+    "actions": [],
+    "variables": [
+      {
+        "name": "date",
+        "description": "Date of the current session (YYYY-MM-DD).",
+        "value": ""
+      },
+      {
+        "name": "steps",
+        "description": "Steps in the current active session.",
+        "value": 0
+      },
+      {
+        "name": "distance",
+        "description": "Distance in the current active session (Fitbit user units).",
+        "value": 0
+      },
+      {
+        "name": "calories",
+        "description": "Calories burned in the current active session.",
+        "value": 0
+      },
+      {
+        "name": "resting_heart_rate",
+        "description": "Current heart rate (latest intraday reading).",
+        "value": 0
+      },
+      {
+        "name": "activity_duration_secs",
+        "description": "Active duration (seconds) for the current session.",
+        "value": 0
+      },
+      {
+        "name": "activity_duration_min",
+        "description": "Active duration (minutes) for the current session.",
+        "value": 0
+      },
+      {
+        "name": "cadence",
+        "description": "Cadence for the current active session (steps per minute).",
+        "value": 0
+      },
+      {
+        "name": "pace",
+        "description": "Pace computed from the current active session (minutes per distance unit).",
+        "value": 0
+      },
+      {
+        "name": "pace_source",
+        "description": "Source for pace: computed or none.",
+        "value": ""
+      },
+      {
+        "name": "latest_activity_name",
+        "description": "Label for the current active session.",
+        "value": ""
+      },
+      {
+        "name": "latest_activity_start",
+        "description": "Start time of the current active session.",
+        "value": ""
+      },
+      {
+        "name": "last_updated",
+        "description": "ISO timestamp when the Fitbit data was last refreshed.",
+        "value": ""
+      }
+    ]
+  }
 }

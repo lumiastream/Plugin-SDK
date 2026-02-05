@@ -1,9 +1,13 @@
 {
 	"name": "lumia-plugin",
-	"version": "0.2.4",
+	"version": "0.2.5",
 	"description": "Command-line tools for creating, building, and validating Lumia Stream plugins.",
 	"bin": {
 		"lumia-plugin": "scripts/cli.js"
+	},
+	"scripts": {
+		"prepack": "node scripts/sync-template.js",
+		"postpack": "node scripts/clean-template.js"
 	},
 	"files": [
 		"scripts",
@@ -20,7 +24,7 @@
 	"author": "Lumia Stream",
 	"license": "MIT",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4",
+		"@lumiastream/plugin": "^0.2.5",
 		"jszip": "3.10.1"
 	}
 }

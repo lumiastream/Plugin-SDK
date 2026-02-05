@@ -7,15 +7,14 @@ Combined source files from the `examples/` directory. Each section shows the ori
 ```
 # Showcase Plugin Template
 
-This template demonstrates a handful of common Lumia Stream plugin capabilities:
+This template demonstrates a minimal, production-friendly Lumia Stream plugin workflow:
 
-- Logs lifecycle events and recent actions
-- Stores and updates variables that other Lumia features can consume
-- Responds to custom actions for logging, variable updates, and alert triggering
-- Triggers a sample alert effect using configurable colors and duration
-- Shows how to react to setting changes inside `onsettingsupdate`
+- Defines a small set of settings with a short setup tutorial
+- Exposes a single action that triggers an alert
+- Updates a few variables that alerts and other Lumia features can use
+- Keeps logging to errors only
 
-Use the CLI to copy and customise the template:
+Use the CLI to copy and customize the template:
 
 ```
 npx lumia-plugin create my_plugin
@@ -30,146 +29,88 @@ After scaffolding you can tailor the manifest, code, and README to match your id
 ```
 const { Plugin } = require("@lumiastream/plugin");
 
-const VARIABLE_NAMES = {
-	lastMessage: "last_message",
-	lastAlertColor: "last_alert_color",
+const DEFAULTS = {
+	message: "Hello from Showcase Plugin!",
+	username: "Viewer",
+	color: "#00c2ff",
+	duration: 5,
 };
 
-const DEFAULTS = {
-	welcomeMessage: "Hello from Showcase Plugin!",
-	color: "#00c2ff",
-	alertDuration: 5,
+const VARIABLE_NAMES = {
+	message: "message",
+	username: "username",
+	color: "color",
+	duration: "duration",
 };
 
 class ShowcasePluginTemplate extends Plugin {
 	async onload() {
-		const message = this._currentMessage();
-		await this._rememberMessage(message);
-
-		if (this.settings.autoAlert === "load") {
-			await this._triggerSampleAlert({
-				color: this.settings.favoriteColor,
-				duration: DEFAULTS.alertDuration,
-			});
-		}
+		await this._syncDefaults();
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
 		if (
-			settings?.welcomeMessage &&
-			settings.welcomeMessage !== previous?.welcomeMessage
+			settings?.defaultMessage !== previous?.defaultMessage ||
+			settings?.defaultColor !== previous?.defaultColor ||
+			settings?.defaultDuration !== previous?.defaultDuration
 		) {
-			await this._rememberMessage(settings.welcomeMessage);
-		}
-
-		if (settings?.autoAlert === "load" && previous?.autoAlert !== "load") {
-			await this._log("Auto alert configured to fire on load");
+			await this._syncDefaults(settings);
 		}
 	}
 
 	async actions(config = {}) {
 		const actions = Array.isArray(config.actions) ? config.actions : [];
 		for (const action of actions) {
-			switch (action?.type) {
-				case "log_message":
-					await this._handleLogMessage(action.data);
-					break;
-				case "update_variable":
-					await this._handleUpdateVariable(action.data);
-					break;
-				case "trigger_alert":
-					await this._triggerSampleAlert(action.data);
-					break;
-				default:
-					await this._log(
-						`Unknown action type: ${action?.type ?? "undefined"}`,
-						"warn",
-					);
+			if (action?.type === "trigger_alert") {
+				await this._triggerSampleAlert(action.data);
 			}
 		}
 	}
 
-	_tag() {
-		return `[${this.manifest?.id ?? "showcase_plugin"}]`;
-	}
+	async _syncDefaults(settings = this.settings) {
+		const message = settings?.defaultMessage ?? DEFAULTS.message;
+		const color = settings?.defaultColor ?? DEFAULTS.color;
+		const duration = Number(settings?.defaultDuration ?? DEFAULTS.duration);
 
-	_currentMessage() {
-		return (
-			this.settings?.welcomeMessage ||
-			`Hello from ${this.manifest?.name ?? "Showcase Plugin"}!`
-		);
-	}
-
-	async _log(message, severity = "info") {
-		if (severity !== "warn" && severity !== "error") {
-			return;
-		}
-
-		const prefix = this._tag();
-		const decorated =
-			severity === "warn"
-				? `${prefix} ⚠️ ${message}`
-				: severity === "error"
-					? `${prefix} ❌ ${message}`
-					: `${prefix} ${message}`;
-
-		await this.lumia.addLog(decorated);
-	}
-
-	async _rememberMessage(value) {
-		await this.lumia.setVariable(VARIABLE_NAMES.lastMessage, value);
-	}
-
-	async _handleLogMessage(data = {}) {
-		const message = data?.message || this._currentMessage();
-		const severity = data?.severity || "info";
-
-		await this._log(message, severity);
-
-		if (typeof this.lumia.showToast === "function") {
-			await this.lumia.showToast({
-				message: `${this.manifest?.name ?? "Plugin"}: ${message}`,
-				time: 4,
-			});
-		}
-
-		if (this.settings.autoAlert === "after-log") {
-			await this._triggerSampleAlert({
-				color: this.settings.favoriteColor,
-				duration: DEFAULTS.alertDuration,
-			});
-		}
-	}
-
-	async _handleUpdateVariable(data = {}) {
-		const value = data?.value ?? new Date().toISOString();
-		await this._rememberMessage(value);
-		await this._log(`Stored variable value: ${value}`);
+		await this.lumia.setVariable(VARIABLE_NAMES.message, message);
+		await this.lumia.setVariable(VARIABLE_NAMES.color, color);
+		await this.lumia.setVariable(VARIABLE_NAMES.duration, duration);
 	}
 
 	async _triggerSampleAlert(data = {}) {
-		const color = data?.color || this.settings?.favoriteColor || DEFAULTS.color;
-		const duration = Number(data?.duration) || DEFAULTS.alertDuration;
+		const username = data?.username ?? DEFAULTS.username;
+		const message =
+			data?.message ?? this.settings?.defaultMessage ?? DEFAULTS.message;
+		const color = data?.color ?? this.settings?.defaultColor ?? DEFAULTS.color;
+		const duration = Number(
+			data?.duration ?? this.settings?.defaultDuration ?? DEFAULTS.duration
+		);
+
+		await this.lumia.setVariable(VARIABLE_NAMES.username, username);
+		await this.lumia.setVariable(VARIABLE_NAMES.message, message);
+		await this.lumia.setVariable(VARIABLE_NAMES.color, color);
+		await this.lumia.setVariable(VARIABLE_NAMES.duration, duration);
 
 		try {
-			const success = await this.lumia.triggerAlert({
-				alert: "sample_light",
-				extraSettings: { color, duration },
+			await this.lumia.triggerAlert({
+				alert: "sample_alert",
+				dynamic: {
+					value: color,
+					username,
+					message,
+					color,
+					duration,
+				},
+				extraSettings: {
+					username,
+					message,
+					color,
+					duration,
+				},
 			});
-
-			if (!success) {
-				await this._log("Sample alert reported failure", "warn");
-				return;
-			}
-
-			await this.lumia.setVariable(VARIABLE_NAMES.lastAlertColor, color);
-			await this._log(
-				`Triggered sample alert with color ${color} for ${duration}s`,
-			);
 		} catch (error) {
-			await this._log(
-				`Failed to trigger sample alert: ${error.message ?? error}`,
-				"error",
+			await this.lumia.addLog(
+				`Sample alert failed: ${error?.message ?? String(error)}`
 			);
 		}
 	}
@@ -190,7 +131,7 @@ module.exports = ShowcasePluginTemplate;
 	"email": "",
 	"website": "",
 	"repository": "",
-	"description": "Showcase plugin that demonstrates Lumia settings, actions, variables, alerts, and logging.",
+	"description": "Starter template that demonstrates settings, actions, variables, and alerts with a minimal code path.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "apps",
@@ -200,38 +141,43 @@ module.exports = ShowcasePluginTemplate;
 	"config": {
 		"settings": [
 			{
-				"key": "welcomeMessage",
-				"label": "Welcome Message",
+				"key": "defaultMessage",
+				"label": "Default Message",
 				"type": "text",
 				"defaultValue": "Hello from Showcase Plugin!",
-				"helperText": "Shown when the plugin loads and stored in the sample variable."
+				"helperText": "Used when the action does not supply a message."
 			},
 			{
-				"key": "favoriteColor",
-				"label": "Favorite Color",
+				"key": "defaultColor",
+				"label": "Default Color",
 				"type": "color",
 				"defaultValue": "#00c2ff",
-				"helperText": "Used when triggering the sample light alert."
+				"helperText": "Used when the action does not supply a color."
 			},
 			{
-				"key": "autoAlert",
-				"label": "Trigger Sample Alert",
-				"type": "select",
-				"defaultValue": "never",
-				"options": [
-					{ "label": "Never", "value": "never" },
-					{ "label": "On Load", "value": "load" },
-					{ "label": "After Log Action", "value": "after-log" }
-				],
-				"helperText": "Automatically fire the sample alert at different times."
+				"key": "defaultDuration",
+				"label": "Default Duration (seconds)",
+				"type": "number",
+				"defaultValue": 5,
+				"min": 1,
+				"max": 60,
+				"helperText": "Used when the action does not supply a duration."
 			}
 		],
+		"settings_tutorial": "---\n### Setup\n1) Enter a default message and color.\n2) Adjust the default duration if you want a longer or shorter alert.\n3) Click Save to store the defaults.\n---\n### What this plugin does\n- Stores the message, username, color, and duration in variables.\n- Uses those values when triggering the sample alert.\n---",
+		"actions_tutorial": "---\n### Trigger Sample Alert\nUse this action to fire the sample alert. You can override the message, username, color, and duration per action. The alert uses both dynamic and extraSettings so variations and templates have the same data.\n---",
 		"actions": [
 			{
-				"type": "log_message",
-				"label": "Log Message",
-				"description": "Write a formatted message to the Lumia log panel and optionally trigger the sample alert.",
+				"type": "trigger_alert",
+				"label": "Trigger Sample Alert",
+				"description": "Trigger the sample alert with optional overrides.",
 				"fields": [
+					{
+						"key": "username",
+						"label": "Username",
+						"type": "text",
+						"defaultValue": "Viewer"
+					},
 					{
 						"key": "message",
 						"label": "Message",
@@ -239,41 +185,10 @@ module.exports = ShowcasePluginTemplate;
 						"defaultValue": "Hello from Showcase Plugin!"
 					},
 					{
-						"key": "severity",
-						"label": "Severity",
-						"type": "select",
-						"defaultValue": "info",
-						"options": [
-							{ "label": "Info", "value": "info" },
-							{ "label": "Warning", "value": "warn" },
-							{ "label": "Error", "value": "error" }
-						]
-					}
-				]
-			},
-			{
-				"type": "update_variable",
-				"label": "Update Variable",
-				"description": "Persist a value into the sample Lumia variable.",
-				"fields": [
-					{
-						"key": "value",
-						"label": "Value",
-						"type": "text",
-						"defaultValue": "Triggered from an action"
-					}
-				]
-			},
-			{
-				"type": "trigger_alert",
-				"label": "Trigger Sample Alert",
-				"description": "Fire the sample alert with optional overrides.",
-				"fields": [
-					{
 						"key": "color",
 						"label": "Color",
 						"type": "color",
-						"defaultValue": "#ff5f5f"
+						"defaultValue": "#00c2ff"
 					},
 					{
 						"key": "duration",
@@ -288,26 +203,45 @@ module.exports = ShowcasePluginTemplate;
 		],
 		"variables": [
 			{
-				"name": "last_message",
+				"name": "message",
 				"description": "Stores the most recent message handled by the plugin.",
 				"value": ""
 			},
 			{
-				"name": "last_alert_color",
+				"name": "username",
+				"description": "Stores the most recent username handled by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "color",
 				"description": "Tracks the color used by the latest sample alert.",
 				"value": ""
+			},
+			{
+				"name": "duration",
+				"description": "Tracks the duration used by the latest sample alert.",
+				"value": 0
 			}
 		],
 		"alerts": [
 			{
-				"title": "Sample Light Alert",
-				"key": "sample_light",
-				"acceptedVariables": ["last_alert_color"],
-				"defaultMessage": "Changing lights to {{last_alert_color}}.",
+				"title": "Sample Alert",
+				"key": "sample_alert",
+				"acceptedVariables": [
+					"message",
+					"username",
+					"color",
+					"duration"
+				],
+				"defaultMessage": "{{username}}: {{message}}",
 				"variationConditions": [
 					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
+						"type": "EQUAL_SELECTION",
+						"description": "Matches dynamic.value against the selected color.",
+						"selections": [
+							{ "label": "Blue", "value": "#00c2ff" },
+							{ "label": "Red", "value": "#ff5f5f" }
+						]
 					}
 				]
 			}
@@ -324,7 +258,7 @@ module.exports = ShowcasePluginTemplate;
 	"name": "lumia-showcase-plugin-template",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
+	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
 		"@lumiastream/plugin": "^0.2.4"

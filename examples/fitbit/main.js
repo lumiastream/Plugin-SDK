@@ -13,19 +13,19 @@ const DEFAULTS = {
 };
 
 const VARIABLE_NAMES = {
-	date: "fitbit_date",
-	steps: "fitbit_steps",
-	distance: "fitbit_distance",
-	calories: "fitbit_calories",
-	restingHeartRate: "fitbit_resting_heart_rate",
-	durationSecs: "fitbit_activity_duration_secs",
-	durationMin: "fitbit_activity_duration_min",
-	cadence: "fitbit_cadence",
-	pace: "fitbit_pace",
-	paceSource: "fitbit_pace_source",
-	latestActivityName: "fitbit_latest_activity_name",
-	latestActivityStart: "fitbit_latest_activity_start",
-	lastUpdated: "fitbit_last_updated",
+	date: "date",
+	steps: "steps",
+	distance: "distance",
+	calories: "calories",
+	restingHeartRate: "resting_heart_rate",
+	durationSecs: "activity_duration_secs",
+	durationMin: "activity_duration_min",
+	cadence: "cadence",
+	pace: "pace",
+	paceSource: "pace_source",
+	latestActivityName: "latest_activity_name",
+	latestActivityStart: "latest_activity_start",
+	lastUpdated: "last_updated",
 };
 
 class FitbitPlugin extends Plugin {
@@ -44,15 +44,17 @@ class FitbitPlugin extends Plugin {
 			heart: null,
 		};
 		this._lastSecondaryFetchAt = 0;
+		this._failureCount = 0;
+		this._backoffMultiplier = 1;
+		this._offline = false;
 	}
 
 	async onload() {
 		await this._primeVariables();
 
 		if (!this._hasAuthTokens()) {
-			await this._log(
+			await this.lumia.addLog(
 				"Fitbit access tokens not set. Use the OAuth button in the plugin settings to authorize.",
-				"warn",
 			);
 			await this._updateConnectionState(false);
 			return;
@@ -77,6 +79,9 @@ class FitbitPlugin extends Plugin {
 			this._coerceNumber(previous?.pollInterval, DEFAULTS.pollInterval);
 
 		if (pollChanged || authChanged) {
+			this._offline = false;
+			this._failureCount = 0;
+			this._backoffMultiplier = 1;
 			this._schedulePolling();
 		}
 
@@ -92,32 +97,9 @@ class FitbitPlugin extends Plugin {
 		}
 	}
 
-	async actions(config = {}) {
-		const actions = Array.isArray(config.actions) ? config.actions : [];
-		if (!actions.length) {
-			return;
-		}
-
-		for (const action of actions) {
-			try {
-				switch (action?.type) {
-					case "fitbit_refresh":
-						await this._refreshMetrics({ reason: "manual-action" });
-						break;
-				}
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await this._log(
-					`Action ${action?.type ?? "unknown"} failed: ${message}`,
-					"error",
-				);
-			}
-		}
-	}
-
 	async validateAuth() {
 		if (!this._hasAuthTokens()) {
-			await this._log("Validation failed: missing Fitbit tokens.", "warn");
+			await this.lumia.addLog("Validation failed: missing Fitbit tokens.");
 			return false;
 		}
 
@@ -130,7 +112,7 @@ class FitbitPlugin extends Plugin {
 			return true;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this._log(`Fitbit validation failed: ${message}`, "error");
+			await this.lumia.addLog(`Fitbit validation failed: ${message}`);
 			return false;
 		}
 	}
@@ -138,6 +120,9 @@ class FitbitPlugin extends Plugin {
 	async _refreshMetrics({ reason } = {}) {
 		if (!this._hasAuthTokens()) {
 			await this._updateConnectionState(false);
+			return;
+		}
+		if (this._offline) {
 			return;
 		}
 
@@ -154,17 +139,15 @@ class FitbitPlugin extends Plugin {
 				const [steps, heart] = await Promise.all([
 					this._fetchIntradayResource("steps", date, token).catch(
 						async (error) => {
-							await this._log(
+							await this.lumia.addLog(
 								`Steps data unavailable: ${this._errorMessage(error)}`,
-								"warn",
 							);
 							return null;
 						},
 					),
 					this._fetchHeartRateIntraday(date, token).catch(async (error) => {
-						await this._log(
+						await this.lumia.addLog(
 							`Heart rate data unavailable: ${this._errorMessage(error)}`,
-							"warn",
 						);
 						return null;
 					}),
@@ -192,18 +175,16 @@ class FitbitPlugin extends Plugin {
 					const [distance, calories] = await Promise.all([
 						this._fetchIntradayResource("distance", date, token).catch(
 							async (error) => {
-								await this._log(
+								await this.lumia.addLog(
 									`Distance data unavailable: ${this._errorMessage(error)}`,
-									"warn",
 								);
 								return null;
 							},
 						),
 						this._fetchIntradayResource("calories", date, token).catch(
 							async (error) => {
-								await this._log(
+								await this.lumia.addLog(
 									`Calories data unavailable: ${this._errorMessage(error)}`,
-									"warn",
 								);
 								return null;
 							},
@@ -231,10 +212,20 @@ class FitbitPlugin extends Plugin {
 				});
 
 				await this._applyMetrics(metrics);
+				this._failureCount = 0;
+				this._backoffMultiplier = 1;
 				await this._updateConnectionState(true);
 			} catch (error) {
 				const message = this._errorMessage(error);
-				await this._log(`Failed to refresh Fitbit data: ${message}`, "warn");
+				this._failureCount += 1;
+				if (this._failureCount >= 3) {
+					this._offline = true;
+					this._clearPolling();
+				} else {
+					this._backoffMultiplier = Math.min(8, 2 ** this._failureCount);
+					this._schedulePolling();
+				}
+				await this.lumia.addLog(`Failed to refresh Fitbit data: ${message}`);
 				await this._updateConnectionState(false);
 			} finally {
 				this._dataRefreshPromise = null;
@@ -855,11 +846,19 @@ class FitbitPlugin extends Plugin {
 	_schedulePolling() {
 		this._clearPolling();
 
-		const intervalSeconds = this._pollInterval();
-		if (!this._hasAuthTokens() || intervalSeconds <= 0) {
+		if (this._offline) {
 			return;
 		}
 
+		const baseInterval = this._pollInterval();
+		if (!this._hasAuthTokens() || baseInterval <= 0) {
+			return;
+		}
+
+		const intervalSeconds = Math.min(
+			Math.max(Math.round(baseInterval * this._backoffMultiplier), 30),
+			1800,
+		);
 		this._pollTimer = setInterval(() => {
 			void this._refreshMetrics({ reason: "poll" });
 		}, intervalSeconds * 1000);
@@ -884,9 +883,8 @@ class FitbitPlugin extends Plugin {
 				await this.lumia.updateConnection(state);
 			} catch (error) {
 				const message = this._errorMessage(error);
-				await this._log(
+				await this.lumia.addLog(
 					`Failed to update connection state: ${message}`,
-					"warn",
 				);
 			}
 		}
@@ -927,17 +925,6 @@ class FitbitPlugin extends Plugin {
 		this._lastVariables.set(name, normalized);
 		await this._setVariable(name, value);
 		return true;
-	}
-
-	async _log(message, severity = "info") {
-		if (typeof this.lumia.addLog !== "function") {
-			return;
-		}
-		if (severity !== "warn" && severity !== "error") {
-			return;
-		}
-
-		await this.lumia.addLog(`[Fitbit] ${message}`, severity);
 	}
 
 	_errorMessage(error) {

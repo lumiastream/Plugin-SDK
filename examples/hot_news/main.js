@@ -8,16 +8,16 @@ const DEFAULTS = {
 };
 
 const VARIABLE_NAMES = {
-  title: "hotnews_latest_title",
-  description: "hotnews_latest_description",
-  url: "hotnews_latest_url",
-  source: "hotnews_latest_source",
-  image: "hotnews_latest_image",
-  published: "hotnews_latest_published",
-  count: "hotnews_article_count",
-  collection: "hotnews_recent_articles",
-  keyword: "hotnews_keyword",
-  lastUpdated: "hotnews_last_updated",
+  title: "latest_title",
+  description: "latest_description",
+  url: "latest_url",
+  source: "latest_source",
+  image: "latest_image",
+  published: "latest_published",
+  count: "article_count",
+  collection: "recent_articles",
+  keyword: "keyword",
+  lastUpdated: "last_updated",
 };
 
 class HotNewsPlugin extends Plugin {
@@ -27,15 +27,15 @@ class HotNewsPlugin extends Plugin {
     this._seenUrls = new Set();
     this._seenQueue = [];
     this._lastConnectionState = null;
+    this._failureCount = 0;
+    this._backoffMultiplier = 1;
+    this._offline = false;
   }
 
   async onload() {
-    await this._log("Hot News plugin starting up.");
-
     if (!this._apiKey()) {
-      await this._log(
-        "NewsAPI key not configured. Add your key in the plugin settings to start polling headlines.",
-        "warn"
+      await this.lumia.addLog(
+        "NewsAPI key not configured. Add your key in the plugin settings to start polling headlines."
       );
       await this._updateConnectionState(false);
       await this._primeVariables();
@@ -50,7 +50,6 @@ class HotNewsPlugin extends Plugin {
   async onunload() {
     this._clearPolling();
     await this._updateConnectionState(false);
-    await this._log("Hot News plugin stopped.");
   }
 
   async onsettingsupdate(settings, previous = {}) {
@@ -64,9 +63,8 @@ class HotNewsPlugin extends Plugin {
       settings?.resultsLimit !== previous?.resultsLimit;
 
     if (apiKeyChanged && !this._apiKey()) {
-      await this._log(
-        "NewsAPI key cleared from settings; pausing headline polling.",
-        "warn"
+      await this.lumia.addLog(
+        "NewsAPI key cleared from settings; pausing headline polling."
       );
       this._clearPolling();
       await this._updateConnectionState(false);
@@ -74,6 +72,9 @@ class HotNewsPlugin extends Plugin {
     }
 
     if (pollChanged || apiKeyChanged) {
+      this._offline = false;
+      this._failureCount = 0;
+      this._backoffMultiplier = 1;
       this._schedulePolling();
     }
 
@@ -84,37 +85,7 @@ class HotNewsPlugin extends Plugin {
     }
   }
 
-  async actions(config = {}) {
-    const actions = Array.isArray(config.actions) ? config.actions : [];
-    if (!actions.length) {
-      return;
-    }
 
-    for (const action of actions) {
-      const data = action?.data ?? action?.value ?? {};
-      try {
-        switch (action?.type) {
-          case "hotnews_manual_refresh":
-            await this._refreshHeadlines({ reason: "manual-action" });
-            break;
-          case "hotnews_search_topic":
-            await this._handleSearchAction(data);
-            break;
-          default:
-            await this._log(
-              `Received unknown action type: ${action?.type ?? "undefined"}`,
-              "warn"
-            );
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        await this._log(
-          `Action ${action?.type ?? "unknown"} failed: ${message}`,
-          "error"
-        );
-      }
-    }
-  }
 
   async validateAuth(data = {}) {
     const apiKey =
@@ -123,7 +94,7 @@ class HotNewsPlugin extends Plugin {
         : this._apiKey();
 
     if (!apiKey) {
-      await this._log("Validation failed: NewsAPI key is required.", "warn");
+      await this.lumia.addLog("Validation failed: NewsAPI key is required.");
       return false;
     }
 
@@ -137,46 +108,25 @@ class HotNewsPlugin extends Plugin {
       });
 
       if (Array.isArray(payload?.articles)) {
-        await this._log("NewsAPI authentication succeeded.");
         return true;
       }
 
-      await this._log(
-        "Validation failed: unexpected response from NewsAPI.",
-        "warn"
+      await this.lumia.addLog(
+        "Validation failed: unexpected response from NewsAPI."
       );
       return false;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this._log(`NewsAPI validation failed: ${message}`, "error");
+      await this.lumia.addLog(`NewsAPI validation failed: ${message}`);
       return false;
     }
   }
 
-  async _handleSearchAction(data = {}) {
-    const rawQuery = typeof data?.query === "string" ? data.query.trim() : "";
-    if (!rawQuery) {
-      throw new Error("Search action requires a keyword or phrase.");
-    }
-
-    const limit = this._coerceNumber(data?.limit, this._resultsLimit());
-    await this._log(`Running one-off search for "${rawQuery}".`);
-
-    const response = await this._fetchHeadlines({
-      keyword: rawQuery,
-      limit,
-      country: "",
-      category: "",
-    });
-
-    await this._processHeadlines(response, {
-      keyword: rawQuery,
-      initial: true,
-    });
-  }
-
   async _refreshHeadlines(options = {}) {
     if (!this._apiKey()) {
+      return;
+    }
+    if (this._offline) {
       return;
     }
 
@@ -193,10 +143,20 @@ class HotNewsPlugin extends Plugin {
         initial: Boolean(options.initial),
       });
 
+      this._failureCount = 0;
+      this._backoffMultiplier = 1;
       await this._updateConnectionState(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this._log(`Failed to refresh headlines: ${message}`, "warn");
+      this._failureCount += 1;
+      if (this._failureCount >= 3) {
+        this._offline = true;
+        this._clearPolling();
+      } else {
+        this._backoffMultiplier = Math.min(8, 2 ** this._failureCount);
+        this._schedulePolling();
+      }
+      await this.lumia.addLog(`Failed to refresh headlines: ${message}`);
       await this._updateConnectionState(false);
     }
   }
@@ -248,33 +208,26 @@ class HotNewsPlugin extends Plugin {
     if (!options.initial && this._alertsEnabled() && unseenArticle) {
       await this._triggerNewHeadlineAlert(unseenArticle, keyword);
     }
-
-    if (latest) {
-      await this._log(
-        `Latest headline: ${latest.source?.name ?? "Unknown Source"} – ${
-          latest.title
-        }`
-      );
-    } else {
-      await this._log("No articles returned for the current filters.", "warn");
-    }
   }
 
   async _triggerNewHeadlineAlert(article, keyword) {
     try {
+      const alertVars = {
+        latest_title: article.title ?? "",
+        latest_source: article.source?.name ?? "",
+        latest_url: article.url ?? "",
+        latest_published: article.publishedAt ?? "",
+        keyword: keyword ?? "",
+      };
+
       await this.lumia.triggerAlert({
         alert: "hotnews_new_headline",
-        extraSettings: {
-          hotnews_latest_title: article.title ?? "",
-          hotnews_latest_source: article.source?.name ?? "",
-          hotnews_latest_url: article.url ?? "",
-          hotnews_latest_published: article.publishedAt ?? "",
-          hotnews_keyword: keyword ?? "",
-        },
+        dynamic: { ...alertVars },
+        extraSettings: { ...alertVars },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this._log(`Failed to trigger headline alert: ${message}`, "warn");
+      await this.lumia.addLog(`Failed to trigger headline alert: ${message}`);
     }
   }
 
@@ -390,11 +343,19 @@ class HotNewsPlugin extends Plugin {
   _schedulePolling() {
     this._clearPolling();
 
-    const intervalSeconds = this._pollInterval();
-    if (!this._apiKey() || intervalSeconds <= 0) {
+    if (this._offline) {
       return;
     }
 
+    const baseInterval = this._pollInterval();
+    if (!this._apiKey() || baseInterval <= 0) {
+      return;
+    }
+
+    const intervalSeconds = Math.min(
+      Math.max(Math.round(baseInterval * this._backoffMultiplier), 60),
+      3600
+    );
     this._pollTimer = setInterval(() => {
       void this._refreshHeadlines();
     }, intervalSeconds * 1000);
@@ -419,9 +380,8 @@ class HotNewsPlugin extends Plugin {
         await this.lumia.updateConnection(state);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        await this._log(
-          `Failed to update connection state: ${message}`,
-          "warn"
+        await this.lumia.addLog(
+          `Failed to update connection state: ${message}`
         );
       }
     }
@@ -485,26 +445,7 @@ class HotNewsPlugin extends Plugin {
       await this.lumia.setVariable(name, value);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this._log(`Failed to set variable ${name}: ${message}`, "warn");
-    }
-  }
-
-  async _log(message, level = "info") {
-    if (level !== "warn" && level !== "error") {
-      return;
-    }
-    const prefix = `[${this.manifest?.id ?? "hot_planet_news"}]`;
-    const decorated =
-      level === "warn"
-        ? `${prefix} ⚠️ ${message}`
-        : level === "error"
-        ? `${prefix} ❌ ${message}`
-        : `${prefix} ${message}`;
-
-    try {
-      await this.lumia.addLog(decorated);
-    } catch {
-      // Silently ignore logging failures.
+      await this.lumia.addLog(`Failed to set variable ${name}: ${message}`);
     }
   }
 }
