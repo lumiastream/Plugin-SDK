@@ -297,6 +297,13 @@ function buildAlertVariables(state) {
 	};
 }
 
+function buildAlertPayload(vars, dynamicOverrides = {}) {
+	return {
+		dynamic: { ...vars, ...dynamicOverrides },
+		extraSettings: { ...vars },
+	};
+}
+
 function normalizeAvatar(value) {
 	if (typeof value === "string") {
 		const trimmed = value.trim();
@@ -353,6 +360,9 @@ class RumblePlugin extends Plugin {
 		this.streamCounter = 0;
 		this.chatState = this.createEmptyChatState();
 		this.chatHasBaseline = false;
+		this.failureCount = 0;
+		this.backoffMultiplier = 1;
+		this.offline = false;
 	}
 
 	createEmptyState() {
@@ -444,45 +454,11 @@ class RumblePlugin extends Plugin {
 		}
 
 		if (apiKeyChanged || intervalChanged) {
+			this.offline = false;
+			this.failureCount = 0;
+			this.backoffMultiplier = 1;
 			await this.stopPolling(false);
 			await this.startPolling({ showToast: false });
-		}
-	}
-
-	async actions(config = {}) {
-		const actionList = Array.isArray(config.actions) ? config.actions : [];
-
-		if (!actionList.length) {
-			return;
-		}
-
-		for (const action of actionList) {
-			try {
-				switch (action.type) {
-					case "manual_poll": {
-						await this.pollAPI();
-						break;
-					}
-
-					case "manual_alert": {
-						await this.lumia.triggerAlert({
-							alert: ALERT_TYPES.STREAM_START,
-							extraSettings: {
-								...buildAlertVariables(this.lastKnownState),
-								title: this.lastKnownState.title,
-								thumbnail: this.lastKnownState.thumbnail || "",
-								viewers: this.lastKnownState.viewers,
-								streamNumber: this.streamCounter,
-								streamUrl: this.lastKnownState.streamUrl,
-							},
-						});
-						break;
-					}
-				}
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.addLog(`[Rumble] Action failed: ${message}`);
-			}
 		}
 	}
 
@@ -540,6 +516,10 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		if (this.offline) {
+			return;
+		}
+
 		if (this.pollIntervalId) {
 			return;
 		}
@@ -553,14 +533,17 @@ class RumblePlugin extends Plugin {
 			this.updateSettings({ pollInterval: normalizedInterval });
 		}
 
+		const intervalSeconds = Math.min(
+			Math.max(Math.round(normalizedInterval * this.backoffMultiplier), MIN_POLL_INTERVAL),
+			MAX_POLL_INTERVAL * 4,
+		);
+
 		await this.pollAPI();
 
 		this.pollIntervalId = setInterval(() => {
 			// Avoid awaiting the result here so the timer keeps its cadence.
 			void this.pollAPI();
-		}, normalizedInterval * 1000);
-
-		await this.lumia.updateConnection(true);
+		}, intervalSeconds * 1000);
 	}
 
 	// Halt polling and let Lumia know the integration is disconnected.
@@ -576,6 +559,10 @@ class RumblePlugin extends Plugin {
 	// Poll the Rumble endpoint once, then delegate processing to the diff logic.
 	async pollAPI() {
 		try {
+			if (this.offline) {
+				return;
+			}
+
 			const apiKey = this.apiKey;
 			if (!apiKey) {
 				return;
@@ -583,9 +570,22 @@ class RumblePlugin extends Plugin {
 
 			const data = await this.fetchStreamData(apiKey);
 			await this.processStreamData(data);
+			this.failureCount = 0;
+			this.backoffMultiplier = 1;
+			await this.lumia.updateConnection(true);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
+			this.failureCount += 1;
+			if (this.failureCount >= 3) {
+				this.offline = true;
+				await this.stopPolling(false);
+			} else {
+				this.backoffMultiplier = Math.min(8, 2 ** this.failureCount);
+				await this.stopPolling(false);
+				await this.startPolling({ showToast: false });
+			}
 			await this.lumia.addLog(`[Rumble] Error polling API: ${message}`);
+			await this.lumia.updateConnection(false);
 		}
 	}
 
@@ -645,7 +645,7 @@ class RumblePlugin extends Plugin {
 		const hadBaseline = this.hasBaseline;
 
 		if (state.live && !previous.live) {
-			await this.handleStreamStart(data, state);
+			await this.handleStreamStart(state);
 		} else if (!state.live && previous.live) {
 			await this.handleStreamEnd(state);
 		}
@@ -705,7 +705,7 @@ class RumblePlugin extends Plugin {
 		setIfChanged("thumbnail", state.thumbnail, previousState?.thumbnail);
 		setIfChanged("stream_url", state.streamUrl, previousState?.streamUrl);
 		setIfChanged("video_id", state.videoId, previousState?.videoId);
-		setIfChanged("rumbles", state.rumbles, previousState?.rumbles);
+		setIfChanged("reactions", state.rumbles, previousState?.rumbles);
 		setIfChanged("followers", state.followers, previousState?.followers);
 		setIfChanged("likes", state.likes, previousState?.likes);
 		setIfChanged("dislikes", state.dislikes, previousState?.dislikes);
@@ -737,7 +737,7 @@ class RumblePlugin extends Plugin {
 	}
 
 	// When a stream flips from offline to live, start a new session and alert.
-	async handleStreamStart(rawData, state) {
+	async handleStreamStart(state) {
 		this.resetChatState();
 		this.sessionData = this.createEmptySession();
 		this.sessionData.streamStartTime = new Date();
@@ -745,68 +745,25 @@ class RumblePlugin extends Plugin {
 		this.sessionData.lastRantAmount = state.rantAmount;
 		this.streamCounter += 1;
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.STREAM_START,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				name: state.title,
 				value: this.streamCounter,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				title: state.title,
-				thumbnail: state.thumbnail,
-				viewers: state.viewers,
-				streamNumber: this.streamCounter,
-				streamUrl: state.streamUrl,
-				channelName: state.channelName,
-				startedAt: state.startedAt ? state.startedAt.toISOString() : "",
-				scheduledStart: state.scheduledStart
-					? state.scheduledStart.toISOString()
-					: "",
-				followers: state.followers,
-				likes: state.likes,
-				dislikes: state.dislikes,
-				subs: state.subs,
-				subGifts: state.subGifts,
-				rumbles: state.rumbles,
-				rants: state.rants,
-				rantAmount: roundToTwo(state.rantAmount),
-				raw: rawData,
-			},
+			}),
 		});
 	}
 
 	// Stream has gone offline: summarise the session and clean up session state.
 	async handleStreamEnd(state) {
-		const now = Date.now();
-		const startTime = this.sessionData.streamStartTime
-			? this.sessionData.streamStartTime.getTime()
-			: now;
-		const durationMs = Math.max(now - startTime, 0);
-		const durationMinutes = Math.floor(durationMs / 60000);
-
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.STREAM_END,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: state.viewers,
 				total: this.streamCounter,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				streamNumber: this.streamCounter,
-				finalViewers: state.viewers,
-				durationMinutes,
-				durationMs,
-				followers: state.followers,
-				likes: state.likes,
-				dislikes: state.dislikes,
-				subs: state.subs,
-				subGifts: state.subGifts,
-				rants: state.rants,
-				rantAmountTotal: roundToTwo(state.rantAmount),
-				streamUrl: state.streamUrl,
-				channelName: state.channelName,
-			},
+			}),
 		});
 
 		this.sessionData.streamStartTime = null;
@@ -820,20 +777,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.FOLLOWER,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.followers,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newFollowers: delta,
-				totalFollowers: state.followers,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -844,20 +795,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.LIKE,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.likes,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newLikes: delta,
-				totalLikes: state.likes,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -868,20 +813,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.DISLIKE,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.dislikes,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newDislikes: delta,
-				totalDislikes: state.dislikes,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -892,20 +831,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.SUB,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.subs,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newSubs: delta,
-				totalSubs: state.subs,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -916,20 +849,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.SUB_GIFT,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.subGifts,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newGiftSubs: delta,
-				totalGiftSubs: state.subGifts,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -947,23 +874,14 @@ class RumblePlugin extends Plugin {
 		this.sessionData.lastRantsCount = state.rants;
 		this.sessionData.lastRantAmount = state.rantAmount;
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.RANT,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
 				total: roundToTwo(state.rantAmount),
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newRants: Math.max(countDelta, 0),
-				rantsTotal: state.rants,
-				rantAmountIncrement: roundToTwo(amountDelta),
-				rantAmountTotal: roundToTwo(state.rantAmount),
-				streamUrl: state.streamUrl,
-				viewers: state.viewers,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
