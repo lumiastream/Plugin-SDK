@@ -321,6 +321,42 @@ To auto-refresh dynamic options when a user selects the action type, set `refres
 }
 ```
 
+### Variable Functions
+
+Variable functions let plugins return values inline in templates (similar to `{{ai_prompt=...}}`).
+
+Define them under `config.variableFunctions`:
+
+```json
+{
+	"config": {
+		"variableFunctions": [
+			{
+				"key": "my_function",
+				"label": "My Function",
+				"description": "Use {{my_function=value}} to return a value."
+			}
+		]
+	}
+}
+```
+
+Usage example:
+
+```
+{{my_function=message|thread|model}}
+```
+
+- The text after `=` is passed to the plugin as a raw string (`value`).
+- A convenience `args` array is provided by splitting the raw string on `|`.
+- Your plugin handles the logic in `variableFunction()` and returns a string.
+
+Guidelines:
+
+- Keep variable functions fast. They run during template resolution.
+- Do not log excessively or retry aggressively.
+- Return a plain string or an object with `{ value, variables }`.
+
 #### Logging Guidance
 
 Avoid excessive logging. High-frequency logs can quickly fill the user's Logs dashboard. Prefer concise logs and only emit details for errors or explicit user actions. Avoid per-plugin log wrappers unless they add real value.
