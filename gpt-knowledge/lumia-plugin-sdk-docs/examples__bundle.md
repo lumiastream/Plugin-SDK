@@ -18,7 +18,9 @@ This template demonstrates a handful of common Lumia Stream plugin capabilities:
 Use the CLI to copy and customise the template:
 
 ```
+
 npx lumia-plugin create my_plugin
+
 ```
 
 After scaffolding you can tailor the manifest, code, and README to match your idea.
@@ -327,7 +329,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating logging, variables, actions, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -1378,7 +1380,7 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -1984,7 +1986,7 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -3167,7 +3169,7 @@ module.exports = FitbitPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -3943,7 +3945,7 @@ module.exports = HotNewsPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -4982,7 +4984,7 @@ module.exports = MinecraftServerPlugin;
 			"name": "lumia-minecraft-server",
 			"version": "1.0.0",
 			"dependencies": {
-				"@lumiastream/plugin": "^0.1.18"
+				"@lumiastream/plugin": "^0.2.4"
 			}
 		},
 		"node_modules/@lumiastream/plugin": {
@@ -5007,7 +5009,7 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 
@@ -5164,7 +5166,7 @@ module.exports = MockLightsPlugin;
   "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
   "main": "main.js",
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.3"
+    "@lumiastream/plugin": "^0.2.4"
   }
 }
 
@@ -6305,7 +6307,6 @@ module.exports = RumblePlugin;
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
-	"repository": "https://github.com/LumiaStream/rumble-plugin",
 	"description": "Track Rumble livestream state and engagement with alerts, variables, and chat display.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
@@ -6634,7 +6635,7 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.2.4"
 	}
 }
 

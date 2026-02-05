@@ -5,6 +5,6 @@
   "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
   "main": "main.js",
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.3"
+    "@lumiastream/plugin": "^0.2.4"
   }
 }

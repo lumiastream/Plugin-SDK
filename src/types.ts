@@ -141,10 +141,6 @@ export interface PluginActionField {
 	 */
 	allowVariables?: boolean;
 	/**
-	 * When true, changing this field triggers refreshActionOptions in the UI.
-	 */
-	refreshOnChange?: boolean;
-	/**
 	 * When true, this field can receive dynamic options from the plugin.
 	 */
 	dynamicOptions?: boolean;
@@ -165,6 +161,10 @@ export interface PluginActionDefinition {
 	label: string;
 	description?: string;
 	icon?: string;
+	/**
+	 * When true, the UI refreshes dynamic options when the action is selected.
+	 */
+	refreshOnChange?: boolean;
 	fields: PluginActionField[];
 }
 
