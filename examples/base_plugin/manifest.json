@@ -6,7 +6,7 @@
 	"email": "",
 	"website": "",
 	"repository": "",
-	"description": "Showcase plugin that demonstrates Lumia settings, actions, variables, alerts, and logging.",
+	"description": "Starter template that demonstrates settings, actions, variables, and alerts with a minimal code path.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "apps",
@@ -16,38 +16,43 @@
 	"config": {
 		"settings": [
 			{
-				"key": "welcomeMessage",
-				"label": "Welcome Message",
+				"key": "defaultMessage",
+				"label": "Default Message",
 				"type": "text",
 				"defaultValue": "Hello from Showcase Plugin!",
-				"helperText": "Shown when the plugin loads and stored in the sample variable."
+				"helperText": "Used when the action does not supply a message."
 			},
 			{
-				"key": "favoriteColor",
-				"label": "Favorite Color",
+				"key": "defaultColor",
+				"label": "Default Color",
 				"type": "color",
 				"defaultValue": "#00c2ff",
-				"helperText": "Used when triggering the sample light alert."
+				"helperText": "Used when the action does not supply a color."
 			},
 			{
-				"key": "autoAlert",
-				"label": "Trigger Sample Alert",
-				"type": "select",
-				"defaultValue": "never",
-				"options": [
-					{ "label": "Never", "value": "never" },
-					{ "label": "On Load", "value": "load" },
-					{ "label": "After Log Action", "value": "after-log" }
-				],
-				"helperText": "Automatically fire the sample alert at different times."
+				"key": "defaultDuration",
+				"label": "Default Duration (seconds)",
+				"type": "number",
+				"defaultValue": 5,
+				"min": 1,
+				"max": 60,
+				"helperText": "Used when the action does not supply a duration."
 			}
 		],
+		"settings_tutorial": "---\n### Setup\n1) Enter a default message and color.\n2) Adjust the default duration if you want a longer or shorter alert.\n3) Click Save to store the defaults.\n---\n### What this plugin does\n- Stores the message, username, color, and duration in variables.\n- Uses those values when triggering the sample alert.\n---",
+		"actions_tutorial": "---\n### Trigger Sample Alert\nUse this action to fire the sample alert. You can override the message, username, color, and duration per action. The alert uses both dynamic and extraSettings so variations and templates have the same data.\n---",
 		"actions": [
 			{
-				"type": "log_message",
-				"label": "Log Message",
-				"description": "Write a formatted message to the Lumia log panel and optionally trigger the sample alert.",
+				"type": "trigger_alert",
+				"label": "Trigger Sample Alert",
+				"description": "Trigger the sample alert with optional overrides.",
 				"fields": [
+					{
+						"key": "username",
+						"label": "Username",
+						"type": "text",
+						"defaultValue": "Viewer"
+					},
 					{
 						"key": "message",
 						"label": "Message",
@@ -55,41 +60,10 @@
 						"defaultValue": "Hello from Showcase Plugin!"
 					},
 					{
-						"key": "severity",
-						"label": "Severity",
-						"type": "select",
-						"defaultValue": "info",
-						"options": [
-							{ "label": "Info", "value": "info" },
-							{ "label": "Warning", "value": "warn" },
-							{ "label": "Error", "value": "error" }
-						]
-					}
-				]
-			},
-			{
-				"type": "update_variable",
-				"label": "Update Variable",
-				"description": "Persist a value into the sample Lumia variable.",
-				"fields": [
-					{
-						"key": "value",
-						"label": "Value",
-						"type": "text",
-						"defaultValue": "Triggered from an action"
-					}
-				]
-			},
-			{
-				"type": "trigger_alert",
-				"label": "Trigger Sample Alert",
-				"description": "Fire the sample alert with optional overrides.",
-				"fields": [
-					{
 						"key": "color",
 						"label": "Color",
 						"type": "color",
-						"defaultValue": "#ff5f5f"
+						"defaultValue": "#00c2ff"
 					},
 					{
 						"key": "duration",
@@ -104,26 +78,45 @@
 		],
 		"variables": [
 			{
-				"name": "last_message",
+				"name": "message",
 				"description": "Stores the most recent message handled by the plugin.",
 				"value": ""
 			},
 			{
-				"name": "last_alert_color",
+				"name": "username",
+				"description": "Stores the most recent username handled by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "color",
 				"description": "Tracks the color used by the latest sample alert.",
 				"value": ""
+			},
+			{
+				"name": "duration",
+				"description": "Tracks the duration used by the latest sample alert.",
+				"value": 0
 			}
 		],
 		"alerts": [
 			{
-				"title": "Sample Light Alert",
-				"key": "sample_light",
-				"acceptedVariables": ["last_alert_color"],
-				"defaultMessage": "Changing lights to {{last_alert_color}}.",
+				"title": "Sample Alert",
+				"key": "sample_alert",
+				"acceptedVariables": [
+					"message",
+					"username",
+					"color",
+					"duration"
+				],
+				"defaultMessage": "{{username}}: {{message}}",
 				"variationConditions": [
 					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
+						"type": "EQUAL_SELECTION",
+						"description": "Matches dynamic.value against the selected color.",
+						"selections": [
+							{ "label": "Blue", "value": "#00c2ff" },
+							{ "label": "Red", "value": "#ff5f5f" }
+						]
 					}
 				]
 			}

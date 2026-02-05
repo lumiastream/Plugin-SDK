@@ -14,7 +14,7 @@ Run any command with `--help` to see detailed options.
 
 ## Template
 
-The CLI ships with a showcase template that demonstrates logging, settings, variables, and alert handling. It mirrors the starter plugin available in this repository so the CLI can scaffold it anywhere.
+The CLI ships with a showcase template that demonstrates settings, actions, variables, and alert handling. It mirrors the starter plugin available in this repository so the CLI can scaffold it anywhere.
 
 ## License
 

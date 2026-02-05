@@ -5,6 +5,10 @@
 	"bin": {
 		"lumia-plugin": "scripts/cli.js"
 	},
+	"scripts": {
+		"prepack": "node scripts/sync-template.js",
+		"postpack": "node scripts/clean-template.js"
+	},
 	"files": [
 		"scripts",
 		"examples/base_plugin",

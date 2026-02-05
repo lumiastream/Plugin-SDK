@@ -2,7 +2,19 @@
 const path = require("path");
 const fs = require("fs");
 
-const TEMPLATE_DIR = path.resolve(__dirname, "..", "examples", "base_plugin");
+const TEMPLATE_DIRS = [
+	path.resolve(__dirname, "..", "..", "examples", "base_plugin"),
+	path.resolve(__dirname, "..", "examples", "base_plugin"),
+];
+
+function resolveTemplateDir() {
+	for (const candidate of TEMPLATE_DIRS) {
+		if (fs.existsSync(candidate)) {
+			return candidate;
+		}
+	}
+	return null;
+}
 
 function toSafeId(value) {
 	const cleaned = value
@@ -95,18 +107,18 @@ async function updateManifest(manifestPath, pluginId, displayName) {
 	if (manifest.config && typeof manifest.config === "object") {
 		const { settings, actions, variables } = manifest.config;
 
-		const welcomeSetting = ensureArray(settings).find(
-			(setting) => setting?.key === "welcomeMessage"
+		const defaultMessageSetting = ensureArray(settings).find(
+			(setting) => setting?.key === "defaultMessage"
 		);
-		if (welcomeSetting) {
-			welcomeSetting.defaultValue = `Hello from ${displayName}!`;
+		if (defaultMessageSetting) {
+			defaultMessageSetting.defaultValue = `Hello from ${displayName}!`;
 		}
 
-		const logAction = ensureArray(actions).find(
-			(action) => action?.type === "log_message"
+		const triggerAlertAction = ensureArray(actions).find(
+			(action) => action?.type === "trigger_alert"
 		);
-		if (logAction && Array.isArray(logAction.fields)) {
-			const messageField = logAction.fields.find(
+		if (triggerAlertAction && Array.isArray(triggerAlertAction.fields)) {
+			const messageField = triggerAlertAction.fields.find(
 				(field) => field?.key === "message"
 			);
 			if (messageField) {
@@ -119,7 +131,7 @@ async function updateManifest(manifestPath, pluginId, displayName) {
 			if (variable.origin) {
 				variable.origin = pluginId;
 			}
-			if (variable.name === "last_message" && "example" in variable) {
+			if (variable.name === "message" && "example" in variable) {
 				variable.example = `Hello from ${displayName}!`;
 			}
 		}
@@ -180,8 +192,13 @@ async function main() {
 		return;
 	}
 
-	if (!fs.existsSync(TEMPLATE_DIR)) {
-		console.error("✖ Template directory not found:", TEMPLATE_DIR);
+	const templateDir = resolveTemplateDir();
+	if (!templateDir) {
+		console.error("✖ Template directory not found.");
+		console.error("   Looked in:");
+		for (const candidate of TEMPLATE_DIRS) {
+			console.error(`   - ${candidate}`);
+		}
 		console.error("   Tip: Make sure lumia-plugin is properly installed.");
 		process.exit(1);
 	}
@@ -198,7 +215,7 @@ async function main() {
 		await ensureEmptyDir(targetDir);
 
 		console.log("  📋 Copying template files...");
-		await copyTemplate(TEMPLATE_DIR, targetDir);
+		await copyTemplate(templateDir, targetDir);
 
 		console.log("  ✏️  Updating manifest.json...");
 		await updateManifest(

@@ -29,3 +29,6 @@ coverage/
 
 # Local assistant config
 .claude/
+
+# Generated CLI template (synced in prepack)
+cli/examples/base_plugin/

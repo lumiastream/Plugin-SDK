@@ -97,7 +97,7 @@ See the [API reference](./docs/api-reference.md) for the full surface area.
 
 The CLI is distributed separately via `lumia-plugin`. Use it with `npx` (requires npm 7+).
 
-- `npx lumia-plugin create my_plugin` scaffold a feature-rich sample plugin showing logging, variables, and alerts
+- `npx lumia-plugin create my_plugin` scaffold a feature-rich sample plugin showing settings, actions, variables, and alerts
 - `npx lumia-plugin validate ./path/to/plugin` check `manifest.json`, entry files, and config for common mistakes
 - `npx lumia-plugin build ./path/to/plugin --out ./plugin.lumiaplugin` bundle the directory into a distributable archive
 
