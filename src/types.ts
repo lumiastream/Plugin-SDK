@@ -370,7 +370,7 @@ export interface ILumiaAPI {
 	updateSettings: (updates: Record<string, any>) => void;
 	updateActionFieldOptions: (params: { actionType: string; fieldKey: string; options: PluginActionFieldOption[] }) => Promise<boolean>;
 	setVariable: (name: string, value: any) => Promise<void>;
-	getVariable: (name: string) => any;
+	getVariable: (name: string) => Promise<any>;
 	callCommand: (name: string, variableValues?: any) => Promise<any>;
 	triggerAlert: (params: PluginTriggerAlertOptions) => Promise<boolean>;
 	displayChat: (params: PluginDisplayChatOptions) => void;
