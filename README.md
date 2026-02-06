@@ -89,6 +89,10 @@ this.lumia.displayChat({
 
 See the [API reference](./docs/api-reference.md) for the full surface area.
 
+## Runtime Environment
+
+Plugins execute in an isolated **Node.js** process (no browser DOM). Use Node-compatible packages and avoid browser-only APIs like `window`, `document`, `localStorage`, or `XMLHttpRequest`. Bundle or ship your dependencies with the plugin; do not assume Lumia provides third-party packages unless documented.
+
 ## Scripts
 
 - `npm run build` – compile the SDK to the `dist` folder.
