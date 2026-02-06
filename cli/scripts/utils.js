@@ -65,8 +65,20 @@ async function readManifest(pluginDir) {
 
 async function collectFiles(pluginDir, ignore = DEFAULT_IGNORE) {
 	const entries = [];
+	const visited = new Set();
 
 	async function walk(currentDir) {
+		let realpath = currentDir;
+		try {
+			realpath = await fs.promises.realpath(currentDir);
+		} catch {
+			// ignore
+		}
+		if (visited.has(realpath)) {
+			return;
+		}
+		visited.add(realpath);
+
 		const list = await fs.promises.readdir(currentDir, { withFileTypes: true });
 		for (const entry of list) {
 			if (ignore.has(entry.name)) continue;
@@ -80,6 +92,18 @@ async function collectFiles(pluginDir, ignore = DEFAULT_IGNORE) {
 				relative.startsWith("node_modules/@lumiastream/plugin") ||
 				relative.startsWith("node_modules/lumia-plugin")
 			) {
+				continue;
+			}
+
+			if (entry.isSymbolicLink()) {
+				const stats = await fs.promises.stat(absolute).catch(() => null);
+				if (stats?.isDirectory()) {
+					await walk(absolute);
+					continue;
+				}
+				if (stats?.isFile()) {
+					entries.push({ absolute, relative: toPosix(relative) });
+				}
 				continue;
 			}
 
