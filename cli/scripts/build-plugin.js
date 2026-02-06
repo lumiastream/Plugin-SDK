@@ -11,7 +11,7 @@ const {
 
 function parseArgs() {
 	const args = process.argv.slice(2);
-	const options = { dir: process.cwd(), outFile: null };
+	const options = { dir: process.cwd(), outFile: null, install: false };
 	while (args.length) {
 		const arg = args.shift();
 		switch (arg) {
@@ -22,6 +22,10 @@ function parseArgs() {
 			case "--out":
 			case "-o":
 				options.outFile = path.resolve(args.shift() || "");
+				break;
+			case "--install":
+			case "-i":
+				options.install = true;
 				break;
 			case "--help":
 			case "-h":
@@ -49,6 +53,7 @@ Usage: npx lumia-plugin build [options]
 Options:
   --dir, -d   Plugin directory (defaults to cwd)
   --out, -o   Output file path (defaults to ./<id>-<version>.lumiaplugin)
+  --install, -i  Run npm install before packaging
   --help, -h  Show this help message
 `);
 }
@@ -67,14 +72,18 @@ async function main() {
 	try {
 		const packageJsonPath = path.join(pluginDir, "package.json");
 		if (fs.existsSync(packageJsonPath)) {
-			console.log("• Running npm install...");
-			const result = spawnSync("npm", ["install"], {
-				cwd: pluginDir,
-				stdio: "inherit",
-			});
-			if (result.status !== 0) {
-				console.error("✖ npm install failed. Aborting build.");
-				process.exit(1);
+			if (options.install) {
+				console.log("• Running npm install...");
+				const result = spawnSync("npm", ["install"], {
+					cwd: pluginDir,
+					stdio: "inherit",
+				});
+				if (result.status !== 0) {
+					console.error("✖ npm install failed. Aborting build.");
+					process.exit(1);
+				}
+			} else {
+				console.log("• Skipping npm install (use --install to enable).");
 			}
 		} else {
 			console.log("• No package.json found; skipping npm install.");
