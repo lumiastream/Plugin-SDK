@@ -66,7 +66,8 @@ Every plugin requires a `manifest.json` file that describes your plugin, its met
 - `onunload()` – called when your plugin is disabled or unloaded.
 - `onupdate(oldVersion, newVersion)` – triggered after version upgrades.
 - `onsettingsupdate(settings, previousSettings)` – called whenever settings change.
-- `actions(config)` – handle custom actions invoked from Lumia automations.
+- `actions(config)` – handle custom actions invoked from Lumia automations.  
+  **Note:** action parameters are provided via `action.value`. Use `const params = action?.value ?? {};`.
 
 ## Lumia API Highlights
 

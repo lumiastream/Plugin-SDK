@@ -62,7 +62,7 @@ class ShowcasePluginTemplate extends Plugin {
 		const actions = Array.isArray(config.actions) ? config.actions : [];
 		for (const action of actions) {
 			if (action?.type === "trigger_alert") {
-				await this._triggerSampleAlert(action.data);
+				await this._triggerSampleAlert(action.value);
 			}
 		}
 	}
@@ -261,7 +261,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.2.6"
 	}
 }
 
@@ -313,7 +313,7 @@ class DivoomPixooPlugin extends Plugin {
 		const actionList = Array.isArray(config.actions) ? config.actions : [];
 
 		for (const action of actionList) {
-			const params = action?.value ?? action?.data ?? {};
+			const params = action?.value ?? {};
 
 			try {
 				switch (action.type) {
@@ -1050,7 +1050,7 @@ module.exports = DivoomPixooPlugin;
 {
 	"id": "divoom_pixoo",
 	"name": "Divoom Pixoo",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -1105,8 +1105,8 @@ module.exports = DivoomPixooPlugin;
 				}
 			}
 		],
-		"settings_tutorial": "---\n### 🎨 Setup Your Divoom Pixoo\n\n1. **Find Your Pixoo's IP Address**:\n   - Use your router's device list\n   - Or use the Divoom app → Device Settings\n   - Example: `192.168.1.42`\n\n2. **Set Static IP (Recommended)**:\n   - Reserve IP in your router's DHCP settings\n   - Prevents IP from changing\n\n3. **Enter Settings**:\n   - IP Address (required)\n   - Port: 80 (default)\n   - Screen size: 64x64 (or 16x16 for Pixoo 16)\n\n4. **Click Save**\n   - Plugin auto-tests connection\n   - Look for ✅ success message\n---",
-		"actions_tutorial": "---\n### 🔧 Available Commands\n\n**Basic Control**:\n- Test Connection - Verify device is reachable\n- Set Brightness - Adjust display brightness (0-100)\n- Set Channel - Switch to clock/visualizer/scene\n- Screen On/Off - Power screen on or off\n- Reset Display - Clear and reset to default\n\n**Display Content**:\n- Send Scrolling Text - Display text messages\n- Clear Screen - Clear all content\n- Display Image - Show image from URL\n- Play GIF - Play animated GIF from URL\n\n**Drawing**:\n- Draw Pixel - Draw individual pixels\n- Draw Rectangle - Draw colored rectangles\n\n**Sound**:\n- Play Buzzer - Play buzzer sound\n\n**Advanced**:\n- Send Raw Command - Send custom API commands\n\n---\n### 💡 Tips\n- Commands are rate-limited to 1 per second (prevents crashes)\n- Connection auto-refreshes every 250 commands\n---",
+		"settings_tutorial": "---\n### \ud83c\udfa8 Setup Your Divoom Pixoo\n\n1. **Find Your Pixoo's IP Address**:\n   - Use your router's device list\n   - Or use the Divoom app \u2192 Device Settings\n   - Example: `192.168.1.42`\n\n2. **Set Static IP (Recommended)**:\n   - Reserve IP in your router's DHCP settings\n   - Prevents IP from changing\n\n3. **Enter Settings**:\n   - IP Address (required)\n   - Port: 80 (default)\n   - Screen size: 64x64 (or 16x16 for Pixoo 16)\n\n4. **Click Save** to store the settings.\n---",
+		"actions_tutorial": "---\n### \ud83d\udd27 Available Commands\n\n**Basic Control**:\n- Set Brightness - Adjust display brightness (0-100)\n- Set Channel - Switch to clock/visualizer/scene\n- Screen On/Off - Power screen on or off\n- Reset Display - Clear and reset to default\n\n**Display Content**:\n- Send Scrolling Text - Display text messages\n- Clear Screen - Clear all content\n- Display Image - Show image from URL\n- Play GIF - Play animated GIF from URL\n\n**Drawing**:\n- Draw Pixel - Draw individual pixels\n- Draw Rectangle - Draw colored rectangles\n\n**Sound**:\n- Play Buzzer - Play buzzer sound\n\n**Advanced**:\n- Send Raw Command - Send custom API commands\n\n---\n### \ud83d\udca1 Tips\n- Commands are rate-limited to 1 per second (prevents crashes)\n- Connection auto-refreshes every 250 commands\n---",
 		"actions": [
 			{
 				"type": "set_screen_on",
@@ -1148,6 +1148,7 @@ module.exports = DivoomPixooPlugin;
 						"label": "Duration (ms)",
 						"type": "number",
 						"required": true,
+						"allowVariables": true,
 						"defaultValue": 500,
 						"validation": {
 							"min": 100,
@@ -1167,12 +1168,14 @@ module.exports = DivoomPixooPlugin;
 						"label": "Message",
 						"type": "textarea",
 						"required": true,
+						"allowVariables": true,
 						"placeholder": "Enter your message (max 512 chars)..."
 					},
 					{
 						"key": "color",
 						"label": "Text Color",
 						"type": "color",
+						"allowVariables": true,
 						"defaultValue": "#FFFFFF"
 					},
 					{
@@ -1192,8 +1195,14 @@ module.exports = DivoomPixooPlugin;
 						"type": "select",
 						"defaultValue": "left",
 						"options": [
-							{ "label": "Left", "value": "left" },
-							{ "label": "Right", "value": "right" }
+							{
+								"label": "Left",
+								"value": "left"
+							},
+							{
+								"label": "Right",
+								"value": "right"
+							}
 						]
 					},
 					{
@@ -1202,9 +1211,18 @@ module.exports = DivoomPixooPlugin;
 						"type": "select",
 						"defaultValue": "center",
 						"options": [
-							{ "label": "Left", "value": "left" },
-							{ "label": "Center", "value": "center" },
-							{ "label": "Right", "value": "right" }
+							{
+								"label": "Left",
+								"value": "left"
+							},
+							{
+								"label": "Center",
+								"value": "center"
+							},
+							{
+								"label": "Right",
+								"value": "right"
+							}
 						]
 					}
 				]
@@ -1219,8 +1237,9 @@ module.exports = DivoomPixooPlugin;
 						"label": "Pixels",
 						"type": "textarea",
 						"required": true,
+						"allowVariables": true,
 						"placeholder": "10,10,#FF0000\n20,20,#00FF00\n30,30,#0000FF",
-						"helperText": "Format: x,y,color (one per line or use ; separator). Example: 10,10,#FF0000;20,20,#00FF00"
+						"helperText": "Format: x,y,color (one per line or use ; separator). Example: 10,10,#FF0000;20,20,#00FF00. Best example for this is using {{message}} as the value. Then your chat can type something like: !divoom 10,10,#FF0000;20,20,#00FF00;30,30,#0000FF"
 					}
 				]
 			},
@@ -1234,6 +1253,7 @@ module.exports = DivoomPixooPlugin;
 						"label": "Rectangles",
 						"type": "textarea",
 						"required": true,
+						"allowVariables": true,
 						"placeholder": "10,10,20,20,#FF0000\n35,35,15,15,#00FF00",
 						"helperText": "Format: x,y,width,height,color (one per line or use ; separator). Example: 10,10,20,20,#FF0000;30,30,15,15,#00FF00"
 					}
@@ -1249,6 +1269,7 @@ module.exports = DivoomPixooPlugin;
 						"label": "GIF URL",
 						"type": "text",
 						"required": true,
+						"allowVariables": true,
 						"placeholder": "https://example.com/animation.gif",
 						"helperText": "Direct link to animated GIF. Must be exactly 16x16, 32x32, or 64x64 pixels."
 					}
@@ -1263,6 +1284,7 @@ module.exports = DivoomPixooPlugin;
 						"key": "color",
 						"label": "Background Color",
 						"type": "color",
+						"allowVariables": true,
 						"defaultValue": "#000000",
 						"helperText": "Color to fill screen after clearing"
 					}
@@ -1284,6 +1306,7 @@ module.exports = DivoomPixooPlugin;
 						"label": "Command",
 						"type": "text",
 						"required": true,
+						"allowVariables": true,
 						"placeholder": "Device/SetRTC",
 						"helperText": "API command path (e.g., Channel/SetClock)"
 					},
@@ -1291,6 +1314,7 @@ module.exports = DivoomPixooPlugin;
 						"key": "payload",
 						"label": "Payload JSON",
 						"type": "textarea",
+						"allowVariables": true,
 						"placeholder": "{\"ClockId\": 182}",
 						"helperText": "Additional command parameters as JSON"
 					}
@@ -1312,7 +1336,7 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.2.6"
 	}
 }
 
@@ -1494,8 +1518,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 
 		for (const action of actionList) {
 			try {
-				const actionData =
-					action?.value ?? action?.data ?? action?.params ?? {};
+				const actionData = action?.value ?? {};
 				if (action.type === "speak") {
 					await this.handleSpeak(actionData);
 				} else if (action.type === "stream_music") {
@@ -1918,7 +1941,7 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.2.6"
 	}
 }
 
@@ -1942,19 +1965,19 @@ const DEFAULTS = {
 };
 
 const VARIABLE_NAMES = {
-	date: "fitbit_date",
-	steps: "fitbit_steps",
-	distance: "fitbit_distance",
-	calories: "fitbit_calories",
-	restingHeartRate: "fitbit_resting_heart_rate",
-	durationSecs: "fitbit_activity_duration_secs",
-	durationMin: "fitbit_activity_duration_min",
-	cadence: "fitbit_cadence",
-	pace: "fitbit_pace",
-	paceSource: "fitbit_pace_source",
-	latestActivityName: "fitbit_latest_activity_name",
-	latestActivityStart: "fitbit_latest_activity_start",
-	lastUpdated: "fitbit_last_updated",
+	date: "date",
+	steps: "steps",
+	distance: "distance",
+	calories: "calories",
+	restingHeartRate: "resting_heart_rate",
+	durationSecs: "activity_duration_secs",
+	durationMin: "activity_duration_min",
+	cadence: "cadence",
+	pace: "pace",
+	paceSource: "pace_source",
+	latestActivityName: "latest_activity_name",
+	latestActivityStart: "latest_activity_start",
+	lastUpdated: "last_updated",
 };
 
 class FitbitPlugin extends Plugin {
@@ -1973,15 +1996,17 @@ class FitbitPlugin extends Plugin {
 			heart: null,
 		};
 		this._lastSecondaryFetchAt = 0;
+		this._failureCount = 0;
+		this._backoffMultiplier = 1;
+		this._offline = false;
 	}
 
 	async onload() {
 		await this._primeVariables();
 
 		if (!this._hasAuthTokens()) {
-			await this._log(
+			await this.lumia.addLog(
 				"Fitbit access tokens not set. Use the OAuth button in the plugin settings to authorize.",
-				"warn",
 			);
 			await this._updateConnectionState(false);
 			return;
@@ -2006,6 +2031,9 @@ class FitbitPlugin extends Plugin {
 			this._coerceNumber(previous?.pollInterval, DEFAULTS.pollInterval);
 
 		if (pollChanged || authChanged) {
+			this._offline = false;
+			this._failureCount = 0;
+			this._backoffMultiplier = 1;
 			this._schedulePolling();
 		}
 
@@ -2021,32 +2049,9 @@ class FitbitPlugin extends Plugin {
 		}
 	}
 
-	async actions(config = {}) {
-		const actions = Array.isArray(config.actions) ? config.actions : [];
-		if (!actions.length) {
-			return;
-		}
-
-		for (const action of actions) {
-			try {
-				switch (action?.type) {
-					case "fitbit_refresh":
-						await this._refreshMetrics({ reason: "manual-action" });
-						break;
-				}
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await this._log(
-					`Action ${action?.type ?? "unknown"} failed: ${message}`,
-					"error",
-				);
-			}
-		}
-	}
-
 	async validateAuth() {
 		if (!this._hasAuthTokens()) {
-			await this._log("Validation failed: missing Fitbit tokens.", "warn");
+			await this.lumia.addLog("Validation failed: missing Fitbit tokens.");
 			return false;
 		}
 
@@ -2059,7 +2064,7 @@ class FitbitPlugin extends Plugin {
 			return true;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this._log(`Fitbit validation failed: ${message}`, "error");
+			await this.lumia.addLog(`Fitbit validation failed: ${message}`);
 			return false;
 		}
 	}
@@ -2067,6 +2072,9 @@ class FitbitPlugin extends Plugin {
 	async _refreshMetrics({ reason } = {}) {
 		if (!this._hasAuthTokens()) {
 			await this._updateConnectionState(false);
+			return;
+		}
+		if (this._offline) {
 			return;
 		}
 
@@ -2083,17 +2091,15 @@ class FitbitPlugin extends Plugin {
 				const [steps, heart] = await Promise.all([
 					this._fetchIntradayResource("steps", date, token).catch(
 						async (error) => {
-							await this._log(
+							await this.lumia.addLog(
 								`Steps data unavailable: ${this._errorMessage(error)}`,
-								"warn",
 							);
 							return null;
 						},
 					),
 					this._fetchHeartRateIntraday(date, token).catch(async (error) => {
-						await this._log(
+						await this.lumia.addLog(
 							`Heart rate data unavailable: ${this._errorMessage(error)}`,
-							"warn",
 						);
 						return null;
 					}),
@@ -2121,18 +2127,16 @@ class FitbitPlugin extends Plugin {
 					const [distance, calories] = await Promise.all([
 						this._fetchIntradayResource("distance", date, token).catch(
 							async (error) => {
-								await this._log(
+								await this.lumia.addLog(
 									`Distance data unavailable: ${this._errorMessage(error)}`,
-									"warn",
 								);
 								return null;
 							},
 						),
 						this._fetchIntradayResource("calories", date, token).catch(
 							async (error) => {
-								await this._log(
+								await this.lumia.addLog(
 									`Calories data unavailable: ${this._errorMessage(error)}`,
-									"warn",
 								);
 								return null;
 							},
@@ -2160,10 +2164,20 @@ class FitbitPlugin extends Plugin {
 				});
 
 				await this._applyMetrics(metrics);
+				this._failureCount = 0;
+				this._backoffMultiplier = 1;
 				await this._updateConnectionState(true);
 			} catch (error) {
 				const message = this._errorMessage(error);
-				await this._log(`Failed to refresh Fitbit data: ${message}`, "warn");
+				this._failureCount += 1;
+				if (this._failureCount >= 3) {
+					this._offline = true;
+					this._clearPolling();
+				} else {
+					this._backoffMultiplier = Math.min(8, 2 ** this._failureCount);
+					this._schedulePolling();
+				}
+				await this.lumia.addLog(`Failed to refresh Fitbit data: ${message}`);
 				await this._updateConnectionState(false);
 			} finally {
 				this._dataRefreshPromise = null;
@@ -2784,11 +2798,19 @@ class FitbitPlugin extends Plugin {
 	_schedulePolling() {
 		this._clearPolling();
 
-		const intervalSeconds = this._pollInterval();
-		if (!this._hasAuthTokens() || intervalSeconds <= 0) {
+		if (this._offline) {
 			return;
 		}
 
+		const baseInterval = this._pollInterval();
+		if (!this._hasAuthTokens() || baseInterval <= 0) {
+			return;
+		}
+
+		const intervalSeconds = Math.min(
+			Math.max(Math.round(baseInterval * this._backoffMultiplier), 30),
+			1800,
+		);
 		this._pollTimer = setInterval(() => {
 			void this._refreshMetrics({ reason: "poll" });
 		}, intervalSeconds * 1000);
@@ -2813,9 +2835,8 @@ class FitbitPlugin extends Plugin {
 				await this.lumia.updateConnection(state);
 			} catch (error) {
 				const message = this._errorMessage(error);
-				await this._log(
+				await this.lumia.addLog(
 					`Failed to update connection state: ${message}`,
-					"warn",
 				);
 			}
 		}
@@ -2856,17 +2877,6 @@ class FitbitPlugin extends Plugin {
 		this._lastVariables.set(name, normalized);
 		await this._setVariable(name, value);
 		return true;
-	}
-
-	async _log(message, severity = "info") {
-		if (typeof this.lumia.addLog !== "function") {
-			return;
-		}
-		if (severity !== "warn" && severity !== "error") {
-			return;
-		}
-
-		await this.lumia.addLog(`[Fitbit] ${message}`, severity);
 	}
 
 	_errorMessage(error) {
@@ -2965,129 +2975,126 @@ module.exports = FitbitPlugin;
 
 ```
 {
-	"id": "fitbit",
-	"name": "Fitbit",
-	"version": "1.0.6",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"repository": "",
-	"description": "Fetch Fitbit intraday activity metrics into Lumia variables and alerts.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "apps",
-	"keywords": "fitbit, fitness, activity, steps, heartrate",
-	"icon": "fitbit.jpg",
-	"config": {
-		"oauth": {
-			"buttonLabel": "Authorize Fitbit",
-			"helperText": "Connect your Fitbit account to pull current activity metrics (intraday access required for server apps).",
-			"openInBrowser": true,
-			"scopes": ["activity", "heartrate", "profile", "settings"],
-			"tokenKeys": {
-				"accessToken": "accessToken",
-				"refreshToken": "refreshToken",
-				"tokenSecret": "tokenSecret"
-			}
-		},
-		"settings": [
-			{
-				"key": "accessToken",
-				"label": "Access Token",
-				"type": "password",
-				"helperText": "Auto-filled after OAuth completes.",
-				"disabled": true,
-				"required": false
-			},
-			{
-				"key": "refreshToken",
-				"label": "Refresh Token",
-				"type": "password",
-				"helperText": "Auto-filled after OAuth completes.",
-				"disabled": true,
-				"required": false
-			}
-		],
-		"settings_tutorial": "---\n### Authorize This Plugin\n1) Click **Authorize Fitbit** in the OAuth section.\n2) Complete the login and grant access.\n---\n### Notes\n- Metrics reflect your current active session using intraday time series.\n- Server apps need Fitbit intraday access enabled.\n- Distance and pace use Fitbit's user unit settings.\n---",
-		"actions_tutorial": "---\n### Refresh Metrics\nUse **Refresh Metrics** to pull the current active session right away.\n---",
-		"actions": [
-			{
-				"type": "fitbit_refresh",
-				"label": "Refresh Metrics",
-				"description": "Fetch Fitbit metrics for the current active session.",
-				"fields": []
-			}
-		],
-		"variables": [
-			{
-				"name": "fitbit_date",
-				"description": "Date of the current session (YYYY-MM-DD).",
-				"value": ""
-			},
-			{
-				"name": "fitbit_steps",
-				"description": "Steps in the current active session.",
-				"value": 0
-			},
-			{
-				"name": "fitbit_distance",
-				"description": "Distance in the current active session (Fitbit user units).",
-				"value": 0
-			},
-			{
-				"name": "fitbit_calories",
-				"description": "Calories burned in the current active session.",
-				"value": 0
-			},
-			{
-				"name": "fitbit_resting_heart_rate",
-				"description": "Current heart rate (latest intraday reading).",
-				"value": 0
-			},
-			{
-				"name": "fitbit_activity_duration_secs",
-				"description": "Active duration (seconds) for the current session.",
-				"value": 0
-			},
-			{
-				"name": "fitbit_activity_duration_min",
-				"description": "Active duration (minutes) for the current session.",
-				"value": 0
-			},
-			{
-				"name": "fitbit_cadence",
-				"description": "Cadence for the current active session (steps per minute).",
-				"value": 0
-			},
-			{
-				"name": "fitbit_pace",
-				"description": "Pace computed from the current active session (minutes per distance unit).",
-				"value": 0
-			},
-			{
-				"name": "fitbit_pace_source",
-				"description": "Source for pace: computed or none.",
-				"value": ""
-			},
-			{
-				"name": "fitbit_latest_activity_name",
-				"description": "Label for the current active session.",
-				"value": ""
-			},
-			{
-				"name": "fitbit_latest_activity_start",
-				"description": "Start time of the current active session.",
-				"value": ""
-			},
-			{
-				"name": "fitbit_last_updated",
-				"description": "ISO timestamp when the Fitbit data was last refreshed.",
-				"value": ""
-			}
-		]
-	}
+  "id": "fitbit",
+  "name": "Fitbit",
+  "version": "1.0.6",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "repository": "",
+  "description": "Fetch Fitbit intraday activity metrics into Lumia variables and alerts.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "apps",
+  "keywords": "fitbit, fitness, activity, steps, heartrate",
+  "icon": "fitbit.jpg",
+  "config": {
+    "oauth": {
+      "buttonLabel": "Authorize Fitbit",
+      "helperText": "Connect your Fitbit account to pull current activity metrics (intraday access required for server apps).",
+      "openInBrowser": true,
+      "scopes": [
+        "activity",
+        "heartrate",
+        "profile",
+        "settings"
+      ],
+      "tokenKeys": {
+        "accessToken": "accessToken",
+        "refreshToken": "refreshToken",
+        "tokenSecret": "tokenSecret"
+      }
+    },
+    "settings": [
+      {
+        "key": "accessToken",
+        "label": "Access Token",
+        "type": "password",
+        "helperText": "Auto-filled after OAuth completes.",
+        "disabled": true,
+        "required": false
+      },
+      {
+        "key": "refreshToken",
+        "label": "Refresh Token",
+        "type": "password",
+        "helperText": "Auto-filled after OAuth completes.",
+        "disabled": true,
+        "required": false
+      }
+    ],
+    "settings_tutorial": "---\n### Authorize This Plugin\n1) Click **Authorize Fitbit** in the OAuth section.\n2) Complete the login and grant access.\n---\n### Notes\n- Metrics reflect your current active session using intraday time series.\n- Server apps need Fitbit intraday access enabled.\n- Distance and pace use Fitbit's user unit settings.\n---",
+    "actions_tutorial": "---\n### Actions\nThis plugin refreshes metrics automatically after OAuth and on the poll interval. There are no actions to run.\n---",
+    "actions": [],
+    "variables": [
+      {
+        "name": "date",
+        "description": "Date of the current session (YYYY-MM-DD).",
+        "value": ""
+      },
+      {
+        "name": "steps",
+        "description": "Steps in the current active session.",
+        "value": 0
+      },
+      {
+        "name": "distance",
+        "description": "Distance in the current active session (Fitbit user units).",
+        "value": 0
+      },
+      {
+        "name": "calories",
+        "description": "Calories burned in the current active session.",
+        "value": 0
+      },
+      {
+        "name": "resting_heart_rate",
+        "description": "Current heart rate (latest intraday reading).",
+        "value": 0
+      },
+      {
+        "name": "activity_duration_secs",
+        "description": "Active duration (seconds) for the current session.",
+        "value": 0
+      },
+      {
+        "name": "activity_duration_min",
+        "description": "Active duration (minutes) for the current session.",
+        "value": 0
+      },
+      {
+        "name": "cadence",
+        "description": "Cadence for the current active session (steps per minute).",
+        "value": 0
+      },
+      {
+        "name": "pace",
+        "description": "Pace computed from the current active session (minutes per distance unit).",
+        "value": 0
+      },
+      {
+        "name": "pace_source",
+        "description": "Source for pace: computed or none.",
+        "value": ""
+      },
+      {
+        "name": "latest_activity_name",
+        "description": "Label for the current active session.",
+        "value": ""
+      },
+      {
+        "name": "latest_activity_start",
+        "description": "Start time of the current active session.",
+        "value": ""
+      },
+      {
+        "name": "last_updated",
+        "description": "ISO timestamp when the Fitbit data was last refreshed.",
+        "value": ""
+      }
+    ]
+  }
 }
-
 ```
 
 ## fitbit/package.json
@@ -3101,7 +3108,7 @@ module.exports = FitbitPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.2.6"
 	}
 }
 
@@ -3120,16 +3127,16 @@ const DEFAULTS = {
 };
 
 const VARIABLE_NAMES = {
-  title: "hotnews_latest_title",
-  description: "hotnews_latest_description",
-  url: "hotnews_latest_url",
-  source: "hotnews_latest_source",
-  image: "hotnews_latest_image",
-  published: "hotnews_latest_published",
-  count: "hotnews_article_count",
-  collection: "hotnews_recent_articles",
-  keyword: "hotnews_keyword",
-  lastUpdated: "hotnews_last_updated",
+  title: "latest_title",
+  description: "latest_description",
+  url: "latest_url",
+  source: "latest_source",
+  image: "latest_image",
+  published: "latest_published",
+  count: "article_count",
+  collection: "recent_articles",
+  keyword: "keyword",
+  lastUpdated: "last_updated",
 };
 
 class HotNewsPlugin extends Plugin {
@@ -3139,15 +3146,15 @@ class HotNewsPlugin extends Plugin {
     this._seenUrls = new Set();
     this._seenQueue = [];
     this._lastConnectionState = null;
+    this._failureCount = 0;
+    this._backoffMultiplier = 1;
+    this._offline = false;
   }
 
   async onload() {
-    await this._log("Hot News plugin starting up.");
-
     if (!this._apiKey()) {
-      await this._log(
-        "NewsAPI key not configured. Add your key in the plugin settings to start polling headlines.",
-        "warn"
+      await this.lumia.addLog(
+        "NewsAPI key not configured. Add your key in the plugin settings to start polling headlines."
       );
       await this._updateConnectionState(false);
       await this._primeVariables();
@@ -3162,7 +3169,6 @@ class HotNewsPlugin extends Plugin {
   async onunload() {
     this._clearPolling();
     await this._updateConnectionState(false);
-    await this._log("Hot News plugin stopped.");
   }
 
   async onsettingsupdate(settings, previous = {}) {
@@ -3176,9 +3182,8 @@ class HotNewsPlugin extends Plugin {
       settings?.resultsLimit !== previous?.resultsLimit;
 
     if (apiKeyChanged && !this._apiKey()) {
-      await this._log(
-        "NewsAPI key cleared from settings; pausing headline polling.",
-        "warn"
+      await this.lumia.addLog(
+        "NewsAPI key cleared from settings; pausing headline polling."
       );
       this._clearPolling();
       await this._updateConnectionState(false);
@@ -3186,6 +3191,9 @@ class HotNewsPlugin extends Plugin {
     }
 
     if (pollChanged || apiKeyChanged) {
+      this._offline = false;
+      this._failureCount = 0;
+      this._backoffMultiplier = 1;
       this._schedulePolling();
     }
 
@@ -3196,37 +3204,7 @@ class HotNewsPlugin extends Plugin {
     }
   }
 
-  async actions(config = {}) {
-    const actions = Array.isArray(config.actions) ? config.actions : [];
-    if (!actions.length) {
-      return;
-    }
 
-    for (const action of actions) {
-      const data = action?.data ?? action?.value ?? {};
-      try {
-        switch (action?.type) {
-          case "hotnews_manual_refresh":
-            await this._refreshHeadlines({ reason: "manual-action" });
-            break;
-          case "hotnews_search_topic":
-            await this._handleSearchAction(data);
-            break;
-          default:
-            await this._log(
-              `Received unknown action type: ${action?.type ?? "undefined"}`,
-              "warn"
-            );
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        await this._log(
-          `Action ${action?.type ?? "unknown"} failed: ${message}`,
-          "error"
-        );
-      }
-    }
-  }
 
   async validateAuth(data = {}) {
     const apiKey =
@@ -3235,7 +3213,7 @@ class HotNewsPlugin extends Plugin {
         : this._apiKey();
 
     if (!apiKey) {
-      await this._log("Validation failed: NewsAPI key is required.", "warn");
+      await this.lumia.addLog("Validation failed: NewsAPI key is required.");
       return false;
     }
 
@@ -3249,46 +3227,25 @@ class HotNewsPlugin extends Plugin {
       });
 
       if (Array.isArray(payload?.articles)) {
-        await this._log("NewsAPI authentication succeeded.");
         return true;
       }
 
-      await this._log(
-        "Validation failed: unexpected response from NewsAPI.",
-        "warn"
+      await this.lumia.addLog(
+        "Validation failed: unexpected response from NewsAPI."
       );
       return false;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this._log(`NewsAPI validation failed: ${message}`, "error");
+      await this.lumia.addLog(`NewsAPI validation failed: ${message}`);
       return false;
     }
   }
 
-  async _handleSearchAction(data = {}) {
-    const rawQuery = typeof data?.query === "string" ? data.query.trim() : "";
-    if (!rawQuery) {
-      throw new Error("Search action requires a keyword or phrase.");
-    }
-
-    const limit = this._coerceNumber(data?.limit, this._resultsLimit());
-    await this._log(`Running one-off search for "${rawQuery}".`);
-
-    const response = await this._fetchHeadlines({
-      keyword: rawQuery,
-      limit,
-      country: "",
-      category: "",
-    });
-
-    await this._processHeadlines(response, {
-      keyword: rawQuery,
-      initial: true,
-    });
-  }
-
   async _refreshHeadlines(options = {}) {
     if (!this._apiKey()) {
+      return;
+    }
+    if (this._offline) {
       return;
     }
 
@@ -3305,10 +3262,20 @@ class HotNewsPlugin extends Plugin {
         initial: Boolean(options.initial),
       });
 
+      this._failureCount = 0;
+      this._backoffMultiplier = 1;
       await this._updateConnectionState(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this._log(`Failed to refresh headlines: ${message}`, "warn");
+      this._failureCount += 1;
+      if (this._failureCount >= 3) {
+        this._offline = true;
+        this._clearPolling();
+      } else {
+        this._backoffMultiplier = Math.min(8, 2 ** this._failureCount);
+        this._schedulePolling();
+      }
+      await this.lumia.addLog(`Failed to refresh headlines: ${message}`);
       await this._updateConnectionState(false);
     }
   }
@@ -3360,33 +3327,26 @@ class HotNewsPlugin extends Plugin {
     if (!options.initial && this._alertsEnabled() && unseenArticle) {
       await this._triggerNewHeadlineAlert(unseenArticle, keyword);
     }
-
-    if (latest) {
-      await this._log(
-        `Latest headline: ${latest.source?.name ?? "Unknown Source"} – ${
-          latest.title
-        }`
-      );
-    } else {
-      await this._log("No articles returned for the current filters.", "warn");
-    }
   }
 
   async _triggerNewHeadlineAlert(article, keyword) {
     try {
+      const alertVars = {
+        latest_title: article.title ?? "",
+        latest_source: article.source?.name ?? "",
+        latest_url: article.url ?? "",
+        latest_published: article.publishedAt ?? "",
+        keyword: keyword ?? "",
+      };
+
       await this.lumia.triggerAlert({
         alert: "hotnews_new_headline",
-        extraSettings: {
-          hotnews_latest_title: article.title ?? "",
-          hotnews_latest_source: article.source?.name ?? "",
-          hotnews_latest_url: article.url ?? "",
-          hotnews_latest_published: article.publishedAt ?? "",
-          hotnews_keyword: keyword ?? "",
-        },
+        dynamic: { ...alertVars },
+        extraSettings: { ...alertVars },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this._log(`Failed to trigger headline alert: ${message}`, "warn");
+      await this.lumia.addLog(`Failed to trigger headline alert: ${message}`);
     }
   }
 
@@ -3502,11 +3462,19 @@ class HotNewsPlugin extends Plugin {
   _schedulePolling() {
     this._clearPolling();
 
-    const intervalSeconds = this._pollInterval();
-    if (!this._apiKey() || intervalSeconds <= 0) {
+    if (this._offline) {
       return;
     }
 
+    const baseInterval = this._pollInterval();
+    if (!this._apiKey() || baseInterval <= 0) {
+      return;
+    }
+
+    const intervalSeconds = Math.min(
+      Math.max(Math.round(baseInterval * this._backoffMultiplier), 60),
+      3600
+    );
     this._pollTimer = setInterval(() => {
       void this._refreshHeadlines();
     }, intervalSeconds * 1000);
@@ -3531,9 +3499,8 @@ class HotNewsPlugin extends Plugin {
         await this.lumia.updateConnection(state);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        await this._log(
-          `Failed to update connection state: ${message}`,
-          "warn"
+        await this.lumia.addLog(
+          `Failed to update connection state: ${message}`
         );
       }
     }
@@ -3597,26 +3564,7 @@ class HotNewsPlugin extends Plugin {
       await this.lumia.setVariable(name, value);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this._log(`Failed to set variable ${name}: ${message}`, "warn");
-    }
-  }
-
-  async _log(message, level = "info") {
-    if (level !== "warn" && level !== "error") {
-      return;
-    }
-    const prefix = `[${this.manifest?.id ?? "hot_planet_news"}]`;
-    const decorated =
-      level === "warn"
-        ? `${prefix} ⚠️ ${message}`
-        : level === "error"
-        ? `${prefix} ❌ ${message}`
-        : `${prefix} ${message}`;
-
-    try {
-      await this.lumia.addLog(decorated);
-    } catch {
-      // Silently ignore logging failures.
+      await this.lumia.addLog(`Failed to set variable ${name}: ${message}`);
     }
   }
 }
@@ -3658,59 +3606,218 @@ module.exports = HotNewsPlugin;
         "type": "select",
         "defaultValue": "us",
         "options": [
-          { "label": "Argentina", "value": "ar" },
-          { "label": "Australia", "value": "au" },
-          { "label": "Austria", "value": "at" },
-          { "label": "Algeria", "value": "dz" },
-          { "label": "Belgium", "value": "be" },
-          { "label": "Brazil", "value": "br" },
-          { "label": "Bulgaria", "value": "bg" },
-          { "label": "Canada", "value": "ca" },
-          { "label": "China", "value": "cn" },
-          { "label": "Colombia", "value": "co" },
-          { "label": "Czechia", "value": "cz" },
-          { "label": "Egypt", "value": "eg" },
-          { "label": "France", "value": "fr" },
-          { "label": "Germany", "value": "de" },
-          { "label": "Greece", "value": "gr" },
-          { "label": "Hong Kong", "value": "hk" },
-          { "label": "Hungary", "value": "hu" },
-          { "label": "India", "value": "in" },
-          { "label": "Indonesia", "value": "id" },
-          { "label": "Ireland", "value": "ie" },
-          { "label": "Italy", "value": "it" },
-          { "label": "Japan", "value": "jp" },
-          { "label": "Latvia", "value": "lv" },
-          { "label": "Lithuania", "value": "lt" },
-          { "label": "Malaysia", "value": "my" },
-          { "label": "Mexico", "value": "mx" },
-          { "label": "Morocco", "value": "ma" },
-          { "label": "Netherlands", "value": "nl" },
-          { "label": "New Zealand", "value": "nz" },
-          { "label": "Nigeria", "value": "ng" },
-          { "label": "Norway", "value": "no" },
-          { "label": "Philippines", "value": "ph" },
-          { "label": "Poland", "value": "pl" },
-          { "label": "Portugal", "value": "pt" },
-          { "label": "Romania", "value": "ro" },
-          { "label": "Russia", "value": "ru" },
-          { "label": "Saudi Arabia", "value": "sa" },
-          { "label": "Serbia", "value": "rs" },
-          { "label": "Singapore", "value": "sg" },
-          { "label": "Slovakia", "value": "sk" },
-          { "label": "Slovenia", "value": "si" },
-          { "label": "South Africa", "value": "za" },
-          { "label": "South Korea", "value": "kr" },
-          { "label": "Sweden", "value": "se" },
-          { "label": "Switzerland", "value": "ch" },
-          { "label": "Taiwan", "value": "tw" },
-          { "label": "Thailand", "value": "th" },
-          { "label": "Turkey", "value": "tr" },
-          { "label": "Ukraine", "value": "ua" },
-          { "label": "United Arab Emirates", "value": "ae" },
-          { "label": "United Kingdom", "value": "gb" },
-          { "label": "United States", "value": "us" },
-          { "label": "Venezuela", "value": "ve" }
+          {
+            "label": "Argentina",
+            "value": "ar"
+          },
+          {
+            "label": "Australia",
+            "value": "au"
+          },
+          {
+            "label": "Austria",
+            "value": "at"
+          },
+          {
+            "label": "Algeria",
+            "value": "dz"
+          },
+          {
+            "label": "Belgium",
+            "value": "be"
+          },
+          {
+            "label": "Brazil",
+            "value": "br"
+          },
+          {
+            "label": "Bulgaria",
+            "value": "bg"
+          },
+          {
+            "label": "Canada",
+            "value": "ca"
+          },
+          {
+            "label": "China",
+            "value": "cn"
+          },
+          {
+            "label": "Colombia",
+            "value": "co"
+          },
+          {
+            "label": "Czechia",
+            "value": "cz"
+          },
+          {
+            "label": "Egypt",
+            "value": "eg"
+          },
+          {
+            "label": "France",
+            "value": "fr"
+          },
+          {
+            "label": "Germany",
+            "value": "de"
+          },
+          {
+            "label": "Greece",
+            "value": "gr"
+          },
+          {
+            "label": "Hong Kong",
+            "value": "hk"
+          },
+          {
+            "label": "Hungary",
+            "value": "hu"
+          },
+          {
+            "label": "India",
+            "value": "in"
+          },
+          {
+            "label": "Indonesia",
+            "value": "id"
+          },
+          {
+            "label": "Ireland",
+            "value": "ie"
+          },
+          {
+            "label": "Italy",
+            "value": "it"
+          },
+          {
+            "label": "Japan",
+            "value": "jp"
+          },
+          {
+            "label": "Latvia",
+            "value": "lv"
+          },
+          {
+            "label": "Lithuania",
+            "value": "lt"
+          },
+          {
+            "label": "Malaysia",
+            "value": "my"
+          },
+          {
+            "label": "Mexico",
+            "value": "mx"
+          },
+          {
+            "label": "Morocco",
+            "value": "ma"
+          },
+          {
+            "label": "Netherlands",
+            "value": "nl"
+          },
+          {
+            "label": "New Zealand",
+            "value": "nz"
+          },
+          {
+            "label": "Nigeria",
+            "value": "ng"
+          },
+          {
+            "label": "Norway",
+            "value": "no"
+          },
+          {
+            "label": "Philippines",
+            "value": "ph"
+          },
+          {
+            "label": "Poland",
+            "value": "pl"
+          },
+          {
+            "label": "Portugal",
+            "value": "pt"
+          },
+          {
+            "label": "Romania",
+            "value": "ro"
+          },
+          {
+            "label": "Russia",
+            "value": "ru"
+          },
+          {
+            "label": "Saudi Arabia",
+            "value": "sa"
+          },
+          {
+            "label": "Serbia",
+            "value": "rs"
+          },
+          {
+            "label": "Singapore",
+            "value": "sg"
+          },
+          {
+            "label": "Slovakia",
+            "value": "sk"
+          },
+          {
+            "label": "Slovenia",
+            "value": "si"
+          },
+          {
+            "label": "South Africa",
+            "value": "za"
+          },
+          {
+            "label": "South Korea",
+            "value": "kr"
+          },
+          {
+            "label": "Sweden",
+            "value": "se"
+          },
+          {
+            "label": "Switzerland",
+            "value": "ch"
+          },
+          {
+            "label": "Taiwan",
+            "value": "tw"
+          },
+          {
+            "label": "Thailand",
+            "value": "th"
+          },
+          {
+            "label": "Turkey",
+            "value": "tr"
+          },
+          {
+            "label": "Ukraine",
+            "value": "ua"
+          },
+          {
+            "label": "United Arab Emirates",
+            "value": "ae"
+          },
+          {
+            "label": "United Kingdom",
+            "value": "gb"
+          },
+          {
+            "label": "United States",
+            "value": "us"
+          },
+          {
+            "label": "Venezuela",
+            "value": "ve"
+          }
         ],
         "helperText": "Restrict headlines to a specific country (defaults to US)."
       },
@@ -3720,14 +3827,38 @@ module.exports = HotNewsPlugin;
         "type": "select",
         "defaultValue": "",
         "options": [
-          { "label": "Any", "value": "" },
-          { "label": "Business", "value": "business" },
-          { "label": "Entertainment", "value": "entertainment" },
-          { "label": "General", "value": "general" },
-          { "label": "Health", "value": "health" },
-          { "label": "Science", "value": "science" },
-          { "label": "Sports", "value": "sports" },
-          { "label": "Technology", "value": "technology" }
+          {
+            "label": "Any",
+            "value": ""
+          },
+          {
+            "label": "Business",
+            "value": "business"
+          },
+          {
+            "label": "Entertainment",
+            "value": "entertainment"
+          },
+          {
+            "label": "General",
+            "value": "general"
+          },
+          {
+            "label": "Health",
+            "value": "health"
+          },
+          {
+            "label": "Science",
+            "value": "science"
+          },
+          {
+            "label": "Sports",
+            "value": "sports"
+          },
+          {
+            "label": "Technology",
+            "value": "technology"
+          }
         ],
         "helperText": "Optional NewsAPI category filter."
       },
@@ -3764,106 +3895,77 @@ module.exports = HotNewsPlugin;
         "helperText": "Trigger the alert whenever a headline appears that has not been seen before."
       }
     ],
-    "settings_tutorial": "---  ### 🔑 Get Your API Key  Sign up at [https://newsapi.org/](https://newsapi.org/) and copy your API key into the NewsAPI Key field.  ---  ### ⚙️ Choose Coverage  Pick a country, optional category, and keyword filter to focus on the stories you care about.  ---  ### ⏱️ Set Poll Interval  Adjust how often the plugin checks NewsAPI (defaults to every 5 minutes).  ---  ### 🚨 Enable Alerts  Leave alerts enabled to have Lumia announce fresh headlines as they arrive.  ---  ### 🪄 Manual Search with Lumia Actions  You can also use Lumia Actions to trigger a manual NewsAPI search whenever you want.  ---",
-    "actions": [
-      {
-        "type": "hotnews_manual_refresh",
-        "label": "Refresh Headlines",
-        "description": "Fetch the latest headlines immediately.",
-        "fields": []
-      },
-      {
-        "type": "hotnews_search_topic",
-        "label": "Search Topic",
-        "description": "Run a one-off search for a different keyword and update variables.",
-        "fields": [
-          {
-            "key": "query",
-            "label": "Keyword or Phrase",
-            "type": "text",
-            "placeholder": "e.g. electric vehicles",
-            "required": true
-          },
-          {
-            "key": "limit",
-            "label": "Results Limit",
-            "type": "number",
-            "defaultValue": 5,
-            "min": 1,
-            "max": 20
-          }
-        ]
-      }
-    ],
+    "settings_tutorial": "---\n### \ud83d\udd11 Get Your API Key\n1) Sign up at https://newsapi.org/ and copy your API key into the NewsAPI Key field.\n---\n### \u2699\ufe0f Choose Coverage\nPick a country, optional category, and keyword filter to focus on the stories you care about.\n---\n### \u23f1\ufe0f Set Poll Interval\nAdjust how often the plugin checks NewsAPI (defaults to every 5 minutes).\n---\n### \ud83d\udea8 Enable Alerts\nLeave alerts enabled to have Lumia announce fresh headlines as they arrive.\n---",
+    "actions": [],
     "alerts": [
       {
         "title": "New Headline",
         "key": "hotnews_new_headline",
-        "defaultMessage": "🔥 {{hotnews_latest_title}} ({{hotnews_latest_source}})",
+        "defaultMessage": "\ud83d\udd25 {{latest_title}} ({{latest_source}})",
         "acceptedVariables": [
-          "hotnews_latest_title",
-          "hotnews_latest_source",
-          "hotnews_latest_url",
-          "hotnews_latest_published",
-          "hotnews_keyword"
+          "latest_title",
+          "latest_source",
+          "latest_url",
+          "latest_published",
+          "keyword"
         ]
       }
     ],
     "variables": [
       {
-        "name": "hotnews_latest_title",
+        "name": "latest_title",
         "description": "Headline from the most recent article.",
         "value": ""
       },
       {
-        "name": "hotnews_latest_description",
+        "name": "latest_description",
         "description": "Summary of the most recent article.",
         "value": ""
       },
       {
-        "name": "hotnews_latest_url",
+        "name": "latest_url",
         "description": "Direct link to the latest article.",
         "value": ""
       },
       {
-        "name": "hotnews_latest_source",
+        "name": "latest_source",
         "description": "Source/publisher of the latest article.",
         "value": ""
       },
       {
-        "name": "hotnews_latest_image",
+        "name": "latest_image",
         "description": "URL to the lead image for the latest article.",
         "value": ""
       },
       {
-        "name": "hotnews_latest_published",
+        "name": "latest_published",
         "description": "ISO timestamp of when the latest article was published.",
         "value": ""
       },
       {
-        "name": "hotnews_article_count",
+        "name": "article_count",
         "description": "Number of articles returned in the latest refresh.",
         "value": 0
       },
       {
-        "name": "hotnews_recent_articles",
+        "name": "recent_articles",
         "description": "JSON payload containing the most recent headlines.",
         "value": ""
       },
       {
-        "name": "hotnews_keyword",
+        "name": "keyword",
         "description": "Keyword used for the latest refresh.",
         "value": ""
       },
       {
-        "name": "hotnews_last_updated",
+        "name": "last_updated",
         "description": "ISO timestamp of the last successful NewsAPI sync.",
         "value": ""
       }
-    ]
+    ],
+    "actions_tutorial": "---\n### Actions\nThis plugin runs on a poll interval and does not expose actions. Update settings to change coverage or refresh timing.\n---"
   }
 }
-
 ```
 
 ## hot_news/package.json
@@ -3877,7 +3979,7 @@ module.exports = HotNewsPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.2.6"
 	}
 }
 
@@ -3948,29 +4050,6 @@ class MinecraftServerPlugin extends Plugin {
 
 			if (settings?.serverHost) {
 				await this.startPolling();
-			}
-		}
-	}
-
-	async actions(config = {}) {
-		const actionList = Array.isArray(config.actions) ? config.actions : [];
-
-		for (const action of actionList) {
-			try {
-				switch (action.type) {
-					case "manual_poll":
-						await this.pollServer();
-						break;
-
-					case "test_connection":
-						await this.testConnection();
-						break;
-				}
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.addLog(
-					`[Minecraft Server] Error in action ${action.type}: ${message}`,
-				);
 			}
 		}
 	}
@@ -4098,27 +4177,6 @@ class MinecraftServerPlugin extends Plugin {
 		} catch (error) {
 			// Server is offline
 			await this.processServerData(null, null);
-		}
-	}
-
-	async testConnection() {
-		const host = this.getServerHost();
-		const port = this.getServerPort();
-
-		if (!host) {
-			await this.lumia.showToast({
-				message: "Please configure server address in settings",
-			});
-			return;
-		}
-
-		try {
-			await this.serverListPing(host, port);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.showToast({
-				message: `❌ Connection failed: ${message}`,
-			});
 		}
 	}
 
@@ -4468,23 +4526,31 @@ class MinecraftServerPlugin extends Plugin {
 		await Promise.all(updates);
 	}
 
+	_buildAlertPayload(vars = {}) {
+		return {
+			dynamic: { ...vars },
+			extraSettings: { ...vars },
+		};
+	}
+
 	async checkServerOnlineOffline(newState, oldState) {
 		if (newState.online && !oldState.online) {
 			// Server came online
+			const alertVars = {
+				online: true,
+				version: newState.version,
+				motd: newState.motd,
+				players_max: newState.playersMax,
+			};
 			await this.lumia.triggerAlert({
 				alert: ALERT_TYPES.SERVER_ONLINE,
-				extraSettings: {
-					online: true,
-					version: newState.version,
-					motd: newState.motd,
-					players_max: newState.playersMax,
-				},
+				...this._buildAlertPayload(alertVars),
 			});
 		} else if (!newState.online && oldState.online) {
 			// Server went offline
 			await this.lumia.triggerAlert({
 				alert: ALERT_TYPES.SERVER_OFFLINE,
-				extraSettings: {},
+				...this._buildAlertPayload({}),
 			});
 
 			// Clear player tracking
@@ -4507,28 +4573,30 @@ class MinecraftServerPlugin extends Plugin {
 				for (let i = 0; i < delta; i += 1) {
 					const label = "Player";
 					await this.lumia.setVariable("last_player_joined", label);
+					const alertVars = {
+						username: label,
+						last_player_joined: label,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
+					};
 					await this.lumia.triggerAlert({
 						alert: ALERT_TYPES.PLAYER_JOINED,
-						extraSettings: {
-							username: label,
-							last_player_joined: label,
-							players_online: newState.playersOnline,
-							players_max: newState.playersMax,
-						},
+						...this._buildAlertPayload(alertVars),
 					});
 				}
 			} else if (delta < 0) {
 				for (let i = 0; i < Math.abs(delta); i += 1) {
 					const label = "Player";
 					await this.lumia.setVariable("last_player_left", label);
+					const alertVars = {
+						username: label,
+						last_player_left: label,
+						players_online: newState.playersOnline,
+						players_max: newState.playersMax,
+					};
 					await this.lumia.triggerAlert({
 						alert: ALERT_TYPES.PLAYER_LEFT,
-						extraSettings: {
-							username: label,
-							last_player_left: label,
-							players_online: newState.playersOnline,
-							players_max: newState.playersMax,
-						},
+						...this._buildAlertPayload(alertVars),
 					});
 				}
 			}
@@ -4540,14 +4608,15 @@ class MinecraftServerPlugin extends Plugin {
 		for (const player of newPlayers) {
 			if (!oldPlayers.has(player)) {
 				await this.lumia.setVariable("last_player_joined", player);
+				const alertVars = {
+					username: player,
+					last_player_joined: player,
+					players_online: newState.playersOnline,
+					players_max: newState.playersMax,
+				};
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_JOINED,
-					extraSettings: {
-						username: player,
-						last_player_joined: player,
-						players_online: newState.playersOnline,
-						players_max: newState.playersMax,
-					},
+					...this._buildAlertPayload(alertVars),
 				});
 			}
 		}
@@ -4556,14 +4625,15 @@ class MinecraftServerPlugin extends Plugin {
 		for (const player of oldPlayers) {
 			if (!newPlayers.has(player)) {
 				await this.lumia.setVariable("last_player_left", player);
+				const alertVars = {
+					username: player,
+					last_player_left: player,
+					players_online: newState.playersOnline,
+					players_max: newState.playersMax,
+				};
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_LEFT,
-					extraSettings: {
-						username: player,
-						last_player_left: player,
-						players_online: newState.playersOnline,
-						players_max: newState.playersMax,
-					},
+					...this._buildAlertPayload(alertVars),
 				});
 			}
 		}
@@ -4578,13 +4648,14 @@ class MinecraftServerPlugin extends Plugin {
 		for (const milestone of milestones) {
 			if (count >= milestone && !this.milestonesReached.has(milestone)) {
 				this.milestonesReached.add(milestone);
+				const alertVars = {
+					players_online: count,
+					players_max: newState.playersMax,
+				};
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.PLAYER_MILESTONE,
-					dynamic: { value: count },
-					extraSettings: {
-						players_online: count,
-						players_max: newState.playersMax,
-					},
+					dynamic: { value: count, ...alertVars },
+					extraSettings: { ...alertVars },
 				});
 			}
 		}
@@ -4606,12 +4677,13 @@ class MinecraftServerPlugin extends Plugin {
 				!this.lastState ||
 				this.lastState.playersOnline < this.lastState.playersMax
 			) {
+				const alertVars = {
+					players_online: newState.playersOnline,
+					players_max: newState.playersMax,
+				};
 				await this.lumia.triggerAlert({
 					alert: ALERT_TYPES.SERVER_FULL,
-					extraSettings: {
-						players_online: newState.playersOnline,
-						players_max: newState.playersMax,
-					},
+					...this._buildAlertPayload(alertVars),
 				});
 			}
 		}
@@ -4707,200 +4779,197 @@ module.exports = MinecraftServerPlugin;
 
 ```
 {
-	"id": "minecraft_server",
-	"name": "Minecraft Server",
-	"version": "1.0.0",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"repository": "https://github.com/LumiaStream/minecraft-server-plugin",
-	"description": "Monitor Minecraft Java servers for status and player changes with alerts and variables.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "games",
-	"keywords": "minecraft, server, java edition, status, players, games",
-	"icon": "minecraft.png",
-	"config": {
-		"settings": [
-			{
-				"key": "serverHost",
-				"label": "Server Address",
-				"type": "text",
-				"placeholder": "play.hypixel.net or 192.168.1.100",
-				"helperText": "Minecraft server hostname or IP address",
-				"required": true
-			},
-			{
-				"key": "serverPort",
-				"label": "Server Port",
-				"type": "number",
-				"defaultValue": 25565,
-				"helperText": "Default Minecraft port is 25565",
-				"validation": {
-					"min": 1,
-					"max": 65535
-				}
-			},
-			{
-				"key": "useQuery",
-				"label": "Enable Query Protocol (Required for player tracking)",
-				"type": "checkbox",
-				"defaultValue": true,
-				"helperText": "Required for player list, join/leave alerts, map, and game type. Set enable-query=true in server.properties."
-			},
-			{
-				"key": "queryPort",
-				"label": "Query Port",
-				"type": "number",
-				"defaultValue": 25565,
-				"helperText": "Must match query.port in server.properties (usually the same as server port)",
-				"validation": {
-					"min": 1,
-					"max": 65535
-				}
-			},
-			{
-				"key": "pollInterval",
-				"label": "Poll Interval (seconds)",
-				"type": "number",
-				"defaultValue": 10,
-				"helperText": "How often to check server status (10-300 seconds)",
-				"validation": {
-					"min": 10,
-					"max": 300
-				}
-			}
-		],
-		"settings_tutorial": "---\n### 🎮 Setup Your Minecraft Server Monitoring\n1) Enter your server address (hostname or IP)\n2) Enter server port (default: 25565)\n3) **Enable Query protocol (required for player tracking)**\n   - Set `enable-query=true` in server.properties\n   - Ensure `query.port` matches the Query Port setting\n   - Enables player list, join/leave alerts, map, and game type\n4) Set poll interval (how often to check)\n5) Click **Save** to start monitoring\n---\n### ✅ Verify Connection\nUse the **Test Connection** action to verify server is reachable.\n---\n### 📊 What Gets Tracked\n- Server online/offline status\n- Current player count\n- Maximum players\n- Server version\n- MOTD (Message of the Day)\n- Player list (Query required)\n---",
-		"actions_tutorial": "---\n### 🔄 Manual Poll\nManually check server status without waiting for next scheduled poll.\n---\n### 🧪 Test Connection\nTest connection to server and display current status.\n---",
-		"actions": [
-			{
-				"type": "manual_poll",
-				"label": "Manual Poll",
-				"description": "Manually poll server status",
-				"fields": []
-			}
-		],
-		"variables": [
-			{
-				"name": "online",
-				"description": "Whether the server is online",
-				"value": false
-			},
-			{
-				"name": "players_online",
-				"description": "Number of players currently online",
-				"value": 0
-			},
-			{
-				"name": "players_max",
-				"description": "Maximum number of players allowed",
-				"value": 0
-			},
-			{
-				"name": "version",
-				"description": "Server version (e.g., 1.21.5)",
-				"value": ""
-			},
-			{
-				"name": "motd",
-				"description": "Server Message of the Day",
-				"value": ""
-			},
-			{
-				"name": "protocol_version",
-				"description": "Protocol version number",
-				"value": 0
-			},
-			{
-				"name": "player_list",
-				"description": "Comma-separated list of player names (Query only)",
-				"value": ""
-			},
-			{
-				"name": "map",
-				"description": "Current world/map name (Query only)",
-				"value": ""
-			},
-			{
-				"name": "game_type",
-				"description": "Game type (Survival, Creative, etc.) (Query only)",
-				"value": ""
-			},
-			{
-				"name": "last_player_joined",
-				"description": "Username of last player who joined",
-				"value": ""
-			},
-			{
-				"name": "last_player_left",
-				"description": "Username of last player who left",
-				"value": ""
-			}
-		],
-		"alerts": [
-			{
-				"title": "Server Online",
-				"key": "serverOnline",
-				"acceptedVariables": ["online", "version", "motd", "players_max"],
-				"defaultMessage": "Minecraft server is now online!",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Server Offline",
-				"key": "serverOffline",
-				"acceptedVariables": [],
-				"defaultMessage": "Minecraft server went offline",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Player Joined",
-				"key": "playerJoined",
-				"acceptedVariables": [
-					"username",
-					"last_player_joined",
-					"players_online",
-					"players_max"
-				],
-				"defaultMessage": "{{last_player_joined}} joined the server! ({{players_online}}/{{players_max}})",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Player Left",
-				"key": "playerLeft",
-				"acceptedVariables": [
-					"username",
-					"last_player_left",
-					"players_online",
-					"players_max"
-				],
-				"defaultMessage": "{{last_player_left}} left the server ({{players_online}}/{{players_max}})",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			}
-		]
-	}
+  "id": "minecraft_server",
+  "name": "Minecraft Server",
+  "version": "1.0.0",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "repository": "https://github.com/LumiaStream/minecraft-server-plugin",
+  "description": "Monitor Minecraft Java servers for status and player changes with alerts and variables.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "games",
+  "keywords": "minecraft, server, java edition, status, players, games",
+  "icon": "minecraft.png",
+  "config": {
+    "settings": [
+      {
+        "key": "serverHost",
+        "label": "Server Address",
+        "type": "text",
+        "placeholder": "play.hypixel.net or 192.168.1.100",
+        "helperText": "Minecraft server hostname or IP address",
+        "required": true
+      },
+      {
+        "key": "serverPort",
+        "label": "Server Port",
+        "type": "number",
+        "defaultValue": 25565,
+        "helperText": "Default Minecraft port is 25565",
+        "validation": {
+          "min": 1,
+          "max": 65535
+        }
+      },
+      {
+        "key": "useQuery",
+        "label": "Enable Query Protocol (Required for player tracking)",
+        "type": "checkbox",
+        "defaultValue": true,
+        "helperText": "Required for player list, join/leave alerts, map, and game type. Set enable-query=true in server.properties."
+      },
+      {
+        "key": "queryPort",
+        "label": "Query Port",
+        "type": "number",
+        "defaultValue": 25565,
+        "helperText": "Must match query.port in server.properties (usually the same as server port)",
+        "validation": {
+          "min": 1,
+          "max": 65535
+        }
+      },
+      {
+        "key": "pollInterval",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 10,
+        "helperText": "How often to check server status (10-300 seconds)",
+        "validation": {
+          "min": 10,
+          "max": 300
+        }
+      }
+    ],
+    "settings_tutorial": "---\n### \ud83c\udfae Setup Your Minecraft Server Monitoring\n1) Enter your server address (hostname or IP)\n2) Enter server port (default: 25565)\n3) **Enable Query protocol (required for player tracking)**\n   - Set `enable-query=true` in server.properties\n   - Ensure `query.port` matches the Query Port setting\n   - Enables player list, join/leave alerts, map, and game type\n4) Set poll interval (how often to check)\n5) Click **Save** to start monitoring\n### \ud83d\udcca What Gets Tracked\n- Server online/offline status\n- Current player count\n- Maximum players\n- Server version\n- MOTD (Message of the Day)\n- Player list (Query required)\n---",
+    "actions_tutorial": "---\n### Actions\nThis plugin runs on the poll interval and does not expose actions.\n---",
+    "actions": [],
+    "variables": [
+      {
+        "name": "online",
+        "description": "Whether the server is online",
+        "value": false
+      },
+      {
+        "name": "players_online",
+        "description": "Number of players currently online",
+        "value": 0
+      },
+      {
+        "name": "players_max",
+        "description": "Maximum number of players allowed",
+        "value": 0
+      },
+      {
+        "name": "version",
+        "description": "Server version (e.g., 1.21.5)",
+        "value": ""
+      },
+      {
+        "name": "motd",
+        "description": "Server Message of the Day",
+        "value": ""
+      },
+      {
+        "name": "protocol_version",
+        "description": "Protocol version number",
+        "value": 0
+      },
+      {
+        "name": "player_list",
+        "description": "Comma-separated list of player names (Query only)",
+        "value": ""
+      },
+      {
+        "name": "map",
+        "description": "Current world/map name (Query only)",
+        "value": ""
+      },
+      {
+        "name": "game_type",
+        "description": "Game type (Survival, Creative, etc.) (Query only)",
+        "value": ""
+      },
+      {
+        "name": "last_player_joined",
+        "description": "Username of last player who joined",
+        "value": ""
+      },
+      {
+        "name": "last_player_left",
+        "description": "Username of last player who left",
+        "value": ""
+      }
+    ],
+    "alerts": [
+      {
+        "title": "Server Online",
+        "key": "serverOnline",
+        "acceptedVariables": [
+          "online",
+          "version",
+          "motd",
+          "players_max"
+        ],
+        "defaultMessage": "Minecraft server is now online!",
+        "variationConditions": [
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Server Offline",
+        "key": "serverOffline",
+        "acceptedVariables": [],
+        "defaultMessage": "Minecraft server went offline",
+        "variationConditions": [
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Player Joined",
+        "key": "playerJoined",
+        "acceptedVariables": [
+          "username",
+          "last_player_joined",
+          "players_online",
+          "players_max"
+        ],
+        "defaultMessage": "{{last_player_joined}} joined the server! ({{players_online}}/{{players_max}})",
+        "variationConditions": [
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Player Left",
+        "key": "playerLeft",
+        "acceptedVariables": [
+          "username",
+          "last_player_left",
+          "players_online",
+          "players_max"
+        ],
+        "defaultMessage": "{{last_player_left}} left the server ({{players_online}}/{{players_max}})",
+        "variationConditions": [
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      }
+    ]
+  }
 }
-
 ```
 
 ## minecraft_server/package-lock.json
@@ -4941,7 +5010,7 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.2.6"
 	}
 }
 
@@ -5098,7 +5167,7 @@ module.exports = MockLightsPlugin;
   "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
   "main": "main.js",
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.4"
+    "@lumiastream/plugin": "^0.2.6"
   }
 }
 
@@ -5406,6 +5475,13 @@ function buildAlertVariables(state) {
 	};
 }
 
+function buildAlertPayload(vars, dynamicOverrides = {}) {
+	return {
+		dynamic: { ...vars, ...dynamicOverrides },
+		extraSettings: { ...vars },
+	};
+}
+
 function normalizeAvatar(value) {
 	if (typeof value === "string") {
 		const trimmed = value.trim();
@@ -5462,6 +5538,9 @@ class RumblePlugin extends Plugin {
 		this.streamCounter = 0;
 		this.chatState = this.createEmptyChatState();
 		this.chatHasBaseline = false;
+		this.failureCount = 0;
+		this.backoffMultiplier = 1;
+		this.offline = false;
 	}
 
 	createEmptyState() {
@@ -5553,45 +5632,11 @@ class RumblePlugin extends Plugin {
 		}
 
 		if (apiKeyChanged || intervalChanged) {
+			this.offline = false;
+			this.failureCount = 0;
+			this.backoffMultiplier = 1;
 			await this.stopPolling(false);
 			await this.startPolling({ showToast: false });
-		}
-	}
-
-	async actions(config = {}) {
-		const actionList = Array.isArray(config.actions) ? config.actions : [];
-
-		if (!actionList.length) {
-			return;
-		}
-
-		for (const action of actionList) {
-			try {
-				switch (action.type) {
-					case "manual_poll": {
-						await this.pollAPI();
-						break;
-					}
-
-					case "manual_alert": {
-						await this.lumia.triggerAlert({
-							alert: ALERT_TYPES.STREAM_START,
-							extraSettings: {
-								...buildAlertVariables(this.lastKnownState),
-								title: this.lastKnownState.title,
-								thumbnail: this.lastKnownState.thumbnail || "",
-								viewers: this.lastKnownState.viewers,
-								streamNumber: this.streamCounter,
-								streamUrl: this.lastKnownState.streamUrl,
-							},
-						});
-						break;
-					}
-				}
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.addLog(`[Rumble] Action failed: ${message}`);
-			}
 		}
 	}
 
@@ -5649,6 +5694,10 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		if (this.offline) {
+			return;
+		}
+
 		if (this.pollIntervalId) {
 			return;
 		}
@@ -5662,14 +5711,17 @@ class RumblePlugin extends Plugin {
 			this.updateSettings({ pollInterval: normalizedInterval });
 		}
 
+		const intervalSeconds = Math.min(
+			Math.max(Math.round(normalizedInterval * this.backoffMultiplier), MIN_POLL_INTERVAL),
+			MAX_POLL_INTERVAL * 4,
+		);
+
 		await this.pollAPI();
 
 		this.pollIntervalId = setInterval(() => {
 			// Avoid awaiting the result here so the timer keeps its cadence.
 			void this.pollAPI();
-		}, normalizedInterval * 1000);
-
-		await this.lumia.updateConnection(true);
+		}, intervalSeconds * 1000);
 	}
 
 	// Halt polling and let Lumia know the integration is disconnected.
@@ -5685,6 +5737,10 @@ class RumblePlugin extends Plugin {
 	// Poll the Rumble endpoint once, then delegate processing to the diff logic.
 	async pollAPI() {
 		try {
+			if (this.offline) {
+				return;
+			}
+
 			const apiKey = this.apiKey;
 			if (!apiKey) {
 				return;
@@ -5692,9 +5748,22 @@ class RumblePlugin extends Plugin {
 
 			const data = await this.fetchStreamData(apiKey);
 			await this.processStreamData(data);
+			this.failureCount = 0;
+			this.backoffMultiplier = 1;
+			await this.lumia.updateConnection(true);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
+			this.failureCount += 1;
+			if (this.failureCount >= 3) {
+				this.offline = true;
+				await this.stopPolling(false);
+			} else {
+				this.backoffMultiplier = Math.min(8, 2 ** this.failureCount);
+				await this.stopPolling(false);
+				await this.startPolling({ showToast: false });
+			}
 			await this.lumia.addLog(`[Rumble] Error polling API: ${message}`);
+			await this.lumia.updateConnection(false);
 		}
 	}
 
@@ -5754,7 +5823,7 @@ class RumblePlugin extends Plugin {
 		const hadBaseline = this.hasBaseline;
 
 		if (state.live && !previous.live) {
-			await this.handleStreamStart(data, state);
+			await this.handleStreamStart(state);
 		} else if (!state.live && previous.live) {
 			await this.handleStreamEnd(state);
 		}
@@ -5814,7 +5883,7 @@ class RumblePlugin extends Plugin {
 		setIfChanged("thumbnail", state.thumbnail, previousState?.thumbnail);
 		setIfChanged("stream_url", state.streamUrl, previousState?.streamUrl);
 		setIfChanged("video_id", state.videoId, previousState?.videoId);
-		setIfChanged("rumbles", state.rumbles, previousState?.rumbles);
+		setIfChanged("reactions", state.rumbles, previousState?.rumbles);
 		setIfChanged("followers", state.followers, previousState?.followers);
 		setIfChanged("likes", state.likes, previousState?.likes);
 		setIfChanged("dislikes", state.dislikes, previousState?.dislikes);
@@ -5846,7 +5915,7 @@ class RumblePlugin extends Plugin {
 	}
 
 	// When a stream flips from offline to live, start a new session and alert.
-	async handleStreamStart(rawData, state) {
+	async handleStreamStart(state) {
 		this.resetChatState();
 		this.sessionData = this.createEmptySession();
 		this.sessionData.streamStartTime = new Date();
@@ -5854,68 +5923,25 @@ class RumblePlugin extends Plugin {
 		this.sessionData.lastRantAmount = state.rantAmount;
 		this.streamCounter += 1;
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.STREAM_START,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				name: state.title,
 				value: this.streamCounter,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				title: state.title,
-				thumbnail: state.thumbnail,
-				viewers: state.viewers,
-				streamNumber: this.streamCounter,
-				streamUrl: state.streamUrl,
-				channelName: state.channelName,
-				startedAt: state.startedAt ? state.startedAt.toISOString() : "",
-				scheduledStart: state.scheduledStart
-					? state.scheduledStart.toISOString()
-					: "",
-				followers: state.followers,
-				likes: state.likes,
-				dislikes: state.dislikes,
-				subs: state.subs,
-				subGifts: state.subGifts,
-				rumbles: state.rumbles,
-				rants: state.rants,
-				rantAmount: roundToTwo(state.rantAmount),
-				raw: rawData,
-			},
+			}),
 		});
 	}
 
 	// Stream has gone offline: summarise the session and clean up session state.
 	async handleStreamEnd(state) {
-		const now = Date.now();
-		const startTime = this.sessionData.streamStartTime
-			? this.sessionData.streamStartTime.getTime()
-			: now;
-		const durationMs = Math.max(now - startTime, 0);
-		const durationMinutes = Math.floor(durationMs / 60000);
-
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.STREAM_END,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: state.viewers,
 				total: this.streamCounter,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				streamNumber: this.streamCounter,
-				finalViewers: state.viewers,
-				durationMinutes,
-				durationMs,
-				followers: state.followers,
-				likes: state.likes,
-				dislikes: state.dislikes,
-				subs: state.subs,
-				subGifts: state.subGifts,
-				rants: state.rants,
-				rantAmountTotal: roundToTwo(state.rantAmount),
-				streamUrl: state.streamUrl,
-				channelName: state.channelName,
-			},
+			}),
 		});
 
 		this.sessionData.streamStartTime = null;
@@ -5929,20 +5955,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.FOLLOWER,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.followers,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newFollowers: delta,
-				totalFollowers: state.followers,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -5953,20 +5973,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.LIKE,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.likes,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newLikes: delta,
-				totalLikes: state.likes,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -5977,20 +5991,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.DISLIKE,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.dislikes,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newDislikes: delta,
-				totalDislikes: state.dislikes,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -6001,20 +6009,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.SUB,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.subs,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newSubs: delta,
-				totalSubs: state.subs,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -6025,20 +6027,14 @@ class RumblePlugin extends Plugin {
 			return;
 		}
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.SUB_GIFT,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: delta,
 				total: state.subGifts,
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newGiftSubs: delta,
-				totalGiftSubs: state.subGifts,
-				streamUrl: state.streamUrl,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -6056,23 +6052,14 @@ class RumblePlugin extends Plugin {
 		this.sessionData.lastRantsCount = state.rants;
 		this.sessionData.lastRantAmount = state.rantAmount;
 
+		const alertVars = buildAlertVariables(state);
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.RANT,
 			showInEventList: true,
-			dynamic: {
+			...buildAlertPayload(alertVars, {
 				value: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
 				total: roundToTwo(state.rantAmount),
-			},
-			extraSettings: {
-				...buildAlertVariables(state),
-				newRants: Math.max(countDelta, 0),
-				rantsTotal: state.rants,
-				rantAmountIncrement: roundToTwo(amountDelta),
-				rantAmountTotal: roundToTwo(state.rantAmount),
-				streamUrl: state.streamUrl,
-				viewers: state.viewers,
-				title: state.title,
-			},
+			}),
 		});
 	}
 
@@ -6233,327 +6220,338 @@ module.exports = RumblePlugin;
 
 ```
 {
-	"id": "rumble",
-	"name": "Rumble",
-	"version": "1.0.0",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"description": "Track Rumble livestream state and engagement with alerts, variables, and chat display.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "platforms",
-	"keywords": "rumble, livestream, chat, followers, alerts",
-	"icon": "rumble.png",
-	"config": {
-		"settings": [
-			{
-				"key": "apiKey",
-				"label": "API Key",
-				"type": "text",
-				"placeholder": "Enter your Rumble livestream API key",
-				"helperText": "Copy the key parameter from your Rumble livestream API URL",
-				"required": true
-			},
-			{
-				"key": "pollInterval",
-				"label": "Poll Interval (seconds)",
-				"type": "number",
-				"defaultValue": 30,
-				"helperText": "How often to check for stream updates (10-300 seconds)"
-			}
-		],
-		"settings_tutorial": "---\n### 🔑 Get Your Rumble Livestream API URL\n1) Open https://rumble.com/account/livestream-api while logged in.\n2) Copy the full Livestream API URL shown on that page.\n3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).\n---\n### ✅ Verify Access\nClick **Save**, then trigger **Manual Poll** to confirm data is flowing.\n---\n### ⏱️ Adjust Polling\nSet a poll interval that balances freshness with API limits (10–300 seconds).\n---",
-		"actions_tutorial": "---\n### 🔁 Manual Poll\nUse this to fetch the latest livestream stats without waiting for the next scheduled poll.\n---\n### 🚨 Manual Alert\nFire the “Stream Started” alert for testing your alert/overlay setup.\n---",
-		"actions": [
-			{
-				"type": "manual_poll",
-				"label": "Manual Poll",
-				"description": "Manually trigger a single API poll",
-				"fields": []
-			},
-			{
-				"type": "manual_alert",
-				"label": "Manual Alert",
-				"description": "Manually trigger the stream started alert",
-				"fields": []
-			}
-		],
-		"variables": [
-			{
-				"name": "live",
-				"description": "Whether the Rumble stream is currently live",
-				"value": false
-			},
-			{
-				"name": "viewers",
-				"description": "Current number of concurrent viewers watching the stream",
-				"value": 0
-			},
-			{
-				"name": "joined",
-				"description": "Total viewers that have joined the stream session",
-				"value": 0
-			},
-			{
-				"name": "title",
-				"description": "Current stream title",
-				"value": ""
-			},
-			{
-				"name": "thumbnail",
-				"description": "Stream thumbnail URL",
-				"value": ""
-			},
-			{
-				"name": "stream_url",
-				"description": "Public URL to the livestream",
-				"value": ""
-			},
-			{
-				"name": "video_id",
-				"description": "Underlying Rumble video ID",
-				"value": ""
-			},
-			{
-				"name": "rumbles",
-				"description": "Current Rumble reaction count on the stream",
-				"value": 0
-			},
-			{
-				"name": "followers",
-				"description": "Current follower count of the channel",
-				"value": 0
-			},
-			{
-				"name": "likes",
-				"description": "Thumbs-up reactions on the stream",
-				"value": 0
-			},
-			{
-				"name": "dislikes",
-				"description": "Thumbs-down reactions on the stream",
-				"value": 0
-			},
-			{
-				"name": "subs",
-				"description": "Total paid subscriptions/memberships for the channel",
-				"value": 0
-			},
-			{
-				"name": "sub_gifts",
-				"description": "Gifted subscriptions/memberships received during the stream",
-				"value": 0
-			},
-			{
-				"name": "rants",
-				"description": "Number of Rants received this stream",
-				"value": 0
-			},
-			{
-				"name": "rant_amount",
-				"description": "Total value of Rants received this stream",
-				"value": 0
-			},
-			{
-				"name": "chat_members",
-				"description": "Active chat members in the livestream chat",
-				"value": 0
-			},
-			{
-				"name": "category",
-				"description": "Category assigned to the livestream",
-				"value": ""
-			},
-			{
-				"name": "description",
-				"description": "Short description of the livestream",
-				"value": ""
-			},
-			{
-				"name": "language",
-				"description": "Language reported by Rumble for the stream",
-				"value": ""
-			},
-			{
-				"name": "chat_url",
-				"description": "Direct URL to the livestream chat",
-				"value": ""
-			},
-			{
-				"name": "channel_name",
-				"description": "Rumble channel display name",
-				"value": ""
-			},
-			{
-				"name": "channel_image",
-				"description": "Avatar image URL for the Rumble channel",
-				"value": ""
-			},
-			{
-				"name": "started_at",
-				"description": "Timestamp of when the stream went live (ISO 8601)",
-				"value": ""
-			},
-			{
-				"name": "scheduled_start",
-				"description": "Scheduled start time for the stream (ISO 8601)",
-				"value": ""
-			},
-			{
-				"name": "last_polled",
-				"description": "Timestamp (ISO 8601) of the most recent Rumble API poll",
-				"value": ""
-			}
-		],
-		"alerts": [
-			{
-				"title": "Stream Started",
-				"key": "streamStarted",
-				"acceptedVariables": [
-					"live",
-					"viewers",
-					"title",
-					"stream_url",
-					"followers",
-					"likes",
-					"dislikes",
-					"subs",
-					"sub_gifts",
-					"rants",
-					"rant_amount"
-				],
-				"defaultMessage": "{{username}} has started streaming on Rumble!",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Stream Ended",
-				"key": "streamEnded",
-				"acceptedVariables": [
-					"live",
-					"viewers",
-					"title",
-					"followers",
-					"likes",
-					"dislikes",
-					"subs",
-					"sub_gifts",
-					"rants",
-					"rant_amount"
-				],
-				"defaultMessage": "{{username}} has ended their Rumble stream.",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Follower",
-				"key": "follower",
-				"acceptedVariables": ["followers", "stream_url", "title"],
-				"defaultMessage": "New followers! Total is now {{followers}}.",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Follow number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Rant",
-				"key": "rant",
-				"acceptedVariables": ["rants", "rant_amount", "viewers", "title"],
-				"defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Rant number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Like",
-				"key": "like",
-				"acceptedVariables": ["likes", "stream_url", "title"],
-				"defaultMessage": "Another thumbs-up! Likes: {{likes}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Like number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Dislike",
-				"key": "dislike",
-				"acceptedVariables": ["dislikes", "stream_url", "title"],
-				"defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Dislike number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Subscriber",
-				"key": "sub",
-				"acceptedVariables": ["subs", "stream_url", "title"],
-				"defaultMessage": "New subscription! Subs total: {{subs}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Sub number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Gift Subscription",
-				"key": "subGift",
-				"acceptedVariables": ["sub_gifts", "stream_url", "title"],
-				"defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Gift sub number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			}
-		]
-	}
+  "id": "rumble",
+  "name": "Rumble",
+  "version": "1.0.0",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "description": "Track Rumble livestream state and engagement with alerts, variables, and chat display.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "platforms",
+  "keywords": "rumble, livestream, chat, followers, alerts",
+  "icon": "rumble.png",
+  "config": {
+    "settings": [
+      {
+        "key": "apiKey",
+        "label": "API Key",
+        "type": "text",
+        "placeholder": "Enter your Rumble livestream API key",
+        "helperText": "Copy the key parameter from your Rumble livestream API URL",
+        "required": true
+      },
+      {
+        "key": "pollInterval",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 30,
+        "helperText": "How often to check for stream updates (10-300 seconds)"
+      }
+    ],
+    "settings_tutorial": "---\n### \ud83d\udd11 Get Your Rumble Livestream API URL\n1) Open https://rumble.com/account/livestream-api while logged in.\n2) Copy the full Livestream API URL shown on that page.\n3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).\n---\n### \u2705 Verify Access\nClick **Save** to start syncing data.\n---\n### \u23f1\ufe0f Adjust Polling\nSet a poll interval that balances freshness with API limits (10\u2013300 seconds).\n---",
+    "actions_tutorial": "---\n### Actions\nThis plugin runs automatically on the poll interval and does not expose actions.\n---",
+    "actions": [],
+    "variables": [
+      {
+        "name": "live",
+        "description": "Whether the Rumble stream is currently live",
+        "value": false
+      },
+      {
+        "name": "viewers",
+        "description": "Current number of concurrent viewers watching the stream",
+        "value": 0
+      },
+      {
+        "name": "joined",
+        "description": "Total viewers that have joined the stream session",
+        "value": 0
+      },
+      {
+        "name": "title",
+        "description": "Current stream title",
+        "value": ""
+      },
+      {
+        "name": "thumbnail",
+        "description": "Stream thumbnail URL",
+        "value": ""
+      },
+      {
+        "name": "stream_url",
+        "description": "Public URL to the livestream",
+        "value": ""
+      },
+      {
+        "name": "video_id",
+        "description": "Underlying Rumble video ID",
+        "value": ""
+      },
+      {
+        "name": "reactions",
+        "description": "Current reaction count on the stream",
+        "value": 0
+      },
+      {
+        "name": "followers",
+        "description": "Current follower count of the channel",
+        "value": 0
+      },
+      {
+        "name": "likes",
+        "description": "Thumbs-up reactions on the stream",
+        "value": 0
+      },
+      {
+        "name": "dislikes",
+        "description": "Thumbs-down reactions on the stream",
+        "value": 0
+      },
+      {
+        "name": "subs",
+        "description": "Total paid subscriptions/memberships for the channel",
+        "value": 0
+      },
+      {
+        "name": "sub_gifts",
+        "description": "Gifted subscriptions/memberships received during the stream",
+        "value": 0
+      },
+      {
+        "name": "rants",
+        "description": "Number of Rants received this stream",
+        "value": 0
+      },
+      {
+        "name": "rant_amount",
+        "description": "Total value of Rants received this stream",
+        "value": 0
+      },
+      {
+        "name": "chat_members",
+        "description": "Active chat members in the livestream chat",
+        "value": 0
+      },
+      {
+        "name": "category",
+        "description": "Category assigned to the livestream",
+        "value": ""
+      },
+      {
+        "name": "description",
+        "description": "Short description of the livestream",
+        "value": ""
+      },
+      {
+        "name": "language",
+        "description": "Language reported by Rumble for the stream",
+        "value": ""
+      },
+      {
+        "name": "chat_url",
+        "description": "Direct URL to the livestream chat",
+        "value": ""
+      },
+      {
+        "name": "channel_name",
+        "description": "Rumble channel display name",
+        "value": ""
+      },
+      {
+        "name": "channel_image",
+        "description": "Avatar image URL for the Rumble channel",
+        "value": ""
+      },
+      {
+        "name": "started_at",
+        "description": "Timestamp of when the stream went live (ISO 8601)",
+        "value": ""
+      },
+      {
+        "name": "scheduled_start",
+        "description": "Scheduled start time for the stream (ISO 8601)",
+        "value": ""
+      },
+      {
+        "name": "last_polled",
+        "description": "Timestamp (ISO 8601) of the most recent Rumble API poll",
+        "value": ""
+      }
+    ],
+    "alerts": [
+      {
+        "title": "Stream Started",
+        "key": "streamStarted",
+        "acceptedVariables": [
+          "live",
+          "viewers",
+          "title",
+          "stream_url",
+          "followers",
+          "likes",
+          "dislikes",
+          "subs",
+          "sub_gifts",
+          "rants",
+          "rant_amount"
+        ],
+        "defaultMessage": "{{username}} has started streaming on Rumble!",
+        "variationConditions": [
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Stream Ended",
+        "key": "streamEnded",
+        "acceptedVariables": [
+          "live",
+          "viewers",
+          "title",
+          "followers",
+          "likes",
+          "dislikes",
+          "subs",
+          "sub_gifts",
+          "rants",
+          "rant_amount"
+        ],
+        "defaultMessage": "{{username}} has ended their Rumble stream.",
+        "variationConditions": [
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Follower",
+        "key": "follower",
+        "acceptedVariables": [
+          "followers",
+          "stream_url",
+          "title"
+        ],
+        "defaultMessage": "New followers! Total is now {{followers}}.",
+        "variationConditions": [
+          {
+            "type": "GREATER_NUMBER",
+            "description": "Follow number is greater than.."
+          },
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Rant",
+        "key": "rant",
+        "acceptedVariables": [
+          "rants",
+          "rant_amount",
+          "viewers",
+          "title"
+        ],
+        "defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
+        "variationConditions": [
+          {
+            "type": "GREATER_NUMBER",
+            "description": "Rant number is greater than.."
+          },
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Like",
+        "key": "like",
+        "acceptedVariables": [
+          "likes",
+          "stream_url",
+          "title"
+        ],
+        "defaultMessage": "Another thumbs-up! Likes: {{likes}}",
+        "variationConditions": [
+          {
+            "type": "GREATER_NUMBER",
+            "description": "Like number is greater than.."
+          },
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Dislike",
+        "key": "dislike",
+        "acceptedVariables": [
+          "dislikes",
+          "stream_url",
+          "title"
+        ],
+        "defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
+        "variationConditions": [
+          {
+            "type": "GREATER_NUMBER",
+            "description": "Dislike number is greater than.."
+          },
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Subscriber",
+        "key": "sub",
+        "acceptedVariables": [
+          "subs",
+          "stream_url",
+          "title"
+        ],
+        "defaultMessage": "New subscription! Subs total: {{subs}}",
+        "variationConditions": [
+          {
+            "type": "GREATER_NUMBER",
+            "description": "Sub number is greater than.."
+          },
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      },
+      {
+        "title": "Gift Subscription",
+        "key": "subGift",
+        "acceptedVariables": [
+          "sub_gifts",
+          "stream_url",
+          "title"
+        ],
+        "defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
+        "variationConditions": [
+          {
+            "type": "GREATER_NUMBER",
+            "description": "Gift sub number is greater than.."
+          },
+          {
+            "type": "RANDOM",
+            "description": "Trigger this variation based on a percent chance."
+          }
+        ]
+      }
+    ]
+  }
 }
-
 ```
 
 ## rumble/package.json
@@ -6567,7 +6565,7 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.2.6"
 	}
 }
 

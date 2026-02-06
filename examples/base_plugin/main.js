@@ -33,7 +33,7 @@ class ShowcasePluginTemplate extends Plugin {
 		const actions = Array.isArray(config.actions) ? config.actions : [];
 		for (const action of actions) {
 			if (action?.type === "trigger_alert") {
-				await this._triggerSampleAlert(action.data);
+				await this._triggerSampleAlert(action.value);
 			}
 		}
 	}

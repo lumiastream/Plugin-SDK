@@ -168,6 +168,26 @@ export interface PluginActionDefinition {
 	fields: PluginActionField[];
 }
 
+export type PluginActionPayloadValue =
+	| Record<string, unknown>
+	| string
+	| number
+	| boolean
+	| Array<unknown>
+	| null;
+
+export interface PluginActionPayload {
+	type: string;
+	value?: PluginActionPayloadValue;
+	id?: string;
+	on?: boolean;
+	base?: string;
+	delay?: number;
+	variables?: Record<string, unknown>;
+	args?: unknown;
+	[key: string]: unknown;
+}
+
 export interface PluginVariableFunctionDefinition {
 	key: string;
 	label?: string;
@@ -411,7 +431,7 @@ export interface PluginRuntime {
 	onload(): Promise<void>;
 	onunload(): Promise<void>;
 	onupdate?(oldVersion: string, newVersion: string): Promise<void>;
-	actions?(config: { actions: any[]; extraSettings?: any }): Promise<void>;
+	actions?(config: { actions: PluginActionPayload[]; extraSettings?: Record<string, unknown> }): Promise<void>;
 	variableFunction?(
 		config: PluginVariableFunctionContext,
 	): Promise<string | PluginVariableFunctionResult | undefined>;

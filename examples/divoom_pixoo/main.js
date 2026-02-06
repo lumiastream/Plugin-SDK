@@ -41,7 +41,7 @@ class DivoomPixooPlugin extends Plugin {
 		const actionList = Array.isArray(config.actions) ? config.actions : [];
 
 		for (const action of actionList) {
-			const params = action?.value ?? action?.data ?? {};
+			const params = action?.value ?? {};
 
 			try {
 				switch (action.type) {

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const path = require("path");
 const fs = require("fs");
+const { spawnSync } = require("child_process");
 const {
 	readManifest,
 	validateManifest,
@@ -64,6 +65,21 @@ async function main() {
 	}
 
 	try {
+		const packageJsonPath = path.join(pluginDir, "package.json");
+		if (fs.existsSync(packageJsonPath)) {
+			console.log("• Running npm install...");
+			const result = spawnSync("npm", ["install"], {
+				cwd: pluginDir,
+				stdio: "inherit",
+			});
+			if (result.status !== 0) {
+				console.error("✖ npm install failed. Aborting build.");
+				process.exit(1);
+			}
+		} else {
+			console.log("• No package.json found; skipping npm install.");
+		}
+
 		const { manifest } = await readManifest(pluginDir);
 		const errors = validateManifest(manifest);
 		if (errors.length) {
@@ -72,10 +88,30 @@ async function main() {
 			process.exit(1);
 		}
 
+		const entryFile =
+			typeof manifest.main === "string" && manifest.main.trim()
+				? manifest.main.trim()
+				: "main.js";
+		const entryPath = path.resolve(pluginDir, entryFile);
+		if (!fs.existsSync(entryPath)) {
+			console.error(`✖ Entry file not found: ${entryFile}`);
+			process.exit(1);
+		}
+
+		console.log(`• Running syntax check on ${entryFile}...`);
+		const checkResult = spawnSync("node", ["--check", entryPath], {
+			cwd: pluginDir,
+			stdio: "inherit",
+		});
+		if (checkResult.status !== 0) {
+			console.error("✖ Syntax check failed. Aborting build.");
+			process.exit(1);
+		}
+
 		const files = await collectFiles(pluginDir);
 		if (!files.length) {
 			console.error(
-				"✖ No files found to package (did you point to the plugin root?)"
+				"✖ No files found to package (did you point to the plugin root?)",
 			);
 			process.exit(1);
 		}

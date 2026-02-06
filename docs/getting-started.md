@@ -113,9 +113,9 @@ export default class MyFirstPlugin extends Plugin {
 	async actions(config: { actions: any[] }): Promise<void> {
 		for (const action of config.actions) {
 			if (action.type === "trigger_alert") {
-				const username = action.data?.username ?? "Viewer";
-				const message =
-					action.data?.message ?? this.settings.message ?? "Hello!";
+				const params = action?.value ?? action?.data ?? {};
+				const username = params?.username ?? "Viewer";
+				const message = params?.message ?? this.settings.message ?? "Hello!";
 
 				await this.lumia.triggerAlert({
 					alert: "custom-hello",
@@ -383,7 +383,7 @@ export default class EventPlugin extends Plugin {
 		for (const action of config.actions) {
 			switch (action.type) {
 				case "manual_trigger":
-					await this.handleManualTrigger(action.data);
+					await this.handleManualTrigger(action?.value ?? action?.data ?? {});
 					break;
 				case "reset_counters":
 					await this.resetCounters();
