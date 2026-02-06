@@ -113,9 +113,9 @@ export default class MyFirstPlugin extends Plugin {
 	async actions(config: { actions: any[] }): Promise<void> {
 		for (const action of config.actions) {
 			if (action.type === "trigger_alert") {
-				const username = action.data?.username ?? "Viewer";
-				const message =
-					action.data?.message ?? this.settings.message ?? "Hello!";
+				const params = action?.value ?? action?.data ?? {};
+				const username = params?.username ?? "Viewer";
+				const message = params?.message ?? this.settings.message ?? "Hello!";
 
 				await this.lumia.triggerAlert({
 					alert: "custom-hello",
@@ -191,6 +191,34 @@ const value = this.lumia.getVariable("my_variable");
 const current = Number(this.lumia.getVariable("counter") ?? 0);
 await this.lumia.setVariable("counter", current + 1);
 ```
+
+### HTTP Requests and Timeouts
+
+The plugin runtime does **not** support `AbortController` / `AbortSignal` in `fetch`. Passing a `signal` option will throw:
+
+```
+Failed to construct 'Request': member signal is not of type AbortSignal.
+```
+
+Use a timeout wrapper instead:
+
+```js
+const timeoutMs = 60000;
+const timeoutPromise = new Promise((_, reject) => {
+	setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
+});
+
+const response = await Promise.race([fetch(url, options), timeoutPromise]);
+if (!response || !response.ok) {
+	const text = response ? await response.text() : "";
+	throw new Error(
+		`Request failed (${response?.status ?? "unknown"}): ${text || response?.statusText || "No response"}`,
+	);
+}
+const data = await response.json();
+```
+
+Keep timeouts reasonable and avoid aggressive retries.
 
 ### Alerts
 
@@ -355,7 +383,7 @@ export default class EventPlugin extends Plugin {
 		for (const action of config.actions) {
 			switch (action.type) {
 				case "manual_trigger":
-					await this.handleManualTrigger(action.data);
+					await this.handleManualTrigger(action?.value ?? action?.data ?? {});
 					break;
 				case "reset_counters":
 					await this.resetCounters();

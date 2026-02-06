@@ -21,6 +21,8 @@ export type {
   PluginActionDefinition,
   PluginActionField,
   PluginActionFieldOption,
+  PluginActionPayload,
+  PluginActionPayloadValue,
   PluginVariableFunctionDefinition,
   PluginVariableFunctionContext,
   PluginVariableFunctionResult,
