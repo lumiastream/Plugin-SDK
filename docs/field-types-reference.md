@@ -4,7 +4,11 @@ This document provides a quick reference for all available field types that can 
 
 ## Overview
 
-Both `settings` and `actions` in your plugin manifest support various field types for collecting user input. All types support common properties like `key`, `label`, `placeholder`, `helperText`, `defaultValue`, and `required`.
+Both `settings` and `actions` in your plugin manifest support various field types for collecting user input.
+
+Property support is not identical between settings and actions:
+- Settings support `disabled` and richer string-length validation (`minLength`/`maxLength`).
+- Action fields support runtime-oriented options such as `allowVariables`, `dynamicOptions`, and multi-select via `multiple`.
 
 ## Supported Field Types
 
@@ -26,8 +30,9 @@ Single-line text input with optional variable support (set `allowVariables: true
 **Properties:**
 - `placeholder` - Placeholder text
 - `validation.pattern` - Regex pattern for validation
-- `validation.minLength` - Minimum character length
-- `validation.maxLength` - Maximum character length
+- `validation.minLength` - Minimum character length (settings)
+- `validation.maxLength` - Maximum character length (settings)
+- `allowVariables` - Enable template variables for action fields
 
 ---
 
@@ -45,7 +50,7 @@ Email address input with built-in validation and optional variable support (set 
 ```
 
 **Properties:**
-- Same as `text` with automatic email validation
+- Same as `text` with automatic email input validation
 
 ---
 
@@ -63,7 +68,7 @@ URL input with built-in validation and optional variable support (set `allowVari
 ```
 
 **Properties:**
-- Same as `text` with automatic URL validation
+- Same as `text` with automatic URL input validation
 
 ---
 
@@ -83,6 +88,7 @@ Password input with hidden characters.
 
 **Properties:**
 - Same as `text` but displays hidden characters
+- Actions do not currently expose `password` fields
 
 ---
 
@@ -103,8 +109,10 @@ Multi-line text input with optional variable support (set `allowVariables: true`
 **Properties:**
 - `rows` - Number of visible text rows (default: 4)
 - `placeholder` - Placeholder text
-- `validation.minLength` - Minimum character length
-- `validation.maxLength` - Maximum character length
+- `validation.pattern` - Regex pattern for validation
+- `validation.minLength` - Minimum character length (settings)
+- `validation.maxLength` - Maximum character length (settings)
+- `allowVariables` - Enable template variables for action fields
 
 ---
 
@@ -146,8 +154,11 @@ Numeric input with optional constraints.
 ```
 
 **Properties:**
-- `validation.min` - Minimum value
-- `validation.max` - Maximum value
+- `validation.min` - Minimum value (settings and actions)
+- `validation.max` - Maximum value (settings and actions)
+- `min` - Minimum value (action fields)
+- `max` - Maximum value (action fields)
+- `allowVariables` - Enable template variables for action fields
 
 ---
 
@@ -167,9 +178,11 @@ Numeric slider input with visual feedback.
 ```
 
 **Properties:**
-- `min` - Minimum value (default: 0)
-- `max` - Maximum value (default: 100)
-- `step` - Increment step (default: 1)
+- `min` - Minimum value (action fields)
+- `max` - Maximum value (action fields)
+- `step` - Increment step (action fields)
+- `validation.min` - Minimum value (settings and actions)
+- `validation.max` - Maximum value (settings and actions)
 
 ---
 
@@ -194,6 +207,10 @@ Dropdown selection from predefined options.
 
 **Properties:**
 - `options` - Array of objects with `label` and `value` properties (required)
+- `allowTyping` - Allow typing a custom value in addition to dropdown options (settings and actions)
+- `multiple` - Allow selecting multiple options; value becomes an array (action fields)
+- `allowVariables` - Enable template variable insertion (action fields)
+- `dynamicOptions` - Allow runtime option updates from plugin code (action fields)
 
 ---
 
@@ -217,7 +234,7 @@ Boolean checkbox input.
 ---
 
 #### `switch` / `toggle`
-Toggle switch for boolean values.
+Toggle switch for boolean values (`toggle` in settings, `switch` in actions).
 
 ```json
 {
@@ -231,7 +248,7 @@ Toggle switch for boolean values.
 
 **Properties:**
 - Accepts boolean values (`true`/`false`)
-- `switch` and `toggle` are interchangeable
+- Use `toggle` for settings and `switch` for actions
 
 ---
 
@@ -271,6 +288,7 @@ File path input with file browser dialog.
 **Properties:**
 - Opens native file picker dialog
 - Returns absolute file path as string
+- `allowVariables` - Enable template variable insertion for action fields
 
 ---
 
@@ -281,20 +299,20 @@ File path input with file browser dialog.
 | `text` | ✅ | ✅ | With `allowVariables` | pattern, length | Single-line input |
 | `email` | ✅ | ✅ | With `allowVariables` | auto | Email validation |
 | `url` | ✅ | ✅ | With `allowVariables` | auto | URL validation |
-| `password` | ✅ | ❌ | ❌ | pattern, length | Hidden characters |
-| `textarea` | ✅ | ✅ | With `allowVariables` | length | Multi-line, rows configurable |
+| `password` | ✅ | ❌ | ❌ | pattern, length (settings) | Hidden characters |
+| `textarea` | ✅ | ✅ | With `allowVariables` | pattern, length (settings) | Multi-line, rows configurable |
 | `text_list` | ✅ | ❌ | ❌ | - | Array of strings |
-| `number` | ✅ | ✅ | With `allowVariables` | min, max | Numeric input |
-| `slider` | ✅ | ✅ | ❌ | min, max, step | Visual slider |
-| `select` | ✅ | ✅ | With `allowVariables` | - | Dropdown menu |
+| `number` | ✅ | ✅ | With `allowVariables` | min, max | Numeric input (`min`/`max` top-level on actions) |
+| `slider` | ✅ | ✅ | ❌ | min, max | Visual slider (`min`/`max`/`step` top-level on actions) |
+| `select` | ✅ | ✅ | With `allowVariables` | - | Dropdown, supports `allowTyping`; `multiple`/`dynamicOptions` on actions |
 | `checkbox` | ✅ | ✅ | ❌ | - | Boolean checkbox |
-| `switch`/`toggle` | ✅ | ✅ | ❌ | - | Toggle switch |
+| `switch`/`toggle` | ✅ | ✅ | ❌ | - | `toggle` in settings, `switch` in actions |
 | `color` | ✅ | ✅ | ❌ | - | Color picker |
 | `file` | ✅ | ✅ | With `allowVariables` | - | File browser |
 
 ## Common Properties
 
-All field types support these common properties:
+### Setting Fields (`config.settings`)
 
 ```json
 {
@@ -304,31 +322,73 @@ All field types support these common properties:
   "placeholder": "...",        // Optional: Placeholder text
   "helperText": "...",         // Optional: Help text below field
   "defaultValue": null,        // Optional: Default value (string, number, boolean, or string[])
-  "required": false            // Optional: Whether field is required
+  "required": false,           // Optional: Whether field is required
+  "disabled": false,           // Optional: Render read-only in UI
+  "allowTyping": false,        // Optional: Select fields only
+  "rows": 4,                   // Optional: Textarea only
+  "options": [],               // Optional: Select fields
+  "validation": {              // Optional
+    "pattern": "^[a-z]+$",
+    "min": 0,
+    "max": 100,
+    "minLength": 1,
+    "maxLength": 100
+  }
+}
+```
+
+### Action Fields (`config.actions[].fields`)
+
+```json
+{
+  "key": "fieldKey",           // Required: Unique identifier for the field
+  "label": "Field Label",       // Required: Display label
+  "type": "text",              // Required: Field type
+  "placeholder": "...",        // Optional: Placeholder text
+  "helperText": "...",         // Optional: Help text below field
+  "defaultValue": null,        // Optional: Any JSON value
+  "required": false,           // Optional: Whether field is required
+  "allowVariables": false,     // Optional: Enable {{variable}} insertion
+  "dynamicOptions": false,     // Optional: Select fields that receive runtime options
+  "allowTyping": false,        // Optional: Select fields
+  "multiple": false,           // Optional: Select fields
+  "rows": 4,                   // Optional: Textarea only
+  "min": 0,                    // Optional: Numeric and slider style fields
+  "max": 100,                  // Optional: Numeric and slider style fields
+  "step": 1,                   // Optional: Slider/number increment
+  "options": [],               // Optional: Select fields
+  "validation": {              // Optional
+    "pattern": "^[a-z]+$",
+    "min": 0,
+    "max": 100
+  }
 }
 ```
 
 ## Validation Options
 
-Different field types support different validation options:
+Validation shape differs between settings and action fields.
 
-### Text-based Fields (text, email, url, password, textarea)
+### Settings Validation (`config.settings[].validation`)
 ```json
 {
   "validation": {
     "pattern": "^[a-zA-Z0-9]+$",  // Regex pattern
+    "min": 0,                      // Numeric minimum
+    "max": 100,                    // Numeric maximum
     "minLength": 5,                // Minimum character length
     "maxLength": 50                // Maximum character length
   }
 }
 ```
 
-### Numeric Fields (number, slider)
+### Action Validation (`config.actions[].fields[].validation`)
 ```json
 {
   "validation": {
-    "min": 0,      // Minimum value
-    "max": 100     // Maximum value
+    "pattern": "^[a-zA-Z0-9]+$",  // Regex pattern
+    "min": 0,                      // Numeric minimum
+    "max": 100                     // Numeric maximum
   }
 }
 ```

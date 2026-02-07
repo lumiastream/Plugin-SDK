@@ -462,6 +462,23 @@ Action fields support the following input types:
 
 Set `allowTyping` to let users type custom values in addition to the provided options. The dropdown list still appears as suggestions.
 
+Set `multiple: true` on `select` fields to allow multi-select values. Use an array for `defaultValue` when `multiple` is enabled.
+
+```json
+{
+	"key": "modes",
+	"label": "Modes",
+	"type": "select",
+	"multiple": true,
+	"defaultValue": ["normal", "fast"],
+	"options": [
+		{ "label": "Normal", "value": "normal" },
+		{ "label": "Fast", "value": "fast" },
+		{ "label": "Slow", "value": "slow" }
+	]
+}
+```
+
 Set `allowVariables: true` to enable template variables (e.g., `{{username}}`) for a specific action field. When omitted, variables are not enabled—even for `select` fields with `allowTyping`.
 
 **Checkbox**
