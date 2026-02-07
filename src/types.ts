@@ -135,6 +135,10 @@ export interface PluginActionField {
 	step?: number;
 	rows?: number;
 	allowTyping?: boolean;
+	/**
+	 * When true, allows selecting multiple values (select fields only).
+	 */
+	multiple?: boolean;
 	defaultValue?: any;
 	/**
 	 * When true, allow template variables (e.g. {{username}}) in this field.
