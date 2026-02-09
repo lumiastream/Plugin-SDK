@@ -29,6 +29,45 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function validateOverlayBundleEntries(value: unknown): string[] {
+  const errors: string[] = [];
+  if (!Array.isArray(value)) {
+    return ["Manifest bundle.overlays must be an array of overlay IDs or shared download URLs"];
+  }
+
+  value.forEach((entry, index) => {
+    if (!isNonEmptyString(entry)) {
+      errors.push(`Manifest bundle.overlays entry at index ${index} must be a non-empty overlay ID or URL string`);
+    }
+  });
+
+  return errors;
+}
+
+function validateCommandBundleEntries(value: unknown): string[] {
+  const errors: string[] = [];
+  const hasSupportedExtension = (filePath: string): boolean => {
+    const normalized = filePath.trim().toLowerCase();
+    return normalized.endsWith(".lumia") || normalized.endsWith(".lumiastream");
+  };
+
+  if (!Array.isArray(value)) {
+    return ["Manifest bundle.commands must be an array of command file paths"];
+  }
+
+  value.forEach((entry, index) => {
+    if (!isNonEmptyString(entry)) {
+      errors.push(`Manifest bundle.commands entry at index ${index} must be a non-empty file path string`);
+      return;
+    }
+    if (!hasSupportedExtension(entry)) {
+      errors.push(`Manifest bundle.commands entry at index ${index} must reference a .lumia or .lumiastream file`);
+    }
+  });
+
+  return errors;
+}
+
 /**
  * Perform lightweight validation on a plugin manifest definition.
  * Returns an array of error strings. An empty array indicates the
@@ -70,6 +109,22 @@ export function validatePluginManifest(manifest: PartialManifest | null | undefi
       const value = config[key];
       if (value !== undefined && !Array.isArray(value)) {
         errors.push(message);
+      }
+    }
+  }
+
+  const bundle = manifest.bundle ?? manifest.bundles;
+  if (bundle !== undefined) {
+    if (!isPlainObject(bundle)) {
+      errors.push("Manifest bundle must be an object when provided");
+    } else {
+      const commandSection = bundle.commands;
+      const overlaysSection = bundle.overlays;
+      if (commandSection !== undefined) {
+        errors.push(...validateCommandBundleEntries(commandSection));
+      }
+      if (overlaysSection !== undefined) {
+        errors.push(...validateOverlayBundleEntries(overlaysSection));
       }
     }
   }

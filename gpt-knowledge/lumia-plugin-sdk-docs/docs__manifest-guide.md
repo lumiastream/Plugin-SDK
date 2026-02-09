@@ -44,7 +44,36 @@ The `manifest.json` file is the heart of your Lumia Stream plugin. It defines me
 - **`license`** (string): License type (e.g., "MIT", "GPL-3.0").
 - **`keywords`** (string): Comma separated list of keywords for search.
 - **`icon`** (string): Plugin icon filename (PNG recommended).
-- **`changelog`** (string): Markdown changelog content.
+- **`changelog`** (string): Markdown changelog content or a relative path to a `.md` file in the plugin package.
+- **`bundle`** (object): Optional install-time bundle for commands and overlays.
+
+### Bundle Content (Optional)
+
+Use `bundle` when you want a plugin to install ready-made commands or overlays along with the plugin itself.
+
+```json
+{
+	"id": "my_plugin",
+	"name": "My Plugin",
+	"version": "1.0.0",
+	"author": "You",
+	"description": "Example",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"config": { "settings": [] },
+	"bundle": {
+		"commands": ["bundle/commands/hype_command.lumia", "bundle/commands/wow_command.lumia"],
+		"overlays": ["overlay-marketplace-upload-id", "another-overlay-upload-id"]
+	}
+}
+```
+
+`bundle.commands` must be an array of exported command file paths (`.lumia` / `.lumiastream`).
+
+`bundle.overlays` must be an array of marketplace upload IDs or shared download URLs.
+Example URL format: `https://api.lumiastream.com/shared/download/<overlay-id>`.
+
+Each ID must reference a public + approved marketplace overlay.
 
 ## Plugin Categories
 
@@ -151,9 +180,9 @@ Settings create a configuration UI for users:
 
 Avoid adding settings that exist only for testing or debugging. Keep settings user-facing and essential.
 
-If you provide `settings_tutorial` (markdown), it renders as a setup guide in the auth screen.
+If you provide `settings_tutorial` (markdown or a relative `.md` file path), it renders as a setup guide in the auth screen.
 
-To provide a tutorial that is specific to actions, use `actions_tutorial`. When present, it renders in the Actions editor.
+To provide a tutorial that is specific to actions, use `actions_tutorial` (markdown or a relative `.md` file path). When present, it renders in the Actions editor.
 
 Populate both tutorials with clear, step-by-step instructions that a first-time user can follow without guesswork.
 

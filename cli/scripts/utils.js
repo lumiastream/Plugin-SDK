@@ -88,7 +88,6 @@ async function collectFiles(pluginDir, ignore = DEFAULT_IGNORE) {
 
 			// Skip bundled Lumia packages in node_modules
 			if (
-				relative === "node_modules/@lumiastream" ||
 				relative.startsWith("node_modules/@lumiastream/plugin") ||
 				relative.startsWith("node_modules/lumia-plugin")
 			) {
