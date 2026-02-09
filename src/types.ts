@@ -76,6 +76,17 @@ export interface PluginDependency {
 	optional?: boolean;
 }
 
+export interface PluginBundleConfig {
+	/**
+	 * Bundled exported command files (`.lumia` / `.lumiastream`).
+	 */
+	commands?: string[];
+	/**
+	 * Bundled marketplace overlay upload IDs or shared download URLs.
+	 */
+	overlays?: string[];
+}
+
 export interface PluginSetting {
 	key: string;
 	label: string;
@@ -251,7 +262,13 @@ export interface PluginOAuthConfig {
 
 export interface PluginIntegrationConfig {
 	settings?: PluginSetting[];
+	/**
+	 * Markdown content or a relative `.md` path resolved at install time.
+	 */
 	settings_tutorial?: string;
+	/**
+	 * Markdown content or a relative `.md` path resolved at install time.
+	 */
 	actions_tutorial?: string;
 	variables?: PluginVariableDefinition[];
 	alerts?: PluginAlertDefinition[];
@@ -275,7 +292,18 @@ export interface PluginManifest {
 	lumiaVersion: string;
 	category: PluginCategory | string;
 	icon?: string;
+	/**
+	 * Markdown content or a relative `.md` path resolved at install time.
+	 */
 	changelog?: string;
+	/**
+	 * Optional install-time content bundle (commands/overlays).
+	 */
+	bundle?: PluginBundleConfig;
+	/**
+	 * Alias for `bundle`.
+	 */
+	bundles?: PluginBundleConfig;
 	config: PluginIntegrationConfig;
 }
 

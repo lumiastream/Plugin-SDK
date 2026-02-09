@@ -11,6 +11,7 @@ export type {
   PluginConfig,
   PluginStats,
   PluginDependency,
+  PluginBundleConfig,
   PluginFile,
   PluginPackage,
   PluginVariableDefinition,
