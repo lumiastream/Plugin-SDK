@@ -68,6 +68,19 @@ Every plugin requires a `manifest.json` file that describes your plugin, its met
 - `onsettingsupdate(settings, previousSettings)` – called whenever settings change.
 - `actions(config)` – handle custom actions invoked from Lumia automations.  
   **Note:** action parameters are provided via `action.value`. Use `const params = action?.value ?? {};`.
+- `searchLights(config)` – optional hook for lights plugins to return discoverable devices in the auth UI.
+- `addLight(config)` – optional hook for manual light add flows; return the updated light list.
+- `searchThemes(config)` – optional hook for lights plugins to return Studio theme options (array or `{ scenes|effects|presets }` object).
+- `onLightChange(config)` – optional runtime hook for light updates and Studio theme executions (`config.rawConfig.theme` when invoked from themes).
+
+## Lights And Studio Themes
+
+If your plugin is a lights integration:
+
+- implement `searchLights` and/or `addLight` for light selection in auth
+- implement `onLightChange` to apply runtime light changes
+- implement `searchThemes` to surface mode/scene options in Studio themes
+- set `config.themeConfig` in `manifest.json` to control which Studio bucket (`scenes`, `effects`, or `presets`) Lumia should use
 
 ## Lumia API Highlights
 

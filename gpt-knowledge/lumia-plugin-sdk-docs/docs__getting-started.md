@@ -195,6 +195,17 @@ npm run build
 
 The compiled JavaScript will be in the `dist` folder. Your plugin is ready to load in the Lumia Stream app.
 
+## Lights Plugin Hooks (Optional)
+
+If your plugin is a lights integration, implement these runtime hooks as needed:
+
+- `searchLights()` to discover devices for auth UI selection
+- `addLight(data)` for manual add flows
+- `onLightChange(config)` to apply color/brightness/power updates
+- `searchThemes()` to expose Studio theme options (scenes/effects/presets)
+
+When Studio themes trigger your plugin, the selected theme value is available in `config.rawConfig.theme` inside `onLightChange`.
+
 ## Working with the Lumia API
 
 ### Variables

@@ -134,8 +134,34 @@ Runtime hooks for lights plugins:
 - Implement `searchLights` to return an array of discovered lights for the UI to save.
 - Implement `addLight` to handle manual-add requests and return the updated array.
 - Implement `onLightChange` to receive color/brightness/power updates for your lights.
+- Implement `searchThemes` to return Studio theme options (for example effects/modes).
 
 Note: Selection and persistence are handled by the PluginAuth UI; plugins should not call `registerLights`/`updateChosenLights`.
+
+### Studio Theme Configuration (optional for lights plugins)
+
+Use `config.themeConfig` when your lights plugin supports Studio theme scenes/effects/presets.
+
+```json
+{
+	"config": {
+		"themeConfig": {
+			"keyForThemes": "effects",
+			"hasEffects": true,
+			"sceneType": "light-theme",
+			"displayKey": "name",
+			"showIndividualLights": true
+		}
+	}
+}
+```
+
+Theme runtime contract:
+
+- `searchThemes` should return either:
+  - an array (stored under `themeConfig.keyForThemes`, default `scenes`)
+  - or an object containing one or more of `scenes`, `effects`, `presets`
+- when a Studio theme is executed, selected theme values are provided to `onLightChange` in `config.rawConfig.theme`
 
 ## Configuration
 

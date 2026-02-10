@@ -90,6 +90,11 @@ export abstract class Plugin {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async searchThemes(_query?: Record<string, any>): Promise<any> {
+    return [];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async addLight(_data: Record<string, any>): Promise<any> {
     return null;
   }

@@ -18,7 +18,11 @@ Store any dependencies, initialise locals, and always pass the parameters to the
 - **`onunload(): Promise<void>`** – invoked when the plugin is disabled. Clean up timers, close sockets, and release resources.
 - **`onupdate(oldVersion: string, newVersion: string): Promise<void>`** – triggered after a version upgrade. Optional.
 - **`onsettingsupdate(settings, previousSettings): Promise<void>`** – called after settings change. Optional.
-- **`onLightChange(config): Promise<void>`** – optional hook fired when Lumia sends a color/brightness update for lights owned by your plugin (`config` includes `brand`, `lights`, `color`, `brightness`, `power`, `transition`, `rawConfig`).
+- **`searchLights(config?): Promise<any>`** – optional discovery hook for lights plugins. Return a list of devices for the auth UI.
+- **`addLight(config): Promise<any>`** – optional manual-add hook for lights plugins. Return the updated list.
+- **`searchThemes(config?): Promise<any>`** – optional Studio theme discovery hook for lights plugins. Return an array or an object containing `scenes`, `effects`, and/or `presets`.
+- **`onLightChange(config): Promise<void>`** – optional hook fired when Lumia sends color/brightness updates for lights owned by your plugin (`config` includes `brand`, `lights`, `color`, `brightness`, `power`, `transition`, `rawConfig`).  
+  For Studio theme-triggered updates, selected theme values are available in `config.rawConfig.theme`.
 
 ### Action Handling
 
@@ -95,6 +99,7 @@ interface PluginVariableFunctionResult {
 - **`sendColor(options: { lights?: string[]; color: string | any; power?: boolean; brightness?: number; transition?: number }): Promise<boolean>`** – control connected lighting devices.
 - **`getLights(): Promise<any>`** – retrieve current light information.
 - _Light management note_: Lights are saved via the PluginAuth UI. Implement `searchLights`/`addLight` to return discovered devices for the UI, and handle runtime updates in `onLightChange`; plugins should not mutate light state directly.
+- _Studio themes note_: If your plugin exposes themes/modes, implement `searchThemes` and set `config.themeConfig` in the manifest so Lumia knows where to place returned options (`scenes`, `effects`, `presets`).
 
 ### Audio & Speech
 
