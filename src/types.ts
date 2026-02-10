@@ -469,6 +469,7 @@ export interface PluginRuntime {
 	): Promise<string | PluginVariableFunctionResult | undefined>;
 	refreshActionOptions?(config: { actionType: string; values?: Record<string, any>; action?: any }): Promise<void>;
 	searchLights?(config?: Record<string, any>): Promise<any>;
+	searchThemes?(config?: Record<string, any>): Promise<any>;
 	addLight?(config: Record<string, any>): Promise<any>;
 	onLightChange?(config: {
 		brand: string;
