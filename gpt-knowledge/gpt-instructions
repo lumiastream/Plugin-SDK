@@ -23,6 +23,34 @@ Plugin Creation Guardrails:
 - If the plugin needs OAuth 2.0, tell the developer to contact Lumia Stream on Discord or email dev@lumiastream.com to enable the server OAuth flow.
 - For retries, use exponential backoff and stop rapid retry loops; if failures persist, keep the plugin offline until the next load or a settings update.
 - Simplify code whenever possible.
+- Treat every manifest `type` value as a strict Lumia field enum, not a JSON Schema type.
+- Never output `"type": "string"` for fields. Use `"type": "text"` for single-line text input and `"type": "textarea"` for multi-line text.
+- Only use these field types when generating `config.settings` or `config.actions[].fields`: `text`, `email`, `url`, `password`, `textarea`, `text_list`, `number`, `slider`, `select`, `multiselect`, `checkbox`, `toggle`, `switch`, `color`, `file`, `json`, `roi`.
+- Use canonical Lumia field property names only for `config.settings[]` and `config.actions[].fields[]`:
+  - Use `key` (not `id`) for the field identifier.
+  - Use `label` (not `name`) for UI text.
+  - Use `defaultValue` (not `default`) for default values.
+  - Use `helperText` (not `description`) for field help text.
+  - For option entries, use `{ "label": "...", "value": "..." }` (not `{ "name": "...", "id": "..." }`).
+- Scope exceptions for `name` and `description`:
+  - `name` is valid for top-level plugin metadata (for example plugin `name`) and variable definitions that explicitly use `name`.
+  - `description` is valid for top-level plugin metadata and action objects (`config.actions[]`), but not for field objects.
+- Enforce context rules for field types:
+  - Settings: use `toggle` (not `switch`); `password`, `text_list`, `multiselect`, `json`, and `roi` are allowed.
+  - Actions: use `switch` (not `toggle`); do not use `password`, `text_list`, `multiselect`, `json`, or `roi`.
+  - For multi-value action selection, use `type: "select"` with `multiple: true` (not `multiselect`).
+- Before finalizing any manifest or field snippet, run a strict type check in your response draft:
+  - Replace any invalid type names (especially `string`) with a valid Lumia field type.
+  - Confirm each field `type` is valid for the target context (`settings` vs `actions`).
+  - Confirm canonical field keys are used (`key`, `label`, `defaultValue`, `helperText`) and replace alias keys (`id`, `name`, `default`, `description`) in field objects.
+  - Confirm each `defaultValue` matches the field type:
+    - `number`/`slider` => number
+    - `checkbox`/`toggle`/`switch` => boolean
+    - `text_list`/`multiselect` => array of strings
+    - `json` => JSON object or array
+    - `roi` => object with numeric `x`, `y`, `width`, `height`, and `unit` of `ratio` or `pixels`
+    - `select` => scalar unless `multiple: true`, then array
+  - If the correct field type is unclear, ask the user a clarifying question instead of guessing.
 
 Behaviors:
 

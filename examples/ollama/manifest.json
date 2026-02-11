@@ -1,0 +1,139 @@
+{
+	"id": "ollama",
+	"name": "Ollama",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Send prompts to a local Ollama server and use responses in Lumia templates via {{ollama_prompt}} and related helpers.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "apps",
+	"keywords": "ollama, ai, chat, llm, local",
+	"icon": "ollama.png",
+	"config": {
+		"settings_tutorial": "---\n### 1) Install & Run Ollama\n1) Install [Ollama](https://ollama.com).\n2) Start the server: `ollama serve` (defaults to `http://localhost:11434`).\n3) Pull a model you want to use, for example: `ollama pull gpt-oss:20b`.\n---\n### 2) Configure This Plugin\n- **Base URL** should point to your Ollama server (default `http://localhost:11434`).\n- **Default Model** should match a local model name from `ollama list`. If left blank, the plugin will try to auto-detect and use the first available model.\n- **Max Output Length** trims long replies for overlays or chat boxes.\n---\n### 3) Variable Functions\n**ollama_prompt**\nSend prompts using a simple syntax.\n\nExample:\n`{{ollama_prompt=Make a funny quote}}`\n\nUse user input:\n`{{ollama_prompt={{message}}}}`\n\nKeep conversation context with a thread name and optional model override:\n`{{ollama_prompt={{message}}|thread_name|gpt-oss:20b}}`\n\nUse a thread name to continue the conversation, and the last parameter to use a specific model.\n\n**ollama_json**\nReturn JSON-only output:\n`{{ollama_json=Summarize this clip as JSON}}`\n\n**ollama_one_line**\nReturn a single-line response (newlines removed):\n`{{ollama_one_line=Write a short hype line}}`\n\n**ollama_prompt_nostore**\nRun a prompt without storing or using history:\n`{{ollama_prompt_nostore=Give me a quick summary}}`\n\n**ollama_prompt_clear**\nClear a conversation thread:\n`{{ollama_prompt_clear=thread_name}}`\n---",
+		"settings": [
+			{
+				"key": "baseUrl",
+				"label": "Base URL",
+				"type": "text",
+				"defaultValue": "http://localhost:11434",
+				"required": true,
+				"helperText": "Your Ollama server URL."
+			},
+			{
+				"key": "defaultModel",
+				"label": "Default Model",
+				"type": "text",
+				"placeholder": "gpt-oss:20b",
+				"required": false,
+				"helperText": "Must match a local model from `ollama list`. Leave blank to auto-detect the first available model."
+			},
+			{
+				"key": "defaultSystemMessage",
+				"label": "Default System Message",
+				"type": "textarea",
+				"rows": 3,
+				"helperText": "Optional system message used when none is provided in the action."
+			},
+			{
+				"key": "defaultTemperature",
+				"label": "Default Temperature",
+				"type": "number",
+				"min": 0,
+				"max": 2,
+				"step": 0.1,
+				"helperText": "Optional. Higher is more creative."
+			},
+			{
+				"key": "defaultTopP",
+				"label": "Default Top P",
+				"type": "number",
+				"min": 0,
+				"max": 1,
+				"step": 0.05,
+				"helperText": "Optional nucleus sampling value."
+			},
+			{
+				"key": "defaultMaxTokens",
+				"label": "Default Max Tokens",
+				"type": "number",
+				"min": 1,
+				"max": 8192,
+				"helperText": "Optional. Maps to Ollama num_predict."
+			},
+			{
+				"key": "keepAlive",
+				"label": "Keep Alive",
+				"type": "text",
+				"placeholder": "5m",
+				"helperText": "How long to keep the model loaded (example: `5m`, `0`). Optional."
+			},
+			{
+				"key": "requestTimeoutMs",
+				"label": "Request Timeout (ms)",
+				"type": "number",
+				"defaultValue": 60000,
+				"min": 1000,
+				"max": 300000,
+				"helperText": "How long to wait for a response."
+			},
+			{
+				"key": "rememberMessages",
+				"label": "Remember Messages",
+				"type": "toggle",
+				"defaultValue": true,
+				"helperText": "Store history per thread or username."
+			},
+			{
+				"key": "maxHistoryMessages",
+				"label": "Max History Messages",
+				"type": "number",
+				"defaultValue": 12,
+				"min": 0,
+				"max": 100,
+				"helperText": "How many recent messages to keep per thread/user."
+			},
+			{
+				"key": "maxOutputChars",
+				"label": "Max Output Length (chars)",
+				"type": "number",
+				"defaultValue": 0,
+				"min": 0,
+				"max": 100000,
+				"helperText": "Trim responses to this length (0 = no limit)."
+			}
+		],
+		"actions": [],
+		"variableFunctions": [
+			{
+				"key": "ollama_prompt",
+				"label": "Ollama Prompt",
+				"description": "Use {{ollama_prompt=message|thread|model}} to return a response from Ollama."
+			},
+			{
+				"key": "ollama_json",
+				"label": "Ollama JSON",
+				"description": "Use {{ollama_json=message|thread|model}} to return JSON-only output."
+			},
+			{
+				"key": "ollama_one_line",
+				"label": "Ollama One Line",
+				"description": "Use {{ollama_one_line=message|thread|model}} to return a single-line response."
+			},
+			{
+				"key": "ollama_prompt_nostore",
+				"label": "Ollama Prompt (No Store)",
+				"description": "Use {{ollama_prompt_nostore=message|thread|model}} to run without history."
+			},
+			{
+				"key": "ollama_prompt_clear",
+				"label": "Ollama Clear Thread",
+				"description": "Use {{ollama_prompt_clear=thread_name}} to clear a conversation thread."
+			}
+		],
+		"variables": [],
+		"alerts": []
+	}
+}

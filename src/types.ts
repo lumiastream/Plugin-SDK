@@ -95,6 +95,7 @@ export interface PluginSetting {
 		| "number"
 		| "text_list"
 		| "select"
+		| "multiselect"
 		| "checkbox"
 		| "slider"
 		| "file"
@@ -103,15 +104,28 @@ export interface PluginSetting {
 		| "textarea"
 		| "email"
 		| "url"
-		| "color";
+		| "color"
+		| "json"
+		| "roi";
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
 	options?: Array<{ label: string; value: string | number | boolean }>;
 	allowTyping?: boolean;
 	rows?: number;
-	defaultValue?: string | number | boolean | string[];
+	section?: string;
+	sectionOrder?: number;
+	group?: string | PluginSettingGroupConfig;
+	defaultValue?:
+		| string
+		| number
+		| boolean
+		| string[]
+		| Record<string, unknown>
+		| Array<unknown>;
 	disabled?: boolean;
+	hidden?: boolean;
+	visibleIf?: PluginVisibleIfCondition;
 	validation?: {
 		pattern?: string;
 		min?: number;
@@ -119,6 +133,25 @@ export interface PluginSetting {
 		minLength?: number;
 		maxLength?: number;
 	};
+}
+
+export interface PluginVisibleIfCondition {
+	key: string;
+	equals:
+		| string
+		| number
+		| boolean
+		| null
+		| Array<string | number | boolean | null>;
+}
+
+export interface PluginSettingGroupConfig {
+	key: string;
+	label?: string;
+	helperText?: string;
+	section?: string;
+	order?: number;
+	visibleIf?: PluginVisibleIfCondition;
 }
 
 export interface PluginActionField {
@@ -193,7 +226,7 @@ export type PluginActionPayloadValue =
 
 export interface PluginActionPayload {
 	type: string;
-	value?: PluginActionPayloadValue;
+	value: PluginActionPayloadValue;
 	id?: string;
 	on?: boolean;
 	base?: string;
@@ -394,12 +427,90 @@ export interface PluginContext {
 	lumia: ILumiaAPI;
 }
 
+export interface PluginSharedResourceOptions<T = any> {
+	/**
+	 * Optional cleanup callback for shared resources.
+	 * Runs once when the final plugin reference is released.
+	 */
+	dispose?: (resource: T) => void | Promise<void>;
+}
+
+export interface PluginNobleScanOptions {
+	/**
+	 * Optional list of service UUID filters. Omit to scan all services.
+	 */
+	serviceUuids?: string[];
+	/**
+	 * Whether duplicate discoveries should be emitted continuously.
+	 */
+	allowDuplicates?: boolean;
+}
+
+export interface PluginSharedNobleClient {
+	/**
+	 * Raw noble module instance.
+	 */
+	getNoble: () => any;
+	/**
+	 * Last observed adapter state.
+	 */
+	getState: () => string;
+	/**
+	 * Whether the shared runtime is currently scanning.
+	 */
+	isScanning: () => boolean;
+	/**
+	 * Wait until adapter state becomes "poweredOn".
+	 */
+	waitForPoweredOn: (timeoutMs?: number) => Promise<string>;
+	/**
+	 * Subscribe to discovered peripherals.
+	 * Returns an unsubscribe callback.
+	 */
+	onDiscover: (listener: (peripheral: any) => void) => () => void;
+	/**
+	 * Subscribe to adapter state changes.
+	 * Returns an unsubscribe callback.
+	 */
+	onStateChange: (listener: (state: string) => void) => () => void;
+	/**
+	 * Start plugin-scoped scan request against shared noble runtime.
+	 */
+	startScanning: (options?: PluginNobleScanOptions) => Promise<boolean>;
+	/**
+	 * Stop this plugin's scan request.
+	 */
+	stopScanning: () => Promise<boolean>;
+}
+
 export interface ILumiaAPI {
 	updateConnection: (state: boolean) => Promise<void>;
 	getConnectionState: () => boolean;
 	getSettings: () => Record<string, any>;
 	setSettings: (newSettings: Record<string, any>) => void;
 	updateSettings: (updates: Record<string, any>) => void;
+	/**
+	 * Acquire a host-level shared resource by key.
+	 * The first caller should provide a factory; subsequent callers can reuse by key.
+	 */
+	acquireShared: <T = any>(
+		key: string,
+		factory?: () => T | Promise<T>,
+		options?: PluginSharedResourceOptions<T>,
+	) => Promise<T>;
+	/**
+	 * Release one reference to a shared resource for the current plugin.
+	 * Returns true when a reference was released.
+	 */
+	releaseShared: (key: string) => Promise<boolean>;
+	/**
+	 * Acquire a shared BLE noble runtime with plugin-scoped listeners and scan controls.
+	 */
+	acquireSharedNoble: (options?: { key?: string }) => Promise<PluginSharedNobleClient>;
+	/**
+	 * Release one reference to the shared BLE noble runtime.
+	 */
+	releaseSharedNoble: (options?: { key?: string }) => Promise<boolean>;
 	updateActionFieldOptions: (params: { actionType: string; fieldKey: string; options: PluginActionFieldOption[] }) => Promise<boolean>;
 	setVariable: (name: string, value: any) => Promise<void>;
 	getVariable: (name: string) => Promise<any>;
@@ -501,16 +612,22 @@ export interface PluginFormField {
 		| "url"
 		| "textarea"
 		| "select"
+		| "multiselect"
 		| "checkbox"
 		| "toggle"
 		| "color"
 		| "slider"
-		| "file";
+		| "file"
+		| "json"
+		| "roi";
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
 	defaultValue?: any;
 	rows?: number;
+	section?: string;
+	sectionOrder?: number;
+	group?: string | PluginSettingGroupConfig;
 	min?: number;
 	max?: number;
 	step?: number;
@@ -524,6 +641,8 @@ export interface PluginFormField {
 	};
 	options?: Array<{ label: string; value: any }>;
 	disabled?: boolean;
+	hidden?: boolean;
+	visibleIf?: PluginVisibleIfCondition;
 	visible?: boolean;
 }
 

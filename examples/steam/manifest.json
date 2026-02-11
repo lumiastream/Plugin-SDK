@@ -1,0 +1,217 @@
+{
+	"id": "steam",
+	"name": "Steam",
+	"version": "1.0.2",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Track Steam profile status, current/recent games, and achievements in Lumia with optional alerts and actions.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "games",
+	"keywords": "steam, steam api, gaming, profile, online status, achievements, recently played",
+	"icon": "steam.png",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Steam Web API Key",
+				"type": "password",
+				"helperText": "Required for all Steam Web API requests.",
+				"required": true
+			},
+			{
+				"key": "steamIdOrVanity",
+				"label": "Steam ID or Vanity Name",
+				"type": "text",
+				"helperText": "Enter a SteamID64 or a vanity URL name.",
+				"required": true
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 15,
+				"min": 15,
+				"max": 900,
+				"helperText": "How often to refresh current status/game (15-900 seconds). Achievements and owned games refresh less frequently automatically."
+			},
+			{
+				"key": "alertGameChangedWhenStopped",
+				"label": "Alert When Game Stops",
+				"type": "checkbox",
+				"defaultValue": true,
+				"helperText": "When enabled, Game Changed alerts also trigger when you stop playing."
+			}
+		],
+		"settings_tutorial": "---\n### Steam Web API Key\n1) Open the [Steam Web API Key page](https://steamcommunity.com/dev/apikey) and sign in.\n2) Enter a domain name (you can use `localhost`).\n3) Accept the terms and click **Register**.\n4) Copy the generated key and paste it into **Steam Web API Key**.\n\n### Steam ID\n1) Open your Steam profile.\n2) Paste **any** of the following into **Steam ID / Vanity Name**:\n   - Your SteamID64 (from account details)\n   - Your vanity profile name\n   - Your full profile URL (example: `https://steamcommunity.com/id/yourname` or `https://steamcommunity.com/profiles/7656119...`)\n\n### Achievements\nAchievement stats are pulled automatically from your **current** game while you are playing.\n---",
+		"actions_tutorial": "---\n---\n### Fetch Game Achievements\nUse **Fetch Achievements For Game** to query a specific game by name or App ID.\nThe results are stored in the requested game variables.\n---",
+		"actions": [
+			{
+				"type": "fetch_game",
+				"label": "Fetch Achievements For Game",
+				"description": "Fetch achievements by game name or App ID (owned games only).",
+				"fields": [
+					{
+						"key": "game",
+						"label": "Game Name or App ID",
+						"type": "text",
+						"placeholder": "ex: Sonic or 1145360",
+						"helperText": "Searches your owned games library for a match.",
+						"allowVariables": true
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "steamid",
+				"description": "SteamID64.",
+				"value": ""
+			},
+			{
+				"name": "persona_username",
+				"description": "Username (Steam persona name).",
+				"value": ""
+			},
+			{
+				"name": "online_status",
+				"description": "Online status (text).",
+				"value": "Offline"
+			},
+			{
+				"name": "profile_url",
+				"description": "Profile URL.",
+				"value": ""
+			},
+			{
+				"name": "avatar",
+				"description": "Avatar URL.",
+				"value": ""
+			},
+			{
+				"name": "current_game_name",
+				"description": "Current in-game name (if playing).",
+				"value": ""
+			},
+			{
+				"name": "current_game_appid",
+				"description": "Current in-game app ID (if playing).",
+				"value": 0
+			},
+			{
+				"name": "game_count",
+				"description": "Owned games count.",
+				"value": 0
+			},
+			{
+				"name": "current_game_achievement_count",
+				"description": "Total achievements for the current/last played game.",
+				"value": 0
+			},
+			{
+				"name": "current_game_achievement_unlocked_count",
+				"description": "Unlocked achievements for the current/last played game.",
+				"value": 0
+			},
+			{
+				"name": "requested_game_appid",
+				"description": "App ID for the last requested game.",
+				"value": 0
+			},
+			{
+				"name": "requested_game_name",
+				"description": "Name for the last requested game.",
+				"value": ""
+			},
+			{
+				"name": "requested_game_achievement_count",
+				"description": "Total achievements for the last requested game.",
+				"value": 0
+			},
+			{
+				"name": "requested_game_achievement_unlocked",
+				"description": "Unlocked achievements for the last requested game.",
+				"value": 0
+			},
+			{
+				"name": "requested_game_achievements",
+				"description": "JSON payload of achievements for the last requested game.",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Online Status Changed",
+				"key": "online_state_changed",
+				"acceptedVariables": ["persona_username", "online_status"],
+				"defaultMessage": "{{persona_username}} is now {{online_status}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_SELECTION",
+						"description": "Pick a online for status.",
+						"selections": [
+							{
+								"label": "Online",
+								"value": "online",
+								"message": "{{persona_username}} is now Online."
+							},
+							{
+								"label": "Offline",
+								"value": "offline",
+								"message": "{{persona_username}} went Offline."
+							},
+							{
+								"label": "Busy",
+								"value": "busy",
+								"message": "{{persona_username}} is Busy."
+							},
+							{
+								"label": "Away",
+								"value": "away",
+								"message": "{{persona_username}} is Away."
+							},
+							{
+								"label": "Snooze",
+								"value": "snooze",
+								"message": "{{persona_username}} is Snoozing."
+							},
+							{
+								"label": "Looking To Trade",
+								"value": "trade",
+								"message": "{{persona_username}} is Looking to Trade."
+							},
+							{
+								"label": "Looking To Play",
+								"value": "play",
+								"message": "{{persona_username}} is Looking to Play."
+							}
+						]
+					}
+				]
+			},
+			{
+				"title": "Achievement Unlocked",
+				"key": "achievement_progress_changed",
+				"acceptedVariables": [
+					"current_game_name",
+					"current_game_achievement_unlocked_count",
+					"current_game_achievement_count"
+				],
+				"defaultMessage": "{{current_game_name}} achievements: {{current_game_achievement_unlocked_count}}/{{current_game_achievement_count}}."
+			},
+			{
+				"title": "Game Changed",
+				"key": "current_game_changed",
+				"acceptedVariables": ["current_game_name", "current_game_appid"],
+				"defaultMessage": "Now playing {{current_game_name}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Game Name"
+					}
+				]
+			}
+		]
+	}
+}

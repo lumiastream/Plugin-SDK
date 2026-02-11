@@ -163,15 +163,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 		};
 	}
 
-	async actions(config = {}) {
-		const actionList = Array.isArray(config.actions) ? config.actions : [];
-		if (!actionList.length) {
-			return;
-		}
-
-		for (const action of actionList) {
+	async actions(config) {
+		for (const action of config.actions) {
 			try {
-				const actionData = action?.value ?? {};
+				const actionData = action.value;
 				if (action.type === "speak") {
 					await this.handleSpeak(actionData);
 				} else if (action.type === "stream_music") {

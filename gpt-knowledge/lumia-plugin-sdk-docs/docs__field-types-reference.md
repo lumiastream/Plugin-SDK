@@ -214,6 +214,29 @@ Dropdown selection from predefined options.
 
 ---
 
+#### `multiselect`
+Multi-value dropdown selection for **settings** fields.
+
+```json
+{
+  "key": "enabledGames",
+  "label": "Enabled Games",
+  "type": "multiselect",
+  "defaultValue": ["valorant", "rocket_league"],
+  "options": [
+    { "label": "Valorant", "value": "valorant" },
+    { "label": "Rocket League", "value": "rocket_league" },
+    { "label": "Overwatch", "value": "overwatch" }
+  ]
+}
+```
+
+**Properties:**
+- `options` - Array of objects with `label` and `value` properties (required)
+- Stored value is always an array of selected option values
+
+---
+
 ### Boolean Types
 
 #### `checkbox`
@@ -292,6 +315,58 @@ File path input with file browser dialog.
 
 ---
 
+#### `json`
+Structured JSON input stored as an object/array value.
+
+```json
+{
+  "key": "detectionRegion",
+  "label": "Detection Region",
+  "type": "json",
+  "defaultValue": {
+    "x": 0.72,
+    "y": 0.02,
+    "width": 0.27,
+    "height": 0.45,
+    "unit": "ratio"
+  },
+  "helperText": "Enter valid JSON."
+}
+```
+
+**Properties:**
+- Renders as a multiline editor in auth/settings UIs
+- Accepts JSON object/array input
+- Stored value is parsed JSON (not raw text)
+
+---
+
+#### `roi`
+Structured region-of-interest editor for screen detection coordinates.
+
+```json
+{
+  "key": "killFeedRoi",
+  "label": "Kill Feed ROI",
+  "type": "roi",
+  "defaultValue": {
+    "x": 0.72,
+    "y": 0.02,
+    "width": 0.27,
+    "height": 0.45,
+    "unit": "ratio"
+  },
+  "helperText": "Use ratio (0-1) or pixels for the detection region."
+}
+```
+
+**Properties:**
+- Renders dedicated `x`/`y`/`width`/`height` controls plus unit (`ratio` or `pixels`)
+- Stored value is an object with `{ x, y, width, height, unit }`
+- `ratio` values are constrained to `0..1`; `pixels` values are absolute coordinates
+
+---
+
 ## Field Type Matrix
 
 | Type | Settings | Actions | Variables | Validation | Notes |
@@ -305,10 +380,13 @@ File path input with file browser dialog.
 | `number` | ✅ | ✅ | With `allowVariables` | min, max | Numeric input (`min`/`max` top-level on actions) |
 | `slider` | ✅ | ✅ | ❌ | min, max | Visual slider (`min`/`max`/`step` top-level on actions) |
 | `select` | ✅ | ✅ | With `allowVariables` | - | Dropdown, supports `allowTyping`; `multiple`/`dynamicOptions` on actions |
+| `multiselect` | ✅ | ❌ | ❌ | - | Multi-value dropdown for settings |
 | `checkbox` | ✅ | ✅ | ❌ | - | Boolean checkbox |
 | `switch`/`toggle` | ✅ | ✅ | ❌ | - | `toggle` in settings, `switch` in actions |
 | `color` | ✅ | ✅ | ❌ | - | Color picker |
 | `file` | ✅ | ✅ | With `allowVariables` | - | File browser |
+| `json` | ✅ | ❌ | ❌ | JSON parse | Structured object/array editor |
+| `roi` | ✅ | ❌ | ❌ | ROI shape + numeric bounds | Region-of-interest editor |
 
 ## Common Properties
 
@@ -321,9 +399,25 @@ File path input with file browser dialog.
   "type": "text",              // Required: Field type
   "placeholder": "...",        // Optional: Placeholder text
   "helperText": "...",         // Optional: Help text below field
-  "defaultValue": null,        // Optional: Default value (string, number, boolean, or string[])
+  "defaultValue": null,        // Optional: Default value (string, number, boolean, string[], or JSON object/array)
   "required": false,           // Optional: Whether field is required
   "disabled": false,           // Optional: Render read-only in UI
+  "hidden": false,             // Optional: Do not render this field in UI
+  "visibleIf": {               // Optional: Conditional visibility
+    "key": "captureMode",
+    "equals": "custom"
+  },
+  "section": "Detection",      // Optional: Top-level settings tab name
+  "sectionOrder": 1,           // Optional: Section/tab sort order (ascending)
+  "group": {                   // Optional: In-section grouped container
+    "key": "valorant",
+    "label": "Valorant Detection",
+    "helperText": "Character-specific rules",
+    "visibleIf": {
+      "key": "enabledGames",
+      "equals": "valorant"
+    }
+  },
   "allowTyping": false,        // Optional: Select fields only
   "rows": 4,                   // Optional: Textarea only
   "options": [],               // Optional: Select fields
@@ -336,6 +430,158 @@ File path input with file browser dialog.
   }
 }
 ```
+
+`visibleIf` follows overlay syntax:
+- `visibleIf.key`: another field key to check
+- `visibleIf.equals`: expected value (scalar or array)
+- Match behavior:
+  - If current value is array and `equals` is array: visible if any overlap
+  - If current value is array and `equals` is scalar: visible if array includes scalar
+  - If current value is scalar and `equals` is array: visible if array includes scalar
+  - If both scalar: strict equality
+
+`group.visibleIf` uses the exact same syntax and behavior as `visibleIf`.
+
+#### Sections vs Groups (How Layout Works)
+
+Use both together, but for different jobs:
+
+- `section`: creates top-level tabs in plugin settings (`Basics`, `Detection`, `Advanced`, etc.)
+- `sectionOrder`: controls tab ordering (lower numbers appear first)
+- `group`: creates a visual container inside a section so related fields are shown together
+- `group.visibleIf`: hides/shows the entire group container at once
+- field-level `visibleIf`: still applies per field even when the field is inside a group
+
+Resolution rules used by Lumia:
+
+- Section label priority: `field.section` -> `group.section` -> `General`
+- Group shorthand is allowed: `"group": "my_group"` (uses key as label)
+- Group metadata form is allowed: `"group": { "key": "my_group", ... }`
+- If the same group key is reused, define label/helper text once in the first object-form declaration
+
+UI rendering shape:
+
+```text
+Plugin Settings
+├─ Tab: Connection            (section="Connection")
+│  ├─ Field: API Key
+│  └─ Field: Poll Interval
+└─ Tab: Detection             (section="Detection")
+   ├─ Group: Valorant Rules   (group="valorant_rules")
+   │  ├─ Field: Kill Template
+   │  └─ Field: ROI
+   └─ Group: Rocket Rules     (group="rocket_rules")
+      ├─ Field: Goal Template
+      └─ Field: ROI
+```
+
+#### Example A: Sections Only
+
+Use this when you only need tabs and no inner container.
+
+```json
+{
+  "config": {
+    "settings": [
+      {
+        "key": "apiKey",
+        "label": "API Key",
+        "type": "password",
+        "section": "Connection",
+        "sectionOrder": 1
+      },
+      {
+        "key": "enabledGames",
+        "label": "Enabled Games",
+        "type": "multiselect",
+        "section": "Detection",
+        "sectionOrder": 2,
+        "options": [
+          { "label": "Valorant", "value": "valorant" },
+          { "label": "Overwatch", "value": "overwatch" }
+        ]
+      },
+      {
+        "key": "cooldownMs",
+        "label": "Cooldown (ms)",
+        "type": "number",
+        "section": "Detection",
+        "sectionOrder": 2,
+        "defaultValue": 1200
+      }
+    ]
+  }
+}
+```
+
+#### Example B: Sections + Groups
+
+Use this when one section has multiple sub-areas that should be visually separated.
+
+```json
+{
+  "config": {
+    "settings": [
+      {
+        "key": "enabledGames",
+        "label": "Enabled Games",
+        "type": "multiselect",
+        "section": "Detection",
+        "sectionOrder": 2,
+        "options": [
+          { "label": "Valorant", "value": "valorant" },
+          { "label": "Rocket League", "value": "rocket_league" }
+        ]
+      },
+      {
+        "key": "valorantTemplate",
+        "label": "Kill Icon Template",
+        "type": "file",
+        "section": "Detection",
+        "group": {
+          "key": "valorant_rules",
+          "label": "Valorant Rules",
+          "helperText": "Templates and ROI for Valorant events.",
+          "order": 1,
+          "visibleIf": {
+            "key": "enabledGames",
+            "equals": "valorant"
+          }
+        }
+      },
+      {
+        "key": "valorantRoi",
+        "label": "Valorant ROI",
+        "type": "roi",
+        "section": "Detection",
+        "group": "valorant_rules"
+      },
+      {
+        "key": "rocketLeagueTemplate",
+        "label": "Goal Template",
+        "type": "file",
+        "section": "Detection",
+        "group": {
+          "key": "rocket_league_rules",
+          "label": "Rocket League Rules",
+          "order": 2
+        },
+        "visibleIf": {
+          "key": "enabledGames",
+          "equals": "rocket_league"
+        }
+      }
+    ]
+  }
+}
+```
+
+In this example:
+
+- `Detection` is one tab (`section`)
+- `valorant_rules` and `rocket_league_rules` are two separate containers (`group`) inside that tab
+- Valorant container visibility is controlled by `group.visibleIf`
+- Rocket League field visibility is controlled by field-level `visibleIf`
 
 ### Action Fields (`config.actions[].fields`)
 

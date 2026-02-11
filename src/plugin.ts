@@ -1,4 +1,11 @@
-import { type PluginManifest, type PluginContext, type ILumiaAPI, type PluginDisplayChatOptions, type PluginAuthValidationResponse } from './types';
+import {
+  type PluginManifest,
+  type PluginContext,
+  type ILumiaAPI,
+  type PluginDisplayChatOptions,
+  type PluginAuthValidationResponse,
+  type PluginActionPayload,
+} from './types';
 
 /**
  * Base Plugin Class - every Lumia Stream plugin should extend this class.
@@ -30,7 +37,7 @@ export abstract class Plugin {
    * Handle custom actions triggered from the UI or Lumia automations.
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async actions(_config: { actions: any[]; extraSettings?: any }): Promise<void> {}
+  async actions(_config: { actions: PluginActionPayload[]; extraSettings?: Record<string, unknown> }): Promise<void> {}
 
   /**
    * Refresh dynamic action field options in the UI.

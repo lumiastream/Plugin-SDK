@@ -1,0 +1,81 @@
+{
+	"id": "typescript_plugin_example",
+	"name": "TypeScript Plugin Example",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "",
+	"website": "",
+	"repository": "",
+	"description": "Example TypeScript plugin that shows typed settings, actions, variables, and alerts.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"main": "dist/main.js",
+	"keywords": "typescript, sample, lumia, plugin",
+	"config": {
+		"settings": [
+			{
+				"key": "defaultMessage",
+				"label": "Default Message",
+				"type": "text",
+				"defaultValue": "Hello from TypeScript Plugin Example!",
+				"helperText": "Used when the action does not include a message."
+			},
+			{
+				"key": "heartbeatInterval",
+				"label": "Heartbeat Interval (seconds)",
+				"type": "number",
+				"defaultValue": 15,
+				"min": 5,
+				"max": 300,
+				"helperText": "How often to refresh the heartbeat variable."
+			}
+		],
+		"actions": [
+			{
+				"type": "send_sample_alert",
+				"label": "Send Sample Alert",
+				"description": "Triggers the sample alert and updates plugin variables.",
+				"fields": [
+					{
+						"key": "username",
+						"label": "Username",
+						"type": "text",
+						"defaultValue": "Viewer"
+					},
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "text",
+						"defaultValue": "Hello from TypeScript Plugin Example!"
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "last_username",
+				"description": "Most recent username used by the action.",
+				"value": ""
+			},
+			{
+				"name": "last_message",
+				"description": "Most recent message used by the action.",
+				"value": ""
+			},
+			{
+				"name": "last_heartbeat",
+				"description": "ISO timestamp from the plugin heartbeat loop.",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "TypeScript Sample Alert",
+				"key": "ts_sample_alert",
+				"acceptedVariables": ["last_username", "last_message"],
+				"defaultMessage": "{{last_username}}: {{last_message}}"
+			}
+		]
+	}
+}

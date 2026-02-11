@@ -1,0 +1,301 @@
+{
+  "id": "eveonline",
+  "name": "EVE Online",
+  "version": "1.0.0",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "repository": "",
+  "description": "Pull EVE Online character status, wallet, location, and activity from ESI into Lumia.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "games",
+  "keywords": "eve online, esi, character, stats, mmo, games",
+  "icon": "eveonline.png",
+  "config": {
+    "oauth": {
+      "buttonLabel": "Authorize EVE Online",
+      "helperText": "Connect your EVE Online character to pull ESI data.",
+      "openInBrowser": true,
+      "scopes": [
+        "esi-characters.read_notifications.v1",
+        "esi-industry.read_character_jobs.v1",
+        "esi-killmails.read_killmails.v1",
+        "esi-location.read_location.v1",
+        "esi-location.read_online.v1",
+        "esi-location.read_ship_type.v1",
+        "esi-markets.read_character_orders.v1",
+        "esi-skills.read_skillqueue.v1",
+        "esi-wallet.read_character_wallet.v1"
+      ],
+      "tokenKeys": {
+        "accessToken": "accessToken",
+        "refreshToken": "refreshToken",
+        "tokenSecret": "tokenSecret"
+      }
+    },
+    "settings": [
+      {
+        "key": "pollInterval",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 120,
+        "min": 60,
+        "max": 900,
+        "helperText": "How often to refresh ESI data (60-900 seconds)."
+      },
+      {
+        "key": "enableAlerts",
+        "label": "Enable Alerts",
+        "type": "toggle",
+        "defaultValue": true,
+        "helperText": "Trigger Lumia alerts for EVE Online events."
+      },
+      {
+        "key": "walletAlertThreshold",
+        "label": "Wallet Alert Threshold (ISK)",
+        "type": "number",
+        "defaultValue": 1000000,
+        "min": 0,
+        "helperText": "Minimum ISK change to trigger wallet spike/drop alerts."
+      },
+      {
+        "key": "accessToken",
+        "label": "Access Token",
+        "type": "password",
+        "helperText": "Auto-filled after OAuth completes.",
+        "disabled": true,
+        "required": false
+      },
+      {
+        "key": "refreshToken",
+        "label": "Refresh Token",
+        "type": "password",
+        "helperText": "Auto-filled after OAuth completes.",
+        "disabled": true,
+        "required": false
+      }
+    ],
+    "settings_tutorial": "---\n### Authorize This Plugin\n1) Click **Authorize EVE Online** in the OAuth section.\n\n**Note:** EVE SSO authorization is per character. To switch characters, re-authorize.\n---\n---",
+    "actions": [],
+    "variables": [
+      {
+        "name": "character_id",
+        "description": "Authenticated character ID.",
+        "value": 0
+      },
+      {
+        "name": "character_name",
+        "description": "Authenticated character name.",
+        "value": ""
+      },
+      {
+        "name": "corporation_id",
+        "description": "Character corporation ID.",
+        "value": 0
+      },
+      {
+        "name": "alliance_id",
+        "description": "Character alliance ID (0 if none).",
+        "value": 0
+      },
+      {
+        "name": "security_status",
+        "description": "Character security status.",
+        "value": 0
+      },
+      {
+        "name": "wallet_balance",
+        "description": "Current wallet balance.",
+        "value": 0
+      },
+      {
+        "name": "online",
+        "description": "Whether the character is currently online.",
+        "value": false
+      },
+      {
+        "name": "solar_system_id",
+        "description": "Current solar system ID.",
+        "value": 0
+      },
+      {
+        "name": "station_id",
+        "description": "Current station ID (0 if not docked).",
+        "value": 0
+      },
+      {
+        "name": "structure_id",
+        "description": "Current structure ID (0 if none).",
+        "value": 0
+      },
+      {
+        "name": "ship_name",
+        "description": "Current ship name.",
+        "value": ""
+      },
+      {
+        "name": "ship_type_id",
+        "description": "Current ship type ID.",
+        "value": 0
+      },
+      {
+        "name": "ship_item_id",
+        "description": "Current ship item ID.",
+        "value": 0
+      },
+      {
+        "name": "skillqueue_count",
+        "description": "Number of skills in the queue.",
+        "value": 0
+      },
+      {
+        "name": "skillqueue_current_skill_id",
+        "description": "Skill ID currently training.",
+        "value": 0
+      },
+      {
+        "name": "skillqueue_current_level",
+        "description": "Training level for the current skill.",
+        "value": 0
+      },
+      {
+        "name": "skillqueue_current_end",
+        "description": "Finish time for the current skill (ISO).",
+        "value": ""
+      },
+      {
+        "name": "skillqueue_ends_at",
+        "description": "Finish time for the last queued skill (ISO).",
+        "value": ""
+      },
+      {
+        "name": "market_orders_active",
+        "description": "Number of active market orders.",
+        "value": 0
+      },
+      {
+        "name": "market_orders_buy",
+        "description": "Number of active buy orders.",
+        "value": 0
+      },
+      {
+        "name": "market_orders_sell",
+        "description": "Number of active sell orders.",
+        "value": 0
+      },
+      {
+        "name": "industry_jobs_active",
+        "description": "Number of active industry jobs.",
+        "value": 0
+      },
+      {
+        "name": "industry_jobs_total",
+        "description": "Total industry jobs returned by ESI.",
+        "value": 0
+      },
+      {
+        "name": "killmails_recent_count",
+        "description": "Count of recent killmails.",
+        "value": 0
+      },
+      {
+        "name": "notifications_count",
+        "description": "Number of notifications returned by ESI.",
+        "value": 0
+      }
+    ],
+    "alerts": [
+      {
+        "title": "Online Status Changed",
+        "key": "eve_online_status",
+        "acceptedVariables": [
+          "character_name",
+          "online",
+          "last_login",
+          "last_logout"
+        ],
+        "defaultMessage": "{{character_name}} is now {{online}}."
+      },
+      {
+        "title": "Skill Queue Empty",
+        "key": "eve_skillqueue_empty",
+        "acceptedVariables": [
+          "character_name",
+          "skillqueue_count",
+          "skillqueue_current_end"
+        ],
+        "defaultMessage": "{{character_name}}'s skill queue is empty."
+      },
+      {
+        "title": "Wallet Spike",
+        "key": "eve_wallet_spike",
+        "acceptedVariables": [
+          "character_name",
+          "wallet_balance"
+        ],
+        "defaultMessage": "{{character_name}} wallet increased ({{wallet_balance}} ISK)."
+      },
+      {
+        "title": "Wallet Drop",
+        "key": "eve_wallet_drop",
+        "acceptedVariables": [
+          "character_name",
+          "wallet_balance"
+        ],
+        "defaultMessage": "{{character_name}} wallet decreased ({{wallet_balance}} ISK)."
+      },
+      {
+        "title": "New Killmail",
+        "key": "eve_killmail_new",
+        "acceptedVariables": [
+          "character_name",
+          "killmails_recent_count"
+        ],
+        "defaultMessage": "New killmail detected for {{character_name}}."
+      },
+      {
+        "title": "New Notification",
+        "key": "eve_notification_new",
+        "acceptedVariables": [
+          "character_name",
+          "notifications_count"
+        ],
+        "defaultMessage": "New EVE notification for {{character_name}}."
+      },
+      {
+        "title": "Docked",
+        "key": "eve_docked",
+        "acceptedVariables": [
+          "character_name",
+          "station_id",
+          "structure_id",
+          "solar_system_id"
+        ],
+        "defaultMessage": "{{character_name}} docked."
+      },
+      {
+        "title": "Undocked",
+        "key": "eve_undocked",
+        "acceptedVariables": [
+          "character_name",
+          "station_id",
+          "structure_id",
+          "solar_system_id"
+        ],
+        "defaultMessage": "{{character_name}} undocked."
+      },
+      {
+        "title": "Ship Changed",
+        "key": "eve_ship_changed",
+        "acceptedVariables": [
+          "character_name",
+          "ship_type_id",
+          "ship_name"
+        ],
+        "defaultMessage": "{{character_name}} switched ships ({{ship_name}})."
+      }
+    ],
+    "actions_tutorial": "---\n### Actions\nThis plugin runs automatically and does not expose actions.\n---"
+  }
+}

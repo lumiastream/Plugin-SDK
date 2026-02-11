@@ -29,10 +29,9 @@ class ShowcasePluginTemplate extends Plugin {
 		}
 	}
 
-	async actions(config = {}) {
-		const actions = Array.isArray(config.actions) ? config.actions : [];
-		for (const action of actions) {
-			if (action?.type === "trigger_alert") {
+	async actions(config) {
+		for (const action of config.actions) {
+			if (action.type === "trigger_alert") {
 				await this._triggerSampleAlert(action.value);
 			}
 		}
