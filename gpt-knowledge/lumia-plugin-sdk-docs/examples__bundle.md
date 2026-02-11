@@ -58,10 +58,9 @@ class ShowcasePluginTemplate extends Plugin {
 		}
 	}
 
-	async actions(config = {}) {
-		const actions = Array.isArray(config.actions) ? config.actions : [];
-		for (const action of actions) {
-			if (action?.type === "trigger_alert") {
+	async actions(config) {
+		for (const action of config.actions) {
+			if (action.type === "trigger_alert") {
 				await this._triggerSampleAlert(action.value);
 			}
 		}
@@ -261,7 +260,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.1"
+		"@lumiastream/plugin": "^0.3.2"
 	}
 }
 
@@ -292,11 +291,22 @@ class DivoomPixooPlugin extends Plugin {
 
 		// PicID counter for Draw/SendHttpGif (resets at 1000 like pixoo-api library)
 		this.picIdCounter = 0;
+		this._connected = false;
+		this._connectionStatePublished = false;
 	}
 
 	async onload() {
-		await this.resetHttpGifId();
-		await this.testConnection();
+		try {
+			await this.resetHttpGifId();
+			await this.testConnection();
+		} catch (error) {
+			await this.setConnectionState(false);
+			throw error;
+		}
+	}
+
+	async onunload() {
+		await this.setConnectionState(false);
 	}
 
 	async onsettingsupdate(settings, previousSettings) {
@@ -309,11 +319,9 @@ class DivoomPixooPlugin extends Plugin {
 		}
 	}
 
-	async actions(config = {}) {
-		const actionList = Array.isArray(config.actions) ? config.actions : [];
-
-		for (const action of actionList) {
-			const params = action?.value ?? {};
+	async actions(config) {
+		for (const action of config.actions) {
+			const params = action.value;
 
 			try {
 				switch (action.type) {
@@ -402,6 +410,7 @@ class DivoomPixooPlugin extends Plugin {
 			await this.lumia.showToast({
 				message: "Please configure Pixoo device IP address in settings",
 			});
+			await this.setConnectionState(false);
 			return false;
 		}
 
@@ -410,6 +419,7 @@ class DivoomPixooPlugin extends Plugin {
 		if (result.success) {
 			this.connectionHealth.lastSuccessTime = Date.now();
 			this.connectionHealth.consecutiveFailures = 0;
+			await this.setConnectionState(true);
 			return true;
 		} else {
 			await this.lumia.addLog(
@@ -419,6 +429,7 @@ class DivoomPixooPlugin extends Plugin {
 				message: `Failed to connect to Pixoo: ${result.error}`,
 			});
 			this.connectionHealth.consecutiveFailures++;
+			await this.setConnectionState(false);
 			return false;
 		}
 	}
@@ -781,6 +792,7 @@ class DivoomPixooPlugin extends Plugin {
 
 		const deviceAddress = this.getDeviceAddress();
 		if (!deviceAddress) {
+			this.setConnectionStateSafe(false);
 			return {
 				success: false,
 				error: "Device address not configured",
@@ -839,6 +851,7 @@ class DivoomPixooPlugin extends Plugin {
 						this.connectionHealth.consecutiveFailures = 0;
 						this.connectionHealth.commandsSinceRefresh++;
 						this.lastPushTime = Date.now();
+						this.setConnectionStateSafe(true);
 
 						resolve({
 							success: true,
@@ -847,6 +860,7 @@ class DivoomPixooPlugin extends Plugin {
 					} else {
 						// Track failure
 						this.connectionHealth.consecutiveFailures++;
+						this.setConnectionStateSafe(false);
 
 						resolve({
 							success: false,
@@ -868,6 +882,7 @@ class DivoomPixooPlugin extends Plugin {
 					await new Promise((r) => setTimeout(r, 1000));
 					resolve(await this.sendCommand(command, payload, retryCount + 1));
 				} else {
+					this.setConnectionStateSafe(false);
 					resolve({
 						success: false,
 						error: error.message,
@@ -882,6 +897,29 @@ class DivoomPixooPlugin extends Plugin {
 			request.write(body);
 			request.end();
 		});
+	}
+
+	async setConnectionState(state) {
+		const normalized = Boolean(state);
+		if (this._connected === normalized && this._connectionStatePublished) {
+			return;
+		}
+
+		this._connected = normalized;
+		this._connectionStatePublished = true;
+
+		try {
+			await this.lumia.updateConnection(normalized);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to update connection state: ${message}`,
+			);
+		}
+	}
+
+	setConnectionStateSafe(state) {
+		void this.setConnectionState(state);
 	}
 
 	// ============================================================================
@@ -1050,7 +1088,7 @@ module.exports = DivoomPixooPlugin;
 {
 	"id": "divoom_pixoo",
 	"name": "Divoom Pixoo",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -1336,7 +1374,7 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.1"
+		"@lumiastream/plugin": "^0.3.2"
 	}
 }
 
@@ -1510,15 +1548,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 		};
 	}
 
-	async actions(config = {}) {
-		const actionList = Array.isArray(config.actions) ? config.actions : [];
-		if (!actionList.length) {
-			return;
-		}
-
-		for (const action of actionList) {
+	async actions(config) {
+		for (const action of config.actions) {
 			try {
-				const actionData = action?.value ?? {};
+				const actionData = action.value;
 				if (action.type === "speak") {
 					await this.handleSpeak(actionData);
 				} else if (action.type === "stream_music") {
@@ -1941,77 +1974,97 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.1"
+		"@lumiastream/plugin": "^0.3.2"
 	}
 }
 
 ```
 
-## fitbit/main.js
+## eveonline/main.js
 
 ```
 const { Plugin } = require("@lumiastream/plugin");
 
-const FITBIT_API_BASE = "https://api.fitbit.com/1";
-const INTRADAY_DETAIL_LEVEL = "1min";
-const HEART_RATE_DETAIL_LEVEL = "1min";
-const ACTIVE_GAP_MINUTES = 2;
-const ACTIVE_LOOKBACK_MINUTES = 5;
-const SECONDARY_FETCH_MINUTES = 5;
-const HEART_RATE_THRESHOLD_FALLBACK = 95;
-const HEART_RATE_THRESHOLD_DELTA = 15;
 const DEFAULTS = {
-	pollInterval: 60,
+	pollInterval: 120,
+	compatibilityDate: "2026-02-03",
+	userAgent: "LumiaStream EVE Online Plugin/1.0.0",
+	walletAlertThreshold: 1000000,
 };
+
+const ESI_BASE_URL = "https://esi.evetech.net/latest";
+const ESI_DATASOURCE = "tranquility";
+const SSO_VERIFY_URL = "https://login.eveonline.com/oauth/verify";
 
 const VARIABLE_NAMES = {
-	date: "date",
-	steps: "steps",
-	distance: "distance",
-	calories: "calories",
-	restingHeartRate: "resting_heart_rate",
-	durationSecs: "activity_duration_secs",
-	durationMin: "activity_duration_min",
-	cadence: "cadence",
-	pace: "pace",
-	paceSource: "pace_source",
-	latestActivityName: "latest_activity_name",
-	latestActivityStart: "latest_activity_start",
+	characterId: "character_id",
+	characterName: "character_name",
+	corporationId: "corporation_id",
+	allianceId: "alliance_id",
+	securityStatus: "security_status",
+	walletBalance: "wallet_balance",
+	online: "online",
+	solarSystemId: "solar_system_id",
+	stationId: "station_id",
+	structureId: "structure_id",
+	shipName: "ship_name",
+	shipTypeId: "ship_type_id",
+	shipItemId: "ship_item_id",
+	skillqueueCount: "skillqueue_count",
+	skillqueueCurrentSkillId: "skillqueue_current_skill_id",
+	skillqueueCurrentLevel: "skillqueue_current_level",
+	skillqueueCurrentEnd: "skillqueue_current_end",
+	skillqueueEndsAt: "skillqueue_ends_at",
+	marketOrdersActive: "market_orders_active",
+	marketOrdersBuy: "market_orders_buy",
+	marketOrdersSell: "market_orders_sell",
+	industryJobsActive: "industry_jobs_active",
+	industryJobsTotal: "industry_jobs_total",
+	killmailsRecentCount: "killmails_recent_count",
+	notificationsCount: "notifications_count",
 };
 
-class FitbitPlugin extends Plugin {
+const ALERT_KEYS = {
+	online: "eve_online_status",
+	skillQueueEmpty: "eve_skillqueue_empty",
+	walletSpike: "eve_wallet_spike",
+	walletDrop: "eve_wallet_drop",
+	killmail: "eve_killmail_new",
+	notification: "eve_notification_new",
+	eve_docked: "eve_docked",
+	eve_undocked: "eve_undocked",
+	shipChanged: "eve_ship_changed",
+};
+
+class EveOnlinePlugin extends Plugin {
 	constructor(manifest, context) {
 		super(manifest, context);
 		this._pollTimer = null;
-		this._lastConnectionState = null;
-		this._dataRefreshPromise = null;
+		this._refreshPromise = null;
 		this._tokenRefreshPromise = null;
+		this._lastConnectionState = null;
 		this._lastVariables = new Map();
-		this._intradayCache = {
-			date: null,
-			steps: null,
-			distance: null,
-			calories: null,
-			heart: null,
-		};
-		this._lastSecondaryFetchAt = 0;
-		this._failureCount = 0;
-		this._backoffMultiplier = 1;
-		this._offline = false;
+		this._etagCache = new Map();
+		this._cooldownUntil = new Map();
+		this._globalBackoffUntil = 0;
+		this._authFailure = false;
+		this._lastErrorLimitWarnAt = 0;
+		this._lastErrorLimitRemaining = null;
+		this._characterId = null;
+		this._characterName = null;
 	}
 
 	async onload() {
-		await this._primeVariables();
-
 		if (!this._hasAuthTokens()) {
-			await this.lumia.addLog(
-				"Fitbit access tokens not set. Use the OAuth button in the plugin settings to authorize.",
+			await this._log(
+				"Missing OAuth tokens. Authorize the plugin in Connections to begin.",
+				"warn",
 			);
 			await this._updateConnectionState(false);
 			return;
 		}
 
-		await this._refreshMetrics({ reason: "startup" });
+		await this._refreshData({ reason: "startup" });
 		this._schedulePolling();
 	}
 
@@ -2021,666 +2074,347 @@ class FitbitPlugin extends Plugin {
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
-		const authChanged =
-			(settings?.accessToken ?? "") !== (previous?.accessToken ?? "") ||
-			(settings?.refreshToken ?? "") !== (previous?.refreshToken ?? "");
-
 		const pollChanged =
-			this._coerceNumber(settings?.pollInterval, DEFAULTS.pollInterval) !==
-			this._coerceNumber(previous?.pollInterval, DEFAULTS.pollInterval);
+			this._pollInterval(settings) !== this._pollInterval(previous);
+		const accessChanged =
+			(settings?.accessToken ?? "") !== (previous?.accessToken ?? "");
+		const refreshChanged =
+			(settings?.refreshToken ?? "") !== (previous?.refreshToken ?? "");
+		const authChanged = accessChanged || refreshChanged;
 
-		if (pollChanged || authChanged) {
-			this._offline = false;
-			this._failureCount = 0;
-			this._backoffMultiplier = 1;
+		if (pollChanged) {
 			this._schedulePolling();
 		}
 
 		if (authChanged) {
-			if (!this._hasAuthTokens()) {
-				await this._updateConnectionState(false);
-				return;
-			}
+			this._characterId = null;
+			this._characterName = null;
+			this._etagCache.clear();
+			this._cooldownUntil.clear();
+			this._authFailure = false;
 		}
 
-		if (authChanged) {
-			await this._refreshMetrics({ reason: "settings-update" });
+		if (authChanged || pollChanged) {
+			await this._refreshData({ reason: "settings-update" });
 		}
+	}
+
+	async actions() {
+		return;
 	}
 
 	async validateAuth() {
 		if (!this._hasAuthTokens()) {
-			await this.lumia.addLog("Validation failed: missing Fitbit tokens.");
+			await this._log("Validation failed: missing OAuth tokens.", "warn");
 			return false;
 		}
 
 		try {
-			const today = this._formatDate(new Date());
-			await Promise.all([
-				this._fetchIntradayResource("steps", today),
-				this._fetchHeartRateIntraday(today),
-			]);
+			const token = await this._ensureAccessToken();
+			await this._verifyToken(token);
 			return true;
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(`Fitbit validation failed: ${message}`);
+			const message = this._errorMessage(error);
+			await this._log(`EVE auth failed: ${message}`, "error");
 			return false;
 		}
 	}
 
-	async _refreshMetrics({ reason } = {}) {
+	_tag() {
+		return `[${this.manifest?.id ?? "eveonline"}]`;
+	}
+
+	async _log(message, severity = "info") {
+		if (severity !== "warn" && severity !== "error") {
+			return;
+		}
+
+		const prefix = this._tag();
+		const decorated =
+			severity === "warn"
+				? `${prefix} ⚠️ ${message}`
+				: severity === "error"
+					? `${prefix} ❌ ${message}`
+					: `${prefix} ${message}`;
+
+		await this.lumia.addLog(decorated);
+	}
+
+	async _refreshData({ reason } = {}) {
 		if (!this._hasAuthTokens()) {
 			await this._updateConnectionState(false);
 			return;
 		}
-		if (this._offline) {
+
+		const now = Date.now();
+		if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
 			return;
 		}
 
-		if (this._dataRefreshPromise) {
-			return this._dataRefreshPromise;
+		if (this._authFailure) {
+			return;
 		}
 
-		this._dataRefreshPromise = (async () => {
-			try {
-				const token = await this._ensureAccessToken();
-				const date = this._formatDate(new Date());
-				this._ensureIntradayDate(date);
+		if (this._refreshPromise) {
+			return this._refreshPromise;
+		}
 
-				const [steps, heart] = await Promise.all([
-					this._fetchIntradayResource("steps", date, token).catch(
-						async (error) => {
-							await this.lumia.addLog(
-								`Steps data unavailable: ${this._errorMessage(error)}`,
-							);
-							return null;
-						},
+		this._refreshPromise = (async () => {
+			try {
+				const accessToken = await this._ensureAccessToken();
+				const identity = await this._resolveCharacter(accessToken);
+				const characterId = identity.characterId;
+
+				const results = await Promise.all([
+					this._safeFetch("character info", () =>
+						this._fetchCharacterInfo(characterId, accessToken),
 					),
-					this._fetchHeartRateIntraday(date, token).catch(async (error) => {
-						await this.lumia.addLog(
-							`Heart rate data unavailable: ${this._errorMessage(error)}`,
-						);
-						return null;
-					}),
+					this._safeFetch("wallet", () =>
+						this._fetchWallet(characterId, accessToken),
+					),
+					this._safeFetch("online status", () =>
+						this._fetchOnline(characterId, accessToken),
+					),
+					this._safeFetch("location", () =>
+						this._fetchLocation(characterId, accessToken),
+					),
+					this._safeFetch("ship", () =>
+						this._fetchShip(characterId, accessToken),
+					),
+					this._safeFetch("skill queue", () =>
+						this._fetchSkillQueue(characterId, accessToken),
+					),
+					this._safeFetch("industry jobs", () =>
+						this._fetchIndustryJobs(characterId, accessToken),
+					),
+					this._safeFetch("market orders", () =>
+						this._fetchOrders(characterId, accessToken),
+					),
+					this._safeFetch("killmails", () =>
+						this._fetchKillmails(characterId, accessToken),
+					),
+					this._safeFetch("notifications", () =>
+						this._fetchNotifications(characterId, accessToken),
+					),
 				]);
 
-				if (steps) {
-					this._intradayCache.steps = steps;
-				}
-				if (heart) {
-					this._intradayCache.heart = heart;
-				}
+				const [
+					characterInfoResult,
+					walletResult,
+					onlineResult,
+					locationResult,
+					shipResult,
+					skillqueueResult,
+					industryJobsResult,
+					ordersResult,
+					killmailsResult,
+					notificationsResult,
+				] = results;
 
-				const activityState = this._detectActivity({
-					steps: this._intradayCache.steps,
-					heart: this._intradayCache.heart,
-				});
+				await this._applyCharacter(identity, characterInfoResult.data);
+				await this._applyWallet(walletResult.data);
+				await this._applyOnline(onlineResult.data);
+				await this._applyLocation(locationResult.data);
+				await this._applyShip(shipResult.data);
+				await this._applySkillQueue(skillqueueResult.data);
+				await this._applyIndustryJobs(industryJobsResult.data);
+				await this._applyOrders(ordersResult.data);
+				await this._applyKillmails(killmailsResult.data);
+				await this._applyNotifications(notificationsResult.data);
 
-				const shouldFetchSecondary =
-					activityState.isActive &&
-					(this._lastSecondaryFetchAt === 0 ||
-						Date.now() - this._lastSecondaryFetchAt >=
-							SECONDARY_FETCH_MINUTES * 60000);
+				const snapshot = {
+					character: identity,
+					characterInfo: characterInfoResult.data,
+					wallet: walletResult.data,
+					online: onlineResult.data,
+					location: locationResult.data,
+					ship: shipResult.data,
+					skillqueue: skillqueueResult.data,
+					industryJobs: industryJobsResult.data,
+					orders: ordersResult.data,
+					killmails: killmailsResult.data,
+					notifications: notificationsResult.data,
+				};
 
-				if (shouldFetchSecondary) {
-					const [distance, calories] = await Promise.all([
-						this._fetchIntradayResource("distance", date, token).catch(
-							async (error) => {
-								await this.lumia.addLog(
-									`Distance data unavailable: ${this._errorMessage(error)}`,
-								);
-								return null;
-							},
-						),
-						this._fetchIntradayResource("calories", date, token).catch(
-							async (error) => {
-								await this.lumia.addLog(
-									`Calories data unavailable: ${this._errorMessage(error)}`,
-								);
-								return null;
-							},
-						),
-					]);
-
-					if (distance) {
-						this._intradayCache.distance = distance;
-					}
-					if (calories) {
-						this._intradayCache.calories = calories;
-					}
-					this._lastSecondaryFetchAt = Date.now();
-				} else if (!activityState.isActive) {
-					this._lastSecondaryFetchAt = 0;
-				}
-
-				const metrics = this._deriveActiveMetrics({
-					date,
-					steps: this._intradayCache.steps,
-					distance: this._intradayCache.distance,
-					calories: this._intradayCache.calories,
-					heart: this._intradayCache.heart,
-					activityState,
-				});
-
-				await this._applyMetrics(metrics);
-				this._failureCount = 0;
-				this._backoffMultiplier = 1;
-				await this._updateConnectionState(true);
+				const successCount = results.filter((result) => result.ok).length;
+				await this._updateConnectionState(successCount > 0);
 			} catch (error) {
 				const message = this._errorMessage(error);
-				this._failureCount += 1;
-				if (this._failureCount >= 3) {
-					this._offline = true;
-					this._clearPolling();
-				} else {
-					this._backoffMultiplier = Math.min(8, 2 ** this._failureCount);
-					this._schedulePolling();
-				}
-				await this.lumia.addLog(`Failed to refresh Fitbit data: ${message}`);
+				await this._log(`Failed to refresh ESI data: ${message}`, "warn");
 				await this._updateConnectionState(false);
-			} finally {
-				this._dataRefreshPromise = null;
 			}
+			this._refreshPromise = null;
 		})();
 
-		return this._dataRefreshPromise;
+		return this._refreshPromise;
 	}
 
-	async _applyMetrics(metrics) {
-		const resolvedDate = metrics?.date ?? "";
-		const steps = this._coerceNumber(metrics?.steps, 0);
-		const distance = this._coerceNumber(metrics?.distance, 0);
-		const calories = this._coerceNumber(metrics?.calories, 0);
-		const durationSecs = this._coerceNumber(metrics?.durationSecs, 0);
-		const durationMin = this._coerceNumber(metrics?.durationMin, 0);
-		const cadence = this._coerceNumber(metrics?.cadence, 0);
-		const pace = this._coerceNumber(metrics?.pace, 0);
-		const paceSource = this._coerceString(metrics?.paceSource, "none");
-		const resolvedHeartRate = this._coerceNumber(metrics?.heartRate, 0);
-		const latestName = this._coerceString(metrics?.activityName, "");
-		const latestStart = this._coerceString(metrics?.activityStart, "");
-
-		const updates = [
-			{ name: VARIABLE_NAMES.date, value: resolvedDate },
-			{ name: VARIABLE_NAMES.steps, value: steps },
-			{ name: VARIABLE_NAMES.distance, value: distance },
-			{ name: VARIABLE_NAMES.calories, value: calories },
-			{ name: VARIABLE_NAMES.restingHeartRate, value: resolvedHeartRate },
-			{ name: VARIABLE_NAMES.durationSecs, value: durationSecs },
-			{ name: VARIABLE_NAMES.durationMin, value: durationMin },
-			{ name: VARIABLE_NAMES.cadence, value: cadence },
-			{ name: VARIABLE_NAMES.pace, value: pace },
-			{ name: VARIABLE_NAMES.paceSource, value: paceSource },
-			{ name: VARIABLE_NAMES.latestActivityName, value: latestName },
-			{ name: VARIABLE_NAMES.latestActivityStart, value: latestStart },
-		];
-
-		await Promise.all(
-			updates.map(({ name, value }) => this._setVariableIfChanged(name, value)),
-		);
-	}
-
-	_deriveActiveMetrics({
-		date,
-		steps,
-		distance,
-		calories,
-		heart,
-		activityState,
-	}) {
-		const stepsData = this._extractIntradaySeries(steps, "steps");
-		const distanceData = this._extractIntradaySeries(distance, "distance");
-		const caloriesData = this._extractIntradaySeries(calories, "calories");
-		const heartSummary = this._extractHeartSummary(heart);
-		const heartIntraday = this._extractHeartIntraday(heart);
-		const heartThreshold =
-			activityState?.heartThreshold ??
-			this._heartRateThreshold(heartSummary.restingHeartRate);
-		const latestHeartRate = this._selectHeartRate({
-			dataset: heartIntraday.dataset,
-			endMinute: null,
-		});
-
-		const stepsWindow = this._calculateActiveWindow({
-			steps: stepsData.dataset,
-			distance: distanceData.dataset,
-			calories: caloriesData.dataset,
-		});
-		const heartWindow = this._calculateHeartActiveWindow(
-			heartIntraday.dataset,
-			heartThreshold,
-		);
-		const activeWindow = this._selectActiveWindow(stepsWindow, heartWindow);
-
-		if (activeWindow.activeMinutes <= 0) {
-			return this._inactiveMetrics(date, { heartRate: latestHeartRate });
-		}
-
-		const totals = this._sumWindowTotals(
-			activeWindow,
-			stepsData.dataset,
-			distanceData.dataset,
-			caloriesData.dataset,
-		);
-
-		const durationMin = activeWindow.activeMinutes;
-		const durationSecs = durationMin * 60;
-
-		const pace =
-			totals.distance > 0 && durationMin > 0
-				? durationMin / totals.distance
-				: 0;
-		const paceSource = totals.distance > 0 ? "computed" : "none";
-		const cadence =
-			durationMin > 0
-				? Math.round((totals.steps / durationMin) * 100) / 100
-				: 0;
-
-		const heartRate = this._selectHeartRate({
-			dataset: heartIntraday.dataset,
-			endMinute: activeWindow.endMinute,
-		});
-
-		const activityStart =
-			activeWindow.startMinute !== null
-				? this._formatDateTime(date, activeWindow.startMinute)
-				: "";
-		const activityName = activeWindow.activeMinutes > 0 ? "Active session" : "";
-
-		return {
-			date,
-			steps: totals.steps,
-			distance: totals.distance,
-			calories: totals.calories,
-			durationSecs,
-			durationMin,
-			cadence,
-			pace,
-			paceSource,
-			heartRate,
-			activityName,
-			activityStart,
-		};
-	}
-
-	_inactiveMetrics(date, { heartRate = 0 } = {}) {
-		return {
-			date,
-			steps: 0,
-			distance: 0,
-			calories: 0,
-			durationSecs: 0,
-			durationMin: 0,
-			cadence: 0,
-			pace: 0,
-			paceSource: "none",
-			heartRate,
-			activityName: "",
-			activityStart: "",
-		};
-	}
-
-	_extractIntradaySeries(response, resource) {
-		if (!response) {
-			return { summary: 0, dataset: [] };
-		}
-		const summaryKey = `activities-${resource}`;
-		const intradayKey = `activities-${resource}-intraday`;
-		const summaryEntry = Array.isArray(response?.[summaryKey])
-			? response[summaryKey][0]
-			: null;
-		const summaryValue = this._coerceNumber(summaryEntry?.value, 0);
-		const dataset = Array.isArray(response?.[intradayKey]?.dataset)
-			? response[intradayKey].dataset
-			: [];
-
-		return { summary: summaryValue, dataset };
-	}
-
-	_extractHeartSummary(response) {
-		const day = Array.isArray(response?.["activities-heart"])
-			? response["activities-heart"][0]
-			: null;
-		const value = day?.value ?? {};
-		return {
-			restingHeartRate:
-				this._coerceNumber(value?.restingHeartRate, null) ?? null,
-			heartRateZones: Array.isArray(value?.heartRateZones)
-				? value.heartRateZones
-				: [],
-		};
-	}
-
-	_extractHeartIntraday(response) {
-		const intraday = response?.["activities-heart-intraday"];
-		const dataset = Array.isArray(intraday?.dataset) ? intraday.dataset : [];
-		return { dataset };
-	}
-
-	_calculateActiveWindow({ steps, distance, calories }) {
-		const stepsMap = this._datasetToMinuteMap(steps);
-		const distanceMap = this._datasetToMinuteMap(distance);
-		const caloriesMap = this._datasetToMinuteMap(calories);
-		return this._calculateActiveWindowFromMaps(
-			stepsMap,
-			distanceMap,
-			caloriesMap,
-		);
-	}
-
-	_calculateHeartActiveWindow(dataset, threshold) {
-		if (!Array.isArray(dataset) || dataset.length === 0) {
-			return { startMinute: null, endMinute: null, activeMinutes: 0 };
-		}
-		const heartMap = new Map();
-		for (const entry of dataset) {
-			const minute = this._timeToMinute(entry?.time);
-			if (minute === null) {
-				continue;
-			}
-			const value = this._coerceNumber(entry?.value, 0);
-			if (value >= threshold) {
-				heartMap.set(minute, value);
-			}
-		}
-
-		return this._calculateActiveWindowFromMaps(heartMap);
-	}
-
-	_calculateActiveWindowFromMaps(...maps) {
-		const lastMinute = this._findLastActiveMinute(...maps);
-		if (lastMinute === null) {
+	async _resolveCharacter(accessToken) {
+		if (this._characterId && this._characterName) {
 			return {
-				startMinute: null,
-				endMinute: null,
-				activeMinutes: 0,
+				characterId: this._characterId,
+				characterName: this._characterName,
 			};
 		}
 
-		let startMinute = lastMinute;
-		let gap = 0;
-		for (let minute = lastMinute; minute >= 0; minute -= 1) {
-			if (this._isActiveMinute(minute, ...maps)) {
-				startMinute = minute;
-				gap = 0;
-			} else {
-				gap += 1;
-				if (gap > ACTIVE_GAP_MINUTES) {
-					break;
-				}
+		const verify = await this._verifyTokenWithRefresh(accessToken);
+		const characterId = this._coerceNumber(verify?.CharacterID, 0);
+		const characterName = this._coerceString(verify?.CharacterName, "");
+
+		if (!characterId || !characterName) {
+			throw new Error("Failed to resolve character identity from SSO.");
+		}
+
+		this._characterId = characterId;
+		this._characterName = characterName;
+
+		return { characterId, characterName };
+	}
+
+	async _verifyTokenWithRefresh(accessToken) {
+		try {
+			return await this._verifyToken(accessToken);
+		} catch (error) {
+			const message = this._errorMessage(error);
+			if (message.includes("401") && this._canRefreshTokens()) {
+				const refreshed = await this._refreshAccessToken();
+				return this._verifyToken(refreshed);
 			}
-		}
-
-		const activeMinutes = this._countActiveMinutes(
-			startMinute,
-			lastMinute,
-			...maps,
-		);
-
-		return {
-			startMinute,
-			endMinute: lastMinute,
-			activeMinutes,
-		};
-	}
-
-	_findLastActiveMinute(...maps) {
-		const minutes = [];
-		for (const map of maps) {
-			if (map && map.size) {
-				for (const key of map.keys()) {
-					minutes.push(Number(key));
-				}
+			if (message.includes("401")) {
+				this._authFailure = true;
+				this._clearPolling();
+				await this._showAuthFailureToast();
 			}
+			throw error;
 		}
-		const lastMinute = Math.max(...minutes);
-		if (!Number.isFinite(lastMinute)) {
-			return null;
-		}
-		for (let minute = lastMinute; minute >= 0; minute -= 1) {
-			if (this._isActiveMinute(minute, ...maps)) {
-				return minute;
-			}
-		}
-		return null;
 	}
 
-	_selectActiveWindow(stepsWindow, heartWindow) {
-		if (heartWindow.activeMinutes > stepsWindow.activeMinutes) {
-			return heartWindow;
+	async _verifyToken(accessToken) {
+		const response = await fetch(SSO_VERIFY_URL, {
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+				Accept: "application/json",
+				"User-Agent": DEFAULTS.userAgent,
+			},
+		});
+
+		if (!response.ok) {
+			const body = await response.text();
+			const trimmed = this._truncateError(body);
+			throw new Error(
+				`SSO verify failed (${response.status}): ${trimmed || "No response body"}`,
+			);
 		}
-		return stepsWindow;
+
+		return response.json();
 	}
 
-	_countActiveMinutes(startMinute, endMinute, ...maps) {
-		if (startMinute === null || endMinute === null) {
-			return 0;
-		}
-		let count = 0;
-		for (let minute = startMinute; minute <= endMinute; minute += 1) {
-			if (this._isActiveMinute(minute, ...maps)) {
-				count += 1;
-			}
-		}
-		return count;
+	async _fetchCharacterInfo(characterId, token) {
+		return this._fetchJson(`/characters/${characterId}/`, token);
 	}
 
-	_sumWindowTotals(activeWindow, steps, distance, calories) {
-		if (activeWindow.startMinute === null || activeWindow.endMinute === null) {
-			return { steps: 0, distance: 0, calories: 0 };
-		}
-
-		const stepsMap = this._datasetToMinuteMap(steps);
-		const distanceMap = this._datasetToMinuteMap(distance);
-		const caloriesMap = this._datasetToMinuteMap(calories);
-
-		let stepsTotal = 0;
-		let distanceTotal = 0;
-		let caloriesTotal = 0;
-		for (
-			let minute = activeWindow.startMinute;
-			minute <= activeWindow.endMinute;
-			minute += 1
-		) {
-			stepsTotal += stepsMap.get(minute) ?? 0;
-			distanceTotal += distanceMap.get(minute) ?? 0;
-			caloriesTotal += caloriesMap.get(minute) ?? 0;
-		}
-
-		return {
-			steps: Math.round(stepsTotal),
-			distance: Math.round(distanceTotal * 1000) / 1000,
-			calories: Math.round(caloriesTotal),
-		};
+	async _fetchWallet(characterId, token) {
+		return this._fetchJson(`/characters/${characterId}/wallet/`, token);
 	}
 
-	_selectHeartRate({ dataset, endMinute }) {
-		if (!Array.isArray(dataset) || dataset.length === 0) {
-			return 0;
-		}
-
-		let candidate = null;
-		for (const entry of dataset) {
-			const minute = this._timeToMinute(entry?.time);
-			if (minute === null) {
-				continue;
-			}
-			if (endMinute !== null && minute > endMinute) {
-				continue;
-			}
-			const value = this._coerceNumber(entry?.value, 0);
-			if (value > 0) {
-				candidate = value;
-			}
-		}
-
-		if (candidate !== null) {
-			return candidate;
-		}
-
-		const lastEntry = dataset[dataset.length - 1];
-		return this._coerceNumber(lastEntry?.value, 0);
+	async _fetchOnline(characterId, token) {
+		return this._fetchJson(`/characters/${characterId}/online/`, token);
 	}
 
-	_isActiveMinute(minute, ...maps) {
-		for (const map of maps) {
-			if (!map) {
-				continue;
-			}
-			if ((map.get(minute) ?? 0) > 0) {
-				return true;
-			}
-		}
-		return false;
+	async _fetchLocation(characterId, token) {
+		return this._fetchJson(`/characters/${characterId}/location/`, token);
 	}
 
-	_detectActivity({ steps, heart }) {
-		const stepsData = this._extractIntradaySeries(steps, "steps");
-		const heartSummary = this._extractHeartSummary(heart);
-		const heartIntraday = this._extractHeartIntraday(heart);
-		const heartThreshold = this._heartRateThreshold(
-			heartSummary.restingHeartRate,
-		);
-
-		const hasStepActivity = this._hasRecentActivity(
-			stepsData.dataset,
-			ACTIVE_LOOKBACK_MINUTES,
-			(entry) => this._coerceNumber(entry?.value, 0) > 0,
-		);
-		const hasHeartActivity = this._hasRecentActivity(
-			heartIntraday.dataset,
-			ACTIVE_LOOKBACK_MINUTES,
-			(entry) => this._coerceNumber(entry?.value, 0) >= heartThreshold,
-		);
-
-		return {
-			isActive: hasStepActivity || hasHeartActivity,
-			hasStepActivity,
-			hasHeartActivity,
-			heartThreshold,
-		};
+	async _fetchShip(characterId, token) {
+		return this._fetchJson(`/characters/${characterId}/ship/`, token);
 	}
 
-	_hasRecentActivity(dataset, lookbackMinutes, predicate) {
-		if (!Array.isArray(dataset) || dataset.length === 0) {
-			return false;
-		}
-
-		let lastMinute = null;
-		for (const entry of dataset) {
-			const minute = this._timeToMinute(entry?.time);
-			if (minute === null) {
-				continue;
-			}
-			lastMinute = minute;
-		}
-		if (lastMinute === null) {
-			return false;
-		}
-
-		const cutoff = Math.max(0, lastMinute - lookbackMinutes);
-		for (const entry of dataset) {
-			const minute = this._timeToMinute(entry?.time);
-			if (minute === null || minute < cutoff) {
-				continue;
-			}
-			if (predicate(entry)) {
-				return true;
-			}
-		}
-
-		return false;
+	async _fetchSkillQueue(characterId, token) {
+		return this._fetchJson(`/characters/${characterId}/skillqueue/`, token);
 	}
 
-	_heartRateThreshold(restingHeartRate) {
-		const resting = this._coerceNumber(restingHeartRate, 0);
-		if (resting > 0) {
-			return Math.max(resting + HEART_RATE_THRESHOLD_DELTA, 80);
-		}
-		return HEART_RATE_THRESHOLD_FALLBACK;
+	async _fetchIndustryJobs(characterId, token) {
+		return this._fetchJson(`/characters/${characterId}/industry/jobs/`, token, {
+			include_completed: false,
+		});
 	}
 
-	_ensureIntradayDate(date) {
-		if (this._intradayCache.date === date) {
-			return;
-		}
-
-		this._intradayCache = {
-			date,
-			steps: null,
-			distance: null,
-			calories: null,
-			heart: null,
-		};
-		this._lastSecondaryFetchAt = 0;
+	async _fetchOrders(characterId, token) {
+		return this._fetchJson(`/characters/${characterId}/orders/`, token);
 	}
 
-	_datasetToMinuteMap(dataset) {
-		const map = new Map();
-		if (!Array.isArray(dataset)) {
-			return map;
-		}
-		for (const entry of dataset) {
-			const minute = this._timeToMinute(entry?.time);
-			if (minute === null) {
-				continue;
-			}
-			map.set(minute, this._coerceNumber(entry?.value, 0));
-		}
-		return map;
-	}
-
-	_timeToMinute(time) {
-		if (!time || typeof time !== "string") {
-			return null;
-		}
-		const [hours, minutes] = time.split(":").map(Number);
-		if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
-			return null;
-		}
-		return hours * 60 + minutes;
-	}
-
-	_formatDateTime(date, minuteOfDay) {
-		if (!date || minuteOfDay === null || minuteOfDay === undefined) {
-			return "";
-		}
-		const hours = Math.floor(minuteOfDay / 60);
-		const minutes = minuteOfDay % 60;
-		const hourLabel = String(hours).padStart(2, "0");
-		const minuteLabel = String(minutes).padStart(2, "0");
-		return `${date}T${hourLabel}:${minuteLabel}:00`;
-	}
-
-	async _fetchHeartRateIntraday(date, tokenOverride) {
+	async _fetchKillmails(characterId, token) {
 		return this._fetchJson(
-			`/user/-/activities/heart/date/${date}/1d/${HEART_RATE_DETAIL_LEVEL}.json`,
-			{ tokenOverride },
+			`/characters/${characterId}/killmails/recent/`,
+			token,
 		);
 	}
 
-	async _fetchIntradayResource(resource, date, tokenOverride) {
-		return this._fetchJson(
-			`/user/-/activities/${resource}/date/${date}/1d/${INTRADAY_DETAIL_LEVEL}.json`,
-			{ tokenOverride },
-		);
+	async _fetchNotifications(characterId, token) {
+		return this._fetchJson(`/characters/${characterId}/notifications/`, token);
 	}
 
-	async _fetchJson(path, { tokenOverride, query } = {}) {
+	async _safeFetch(label, fn) {
+		try {
+			return { ok: true, data: await fn() };
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`${label} fetch failed: ${message}`, "warn");
+			return { ok: false, data: null };
+		}
+	}
+
+	async _fetchJson(path, tokenOverride, query) {
 		const initialToken = tokenOverride ?? (await this._ensureAccessToken());
-		const response = await this._request(path, initialToken, query);
+		const url = this._buildUrl(path, query);
+		if (this._isOnCooldown(url)) {
+			return null;
+		}
+		let response = await this._request(url, initialToken);
 
 		if (response.status === 401 && this._canRefreshTokens()) {
 			const refreshed = await this._refreshAccessToken();
-			const retry = await this._request(path, refreshed, query);
-			return this._readResponse(retry, path);
+			response = await this._request(url, refreshed);
+		}
+		if (response.status === 401) {
+			this._authFailure = true;
+			this._clearPolling();
+			await this._showAuthFailureToast();
+			throw new Error(
+				"Unauthorized (401). Re-authorize the plugin in Connections.",
+			);
 		}
 
-		return this._readResponse(response, path);
+		if (response.status === 429) {
+			const retryAfter = this._coerceNumber(
+				response.headers.get("Retry-After"),
+				60,
+			);
+			this._applyGlobalBackoff(retryAfter);
+			throw new Error(
+				`ESI rate limited (429). Backing off for ${retryAfter}s.`,
+			);
+		}
+
+		if (response.status === 304) {
+			return null;
+		}
+
+		if (!response.ok) {
+			const body = await response.text();
+			const trimmed = this._truncateError(body);
+			throw new Error(
+				`ESI error (${response.status}) on ${path}: ${trimmed || "No response body"}`,
+			);
+		}
+
+		return response.json();
 	}
 
-	async _request(path, token, query) {
-		const url = new URL(`${FITBIT_API_BASE}${path}`);
+	_buildUrl(path, query) {
+		const url = new URL(`${ESI_BASE_URL}${path}`);
+		url.searchParams.set("datasource", ESI_DATASOURCE);
+
 		if (query) {
 			for (const [key, value] of Object.entries(query)) {
 				if (value === undefined || value === null || value === "") {
@@ -2690,23 +2424,72 @@ class FitbitPlugin extends Plugin {
 			}
 		}
 
-		return fetch(url.toString(), {
-			headers: {
-				Authorization: `Bearer ${token}`,
-				Accept: "application/json",
-			},
-		});
+		return url.toString();
 	}
 
-	async _readResponse(response, path) {
-		if (!response.ok) {
-			const body = await response.text();
-			throw new Error(
-				`Fitbit API error (${response.status}) on ${path}: ${body || "No response body"}`,
-			);
+	_isOnCooldown(url) {
+		const until = this._cooldownUntil.get(url);
+		return Boolean(until && Date.now() < until);
+	}
+
+	_updateCooldown(url, response) {
+		const expiresHeader = response.headers.get("expires");
+		if (!expiresHeader) {
+			return;
+		}
+		const expiresAt = Date.parse(expiresHeader);
+		if (Number.isNaN(expiresAt)) {
+			return;
+		}
+		this._cooldownUntil.set(url, expiresAt);
+	}
+
+	async _request(url, token) {
+		const headers = {
+			Accept: "application/json",
+			"User-Agent": DEFAULTS.userAgent,
+			"X-Compatibility-Date": DEFAULTS.compatibilityDate,
+		};
+
+		if (token) {
+			headers.Authorization = `Bearer ${token}`;
 		}
 
-		return response.json();
+		const etag = this._etagCache.get(url);
+		if (etag) {
+			headers["If-None-Match"] = etag;
+		}
+
+		const response = await fetch(url, { headers });
+
+		const responseEtag = response.headers.get("etag");
+		this._updateCooldown(url, response);
+		if (responseEtag) {
+			this._etagCache.set(url, responseEtag);
+		}
+
+		const errorRemain = this._coerceNumber(
+			response.headers.get("X-ESI-Error-Limit-Remain"),
+			NaN,
+		);
+		if (!Number.isNaN(errorRemain)) {
+			const now = Date.now();
+			const wasLow =
+				this._lastErrorLimitRemaining !== null &&
+				this._lastErrorLimitRemaining <= 5;
+			const isLow = errorRemain <= 5;
+			const shouldLog =
+				isLow && (!wasLow || now - this._lastErrorLimitWarnAt > 5 * 60 * 1000);
+			if (shouldLog) {
+				this._lastErrorLimitWarnAt = now;
+			}
+			if (!isLow) {
+				this._lastErrorLimitWarnAt = 0;
+			}
+			this._lastErrorLimitRemaining = errorRemain;
+		}
+
+		return response;
 	}
 
 	async _refreshAccessToken() {
@@ -2724,10 +2507,7 @@ class FitbitPlugin extends Plugin {
 				throw new Error("Missing OAuth refresh support.");
 			}
 
-			const payload = await this.lumia.refreshOAuthToken({
-				refreshToken,
-				applicationId: 1,
-			});
+			const payload = await this.lumia.refreshOAuthToken({ refreshToken });
 			const accessToken = this._coerceString(payload?.accessToken, "");
 			const nextRefreshToken =
 				this._coerceString(payload?.refreshToken, "") || refreshToken;
@@ -2756,20 +2536,10 @@ class FitbitPlugin extends Plugin {
 		const refreshToken = this._refreshToken();
 
 		if (!accessToken && !refreshToken) {
-			throw new Error("Missing Fitbit access credentials.");
+			throw new Error("Missing EVE access credentials.");
 		}
 
-		const expiresAt = this._tokenExpiresAt();
-		const now = Date.now();
-		if (accessToken && !expiresAt) {
-			return accessToken;
-		}
-
-		if (accessToken && expiresAt && now < expiresAt - 60000) {
-			return accessToken;
-		}
-
-		if (!this._canRefreshTokens()) {
+		if (accessToken) {
 			return accessToken;
 		}
 
@@ -2780,24 +2550,335 @@ class FitbitPlugin extends Plugin {
 		return this._refreshAccessToken();
 	}
 
+	async _applyCharacter(identity, characterInfo) {
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.characterId,
+			identity?.characterId ?? 0,
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.characterName,
+			identity?.characterName ?? "",
+		);
+
+		if (!characterInfo) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.corporationId,
+			this._coerceNumber(characterInfo?.corporation_id, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.allianceId,
+			this._coerceNumber(characterInfo?.alliance_id, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.securityStatus,
+			this._coerceNumber(characterInfo?.security_status, 0),
+		);
+	}
+
+	async _applyWallet(wallet) {
+		if (wallet === null || wallet === undefined) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.walletBalance,
+			this._coerceNumber(wallet, 0),
+		);
+	}
+
+	async _applyOnline(online) {
+		if (!online) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.online,
+			Boolean(online?.online),
+		);
+	}
+
+	async _applyLocation(location) {
+		if (!location) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.solarSystemId,
+			this._coerceNumber(location?.solar_system_id, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.stationId,
+			this._coerceNumber(location?.station_id, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.structureId,
+			this._coerceNumber(location?.structure_id, 0),
+		);
+	}
+
+	async _applyShip(ship) {
+		if (!ship) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.shipName,
+			this._coerceString(ship?.ship_name, ""),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.shipTypeId,
+			this._coerceNumber(ship?.ship_type_id, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.shipItemId,
+			this._coerceNumber(ship?.ship_item_id, 0),
+		);
+	}
+
+	async _applySkillQueue(queue) {
+		if (!Array.isArray(queue)) {
+			return;
+		}
+
+		const sorted = [...queue].sort(
+			(a, b) =>
+				this._coerceNumber(a?.queue_position, 0) -
+				this._coerceNumber(b?.queue_position, 0),
+		);
+		const current = sorted[0] || null;
+		const last = sorted[sorted.length - 1] || null;
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.skillqueueCount,
+			sorted.length,
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.skillqueueCurrentSkillId,
+			this._coerceNumber(current?.skill_id, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.skillqueueCurrentLevel,
+			this._coerceNumber(current?.finished_level, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.skillqueueCurrentEnd,
+			this._coerceString(current?.finish_date, ""),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.skillqueueEndsAt,
+			this._coerceString(last?.finish_date, ""),
+		);
+	}
+
+	async _applyIndustryJobs(jobs) {
+		if (!Array.isArray(jobs)) {
+			return;
+		}
+
+		const activeCount = jobs.filter((job) => job?.status === "active").length;
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.industryJobsActive,
+			activeCount,
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.industryJobsTotal,
+			jobs.length,
+		);
+	}
+
+	async _applyOrders(orders) {
+		if (!Array.isArray(orders)) {
+			return;
+		}
+
+		const buyCount = orders.filter((order) => order?.is_buy_order).length;
+		const sellCount = orders.filter((order) => !order?.is_buy_order).length;
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.marketOrdersActive,
+			orders.length,
+		);
+		await this._setVariableIfChanged(VARIABLE_NAMES.marketOrdersBuy, buyCount);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.marketOrdersSell,
+			sellCount,
+		);
+	}
+
+	async _applyKillmails(killmails) {
+		if (!Array.isArray(killmails)) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.killmailsRecentCount,
+			killmails.length,
+		);
+	}
+
+	async _applyNotifications(notifications) {
+		if (!Array.isArray(notifications)) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.notificationsCount,
+			notifications.length,
+		);
+	}
+
+	_alertsEnabled() {
+		return this.settings?.enableAlerts !== false;
+	}
+
+	_walletAlertThreshold() {
+		const threshold = this._coerceNumber(
+			this.settings?.walletAlertThreshold,
+			DEFAULTS.walletAlertThreshold,
+		);
+		return Number.isFinite(threshold)
+			? threshold
+			: DEFAULTS.walletAlertThreshold;
+	}
+
+	_buildAlertSnapshot({
+		previous,
+		characterInfo,
+		wallet,
+		online,
+		location,
+		ship,
+		skillqueue,
+		killmails,
+		notifications,
+	}) {
+		const snapshot = {
+			online: previous?.online ?? false,
+			skillqueueCount: previous?.skillqueueCount ?? 0,
+			walletBalance: previous?.walletBalance ?? 0,
+			killmailsRecentCount: previous?.killmailsRecentCount ?? 0,
+			notificationsCount: previous?.notificationsCount ?? 0,
+			stationId: previous?.stationId ?? 0,
+			structureId: previous?.structureId ?? 0,
+			shipTypeId: previous?.shipTypeId ?? 0,
+		};
+
+		if (online) {
+			snapshot.online = Boolean(online?.online);
+		}
+
+		if (Array.isArray(skillqueue)) {
+			snapshot.skillqueueCount = skillqueue.length;
+		}
+
+		if (wallet !== null && wallet !== undefined) {
+			snapshot.walletBalance = this._coerceNumber(wallet, 0);
+		}
+
+		if (Array.isArray(killmails)) {
+			snapshot.killmailsRecentCount = killmails.length;
+		}
+
+		if (Array.isArray(notifications)) {
+			snapshot.notificationsCount = notifications.length;
+		}
+
+		if (location) {
+			snapshot.stationId = this._coerceNumber(location?.station_id, 0);
+			snapshot.structureId = this._coerceNumber(location?.structure_id, 0);
+		}
+
+		if (ship) {
+			snapshot.shipTypeId = this._coerceNumber(ship?.ship_type_id, 0);
+		}
+
+		return snapshot;
+	}
+
+	async _maybeTriggerAlerts({ previous, current }) {
+		if (!previous || !current) {
+			return;
+		}
+
+		if (previous.online !== current.online) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.online });
+		}
+
+		if (previous.skillqueueCount > 0 && current.skillqueueCount === 0) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.skillQueueEmpty });
+		}
+
+		const walletDelta = current.walletBalance - previous.walletBalance;
+		const threshold = this._walletAlertThreshold();
+		if (threshold > 0 && Math.abs(walletDelta) >= threshold) {
+			await this.lumia.triggerAlert({
+				alert:
+					walletDelta >= 0 ? ALERT_KEYS.walletSpike : ALERT_KEYS.walletDrop,
+			});
+		}
+
+		if (current.killmailsRecentCount > previous.killmailsRecentCount) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.killmail });
+		}
+
+		if (current.notificationsCount > previous.notificationsCount) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.notification });
+		}
+
+		const wasDocked = (previous.stationId || previous.structureId) > 0;
+		const isDocked = (current.stationId || current.structureId) > 0;
+		if (!wasDocked && isDocked) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.eve_docked });
+		} else if (wasDocked && !isDocked) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.eve_undocked });
+		}
+
+		if (
+			previous.shipTypeId &&
+			current.shipTypeId &&
+			previous.shipTypeId !== current.shipTypeId
+		) {
+			await this.lumia.triggerAlert({ alert: ALERT_KEYS.shipChanged });
+		}
+	}
+
+	async _showAuthFailureToast() {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message:
+					"EVE Online auth expired. Re-authorize the plugin in Connections.",
+				time: 6,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	_applyGlobalBackoff(seconds) {
+		const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
+		const until = Date.now() + delayMs;
+		if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
+			this._globalBackoffUntil = until;
+		}
+	}
+
 	_schedulePolling() {
 		this._clearPolling();
 
-		if (this._offline) {
+		const intervalSeconds = this._pollInterval(this.settings);
+		if (!this._hasAuthTokens() || intervalSeconds <= 0) {
 			return;
 		}
 
-		const baseInterval = this._pollInterval();
-		if (!this._hasAuthTokens() || baseInterval <= 0) {
-			return;
-		}
-
-		const intervalSeconds = Math.min(
-			Math.max(Math.round(baseInterval * this._backoffMultiplier), 30),
-			1800,
-		);
 		this._pollTimer = setInterval(() => {
-			void this._refreshMetrics({ reason: "poll" });
+			void this._refreshData({ reason: "poll" });
 		}, intervalSeconds * 1000);
 	}
 
@@ -2806,6 +2887,33 @@ class FitbitPlugin extends Plugin {
 			clearInterval(this._pollTimer);
 			this._pollTimer = null;
 		}
+	}
+
+	_hasAuthTokens() {
+		return Boolean(this._accessToken() || this._refreshToken());
+	}
+
+	_accessToken() {
+		return this._coerceString(this.settings?.accessToken, "");
+	}
+
+	_refreshToken() {
+		return this._coerceString(this.settings?.refreshToken, "");
+	}
+
+	_canRefreshTokens() {
+		return Boolean(
+			this._refreshToken() &&
+			typeof this.lumia?.refreshOAuthToken === "function",
+		);
+	}
+
+	_pollInterval(settings = this.settings) {
+		const interval = this._coerceNumber(
+			settings?.pollInterval,
+			DEFAULTS.pollInterval,
+		);
+		return Number.isFinite(interval) ? interval : DEFAULTS.pollInterval;
 	}
 
 	async _updateConnectionState(state) {
@@ -2819,29 +2927,9 @@ class FitbitPlugin extends Plugin {
 			try {
 				await this.lumia.updateConnection(state);
 			} catch (error) {
-				const message = this._errorMessage(error);
-				await this.lumia.addLog(
-					`Failed to update connection state: ${message}`,
-				);
+				// const message = this._errorMessage(error);
 			}
 		}
-	}
-
-	async _primeVariables() {
-		await Promise.all([
-			this._setVariableIfChanged(VARIABLE_NAMES.date, ""),
-			this._setVariableIfChanged(VARIABLE_NAMES.steps, 0),
-			this._setVariableIfChanged(VARIABLE_NAMES.distance, 0),
-			this._setVariableIfChanged(VARIABLE_NAMES.calories, 0),
-			this._setVariableIfChanged(VARIABLE_NAMES.restingHeartRate, 0),
-			this._setVariableIfChanged(VARIABLE_NAMES.durationSecs, 0),
-			this._setVariableIfChanged(VARIABLE_NAMES.durationMin, 0),
-			this._setVariableIfChanged(VARIABLE_NAMES.cadence, 0),
-			this._setVariableIfChanged(VARIABLE_NAMES.pace, 0),
-			this._setVariableIfChanged(VARIABLE_NAMES.paceSource, ""),
-			this._setVariableIfChanged(VARIABLE_NAMES.latestActivityName, ""),
-			this._setVariableIfChanged(VARIABLE_NAMES.latestActivityStart, ""),
-		]);
 	}
 
 	async _setVariable(name, value) {
@@ -2863,56 +2951,45 @@ class FitbitPlugin extends Plugin {
 		return true;
 	}
 
+	_normalizeValue(value) {
+		if (value === null || value === undefined) {
+			return "";
+		}
+		if (typeof value === "object") {
+			try {
+				return JSON.stringify(value);
+			} catch (error) {
+				return String(value);
+			}
+		}
+		return String(value);
+	}
+
+	_valuesEqual(a, b) {
+		return a === b;
+	}
+
 	_errorMessage(error) {
-		return error instanceof Error ? error.message : String(error);
+		if (!error) {
+			return "Unknown error";
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		return error?.message || String(error);
 	}
 
-	_accessToken() {
-		return this._coerceString(this.settings?.accessToken, "");
-	}
-
-	_refreshToken() {
-		return this._coerceString(this.settings?.refreshToken, "");
-	}
-
-	_tokenExpiresAt() {
-		return this._coerceNumber(this.settings?.tokenExpiresAt, 0);
-	}
-
-	_pollInterval() {
-		return this._coerceNumber(
-			this.settings?.pollInterval,
-			DEFAULTS.pollInterval,
-		);
-	}
-
-	_canRefreshTokens() {
-		return Boolean(
-			this._refreshToken() &&
-			typeof this.lumia?.refreshOAuthToken === "function",
-		);
-	}
-
-	_hasAuthTokens() {
-		return Boolean(this._accessToken() || this._refreshToken());
-	}
-
-	_formatDate(date) {
-		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, "0");
-		const day = String(date.getDate()).padStart(2, "0");
-		return `${year}-${month}-${day}`;
+	_truncateError(value) {
+		if (!value) {
+			return "";
+		}
+		const trimmed = String(value).replace(/\s+/g, " ").trim();
+		return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
 	}
 
 	_coerceNumber(value, fallback = 0) {
-		if (typeof value === "number" && Number.isFinite(value)) {
-			return value;
-		}
-		if (typeof value === "string" && value.trim().length) {
-			const parsed = Number(value);
-			return Number.isFinite(parsed) ? parsed : fallback;
-		}
-		return fallback;
+		const number = Number(value);
+		return Number.isFinite(number) ? number : fallback;
 	}
 
 	_coerceString(value, fallback = "") {
@@ -2924,64 +3001,44 @@ class FitbitPlugin extends Plugin {
 		}
 		return String(value);
 	}
-
-	_normalizeValue(value) {
-		if (typeof value === "number") {
-			return Number.isFinite(value) ? value : 0;
-		}
-		if (typeof value === "string") {
-			return value;
-		}
-		if (value === null || value === undefined) {
-			return "";
-		}
-		if (typeof value === "object") {
-			return JSON.stringify(value);
-		}
-		return String(value);
-	}
-
-	_valuesEqual(a, b) {
-		if (typeof a === "number" && typeof b === "number") {
-			if (Number.isNaN(a) && Number.isNaN(b)) {
-				return true;
-			}
-		}
-		return a === b;
-	}
 }
 
-module.exports = FitbitPlugin;
+module.exports = EveOnlinePlugin;
 
 ```
 
-## fitbit/manifest.json
+## eveonline/manifest.json
 
 ```
 {
-  "id": "fitbit",
-  "name": "Fitbit",
-  "version": "1.0.6",
+  "id": "eveonline",
+  "name": "EVE Online",
+  "version": "1.0.0",
   "author": "Lumia Stream",
   "email": "dev@lumiastream.com",
   "website": "https://lumiastream.com",
   "repository": "",
-  "description": "Fetch Fitbit intraday activity metrics into Lumia variables and alerts.",
+  "description": "Pull EVE Online character status, wallet, location, and activity from ESI into Lumia.",
   "license": "MIT",
   "lumiaVersion": "^9.0.0",
-  "category": "apps",
-  "keywords": "fitbit, fitness, activity, steps, heartrate",
-  "icon": "fitbit.jpg",
+  "category": "games",
+  "keywords": "eve online, esi, character, stats, mmo, games",
+  "icon": "eveonline.png",
   "config": {
     "oauth": {
-      "buttonLabel": "Authorize Fitbit",
-      "helperText": "Connect your Fitbit account to pull current activity metrics (intraday access required for server apps).",
+      "buttonLabel": "Authorize EVE Online",
+      "helperText": "Connect your EVE Online character to pull ESI data.",
       "openInBrowser": true,
       "scopes": [
-        "activity",
-        "heartrate",
-        "profile",
-        "settings"
+        "esi-characters.read_notifications.v1",
+        "esi-industry.read_character_jobs.v1",
+        "esi-killmails.read_killmails.v1",
+        "esi-location.read_location.v1",
+        "esi-location.read_online.v1",
+        "esi-location.read_ship_type.v1",
+        "esi-markets.read_character_orders.v1",
+        "esi-skills.read_skillqueue.v1",
+        "esi-wallet.read_character_wallet.v1"
       ],
       "tokenKeys": {
         "accessToken": "accessToken",
@@ -2990,6 +3047,30 @@ module.exports = FitbitPlugin;
       }
     },
     "settings": [
+      {
+        "key": "pollInterval",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 120,
+        "min": 60,
+        "max": 900,
+        "helperText": "How often to refresh ESI data (60-900 seconds)."
+      },
+      {
+        "key": "enableAlerts",
+        "label": "Enable Alerts",
+        "type": "toggle",
+        "defaultValue": true,
+        "helperText": "Trigger Lumia alerts for EVE Online events."
+      },
+      {
+        "key": "walletAlertThreshold",
+        "label": "Wallet Alert Threshold (ISK)",
+        "type": "number",
+        "defaultValue": 1000000,
+        "min": 0,
+        "helperText": "Minimum ISK change to trigger wallet spike/drop alerts."
+      },
       {
         "key": "accessToken",
         "label": "Access Token",
@@ -3007,949 +3088,244 @@ module.exports = FitbitPlugin;
         "required": false
       }
     ],
-    "settings_tutorial": "---\n### Authorize This Plugin\n1) Click **Authorize Fitbit** in the OAuth section.\n2) Complete the login and grant access.\n---\n### Notes\n- Metrics reflect your current active session using intraday time series.\n- Server apps need Fitbit intraday access enabled.\n- Distance and pace use Fitbit's user unit settings.\n---",
-    "actions_tutorial": "---\n### Actions\nThis plugin refreshes metrics automatically after OAuth and on the poll interval. There are no actions to run.\n---",
+    "settings_tutorial": "---\n### Authorize This Plugin\n1) Click **Authorize EVE Online** in the OAuth section.\n\n**Note:** EVE SSO authorization is per character. To switch characters, re-authorize.\n---\n---",
     "actions": [],
     "variables": [
       {
-        "name": "date",
-        "description": "Date of the current session (YYYY-MM-DD).",
+        "name": "character_id",
+        "description": "Authenticated character ID.",
+        "value": 0
+      },
+      {
+        "name": "character_name",
+        "description": "Authenticated character name.",
         "value": ""
       },
       {
-        "name": "steps",
-        "description": "Steps in the current active session.",
+        "name": "corporation_id",
+        "description": "Character corporation ID.",
         "value": 0
       },
       {
-        "name": "distance",
-        "description": "Distance in the current active session (Fitbit user units).",
+        "name": "alliance_id",
+        "description": "Character alliance ID (0 if none).",
         "value": 0
       },
       {
-        "name": "calories",
-        "description": "Calories burned in the current active session.",
+        "name": "security_status",
+        "description": "Character security status.",
         "value": 0
       },
       {
-        "name": "resting_heart_rate",
-        "description": "Current heart rate (latest intraday reading).",
+        "name": "wallet_balance",
+        "description": "Current wallet balance.",
         "value": 0
       },
       {
-        "name": "activity_duration_secs",
-        "description": "Active duration (seconds) for the current session.",
+        "name": "online",
+        "description": "Whether the character is currently online.",
+        "value": false
+      },
+      {
+        "name": "solar_system_id",
+        "description": "Current solar system ID.",
         "value": 0
       },
       {
-        "name": "activity_duration_min",
-        "description": "Active duration (minutes) for the current session.",
+        "name": "station_id",
+        "description": "Current station ID (0 if not docked).",
         "value": 0
       },
       {
-        "name": "cadence",
-        "description": "Cadence for the current active session (steps per minute).",
+        "name": "structure_id",
+        "description": "Current structure ID (0 if none).",
         "value": 0
       },
       {
-        "name": "pace",
-        "description": "Pace computed from the current active session (minutes per distance unit).",
-        "value": 0
-      },
-      {
-        "name": "pace_source",
-        "description": "Source for pace: computed or none.",
+        "name": "ship_name",
+        "description": "Current ship name.",
         "value": ""
       },
       {
-        "name": "latest_activity_name",
-        "description": "Label for the current active session.",
+        "name": "ship_type_id",
+        "description": "Current ship type ID.",
+        "value": 0
+      },
+      {
+        "name": "ship_item_id",
+        "description": "Current ship item ID.",
+        "value": 0
+      },
+      {
+        "name": "skillqueue_count",
+        "description": "Number of skills in the queue.",
+        "value": 0
+      },
+      {
+        "name": "skillqueue_current_skill_id",
+        "description": "Skill ID currently training.",
+        "value": 0
+      },
+      {
+        "name": "skillqueue_current_level",
+        "description": "Training level for the current skill.",
+        "value": 0
+      },
+      {
+        "name": "skillqueue_current_end",
+        "description": "Finish time for the current skill (ISO).",
         "value": ""
       },
       {
-        "name": "latest_activity_start",
-        "description": "Start time of the current active session.",
+        "name": "skillqueue_ends_at",
+        "description": "Finish time for the last queued skill (ISO).",
         "value": ""
-      }
-    ]
-  }
-}
-```
-
-## fitbit/package.json
-
-```
-{
-	"name": "lumia_plugin-fitbit",
-	"version": "1.0.0",
-	"private": true,
-	"description": "Lumia Stream plugin that pulls Fitbit activity and heart-rate metrics.",
-	"main": "main.js",
-	"scripts": {},
-	"dependencies": {
-		"@lumiastream/plugin": "^0.3.1"
-	}
-}
-
-```
-
-## hot_news/main.js
-
-```
-const { Plugin } = require("@lumiastream/plugin");
-
-const NEWS_API_BASE = "https://newsapi.org/v2";
-
-const DEFAULTS = {
-  pollInterval: 300,
-  resultsLimit: 5,
-};
-
-const VARIABLE_NAMES = {
-  title: "latest_title",
-  description: "latest_description",
-  url: "latest_url",
-  source: "latest_source",
-  image: "latest_image",
-  published: "latest_published",
-  count: "article_count",
-  collection: "recent_articles",
-  keyword: "keyword",
-};
-
-class HotNewsPlugin extends Plugin {
-  constructor(manifest, context) {
-    super(manifest, context);
-    this._pollTimer = null;
-    this._seenUrls = new Set();
-    this._seenQueue = [];
-    this._lastConnectionState = null;
-    this._failureCount = 0;
-    this._backoffMultiplier = 1;
-    this._offline = false;
-  }
-
-  async onload() {
-    if (!this._apiKey()) {
-      await this.lumia.addLog(
-        "NewsAPI key not configured. Add your key in the plugin settings to start polling headlines."
-      );
-      await this._updateConnectionState(false);
-      await this._primeVariables();
-      return;
-    }
-
-    await this._primeVariables();
-    await this._refreshHeadlines({ initial: true });
-    this._schedulePolling();
-  }
-
-  async onunload() {
-    this._clearPolling();
-    await this._updateConnectionState(false);
-  }
-
-  async onsettingsupdate(settings, previous = {}) {
-    const apiKeyChanged = (settings?.apiKey ?? "") !== (previous?.apiKey ?? "");
-    const pollChanged =
-      Number(settings?.pollInterval) !== Number(previous?.pollInterval);
-    const filterChanged =
-      settings?.country !== previous?.country ||
-      settings?.category !== previous?.category ||
-      settings?.query !== previous?.query ||
-      settings?.resultsLimit !== previous?.resultsLimit;
-
-    if (apiKeyChanged && !this._apiKey()) {
-      await this.lumia.addLog(
-        "NewsAPI key cleared from settings; pausing headline polling."
-      );
-      this._clearPolling();
-      await this._updateConnectionState(false);
-      return;
-    }
-
-    if (pollChanged || apiKeyChanged) {
-      this._offline = false;
-      this._failureCount = 0;
-      this._backoffMultiplier = 1;
-      this._schedulePolling();
-    }
-
-    if (filterChanged || apiKeyChanged) {
-      this._seenUrls.clear();
-      this._seenQueue = [];
-      await this._refreshHeadlines({ reason: "settings-update" });
-    }
-  }
-
-
-
-  async validateAuth(data = {}) {
-    const apiKey =
-      typeof data?.apiKey === "string" && data.apiKey.trim().length
-        ? data.apiKey.trim()
-        : this._apiKey();
-
-    if (!apiKey) {
-      await this.lumia.addLog("Validation failed: NewsAPI key is required.");
-      return false;
-    }
-
-    try {
-      const payload = await this._fetchHeadlines({
-        apiKey,
-        country: data?.country ?? this._country(),
-        category: data?.category ?? this._category(),
-        keyword: data?.query ?? this._keyword(),
-        limit: 1,
-      });
-
-      if (Array.isArray(payload?.articles)) {
-        return true;
-      }
-
-      await this.lumia.addLog(
-        "Validation failed: unexpected response from NewsAPI."
-      );
-      return false;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.lumia.addLog(`NewsAPI validation failed: ${message}`);
-      return false;
-    }
-  }
-
-  async _refreshHeadlines(options = {}) {
-    if (!this._apiKey()) {
-      return;
-    }
-    if (this._offline) {
-      return;
-    }
-
-    try {
-      const response = await this._fetchHeadlines({
-        keyword: this._keyword(),
-        limit: this._resultsLimit(),
-        country: this._country(),
-        category: this._category(),
-      });
-
-      await this._processHeadlines(response, {
-        keyword: this._keyword(),
-        initial: Boolean(options.initial),
-      });
-
-      this._failureCount = 0;
-      this._backoffMultiplier = 1;
-      await this._updateConnectionState(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this._failureCount += 1;
-      if (this._failureCount >= 3) {
-        this._offline = true;
-        this._clearPolling();
-      } else {
-        this._backoffMultiplier = Math.min(8, 2 ** this._failureCount);
-        this._schedulePolling();
-      }
-      await this.lumia.addLog(`Failed to refresh headlines: ${message}`);
-      await this._updateConnectionState(false);
-    }
-  }
-
-  async _processHeadlines(payload = {}, options = {}) {
-    const articles = Array.isArray(payload?.articles)
-      ? payload.articles.filter((article) => article && article.title)
-      : [];
-
-    const keyword = options.keyword ?? this._keyword();
-    const latest = articles[0] ?? null;
-    const unseenArticle = this._findFirstUnseen(articles);
-    const articleSummaries = articles.slice(0, 20).map((article) => ({
-      title: article.title ?? "",
-      source: article.source?.name ?? "",
-      url: article.url ?? "",
-      publishedAt: article.publishedAt ?? "",
-      image: article.urlToImage ?? "",
-      description: article.description ?? "",
-    }));
-
-    await Promise.all([
-      this._setVariable(VARIABLE_NAMES.title, latest?.title ?? ""),
-      this._setVariable(VARIABLE_NAMES.description, latest?.description ?? ""),
-      this._setVariable(VARIABLE_NAMES.url, latest?.url ?? ""),
-      this._setVariable(VARIABLE_NAMES.source, latest?.source?.name ?? ""),
-      this._setVariable(VARIABLE_NAMES.image, latest?.urlToImage ?? ""),
-      this._setVariable(VARIABLE_NAMES.published, latest?.publishedAt ?? ""),
-      this._setVariable(VARIABLE_NAMES.count, articles.length),
-      this._setVariable(
-        VARIABLE_NAMES.collection,
-        JSON.stringify({
-          keyword,
-          count: articles.length,
-          articles: articleSummaries,
-        })
-      ),
-      this._setVariable(VARIABLE_NAMES.keyword, keyword || ""),
-    ]);
-
-    for (const article of articles) {
-      if (typeof article?.url === "string" && article.url) {
-        this._rememberSeen(article.url);
-      }
-    }
-
-    if (!options.initial && this._alertsEnabled() && unseenArticle) {
-      await this._triggerNewHeadlineAlert(unseenArticle, keyword);
-    }
-  }
-
-  async _triggerNewHeadlineAlert(article, keyword) {
-    try {
-      const alertVars = {
-        latest_title: article.title ?? "",
-        latest_source: article.source?.name ?? "",
-        latest_url: article.url ?? "",
-        latest_published: article.publishedAt ?? "",
-        keyword: keyword ?? "",
-      };
-
-      await this.lumia.triggerAlert({
-        alert: "hotnews_new_headline",
-        dynamic: { ...alertVars },
-        extraSettings: { ...alertVars },
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.lumia.addLog(`Failed to trigger headline alert: ${message}`);
-    }
-  }
-
-  async _fetchHeadlines({ apiKey, keyword, limit, country, category }) {
-    const effectiveKey = apiKey || this._apiKey();
-    if (!effectiveKey) {
-      throw new Error("Missing NewsAPI key.");
-    }
-
-    const clampedLimit = Math.max(
-      1,
-      Math.min(100, this._coerceNumber(limit, DEFAULTS.resultsLimit))
-    );
-    const url = new URL(`${NEWS_API_BASE}/top-headlines`);
-    url.searchParams.set("pageSize", String(clampedLimit));
-    url.searchParams.set("page", "1");
-
-    const resolvedKeyword = typeof keyword === "string" ? keyword.trim() : "";
-    if (resolvedKeyword) {
-      url.searchParams.set("q", resolvedKeyword);
-    }
-
-    const resolvedCountry =
-      typeof country === "string" ? country.trim().toLowerCase() : "";
-    if (resolvedCountry) {
-      url.searchParams.set("country", resolvedCountry);
-    }
-
-    const resolvedCategory =
-      typeof category === "string" ? category.trim().toLowerCase() : "";
-    if (resolvedCategory) {
-      url.searchParams.set("category", resolvedCategory);
-    }
-
-    if (!resolvedCountry && !resolvedKeyword) {
-      url.searchParams.set("language", "en");
-    }
-
-    const response = await fetch(url.toString(), {
-      headers: {
-        "X-Api-Key": effectiveKey,
-        Accept: "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `NewsAPI error (${response.status}): ${body || "No response body"}`
-      );
-    }
-
-    const json = await response.json();
-    if (json?.status !== "ok") {
-      throw new Error(
-        json?.message
-          ? `NewsAPI returned an error: ${json.message}`
-          : "NewsAPI response did not include a success status."
-      );
-    }
-
-    return json;
-  }
-
-  _findFirstUnseen(articles = []) {
-    for (const article of articles) {
-      const url = typeof article?.url === "string" ? article.url : "";
-      if (!url) {
-        continue;
-      }
-      if (!this._seenUrls.has(url)) {
-        return article;
-      }
-    }
-    return null;
-  }
-
-  _rememberSeen(url) {
-    if (!url || this._seenUrls.has(url)) {
-      return;
-    }
-
-    this._seenUrls.add(url);
-    this._seenQueue.push(url);
-
-    const MAX_SEEN = 200;
-    while (this._seenQueue.length > MAX_SEEN) {
-      const removed = this._seenQueue.shift();
-      if (removed) {
-        this._seenUrls.delete(removed);
-      }
-    }
-  }
-
-  async _primeVariables() {
-    await Promise.all([
-      this._setVariable(VARIABLE_NAMES.title, ""),
-      this._setVariable(VARIABLE_NAMES.description, ""),
-      this._setVariable(VARIABLE_NAMES.url, ""),
-      this._setVariable(VARIABLE_NAMES.source, ""),
-      this._setVariable(VARIABLE_NAMES.image, ""),
-      this._setVariable(VARIABLE_NAMES.published, ""),
-      this._setVariable(VARIABLE_NAMES.count, 0),
-      this._setVariable(
-        VARIABLE_NAMES.collection,
-        JSON.stringify({ keyword: "", count: 0, articles: [] })
-      ),
-      this._setVariable(VARIABLE_NAMES.keyword, this._keyword() || ""),
-    ]);
-  }
-
-  _schedulePolling() {
-    this._clearPolling();
-
-    if (this._offline) {
-      return;
-    }
-
-    const baseInterval = this._pollInterval();
-    if (!this._apiKey() || baseInterval <= 0) {
-      return;
-    }
-
-    const intervalSeconds = Math.min(
-      Math.max(Math.round(baseInterval * this._backoffMultiplier), 60),
-      3600
-    );
-    this._pollTimer = setInterval(() => {
-      void this._refreshHeadlines();
-    }, intervalSeconds * 1000);
-  }
-
-  _clearPolling() {
-    if (this._pollTimer) {
-      clearInterval(this._pollTimer);
-      this._pollTimer = null;
-    }
-  }
-
-  async _updateConnectionState(state) {
-    if (this._lastConnectionState === state) {
-      return;
-    }
-
-    this._lastConnectionState = state;
-
-    if (typeof this.lumia.updateConnection === "function") {
-      try {
-        await this.lumia.updateConnection(state);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        await this.lumia.addLog(
-          `Failed to update connection state: ${message}`
-        );
-      }
-    }
-  }
-
-  _apiKey() {
-    const value = this.settings?.apiKey;
-    return typeof value === "string" ? value.trim() : "";
-  }
-
-  _pollInterval() {
-    const configured = this._coerceNumber(this.settings?.pollInterval, null);
-    if (configured === null) {
-      return DEFAULTS.pollInterval;
-    }
-    return Math.max(60, Math.min(1800, Math.round(configured)));
-  }
-
-  _resultsLimit() {
-    return Math.max(
-      1,
-      Math.min(
-        20,
-        this._coerceNumber(this.settings?.resultsLimit, DEFAULTS.resultsLimit)
-      )
-    );
-  }
-
-  _country() {
-    const raw = this.settings?.country;
-    return typeof raw === "string" ? raw.trim().toLowerCase() : "";
-  }
-
-  _category() {
-    const raw = this.settings?.category;
-    return typeof raw === "string" ? raw.trim().toLowerCase() : "";
-  }
-
-  _keyword() {
-    const raw = this.settings?.query;
-    return typeof raw === "string" ? raw.trim() : "";
-  }
-
-  _alertsEnabled() {
-    return this.settings?.enableAlerts !== false;
-  }
-
-  _coerceNumber(value, fallback) {
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-    if (typeof value === "string" && value.trim().length) {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : fallback;
-    }
-    return fallback;
-  }
-
-  async _setVariable(name, value) {
-    try {
-      await this.lumia.setVariable(name, value);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.lumia.addLog(`Failed to set variable ${name}: ${message}`);
-    }
-  }
-}
-
-module.exports = HotNewsPlugin;
-
-```
-
-## hot_news/manifest.json
-
-```
-{
-  "id": "hot_news",
-  "name": "Hot News",
-  "version": "1.0.3",
-  "author": "Lumia Stream",
-  "email": "dev@lumiastream.com",
-  "website": "https://lumiastream.com",
-  "description": "Poll NewsAPI for topic headlines, store latest articles in variables, and trigger alerts.",
-  "license": "MIT",
-  "lumiaVersion": "^9.0.0",
-  "category": "utilities",
-  "keywords": "news, headlines, newsapi, breaking, alerts",
-  "icon": "hot_news.png",
-  "externalHelpLink": "https://lumiastream.com/contact",
-  "config": {
-    "settings": [
-      {
-        "key": "apiKey",
-        "label": "NewsAPI Key",
-        "type": "password",
-        "placeholder": "Enter your NewsAPI.org key",
-        "helperText": "Generate a key at https://newsapi.org/ to authenticate requests.",
-        "required": true
       },
       {
-        "key": "country",
-        "label": "Country",
-        "type": "select",
-        "defaultValue": "us",
-        "options": [
-          {
-            "label": "Argentina",
-            "value": "ar"
-          },
-          {
-            "label": "Australia",
-            "value": "au"
-          },
-          {
-            "label": "Austria",
-            "value": "at"
-          },
-          {
-            "label": "Algeria",
-            "value": "dz"
-          },
-          {
-            "label": "Belgium",
-            "value": "be"
-          },
-          {
-            "label": "Brazil",
-            "value": "br"
-          },
-          {
-            "label": "Bulgaria",
-            "value": "bg"
-          },
-          {
-            "label": "Canada",
-            "value": "ca"
-          },
-          {
-            "label": "China",
-            "value": "cn"
-          },
-          {
-            "label": "Colombia",
-            "value": "co"
-          },
-          {
-            "label": "Czechia",
-            "value": "cz"
-          },
-          {
-            "label": "Egypt",
-            "value": "eg"
-          },
-          {
-            "label": "France",
-            "value": "fr"
-          },
-          {
-            "label": "Germany",
-            "value": "de"
-          },
-          {
-            "label": "Greece",
-            "value": "gr"
-          },
-          {
-            "label": "Hong Kong",
-            "value": "hk"
-          },
-          {
-            "label": "Hungary",
-            "value": "hu"
-          },
-          {
-            "label": "India",
-            "value": "in"
-          },
-          {
-            "label": "Indonesia",
-            "value": "id"
-          },
-          {
-            "label": "Ireland",
-            "value": "ie"
-          },
-          {
-            "label": "Italy",
-            "value": "it"
-          },
-          {
-            "label": "Japan",
-            "value": "jp"
-          },
-          {
-            "label": "Latvia",
-            "value": "lv"
-          },
-          {
-            "label": "Lithuania",
-            "value": "lt"
-          },
-          {
-            "label": "Malaysia",
-            "value": "my"
-          },
-          {
-            "label": "Mexico",
-            "value": "mx"
-          },
-          {
-            "label": "Morocco",
-            "value": "ma"
-          },
-          {
-            "label": "Netherlands",
-            "value": "nl"
-          },
-          {
-            "label": "New Zealand",
-            "value": "nz"
-          },
-          {
-            "label": "Nigeria",
-            "value": "ng"
-          },
-          {
-            "label": "Norway",
-            "value": "no"
-          },
-          {
-            "label": "Philippines",
-            "value": "ph"
-          },
-          {
-            "label": "Poland",
-            "value": "pl"
-          },
-          {
-            "label": "Portugal",
-            "value": "pt"
-          },
-          {
-            "label": "Romania",
-            "value": "ro"
-          },
-          {
-            "label": "Russia",
-            "value": "ru"
-          },
-          {
-            "label": "Saudi Arabia",
-            "value": "sa"
-          },
-          {
-            "label": "Serbia",
-            "value": "rs"
-          },
-          {
-            "label": "Singapore",
-            "value": "sg"
-          },
-          {
-            "label": "Slovakia",
-            "value": "sk"
-          },
-          {
-            "label": "Slovenia",
-            "value": "si"
-          },
-          {
-            "label": "South Africa",
-            "value": "za"
-          },
-          {
-            "label": "South Korea",
-            "value": "kr"
-          },
-          {
-            "label": "Sweden",
-            "value": "se"
-          },
-          {
-            "label": "Switzerland",
-            "value": "ch"
-          },
-          {
-            "label": "Taiwan",
-            "value": "tw"
-          },
-          {
-            "label": "Thailand",
-            "value": "th"
-          },
-          {
-            "label": "Turkey",
-            "value": "tr"
-          },
-          {
-            "label": "Ukraine",
-            "value": "ua"
-          },
-          {
-            "label": "United Arab Emirates",
-            "value": "ae"
-          },
-          {
-            "label": "United Kingdom",
-            "value": "gb"
-          },
-          {
-            "label": "United States",
-            "value": "us"
-          },
-          {
-            "label": "Venezuela",
-            "value": "ve"
-          }
-        ],
-        "helperText": "Restrict headlines to a specific country (defaults to US)."
+        "name": "market_orders_active",
+        "description": "Number of active market orders.",
+        "value": 0
       },
       {
-        "key": "category",
-        "label": "Category",
-        "type": "select",
-        "defaultValue": "",
-        "options": [
-          {
-            "label": "Any",
-            "value": ""
-          },
-          {
-            "label": "Business",
-            "value": "business"
-          },
-          {
-            "label": "Entertainment",
-            "value": "entertainment"
-          },
-          {
-            "label": "General",
-            "value": "general"
-          },
-          {
-            "label": "Health",
-            "value": "health"
-          },
-          {
-            "label": "Science",
-            "value": "science"
-          },
-          {
-            "label": "Sports",
-            "value": "sports"
-          },
-          {
-            "label": "Technology",
-            "value": "technology"
-          }
-        ],
-        "helperText": "Optional NewsAPI category filter."
+        "name": "market_orders_buy",
+        "description": "Number of active buy orders.",
+        "value": 0
       },
       {
-        "key": "query",
-        "label": "Keyword Filter",
-        "type": "text",
-        "placeholder": "e.g. spaceX, esports, climate",
-        "helperText": "Only return articles matching this keyword or phrase (optional)."
+        "name": "market_orders_sell",
+        "description": "Number of active sell orders.",
+        "value": 0
       },
       {
-        "key": "pollInterval",
-        "label": "Poll Interval (seconds)",
-        "type": "number",
-        "defaultValue": 300,
-        "min": 60,
-        "max": 1800,
-        "helperText": "How often to refresh headlines (1-30 minutes)."
+        "name": "industry_jobs_active",
+        "description": "Number of active industry jobs.",
+        "value": 0
       },
       {
-        "key": "resultsLimit",
-        "label": "Results Limit",
-        "type": "number",
-        "defaultValue": 5,
-        "min": 1,
-        "max": 20,
-        "helperText": "How many headlines to pull each refresh (max 20)."
+        "name": "industry_jobs_total",
+        "description": "Total industry jobs returned by ESI.",
+        "value": 0
       },
       {
-        "key": "enableAlerts",
-        "label": "Enable New Headline Alerts",
-        "type": "toggle",
-        "defaultValue": true,
-        "helperText": "Trigger the alert whenever a headline appears that has not been seen before."
+        "name": "killmails_recent_count",
+        "description": "Count of recent killmails.",
+        "value": 0
+      },
+      {
+        "name": "notifications_count",
+        "description": "Number of notifications returned by ESI.",
+        "value": 0
       }
     ],
-    "settings_tutorial": "---\n### \ud83d\udd11 Get Your API Key\n1) Sign up at https://newsapi.org/ and copy your API key into the NewsAPI Key field.\n---\n### \u2699\ufe0f Choose Coverage\nPick a country, optional category, and keyword filter to focus on the stories you care about.\n---\n### \u23f1\ufe0f Set Poll Interval\nAdjust how often the plugin checks NewsAPI (defaults to every 5 minutes).\n---\n### \ud83d\udea8 Enable Alerts\nLeave alerts enabled to have Lumia announce fresh headlines as they arrive.\n---",
-    "actions": [],
     "alerts": [
       {
-        "title": "New Headline",
-        "key": "hotnews_new_headline",
-        "defaultMessage": "\ud83d\udd25 {{latest_title}} ({{latest_source}})",
+        "title": "Online Status Changed",
+        "key": "eve_online_status",
         "acceptedVariables": [
-          "latest_title",
-          "latest_source",
-          "latest_url",
-          "latest_published",
-          "keyword"
-        ]
+          "character_name",
+          "online",
+          "last_login",
+          "last_logout"
+        ],
+        "defaultMessage": "{{character_name}} is now {{online}}."
+      },
+      {
+        "title": "Skill Queue Empty",
+        "key": "eve_skillqueue_empty",
+        "acceptedVariables": [
+          "character_name",
+          "skillqueue_count",
+          "skillqueue_current_end"
+        ],
+        "defaultMessage": "{{character_name}}'s skill queue is empty."
+      },
+      {
+        "title": "Wallet Spike",
+        "key": "eve_wallet_spike",
+        "acceptedVariables": [
+          "character_name",
+          "wallet_balance"
+        ],
+        "defaultMessage": "{{character_name}} wallet increased ({{wallet_balance}} ISK)."
+      },
+      {
+        "title": "Wallet Drop",
+        "key": "eve_wallet_drop",
+        "acceptedVariables": [
+          "character_name",
+          "wallet_balance"
+        ],
+        "defaultMessage": "{{character_name}} wallet decreased ({{wallet_balance}} ISK)."
+      },
+      {
+        "title": "New Killmail",
+        "key": "eve_killmail_new",
+        "acceptedVariables": [
+          "character_name",
+          "killmails_recent_count"
+        ],
+        "defaultMessage": "New killmail detected for {{character_name}}."
+      },
+      {
+        "title": "New Notification",
+        "key": "eve_notification_new",
+        "acceptedVariables": [
+          "character_name",
+          "notifications_count"
+        ],
+        "defaultMessage": "New EVE notification for {{character_name}}."
+      },
+      {
+        "title": "Docked",
+        "key": "eve_docked",
+        "acceptedVariables": [
+          "character_name",
+          "station_id",
+          "structure_id",
+          "solar_system_id"
+        ],
+        "defaultMessage": "{{character_name}} docked."
+      },
+      {
+        "title": "Undocked",
+        "key": "eve_undocked",
+        "acceptedVariables": [
+          "character_name",
+          "station_id",
+          "structure_id",
+          "solar_system_id"
+        ],
+        "defaultMessage": "{{character_name}} undocked."
+      },
+      {
+        "title": "Ship Changed",
+        "key": "eve_ship_changed",
+        "acceptedVariables": [
+          "character_name",
+          "ship_type_id",
+          "ship_name"
+        ],
+        "defaultMessage": "{{character_name}} switched ships ({{ship_name}})."
       }
     ],
-    "variables": [
-      {
-        "name": "latest_title",
-        "description": "Headline from the most recent article.",
-        "value": ""
-      },
-      {
-        "name": "latest_description",
-        "description": "Summary of the most recent article.",
-        "value": ""
-      },
-      {
-        "name": "latest_url",
-        "description": "Direct link to the latest article.",
-        "value": ""
-      },
-      {
-        "name": "latest_source",
-        "description": "Source/publisher of the latest article.",
-        "value": ""
-      },
-      {
-        "name": "latest_image",
-        "description": "URL to the lead image for the latest article.",
-        "value": ""
-      },
-      {
-        "name": "latest_published",
-        "description": "ISO timestamp of when the latest article was published.",
-        "value": ""
-      },
-      {
-        "name": "article_count",
-        "description": "Number of articles returned in the latest refresh.",
-        "value": 0
-      },
-      {
-        "name": "recent_articles",
-        "description": "JSON payload containing the most recent headlines.",
-        "value": ""
-      },
-      {
-        "name": "keyword",
-        "description": "Keyword used for the latest refresh.",
-        "value": ""
-      }
-    ],
-    "actions_tutorial": "---\n### Actions\nThis plugin runs on a poll interval and does not expose actions. Update settings to change coverage or refresh timing.\n---"
+    "actions_tutorial": "---\n### Actions\nThis plugin runs automatically and does not expose actions.\n---"
   }
 }
+
 ```
 
-## hot_news/package.json
+## eveonline/package.json
 
 ```
 {
-	"name": "lumia_plugin-hot-news",
+	"name": "lumia_plugin-eve-online",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Lumia Stream plugin that polls NewsAPI.org for the latest headlines and mirrors them into Lumia variables.",
+	"description": "Lumia Stream plugin that pulls EVE Online character data from ESI.",
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.1"
+		"@lumiastream/plugin": "^0.2.3"
 	}
 }
 
@@ -4942,33 +4318,6 @@ module.exports = MinecraftServerPlugin;
 }
 ```
 
-## minecraft_server/package-lock.json
-
-```
-{
-	"name": "lumia-minecraft-server",
-	"version": "1.0.0",
-	"lockfileVersion": 3,
-	"requires": true,
-	"packages": {
-		"": {
-			"name": "lumia-minecraft-server",
-			"version": "1.0.0",
-			"dependencies": {
-				"@lumiastream/plugin": "^0.2.4"
-			}
-		},
-		"node_modules/@lumiastream/plugin": {
-			"version": "0.1.18",
-			"resolved": "https://registry.npmjs.org/@lumiastream/plugin/-/plugin-0.1.18.tgz",
-			"integrity": "sha512-J290nM+G6wD8fUFAdJgzEWkRZEZCKtDjLDRAh5utHVOily+sJrg/tl2HhyEXGB+ALHZpEiYGfIyLWghhYlKiTQ==",
-			"license": "MIT"
-		}
-	}
-}
-
-```
-
 ## minecraft_server/package.json
 
 ```
@@ -4980,165 +4329,3816 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.1"
+		"@lumiastream/plugin": "^0.3.2"
 	}
 }
 
 ```
 
-## mock_lights_plugin/main.js
+## ntfy/main.js
 
 ```
 const { Plugin } = require("@lumiastream/plugin");
 
-const DEFAULT_LIGHTS = [
-	{ id: "mock-1", name: "Mock Panel A", ip: "10.0.0.11" },
-	{ id: "mock-2", name: "Mock Strip B", ip: "10.0.0.12" },
-];
+const DEFAULTS = {
+	baseUrl: "https://ntfy.sh",
+	reconnectInterval: 5,
+	maxReconnectInterval: 300,
+	minPriority: 1,
+	logThrottleMs: 5 * 60 * 1000,
+	maxVariableLength: 2000,
+};
 
-class MockLightsPlugin extends Plugin {
+const ALERT_KEYS = {
+	notification: "notification",
+};
+
+const VARIABLE_NAMES = {
+	title: "title",
+	message: "message",
+	topic: "topic",
+	priority: "priority",
+	tags: "tags",
+	id: "id",
+	time: "time",
+	click: "click",
+	icon: "icon",
+	attachmentUrl: "attachment_url",
+	event: "event",
+};
+
+class NtfyPlugin extends Plugin {
 	constructor(manifest, context) {
 		super(manifest, context);
-		this._lights = [...DEFAULT_LIGHTS];
-		this._idCounter = DEFAULT_LIGHTS.length + 1;
+		this.ws = null;
+		this.isConnecting = false;
+		this.isManuallyDisconnected = false;
+		this.reconnectTimeoutId = null;
+		this._lastConnectionState = null;
+		this._logTimestamps = new Map();
+		this._currentReconnectInterval = DEFAULTS.reconnectInterval;
+		this._cachedTagFilter = [];
+		this._cachedRegex = null;
+		this._cachedRegexSource = "";
 	}
 
 	async onload() {
-		await this.lumia.updateConnection(true);
+		this._refreshFilters();
+
+		if (this._autoConnect()) {
+			await this.connect({ showToast: false });
+		} else {
+			await this._updateConnectionState(false);
+		}
 	}
 
 	async onunload() {
-		await this.lumia.updateConnection(false);
+		await this.disconnect(false);
 	}
 
-	async searchLights() {
-		const newLight = {
-			id: `mock-${this._idCounter}`,
-			name: `Discovered Mock ${this._idCounter}`,
-			ip: `10.0.0.${10 + this._idCounter}`,
-		};
-		this._idCounter++;
-		this._mergeLights([newLight]);
-		await this._log(`Discovered ${newLight.name} (${newLight.id})`);
-		return this._lights;
-	}
+	async onsettingsupdate(settings, previous = {}) {
+		const connectionChanged =
+			this._baseUrl(settings) !== this._baseUrl(previous) ||
+			this._topicsKey(settings) !== this._topicsKey(previous) ||
+			this._authKey(settings) !== this._authKey(previous);
 
-	async addLight(data = {}) {
-		const newLight = {
-			id: data.id || `manual-${Date.now()}`,
-			name: data.name || `Manual Mock ${this._idCounter++}`,
-			ip: data.ip,
-		};
-		this._mergeLights([newLight]);
-		await this._log(`Manually added ${newLight.name} (${newLight.id})`);
-		return this._lights;
-	}
+		const autoConnectChanged =
+			Boolean(settings?.autoConnect) !== Boolean(previous?.autoConnect);
 
-	async onLightChange(config = {}) {
-		const ids = Array.isArray(config.lights)
-			? config.lights.map((l) => l?.id || l).join(", ")
-			: "unknown";
-		const color = config.color
-			? `rgb(${config.color.r},${config.color.g},${config.color.b})`
-			: "no color";
-		const brightness =
-			typeof config.brightness === "number"
-				? `${config.brightness}%`
-				: "unchanged";
-		const power =
-			typeof config.power === "boolean"
-				? config.power
-					? "on"
-					: "off"
-				: "unchanged";
+		const reconnectChanged =
+			this._reconnectInterval(settings) !== this._reconnectInterval(previous);
 
-		await this._log(
-			`onLightChange -> brand=${config.brand} lights=[${ids}] color=${color} brightness=${brightness} power=${power}`,
-		);
-	}
+		const filterChanged =
+			this._tagFilter(settings) !== this._tagFilter(previous) ||
+			this._messageRegex(settings) !== this._messageRegex(previous) ||
+			this._minPriority(settings) !== this._minPriority(previous);
 
-	_mergeLights(newOnes = []) {
-		const existing = new Map(this._lights.map((l) => [l.id, l]));
-		newOnes.forEach((light) => {
-			if (!existing.has(light.id)) {
-				existing.set(light.id, light);
+		if (filterChanged) {
+			this._refreshFilters(settings);
+		}
+
+		if (reconnectChanged) {
+			this._currentReconnectInterval = this._reconnectInterval(settings);
+		}
+
+		if (connectionChanged || autoConnectChanged) {
+			if (this._autoConnect(settings)) {
+				this.isManuallyDisconnected = false;
+				await this._reconnect({ showToast: false });
+			} else {
+				await this.disconnect(false);
 			}
-		});
-		this._lights = Array.from(existing.values());
+		}
+	}
+
+	async actions(config) {
+		for (const action of config.actions) {
+			try {
+				switch (action.type) {
+					case "manual_connect":
+						await this.connect({ showToast: true });
+						break;
+					case "manual_disconnect":
+						await this.disconnect(true);
+						break;
+					case "test_alert":
+						await this._handleTestAlert();
+						break;
+				}
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(
+					`Action ${action.type ?? "unknown"} failed: ${message}`,
+					"error",
+				);
+			}
+		}
+	}
+
+	async validateAuth(data = {}) {
+		const baseUrl = this._baseUrl(data) || this._baseUrl();
+		const topics = this._topics(data);
+		const authType = this._authType(data);
+
+		if (!baseUrl) {
+			return { ok: false, message: "Missing ntfy server base URL." };
+		}
+		if (!topics.length) {
+			return { ok: false, message: "Missing ntfy topic(s)." };
+		}
+		if (authType === "token" && !this._accessToken(data)) {
+			return { ok: false, message: "Missing ntfy access token." };
+		}
+		if (authType === "basic" && !this._username(data)) {
+			return { ok: false, message: "Missing ntfy username." };
+		}
+		if (authType === "basic" && !this._password(data)) {
+			return { ok: false, message: "Missing ntfy password." };
+		}
+
+		return { ok: true };
+	}
+
+	_tag() {
+		return `[${this.manifest?.id ?? "ntfy"}]`;
 	}
 
 	async _log(message, severity = "info") {
-		if (severity !== "error") {
+		if (severity !== "warn" && severity !== "error") {
 			return;
 		}
-		await this.lumia.addLog(`[${this.manifest.id}] ${message}`);
+
+		const prefix = this._tag();
+		const decorated =
+			severity === "warn"
+				? `${prefix} WARNING: ${message}`
+				: `${prefix} ERROR: ${message}`;
+
+		await this.lumia.addLog(decorated);
+	}
+
+	async _logThrottled(
+		key,
+		message,
+		severity = "warn",
+		intervalMs = DEFAULTS.logThrottleMs,
+	) {
+		const now = Date.now();
+		const last = this._logTimestamps.get(key) ?? 0;
+		if (now - last < intervalMs) {
+			return;
+		}
+		this._logTimestamps.set(key, now);
+		await this._log(message, severity);
+	}
+
+	_refreshFilters(settings = this.settings) {
+		this._cachedTagFilter = this._parseTagFilter(settings);
+		const regexValue = this._messageRegex(settings);
+		if (!regexValue) {
+			this._cachedRegex = null;
+			this._cachedRegexSource = "";
+			return;
+		}
+
+		try {
+			const parsed = this._parseRegex(regexValue);
+			this._cachedRegex = new RegExp(parsed.pattern, parsed.flags);
+			this._cachedRegexSource = regexValue;
+		} catch (error) {
+			this._cachedRegex = null;
+			this._cachedRegexSource = "";
+			void this._log(
+				`Invalid message regex ignored: ${this._errorMessage(error)}`,
+				"warn",
+			);
+		}
+	}
+
+	async connect(options = {}) {
+		const { showToast = true } = options;
+
+		if (this.isConnecting) {
+			return;
+		}
+
+		if (typeof WebSocket !== "function") {
+			await this._log(
+				"WebSocket is not available in this environment.",
+				"error",
+			);
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		if (!this._hasRequiredSettings()) {
+			await this._updateConnectionState(false);
+			await this._log("Missing ntfy server URL or topics.", "warn");
+			if (showToast && typeof this.lumia.showToast === "function") {
+				await this.lumia.showToast({
+					message: "ntfy settings missing: server URL or topics",
+				});
+			}
+			return;
+		}
+
+		if (this.ws && this.ws.readyState === 1) {
+			return;
+		}
+
+		try {
+			this.isConnecting = true;
+			this.isManuallyDisconnected = false;
+
+			const wsUrl = this._buildWsUrl();
+			this.ws = new WebSocket(wsUrl);
+
+			this.ws.onopen = () => {
+				void this._handleOpen(showToast);
+			};
+			this.ws.onmessage = (event) => {
+				void this._handleMessage(event);
+			};
+			this.ws.onerror = (error) => {
+				void this._handleError(error);
+			};
+			this.ws.onclose = () => {
+				void this._handleClose();
+			};
+		} catch (error) {
+			this.isConnecting = false;
+			const message = this._errorMessage(error);
+			await this._log(`Connection error: ${message}`, "error");
+			if (showToast && typeof this.lumia.showToast === "function") {
+				await this.lumia.showToast({
+					message: `Failed to connect: ${message}`,
+				});
+			}
+		}
+	}
+
+	async disconnect(showToast = true) {
+		this.isManuallyDisconnected = true;
+
+		if (this.reconnectTimeoutId) {
+			clearTimeout(this.reconnectTimeoutId);
+			this.reconnectTimeoutId = null;
+		}
+
+		if (this.ws) {
+			this.ws.onclose = null;
+			this.ws.close();
+			this.ws = null;
+		}
+
+		this.isConnecting = false;
+		this._currentReconnectInterval = this._reconnectInterval();
+
+		if (showToast && typeof this.lumia.showToast === "function") {
+			await this.lumia.showToast({ message: "Disconnected from ntfy" });
+		}
+
+		await this._updateConnectionState(false);
+	}
+
+	async _reconnect(options = {}) {
+		await this.disconnect(false);
+		if (this._autoConnect()) {
+			await this.connect(options);
+		}
+	}
+
+	async _handleOpen(showToast = true) {
+		this.isConnecting = false;
+		this._currentReconnectInterval = this._reconnectInterval();
+
+		if (showToast && typeof this.lumia.showToast === "function") {
+			await this.lumia.showToast({ message: "Connected to ntfy" });
+		}
+
+		await this._updateConnectionState(true);
+	}
+
+	async _handleMessage(event) {
+		const raw = this._normalizeMessageData(event?.data);
+		if (!raw) {
+			return;
+		}
+
+		let payload;
+		try {
+			payload = JSON.parse(raw);
+		} catch (error) {
+			await this._logThrottled(
+				"json-parse",
+				`Failed to parse ntfy payload: ${this._errorMessage(error)}`,
+				"warn",
+			);
+			return;
+		}
+
+		const eventType = String(payload?.event || "").toLowerCase();
+
+		if (eventType !== "message") {
+			return;
+		}
+
+		if (!this._passesFilters(payload)) {
+			return;
+		}
+
+		await this._handleNotification(payload);
+	}
+
+	async _handleError(error) {
+		const message = this._errorMessage(error);
+		await this._logThrottled(
+			"socket-error",
+			`WebSocket error: ${message}`,
+			"warn",
+		);
+	}
+
+	async _handleClose() {
+		await this._updateConnectionState(false);
+
+		if (!this.isManuallyDisconnected) {
+			await this._scheduleReconnect();
+		}
+	}
+
+	async _scheduleReconnect() {
+		if (this.reconnectTimeoutId) {
+			return;
+		}
+
+		const interval = this._currentReconnectInterval;
+		const next = Math.min(Math.max(interval, 1), DEFAULTS.maxReconnectInterval);
+
+		this.reconnectTimeoutId = setTimeout(() => {
+			this.reconnectTimeoutId = null;
+			this._currentReconnectInterval = Math.min(
+				this._currentReconnectInterval * 2,
+				DEFAULTS.maxReconnectInterval,
+			);
+			void this.connect({ showToast: false });
+		}, next * 1000);
+	}
+
+	async _handleNotification(payload = {}) {
+		const alertVariables = this._buildAlertVariables(payload);
+
+		if (this._enableAlerts()) {
+			await this._triggerNotificationAlert(alertVariables, "alert");
+		}
+	}
+
+	async _handleTestAlert() {
+		const testPayload = {
+			event: "message",
+			id: "test-notification",
+			topic: this._topics()[0] || "",
+			time: Math.floor(Date.now() / 1000),
+			priority: 3,
+			title: "Test Notification",
+			message: "This is a test from the ntfy plugin.",
+			tags: ["test", "lumia"],
+			click: "https://ntfy.sh",
+		};
+		const alertVariables = this._buildAlertVariables(testPayload);
+		await this._triggerNotificationAlert(alertVariables, "test alert");
+	}
+
+	_buildAlertPayload(alertVariables = {}) {
+		return {
+			dynamic: {
+				...alertVariables,
+				value: alertVariables[VARIABLE_NAMES.priority],
+			},
+			extraSettings: {
+				...alertVariables,
+			},
+		};
+	}
+
+	_buildAlertVariables(payload = {}) {
+		const tags = this._normalizeTags(payload?.tags);
+		const formattedTime = this._formatTime(payload?.time);
+		const attachmentUrl =
+			payload?.attachment?.url ||
+			payload?.attachment?.link ||
+			payload?.attachment?.href;
+
+		return {
+			[VARIABLE_NAMES.title]: this._truncateValue(payload?.title),
+			[VARIABLE_NAMES.message]: this._truncateValue(payload?.message),
+			[VARIABLE_NAMES.topic]: this._truncateValue(payload?.topic),
+			[VARIABLE_NAMES.priority]: this._coerceNumber(payload?.priority, ""),
+			[VARIABLE_NAMES.tags]: this._truncateValue(tags),
+			[VARIABLE_NAMES.id]: this._truncateValue(payload?.id),
+			[VARIABLE_NAMES.time]: this._truncateValue(formattedTime || payload?.time),
+			[VARIABLE_NAMES.click]: this._truncateValue(payload?.click),
+			[VARIABLE_NAMES.icon]: this._truncateValue(payload?.icon),
+			[VARIABLE_NAMES.attachmentUrl]: this._truncateValue(attachmentUrl),
+			[VARIABLE_NAMES.event]: this._truncateValue(payload?.event),
+		};
+	}
+
+	async _triggerNotificationAlert(alertVariables = {}, label = "alert") {
+		try {
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.notification,
+				...this._buildAlertPayload(alertVariables),
+			});
+		} catch (error) {
+			await this._log(
+				`Failed to trigger ${label}: ${this._errorMessage(error)}`,
+				"warn",
+			);
+		}
+	}
+
+	async _updateConnectionState(state) {
+		if (this._lastConnectionState === state) {
+			return;
+		}
+
+		this._lastConnectionState = state;
+
+		if (typeof this.lumia.updateConnection === "function") {
+			try {
+				await this.lumia.updateConnection(state);
+			} catch (error) {
+				await this._log(
+					`Failed to update connection state: ${this._errorMessage(error)}`,
+					"warn",
+				);
+			}
+		}
+	}
+
+	_buildWsUrl() {
+		const baseUrl = this._baseUrl();
+		const topics = this._topics();
+
+		if (!baseUrl) {
+			throw new Error("Missing ntfy base URL");
+		}
+		if (!topics.length) {
+			throw new Error("Missing ntfy topics");
+		}
+
+		const url = new URL(baseUrl);
+		url.protocol = url.protocol === "http:" ? "ws:" : "wss:";
+		const basePath = url.pathname.replace(/\/+$/, "");
+		const topicPath = topics
+			.map((topic) => encodeURIComponent(topic))
+			.join(",");
+		url.pathname = `${basePath}/${topicPath}/ws`;
+
+		const auth = this._buildAuthQuery();
+		if (auth) {
+			url.searchParams.set("auth", auth);
+		}
+
+		return url.toString();
+	}
+
+	_buildAuthQuery(settings = this.settings) {
+		const authType = this._authType(settings);
+		if (authType === "token") {
+			const token = this._accessToken(settings);
+			if (!token) {
+				return "";
+			}
+			const headerValue = `Bearer ${token}`;
+			return Buffer.from(headerValue).toString("base64");
+		}
+
+		if (authType === "basic") {
+			const username = this._username(settings);
+			const password = this._password(settings);
+			if (!username || !password) {
+				return "";
+			}
+			const credential = Buffer.from(`${username}:${password}`).toString(
+				"base64",
+			);
+			const headerValue = `Basic ${credential}`;
+			return Buffer.from(headerValue).toString("base64");
+		}
+
+		return "";
+	}
+
+	_hasRequiredSettings(settings = this.settings) {
+		return Boolean(this._baseUrl(settings) && this._topics(settings).length);
+	}
+
+	_baseUrl(settings = this.settings) {
+		const raw = this._trim(settings?.baseUrl);
+		return raw || DEFAULTS.baseUrl;
+	}
+
+	_topics(settings = this.settings) {
+		const raw = this._trim(settings?.topics);
+		if (!raw) {
+			return [];
+		}
+		return raw
+			.split(",")
+			.map((value) => value.trim())
+			.filter(Boolean);
+	}
+
+	_topicsKey(settings = this.settings) {
+		return this._topics(settings).join(",");
+	}
+
+	_authKey(settings = this.settings) {
+		return [
+			this._authType(settings),
+			this._accessToken(settings),
+			this._username(settings),
+			this._password(settings),
+		].join("|");
+	}
+
+	_authType(settings = this.settings) {
+		const raw = this._trim(settings?.authType);
+		if (raw === "token" || raw === "basic") {
+			return raw;
+		}
+		return "none";
+	}
+
+	_accessToken(settings = this.settings) {
+		return this._trim(settings?.accessToken);
+	}
+
+	_username(settings = this.settings) {
+		return this._trim(settings?.username);
+	}
+
+	_password(settings = this.settings) {
+		return this._trim(settings?.password);
+	}
+
+	_autoConnect(settings = this.settings) {
+		return settings?.autoConnect !== false;
+	}
+
+	_reconnectInterval(settings = this.settings) {
+		const raw = Number(settings?.reconnectInterval);
+		const value = Number.isFinite(raw) ? raw : DEFAULTS.reconnectInterval;
+		return Math.min(Math.max(value, 1), DEFAULTS.maxReconnectInterval);
+	}
+
+	_minPriority(settings = this.settings) {
+		const raw = Number(settings?.minPriority);
+		const value = Number.isFinite(raw) ? raw : DEFAULTS.minPriority;
+		return Math.min(Math.max(value, 1), 5);
+	}
+
+	_tagFilter(settings = this.settings) {
+		return this._trim(settings?.tagFilter);
+	}
+
+	_messageRegex(settings = this.settings) {
+		return this._trim(settings?.messageRegex);
+	}
+
+	_enableAlerts(settings = this.settings) {
+		return settings?.enableAlerts !== false;
+	}
+
+	_parseTagFilter(settings = this.settings) {
+		const raw = this._tagFilter(settings);
+		if (!raw) {
+			return [];
+		}
+		return raw
+			.split(",")
+			.map((value) => value.trim().toLowerCase())
+			.filter(Boolean);
+	}
+
+	_parseRegex(raw) {
+		const trimmed = raw.trim();
+		const match = trimmed.match(/^\/(.+)\/([gimsuy]*)$/);
+		if (match) {
+			return { pattern: match[1], flags: match[2] || "i" };
+		}
+		return { pattern: trimmed, flags: "i" };
+	}
+
+	_passesFilters(payload = {}) {
+		const minPriority = this._minPriority();
+		const priority = this._coerceNumber(payload?.priority, 0);
+		if (minPriority > 1 && priority < minPriority) {
+			return false;
+		}
+
+		if (this._cachedTagFilter.length) {
+			const tags = Array.isArray(payload?.tags) ? payload.tags : [];
+			const lower = tags.map((tag) => String(tag).toLowerCase());
+			const missing = this._cachedTagFilter.some(
+				(required) => !lower.includes(required),
+			);
+			if (missing) {
+				return false;
+			}
+		}
+
+		if (this._cachedRegex && this._cachedRegexSource) {
+			const title = payload?.title ? String(payload.title) : "";
+			const message = payload?.message ? String(payload.message) : "";
+			const haystack = `${title} ${message}`.trim();
+			if (this._cachedRegex.global) {
+				this._cachedRegex.lastIndex = 0;
+			}
+			if (haystack && !this._cachedRegex.test(haystack)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	_normalizeMessageData(data) {
+		if (!data) {
+			return "";
+		}
+		if (typeof data === "string") {
+			return data.trim();
+		}
+		if (Buffer.isBuffer(data)) {
+			return data.toString("utf8").trim();
+		}
+		if (ArrayBuffer.isView(data)) {
+			return Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+				.toString("utf8")
+				.trim();
+		}
+		return String(data).trim();
+	}
+
+	_normalizeTags(value) {
+		if (Array.isArray(value)) {
+			return value
+				.map((tag) => String(tag).trim())
+				.filter(Boolean)
+				.join(",");
+		}
+		if (typeof value === "string") {
+			return value
+				.split(",")
+				.map((tag) => tag.trim())
+				.filter(Boolean)
+				.join(",");
+		}
+		return "";
+	}
+
+	_formatTime(value) {
+		if (!value) {
+			return "";
+		}
+		const seconds = Number(value);
+		if (Number.isFinite(seconds)) {
+			return new Date(seconds * 1000).toISOString();
+		}
+		const parsed = new Date(value);
+		return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+	}
+
+	_truncateValue(value, limit = DEFAULTS.maxVariableLength) {
+		if (value === undefined || value === null) {
+			return "";
+		}
+		const trimmed = String(value).replace(/\s+/g, " ").trim();
+		return trimmed.length > limit ? `${trimmed.slice(0, limit)}...` : trimmed;
+	}
+
+	_trim(value) {
+		if (typeof value !== "string") {
+			return "";
+		}
+		return value.trim();
+	}
+
+	_coerceNumber(value, fallback = 0) {
+		const num = Number(value);
+		return Number.isFinite(num) ? num : fallback;
+	}
+
+	_errorMessage(error) {
+		if (!error) {
+			return "Unknown error";
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		return error?.message || String(error);
 	}
 }
 
-module.exports = MockLightsPlugin;
+module.exports = NtfyPlugin;
 
 ```
 
-## mock_lights_plugin/manifest.json
+## ntfy/manifest.json
 
 ```
 {
-  "id": "mock_lights_plugin",
-  "name": "Mock Lights Plugin",
+	"id": "ntfy",
+	"name": "ntfy",
+	"version": "1.0.1",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Subscribe to ntfy topics and trigger Lumia alerts/variables for incoming notifications.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "apps",
+	"keywords": "ntfy, notifications, subscribe, websocket, alerts",
+	"icon": "ntfy.png",
+	"config": {
+		"settings": [
+			{
+				"key": "baseUrl",
+				"label": "Server Base URL",
+				"type": "url",
+				"defaultValue": "https://ntfy.sh",
+				"placeholder": "https://ntfy.sh",
+				"helperText": "Base URL for your ntfy server (hosted or self-hosted).",
+				"required": true
+			},
+			{
+				"key": "topics",
+				"label": "Topics",
+				"type": "text",
+				"placeholder": "alerts,stream,home",
+				"helperText": "Comma-separated list of ntfy topics to subscribe to.",
+				"required": true
+			},
+			{
+				"key": "authType",
+				"label": "Authentication Type",
+				"type": "select",
+				"defaultValue": "none",
+				"options": [
+					{
+						"label": "None",
+						"value": "none"
+					},
+					{
+						"label": "Access Token",
+						"value": "token"
+					},
+					{
+						"label": "Username + Password",
+						"value": "basic"
+					}
+				],
+				"helperText": "Use an access token (recommended) or username/password if your server requires auth."
+			},
+			{
+				"key": "accessToken",
+				"label": "Access Token",
+				"type": "password",
+				"placeholder": "ntfy access token",
+				"helperText": "Paste a personal access token if auth type is Access Token."
+			},
+			{
+				"key": "username",
+				"label": "Username",
+				"type": "text",
+				"placeholder": "ntfy username",
+				"helperText": "Used when Authentication Type is Username + Password."
+			},
+			{
+				"key": "password",
+				"label": "Password",
+				"type": "password",
+				"placeholder": "ntfy password",
+				"helperText": "Used when Authentication Type is Username + Password."
+			},
+			{
+				"key": "minPriority",
+				"label": "Minimum Priority",
+				"type": "number",
+				"defaultValue": 1,
+				"min": 1,
+				"max": 5,
+				"helperText": "Ignore messages below this priority (1-5)."
+			},
+			{
+				"key": "tagFilter",
+				"label": "Required Tags",
+				"type": "text",
+				"placeholder": "alert,lumia",
+				"helperText": "Optional comma-separated tags that must be present on a message."
+			},
+			{
+				"key": "messageRegex",
+				"label": "Message Regex",
+				"type": "text",
+				"placeholder": "error|warning",
+				"helperText": "Optional regex filter applied to title + message (case-insensitive)."
+			}
+		],
+		"settings_tutorial": "---\n1) Enter your ntfy server base URL (hosted or self-hosted).\n2) Add one or more topics (comma-separated).\n3) If your server requires auth, choose **Access Token** (recommended) or **Username + Password**.\n\n### Notes\n- Access tokens and Basic auth are supported for subscriptions.\n- Topics are case-sensitive and should match your ntfy publisher topics.\n---",
+		"variables": [],
+		"alerts": [
+			{
+				"title": "Notification",
+				"key": "notification",
+				"acceptedVariables": [
+					"title",
+					"message",
+					"topic",
+					"priority",
+					"tags",
+					"id",
+					"time",
+					"click",
+					"icon",
+					"attachment_url",
+					"event"
+				],
+				"defaultMessage": "Notification: {{title}} {{message}}"
+			}
+		],
+		"actions": [],
+		"actions_tutorial": "---\n### Actions\nThis plugin runs automatically and does not expose actions.\n---"
+	}
+}
+
+```
+
+## ntfy/package.json
+
+```
+{
+	"name": "lumia-ntfy",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that subscribes to ntfy topics and triggers alerts on incoming messages.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.2.3"
+	}
+}
+
+```
+
+## ollama/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const DEFAULTS = {
+	baseUrl: "http://localhost:11434",
+	requestTimeoutMs: 60000,
+	maxHistoryMessages: 12,
+	rememberMessages: true,
+	modelCacheTtlMs: 5 * 60 * 1000,
+};
+
+class OllamaPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._messagesByThread = {};
+		this._messagesByUser = {};
+		this._lastConnectionState = null;
+		this._modelCache = { list: [], fetchedAt: 0 };
+		this._modelFetchPromise = null;
+	}
+
+	async onload() {
+		await this._updateConnectionState(false);
+		void this._refreshModelCache();
+	}
+
+	async onsettingsupdate(settings, previous = {}) {
+		const baseChanged = this._baseUrl(settings) !== this._baseUrl(previous);
+		const modelChanged =
+			this._defaultModel(settings) !== this._defaultModel(previous);
+		if (baseChanged || modelChanged) {
+			await this._validateConnection({ silent: true });
+			void this._refreshModelCache({ force: true, silent: true });
+		}
+	}
+
+	async validateAuth() {
+		return this._validateConnection({ silent: true });
+	}
+
+	async variableFunction({ key, value, raw, allVariables } = {}) {
+		if (!key) return "";
+
+		const input =
+			typeof value === "string"
+				? value
+				: typeof raw === "string"
+					? raw
+					: "";
+		if (!input.trim()) {
+			return "";
+		}
+
+		if (key === "ollama_prompt_clear") {
+			this._clearHistory(input, allVariables);
+			return "";
+		}
+
+		if (
+			key !== "ollama_prompt" &&
+			key !== "ollama_prompt_nostore" &&
+			key !== "ollama_json" &&
+			key !== "ollama_one_line"
+		) {
+			return "";
+		}
+
+		const parsed = this._parsePromptInput(input);
+		if (!parsed?.message) {
+			return "";
+		}
+
+		const data = {
+			message: parsed.message,
+			thread: parsed.thread,
+			model: parsed.model,
+			username: allVariables?.username,
+		};
+
+		if (key === "ollama_prompt_nostore") {
+			return await this._handleChat(data, {
+				useHistory: false,
+				storeHistory: false,
+			});
+		}
+
+		if (key === "ollama_one_line") {
+			return await this._handleChat(data, {
+				responseTransform: (text) => this._toOneLine(text),
+			});
+		}
+
+		if (key === "ollama_json") {
+			return await this._handleChat(data, {
+				format: "json",
+				responseTransform: (text) => this._toJsonString(text),
+			});
+		}
+
+		return await this._handleChat(data);
+	}
+
+	async _handleChat(
+		data = {},
+		{ format, responseTransform, useHistory = true, storeHistory = true } = {},
+	) {
+		const message = this._trim(
+			data?.message ?? data?.prompt ?? data?.text ?? "",
+		);
+		if (!message) {
+			return "";
+		}
+
+		const baseUrl = this._baseUrl();
+		if (!baseUrl) {
+			return "";
+		}
+
+		const model = await this._resolveModel(data);
+		if (!model) {
+			return "";
+		}
+
+		const systemMessage = this._systemMessage(data);
+		const temperature = this._number(
+			data?.temperature,
+			this._defaultTemperature(),
+		);
+		const topP = this._number(data?.top_p, this._defaultTopP());
+		const maxTokens = this._number(
+			data?.max_tokens,
+			this._defaultMaxTokens(),
+		);
+		const keepAlive = this._keepAlive(data);
+
+		const thread = this._trim(data?.thread);
+		const username = this._trim(data?.username);
+		const rememberMessages = this._rememberMessages(data);
+
+		const historyKey =
+			useHistory && rememberMessages
+				? this._historyKey({
+						thread,
+						username,
+						rememberMessages,
+				  })
+				: null;
+		const history = historyKey ? this._getHistory(historyKey) : [];
+
+		let messages = this._cloneMessages(history);
+		if (systemMessage) {
+			if (messages.length && messages[0]?.role === "system") {
+				messages[0] = { role: "system", content: systemMessage };
+			} else {
+				messages.unshift({ role: "system", content: systemMessage });
+			}
+		}
+		messages.push({ role: "user", content: message });
+
+		const body = {
+			model,
+			messages,
+			stream: false,
+		};
+
+		const options = {};
+		if (temperature !== null) options.temperature = temperature;
+		if (topP !== null) options.top_p = topP;
+		if (maxTokens !== null) options.num_predict = Math.trunc(maxTokens);
+		if (Object.keys(options).length) body.options = options;
+		if (keepAlive) body.keep_alive = keepAlive;
+		if (format) body.format = format;
+
+		let response;
+		try {
+			response = await this._fetchJson(this._url("/api/chat"), {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+			await this._updateConnectionState(true);
+		} catch (error) {
+			const messageText = this._errorMessage(error);
+			await this._updateConnectionState(false);
+			return "";
+		}
+
+		let responseText =
+			this._trim(response?.message?.content) ||
+			this._trim(response?.response) ||
+			"";
+
+		if (typeof responseTransform === "function") {
+			responseText = responseTransform(responseText);
+		}
+		responseText = this._applyMaxOutput(responseText);
+
+		if (historyKey && storeHistory) {
+			const nextHistory = this._trimHistory(
+				this._appendHistory(messages, responseText),
+				this._maxHistoryMessages(),
+			);
+			this._setHistory(historyKey, nextHistory);
+		}
+
+		return responseText;
+	}
+
+	async _validateConnection({ silent } = {}) {
+		const baseUrl = this._baseUrl();
+		if (!baseUrl) {
+			return { ok: false, message: "Missing Base URL." };
+		}
+
+		try {
+			await this._fetchJson(this._url("/api/tags"), { method: "GET" });
+			await this._updateConnectionState(true);
+			return { ok: true };
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._updateConnectionState(false);
+			if (!silent) {
+			}
+			return { ok: false, message };
+		}
+	}
+
+	_baseUrl(settings = this.settings) {
+		return this._trim(settings?.baseUrl) || DEFAULTS.baseUrl;
+	}
+
+	_defaultModel(settings = this.settings) {
+		return this._trim(settings?.defaultModel);
+	}
+
+	_defaultSystemMessage(settings = this.settings) {
+		return this._trim(settings?.defaultSystemMessage);
+	}
+
+	_defaultTemperature(settings = this.settings) {
+		return this._number(settings?.defaultTemperature, null);
+	}
+
+	_defaultTopP(settings = this.settings) {
+		return this._number(settings?.defaultTopP, null);
+	}
+
+	_defaultMaxTokens(settings = this.settings) {
+		return this._number(settings?.defaultMaxTokens, null);
+	}
+
+	_keepAlive(settings = this.settings) {
+		return this._trim(settings?.keepAlive);
+	}
+
+	_requestTimeoutMs(settings = this.settings) {
+		const raw = Number(settings?.requestTimeoutMs);
+		const value = Number.isFinite(raw) ? raw : DEFAULTS.requestTimeoutMs;
+		return Math.min(Math.max(value, 1000), 300000);
+	}
+
+	_maxOutputChars(settings = this.settings) {
+		const raw = Number(settings?.maxOutputChars);
+		if (!Number.isFinite(raw)) return 0;
+		return Math.min(Math.max(raw, 0), 100000);
+	}
+
+	_rememberMessages(data = {}) {
+		if (typeof data?.keepTrackOfMessages === "boolean") {
+			return data.keepTrackOfMessages;
+		}
+		const value = this.settings?.rememberMessages;
+		if (typeof value === "boolean") return value;
+		return DEFAULTS.rememberMessages;
+	}
+
+	_maxHistoryMessages(settings = this.settings) {
+		const raw = Number(settings?.maxHistoryMessages);
+		if (!Number.isFinite(raw)) return DEFAULTS.maxHistoryMessages;
+		return Math.min(Math.max(raw, 0), 100);
+	}
+
+	async _resolveModel(data = {}) {
+		const explicit = this._trim(data?.model);
+		if (explicit) return explicit;
+		const configured = this._defaultModel();
+		if (configured) return configured;
+
+		const models = await this._refreshModelCache({ silent: true });
+		const resolved = models[0] ?? "";
+		if (resolved) {
+			this.updateSettings({ defaultModel: resolved });
+		}
+		return resolved;
+	}
+
+	_systemMessage(data = {}) {
+		return this._trim(data?.systemMessage) || this._defaultSystemMessage();
+	}
+
+	_clearHistory(input, allVariables) {
+		const raw = this._trim(input);
+		if (raw) {
+			if (raw.startsWith("user:")) {
+				const key = raw.slice(5).trim();
+				if (key) {
+					delete this._messagesByUser[key];
+				}
+				return;
+			}
+			delete this._messagesByThread[raw];
+			return;
+		}
+
+		const username = this._trim(allVariables?.username);
+		if (username) {
+			delete this._messagesByUser[username];
+		}
+	}
+
+	_parsePromptInput(raw) {
+		const separator = "|";
+		let message = raw;
+		let thread;
+		let model;
+
+		const lastPipeIndex = raw.lastIndexOf(separator);
+		if (lastPipeIndex !== -1) {
+			const beforeLast = raw.substring(0, lastPipeIndex);
+			const secondLast = beforeLast.lastIndexOf(separator);
+			if (secondLast !== -1) {
+				message = beforeLast.substring(0, secondLast).trim();
+				thread = beforeLast.substring(secondLast + 1).trim();
+				model = raw.substring(lastPipeIndex + 1).trim();
+			} else {
+				message = beforeLast.trim();
+				thread = raw.substring(lastPipeIndex + 1).trim();
+			}
+		}
+
+		return {
+			message: message?.trim() ?? "",
+			thread: thread?.trim(),
+			model: model?.trim(),
+		};
+	}
+
+	_toOneLine(text) {
+		if (!text) return "";
+		return String(text).replace(/\s+/g, " ").trim();
+	}
+
+	_toJsonString(text) {
+		if (!text) return "";
+		const trimmed = String(text).trim();
+		try {
+			const parsed = JSON.parse(trimmed);
+			return JSON.stringify(parsed);
+		} catch (error) {
+			return trimmed;
+		}
+	}
+
+	_applyMaxOutput(text) {
+		const maxChars = this._maxOutputChars();
+		if (!maxChars || !text) return text ?? "";
+		const value = String(text);
+		if (value.length <= maxChars) return value;
+		return value.slice(0, maxChars);
+	}
+
+	async _refreshModelCache({ force = false, silent = false } = {}) {
+		const now = Date.now();
+		if (
+			!force &&
+			this._modelCache.list.length > 0 &&
+			now - this._modelCache.fetchedAt < DEFAULTS.modelCacheTtlMs
+		) {
+			return this._modelCache.list;
+		}
+
+		if (this._modelFetchPromise) {
+			try {
+				return await this._modelFetchPromise;
+			} catch (error) {
+				return this._modelCache.list;
+			}
+		}
+
+		this._modelFetchPromise = (async () => {
+			const response = await this._fetchJson(this._url("/api/tags"), {
+				method: "GET",
+			});
+			const models = Array.isArray(response?.models)
+				? response.models
+						.map((model) => this._trim(model?.name))
+						.filter(Boolean)
+				: [];
+			this._modelCache = { list: models, fetchedAt: now };
+			if (!this._defaultModel() && models.length > 0) {
+				this.updateSettings({ defaultModel: models[0] });
+			}
+			return models;
+		})().finally(() => {
+			this._modelFetchPromise = null;
+		});
+
+		try {
+			return await this._modelFetchPromise;
+		} catch (error) {
+			if (!silent) {
+				await this._updateConnectionState(false);
+			}
+			return this._modelCache.list;
+		}
+	}
+
+	_historyKey({ thread, username, rememberMessages }) {
+		if (thread) return { type: "thread", key: thread };
+		if (rememberMessages && username) return { type: "user", key: username };
+		return null;
+	}
+
+	_getHistory(key) {
+		if (key.type === "thread") {
+			return this._messagesByThread[key.key] ?? [];
+		}
+		return this._messagesByUser[key.key] ?? [];
+	}
+
+	_setHistory(key, messages) {
+		if (key.type === "thread") {
+			this._messagesByThread[key.key] = messages;
+			return;
+		}
+		this._messagesByUser[key.key] = messages;
+	}
+
+	_cloneMessages(messages) {
+		return Array.isArray(messages)
+			? messages.map((msg) => ({
+					role: msg?.role,
+					content: msg?.content,
+			  }))
+			: [];
+	}
+
+	_appendHistory(messages, responseText) {
+		const next = this._cloneMessages(messages);
+		if (responseText) {
+			next.push({ role: "assistant", content: responseText });
+		}
+		return next;
+	}
+
+	_trimHistory(messages, maxMessages) {
+		if (!Array.isArray(messages)) return [];
+		if (maxMessages <= 0) {
+			return messages[0]?.role === "system" ? [messages[0]] : [];
+		}
+
+		const hasSystem = messages[0]?.role === "system";
+		const system = hasSystem ? messages[0] : null;
+		const rest = hasSystem ? messages.slice(1) : messages;
+		const trimmed = rest.slice(-maxMessages);
+		return system ? [system, ...trimmed] : trimmed;
+	}
+
+	_trim(value) {
+		return typeof value === "string" ? value.trim() : "";
+	}
+
+	_number(value, fallback) {
+		if (value === undefined || value === null || value === "") return fallback;
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : fallback;
+	}
+
+	_errorMessage(error) {
+		if (error instanceof Error) return error.message;
+		return String(error ?? "Unknown error");
+	}
+
+	_url(path) {
+		const base = new URL(this._baseUrl());
+		const basePath = base.pathname.replace(/\/+$/, "");
+		base.pathname = `${basePath}${path}`;
+		return base.toString();
+	}
+
+	async _fetchJson(url, options = {}) {
+		const timeoutMs = this._requestTimeoutMs();
+		const timeoutPromise = new Promise((_, reject) => {
+			setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
+		});
+
+		const response = await Promise.race([fetch(url, options), timeoutPromise]);
+
+		if (!response || !response.ok) {
+			const text = response ? await response.text() : "";
+			throw new Error(
+				`Request failed (${response?.status ?? "unknown"}): ${text || response?.statusText || "No response"}`,
+			);
+		}
+
+		return await response.json();
+	}
+
+	async _updateConnectionState(state) {
+		if (this._lastConnectionState === state) {
+			return;
+		}
+
+		this._lastConnectionState = state;
+
+		if (typeof this.lumia.updateConnection === "function") {
+			try {
+				await this.lumia.updateConnection(state);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this.lumia.addLog(
+					`[Ollama] Failed to update connection: ${message}`,
+				);
+			}
+		}
+	}
+}
+
+module.exports = OllamaPlugin;
+
+```
+
+## ollama/manifest.json
+
+```
+{
+	"id": "ollama",
+	"name": "Ollama",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Send prompts to a local Ollama server and use responses in Lumia templates via {{ollama_prompt}} and related helpers.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "apps",
+	"keywords": "ollama, ai, chat, llm, local",
+	"icon": "ollama.png",
+	"config": {
+		"settings_tutorial": "---\n### 1) Install & Run Ollama\n1) Install [Ollama](https://ollama.com).\n2) Start the server: `ollama serve` (defaults to `http://localhost:11434`).\n3) Pull a model you want to use, for example: `ollama pull gpt-oss:20b`.\n---\n### 2) Configure This Plugin\n- **Base URL** should point to your Ollama server (default `http://localhost:11434`).\n- **Default Model** should match a local model name from `ollama list`. If left blank, the plugin will try to auto-detect and use the first available model.\n- **Max Output Length** trims long replies for overlays or chat boxes.\n---\n### 3) Variable Functions\n**ollama_prompt**\nSend prompts using a simple syntax.\n\nExample:\n`{{ollama_prompt=Make a funny quote}}`\n\nUse user input:\n`{{ollama_prompt={{message}}}}`\n\nKeep conversation context with a thread name and optional model override:\n`{{ollama_prompt={{message}}|thread_name|gpt-oss:20b}}`\n\nUse a thread name to continue the conversation, and the last parameter to use a specific model.\n\n**ollama_json**\nReturn JSON-only output:\n`{{ollama_json=Summarize this clip as JSON}}`\n\n**ollama_one_line**\nReturn a single-line response (newlines removed):\n`{{ollama_one_line=Write a short hype line}}`\n\n**ollama_prompt_nostore**\nRun a prompt without storing or using history:\n`{{ollama_prompt_nostore=Give me a quick summary}}`\n\n**ollama_prompt_clear**\nClear a conversation thread:\n`{{ollama_prompt_clear=thread_name}}`\n---",
+		"settings": [
+			{
+				"key": "baseUrl",
+				"label": "Base URL",
+				"type": "text",
+				"defaultValue": "http://localhost:11434",
+				"required": true,
+				"helperText": "Your Ollama server URL."
+			},
+			{
+				"key": "defaultModel",
+				"label": "Default Model",
+				"type": "text",
+				"placeholder": "gpt-oss:20b",
+				"required": false,
+				"helperText": "Must match a local model from `ollama list`. Leave blank to auto-detect the first available model."
+			},
+			{
+				"key": "defaultSystemMessage",
+				"label": "Default System Message",
+				"type": "textarea",
+				"rows": 3,
+				"helperText": "Optional system message used when none is provided in the action."
+			},
+			{
+				"key": "defaultTemperature",
+				"label": "Default Temperature",
+				"type": "number",
+				"min": 0,
+				"max": 2,
+				"step": 0.1,
+				"helperText": "Optional. Higher is more creative."
+			},
+			{
+				"key": "defaultTopP",
+				"label": "Default Top P",
+				"type": "number",
+				"min": 0,
+				"max": 1,
+				"step": 0.05,
+				"helperText": "Optional nucleus sampling value."
+			},
+			{
+				"key": "defaultMaxTokens",
+				"label": "Default Max Tokens",
+				"type": "number",
+				"min": 1,
+				"max": 8192,
+				"helperText": "Optional. Maps to Ollama num_predict."
+			},
+			{
+				"key": "keepAlive",
+				"label": "Keep Alive",
+				"type": "text",
+				"placeholder": "5m",
+				"helperText": "How long to keep the model loaded (example: `5m`, `0`). Optional."
+			},
+			{
+				"key": "requestTimeoutMs",
+				"label": "Request Timeout (ms)",
+				"type": "number",
+				"defaultValue": 60000,
+				"min": 1000,
+				"max": 300000,
+				"helperText": "How long to wait for a response."
+			},
+			{
+				"key": "rememberMessages",
+				"label": "Remember Messages",
+				"type": "toggle",
+				"defaultValue": true,
+				"helperText": "Store history per thread or username."
+			},
+			{
+				"key": "maxHistoryMessages",
+				"label": "Max History Messages",
+				"type": "number",
+				"defaultValue": 12,
+				"min": 0,
+				"max": 100,
+				"helperText": "How many recent messages to keep per thread/user."
+			},
+			{
+				"key": "maxOutputChars",
+				"label": "Max Output Length (chars)",
+				"type": "number",
+				"defaultValue": 0,
+				"min": 0,
+				"max": 100000,
+				"helperText": "Trim responses to this length (0 = no limit)."
+			}
+		],
+		"actions": [],
+		"variableFunctions": [
+			{
+				"key": "ollama_prompt",
+				"label": "Ollama Prompt",
+				"description": "Use {{ollama_prompt=message|thread|model}} to return a response from Ollama."
+			},
+			{
+				"key": "ollama_json",
+				"label": "Ollama JSON",
+				"description": "Use {{ollama_json=message|thread|model}} to return JSON-only output."
+			},
+			{
+				"key": "ollama_one_line",
+				"label": "Ollama One Line",
+				"description": "Use {{ollama_one_line=message|thread|model}} to return a single-line response."
+			},
+			{
+				"key": "ollama_prompt_nostore",
+				"label": "Ollama Prompt (No Store)",
+				"description": "Use {{ollama_prompt_nostore=message|thread|model}} to run without history."
+			},
+			{
+				"key": "ollama_prompt_clear",
+				"label": "Ollama Clear Thread",
+				"description": "Use {{ollama_prompt_clear=thread_name}} to clear a conversation thread."
+			}
+		],
+		"variables": [],
+		"alerts": []
+	}
+}
+
+```
+
+## ollama/package.json
+
+```
+{
+  "name": "lumia-ollama",
   "version": "1.0.0",
-  "author": "Lumia Stream",
-  "email": "",
-  "website": "",
-  "repository": "",
-  "description": "Mock light provider that simulates lights for testing Lumia device actions.",
-  "license": "MIT",
-  "lumiaVersion": "^9.0.0",
-  "category": "lights",
-  "keywords": "mock, lights, testing, sample, debug",
-  "icon": "",
-  "changelog": "",
-  "config": {
-    "settings": [],
-    "actions": [],
-    "variables": [],
-    "alerts": [],
-    "lights": {
-      "search": {
-        "buttonLabel": "Discover mock lights",
-        "helperText": "Generates a new fake light each time."
-      },
-      "manualAdd": {
-        "buttonLabel": "Add mock light",
-        "helperText": "Supply whatever identifiers you want to test manual entry.",
-        "fields": [
-          { "key": "name", "label": "Name", "type": "text", "required": true },
-          { "key": "id", "label": "Light ID (optional)", "type": "text" },
-          { "key": "ip", "label": "IP (optional)", "type": "text" }
-        ]
-      },
-      "displayFields": [
-        { "key": "name", "label": "Name" },
-        { "key": "ip", "label": "IP", "fallback": "No IP" }
-      ],
-      "emptyStateText": "No mock lights yet. Discover or add one."
-    }
+  "private": true,
+  "description": "Lumia Stream plugin that sends prompts to Ollama and exposes the response in variables and alerts.",
+  "main": "main.js",
+  "scripts": {},
+  "dependencies": {
+    "@lumiastream/plugin": "^0.2.3"
   }
 }
 
 ```
 
-## mock_lights_plugin/package.json
+## openrgb/README.md
+
+```
+# OpenRGB Plugin (Private)
+
+Use OpenRGB devices as Lumia Stream lights through the OpenRGB SDK server.
+
+## Features
+
+- Discovers OpenRGB controllers and exposes them as selectable Lumia lights.
+- Handles Lumia light updates (`onLightChange`) for real-time color/power/brightness control.
+- Applies software fade transitions when Lumia sends a `transition` value.
+- Exposes per-device OpenRGB modes as Studio Theme options.
+- Provides actions for:
+  - Loading/saving OpenRGB profiles
+
+## Setup
+
+1. Open OpenRGB and enable the SDK server.
+2. In Lumia plugin settings, set host/port (default `127.0.0.1:6742`).
+3. Activate plugin. The plugin always runs startup discovery automatically.
+4. Optionally click **Discover OpenRGB Devices** in auth to refresh manually.
+5. Select discovered devices in the light list.
+
+## Notes
+
+- This plugin writes per-LED colors through the OpenRGB SDK protocol.
+- Live light color updates are sent fire-and-forget (no request timeout waiting).
+- Discovery/auth calls use a fixed 4000ms timeout.
+- SDK client name is fixed to `Lumia Stream`.
+- Turning power off writes black to all LEDs for targeted devices.
+- If discovery does not return a device, manual add accepts a controller ID.
+- Controller ID is the zero-based index in OpenRGB's Devices list order (first device is `0`, second is `1`, etc.).
+
+```
+
+## openrgb/main.js
+
+```
+const net = require("net");
+const { createHash } = require("crypto");
+const { Plugin } = require("@lumiastream/plugin");
+
+const PACKET_TYPES = {
+	REQUEST_CONTROLLER_COUNT: 0,
+	REQUEST_CONTROLLER_DATA: 1,
+	REQUEST_PROTOCOL_VERSION: 40,
+	SET_CLIENT_NAME: 50,
+	DEVICE_LIST_UPDATED: 100,
+	REQUEST_PROFILE_LIST: 150,
+	REQUEST_SAVE_PROFILE: 151,
+	REQUEST_LOAD_PROFILE: 152,
+	REQUEST_DELETE_PROFILE: 153,
+	RGBCONTROLLER_UPDATELEDS: 1050,
+	RGBCONTROLLER_SETCUSTOMMODE: 1100,
+	RGBCONTROLLER_UPDATEMODE: 1101,
+};
+
+const HEADER_SIZE = 16;
+const HEADER_MAGIC = Buffer.from("ORGB", "ascii");
+const ZONE_TYPE_MATRIX = 2;
+const DEFAULT_PROTOCOL_VERSION = 4;
+const DISCOVERY_TIMEOUT_MS = 4000;
+const TRANSITION_STEP_MS = 33;
+const MAX_TRANSITION_STEPS = 45;
+const MAX_TRANSITION_MS = 30000;
+const OPENRGB_CLIENT_NAME = "Lumia Stream";
+const MODE_FLAG_HAS_SPEED = 1 << 0;
+const MODE_FLAG_HAS_DIRECTION_LR = 1 << 1;
+const MODE_FLAG_HAS_DIRECTION_UD = 1 << 2;
+const MODE_FLAG_HAS_DIRECTION_HV = 1 << 3;
+const MODE_FLAG_HAS_BRIGHTNESS = 1 << 4;
+
+const DEFAULTS = {
+	host: "127.0.0.1",
+	port: 6742,
+};
+
+function clamp(value, min, max) {
+	return Math.min(max, Math.max(min, value));
+}
+
+function coerceString(value, fallback = "") {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : fallback;
+	}
+	if (value === null || value === undefined) {
+		return fallback;
+	}
+	const text = String(value).trim();
+	return text.length ? text : fallback;
+}
+
+function coerceNumber(value, fallback) {
+	const unwrapped = unwrapActionValue(value);
+	if (unwrapped === null || unwrapped === undefined || unwrapped === "") {
+		return fallback;
+	}
+	if (typeof unwrapped === "number" && Number.isFinite(unwrapped)) {
+		return unwrapped;
+	}
+	const parsed = Number(unwrapped);
+	return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function coerceBoolean(value, fallback = false) {
+	const unwrapped = unwrapActionValue(value);
+	if (typeof unwrapped === "boolean") {
+		return unwrapped;
+	}
+	if (typeof unwrapped === "number") {
+		return unwrapped !== 0;
+	}
+	if (typeof unwrapped === "string") {
+		const text = unwrapped.trim().toLowerCase();
+		if (["1", "true", "on", "yes", "enabled"].includes(text)) {
+			return true;
+		}
+		if (["0", "false", "off", "no", "disabled"].includes(text)) {
+			return false;
+		}
+	}
+	return fallback;
+}
+
+function unwrapActionValue(value) {
+	if (!value || typeof value !== "object") {
+		return value;
+	}
+	if (Object.prototype.hasOwnProperty.call(value, "value")) {
+		return value.value;
+	}
+	if (Object.prototype.hasOwnProperty.call(value, "label")) {
+		return value.label;
+	}
+	return value;
+}
+
+function normalizeListInput(value) {
+	const output = [];
+	const seen = new Set();
+
+	const append = (entry) => {
+		if (entry === null || entry === undefined) {
+			return;
+		}
+		if (Array.isArray(entry)) {
+			entry.forEach(append);
+			return;
+		}
+
+		const unwrapped = unwrapActionValue(entry);
+		if (Array.isArray(unwrapped)) {
+			unwrapped.forEach(append);
+			return;
+		}
+
+		if (typeof unwrapped === "object" && unwrapped !== null) {
+			if (unwrapped.id !== undefined) {
+				append(unwrapped.id);
+				return;
+			}
+			if (unwrapped.openrgbDeviceId !== undefined) {
+				append(unwrapped.openrgbDeviceId);
+				return;
+			}
+			if (unwrapped.deviceId !== undefined) {
+				append(unwrapped.deviceId);
+				return;
+			}
+			if (unwrapped.value !== undefined) {
+				append(unwrapped.value);
+				return;
+			}
+			return;
+		}
+
+		if (typeof unwrapped === "string") {
+			unwrapped
+				.split(",")
+				.map((part) => part.trim())
+				.filter(Boolean)
+				.forEach((part) => {
+					if (!seen.has(part)) {
+						seen.add(part);
+						output.push(part);
+					}
+				});
+			return;
+		}
+
+		const normalized = String(unwrapped).trim();
+		if (!normalized) {
+			return;
+		}
+		if (!seen.has(normalized)) {
+			seen.add(normalized);
+			output.push(normalized);
+		}
+	};
+
+	append(value);
+	return output;
+}
+
+function normalizeColor(value) {
+	const unwrapped = unwrapActionValue(value);
+
+	if (!unwrapped && unwrapped !== 0) {
+		return null;
+	}
+
+	if (Array.isArray(unwrapped) && unwrapped.length >= 3) {
+		const r = clamp(Math.round(coerceNumber(unwrapped[0], 0)), 0, 255);
+		const g = clamp(Math.round(coerceNumber(unwrapped[1], 0)), 0, 255);
+		const b = clamp(Math.round(coerceNumber(unwrapped[2], 0)), 0, 255);
+		return { r, g, b };
+	}
+
+	if (typeof unwrapped === "object") {
+		const r = coerceNumber(unwrapped.r ?? unwrapped.red, NaN);
+		const g = coerceNumber(unwrapped.g ?? unwrapped.green, NaN);
+		const b = coerceNumber(unwrapped.b ?? unwrapped.blue, NaN);
+		if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
+			return {
+				r: clamp(Math.round(r), 0, 255),
+				g: clamp(Math.round(g), 0, 255),
+				b: clamp(Math.round(b), 0, 255),
+			};
+		}
+	}
+
+	if (typeof unwrapped === "string") {
+		const text = unwrapped.trim();
+		const hexMatch = text.match(/^#?([0-9a-fA-F]{6})$/);
+		if (hexMatch) {
+			const hex = hexMatch[1];
+			return {
+				r: parseInt(hex.slice(0, 2), 16),
+				g: parseInt(hex.slice(2, 4), 16),
+				b: parseInt(hex.slice(4, 6), 16),
+			};
+		}
+
+		const rgbMatch = text.match(
+			/^\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*$/,
+		);
+		if (rgbMatch) {
+			return {
+				r: clamp(parseInt(rgbMatch[1], 10), 0, 255),
+				g: clamp(parseInt(rgbMatch[2], 10), 0, 255),
+				b: clamp(parseInt(rgbMatch[3], 10), 0, 255),
+			};
+		}
+	}
+
+	return null;
+}
+
+function applyBrightness(color, brightness) {
+	const value = clamp(Math.round(coerceNumber(brightness, 100)), 0, 100) / 100;
+	return {
+		r: clamp(Math.round(color.r * value), 0, 255),
+		g: clamp(Math.round(color.g * value), 0, 255),
+		b: clamp(Math.round(color.b * value), 0, 255),
+	};
+}
+
+function isBlackColor(color) {
+	return Boolean(
+		color &&
+			Number(color.r) === 0 &&
+			Number(color.g) === 0 &&
+			Number(color.b) === 0,
+	);
+}
+
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function lerpChannel(start, end, t) {
+	return clamp(Math.round(start + (end - start) * t), 0, 255);
+}
+
+function lerpColor(start, end, t) {
+	return {
+		r: lerpChannel(start.r, end.r, t),
+		g: lerpChannel(start.g, end.g, t),
+		b: lerpChannel(start.b, end.b, t),
+	};
+}
+
+function colorsEqual(a, b) {
+	return (
+		Number(a?.r) === Number(b?.r) &&
+		Number(a?.g) === Number(b?.g) &&
+		Number(a?.b) === Number(b?.b)
+	);
+}
+
+function buildUpdateLedsPayload(ledCount, color) {
+	const total = Math.max(1, Math.floor(coerceNumber(ledCount, 1)));
+	const packetSize = 6 + total * 4;
+	const payload = Buffer.alloc(packetSize);
+	payload.writeUInt32LE(packetSize, 0);
+	payload.writeUInt16LE(total, 4);
+
+	for (let i = 0; i < total; i++) {
+		const offset = 6 + i * 4;
+		payload.writeUInt8(color.r, offset);
+		payload.writeUInt8(color.g, offset + 1);
+		payload.writeUInt8(color.b, offset + 2);
+		payload.writeUInt8(0, offset + 3);
+	}
+
+	return payload;
+}
+
+function packCString(value) {
+	return Buffer.from(`${String(value ?? "")}\0`, "utf8");
+}
+
+function packLengthPrefixedString(value) {
+	const text = String(value ?? "");
+	const bytes = Buffer.from(text, "utf8");
+	const out = Buffer.alloc(2 + bytes.length + 1);
+	out.writeUInt16LE(bytes.length + 1, 0);
+	bytes.copy(out, 2);
+	out[out.length - 1] = 0;
+	return out;
+}
+
+class BufferCursor {
+	constructor(buffer) {
+		this.buffer = buffer;
+		this.offset = 0;
+	}
+
+	ensure(size) {
+		if (this.offset + size > this.buffer.length) {
+			throw new Error(
+				`OpenRGB packet parse overflow (offset=${this.offset}, size=${size}, length=${this.buffer.length})`,
+			);
+		}
+	}
+
+	readUInt16() {
+		this.ensure(2);
+		const value = this.buffer.readUInt16LE(this.offset);
+		this.offset += 2;
+		return value;
+	}
+
+	readUInt8() {
+		this.ensure(1);
+		const value = this.buffer.readUInt8(this.offset);
+		this.offset += 1;
+		return value;
+	}
+
+	readUInt32() {
+		this.ensure(4);
+		const value = this.buffer.readUInt32LE(this.offset);
+		this.offset += 4;
+		return value;
+	}
+
+	readInt32() {
+		this.ensure(4);
+		const value = this.buffer.readInt32LE(this.offset);
+		this.offset += 4;
+		return value;
+	}
+
+	readString() {
+		const length = this.readUInt16();
+		this.ensure(length);
+		const raw = this.buffer.subarray(this.offset, this.offset + length);
+		this.offset += length;
+		return raw.toString("utf8").replace(/\0+$/g, "");
+	}
+
+	skip(size) {
+		this.ensure(size);
+		this.offset += size;
+	}
+}
+
+function parseMode(cursor, protocolVersion, index) {
+	const name = cursor.readString();
+	const value = cursor.readInt32();
+	const flags = cursor.readUInt32();
+	let speedMin = cursor.readUInt32();
+	let speedMax = cursor.readUInt32();
+	let brightnessMin = protocolVersion >= 3 ? cursor.readUInt32() : null;
+	let brightnessMax = protocolVersion >= 3 ? cursor.readUInt32() : null;
+	let colorsMin = cursor.readUInt32();
+	let colorsMax = cursor.readUInt32();
+	let speed = cursor.readUInt32();
+	let brightness = protocolVersion >= 3 ? cursor.readUInt32() : null;
+	let direction = cursor.readUInt32();
+	const colorMode = cursor.readUInt32();
+	const colorCount = cursor.readUInt16();
+	const colors = [];
+	for (let i = 0; i < colorCount; i++) {
+		const r = cursor.readUInt8();
+		const g = cursor.readUInt8();
+		const b = cursor.readUInt8();
+		cursor.readUInt8(); // Reserved/white channel
+		colors.push({ r, g, b });
+	}
+
+	if ((flags & MODE_FLAG_HAS_SPEED) === 0) {
+		speed = null;
+		speedMin = null;
+		speedMax = null;
+	}
+	if (protocolVersion < 3 || (flags & MODE_FLAG_HAS_BRIGHTNESS) === 0) {
+		brightness = null;
+		brightnessMin = null;
+		brightnessMax = null;
+	}
+	if (colorCount === 0) {
+		colorsMin = null;
+		colorsMax = null;
+	}
+	if (
+		(flags & MODE_FLAG_HAS_DIRECTION_LR) === 0 &&
+		(flags & MODE_FLAG_HAS_DIRECTION_UD) === 0 &&
+		(flags & MODE_FLAG_HAS_DIRECTION_HV) === 0
+	) {
+		direction = null;
+	}
+
+	return {
+		index,
+		id: index,
+		name,
+		value,
+		flags,
+		speedMin,
+		speedMax,
+		brightnessMin,
+		brightnessMax,
+		colorsMin,
+		colorsMax,
+		speed,
+		brightness,
+		direction,
+		colorMode,
+		colors,
+	};
+}
+
+function parseZone(cursor, protocolVersion, index) {
+	const name = cursor.readString();
+	const type = cursor.readInt32();
+	const ledsMin = cursor.readUInt32();
+	const ledsMax = cursor.readUInt32();
+	const numLeds = cursor.readUInt32();
+	const matrixZoneSize = cursor.readUInt16();
+
+	if (type === ZONE_TYPE_MATRIX) {
+		const height = cursor.readUInt32();
+		const width = cursor.readUInt32();
+		const mapEntries = matrixZoneSize > 0 ? matrixZoneSize : width * height;
+		cursor.skip(mapEntries * 4);
+	} else if (matrixZoneSize > 0) {
+		// Defensive skip if malformed payload reports matrix data for non-matrix zones.
+		cursor.skip(matrixZoneSize * 4);
+	}
+
+	if (protocolVersion >= 4) {
+		const segmentCount = cursor.readUInt16();
+		for (let i = 0; i < segmentCount; i++) {
+			cursor.readString();
+			cursor.readInt32();
+			cursor.readUInt32();
+			cursor.readUInt32();
+		}
+	}
+
+	return {
+		index,
+		name,
+		type,
+		ledsMin,
+		ledsMax,
+		numLeds,
+	};
+}
+
+function parseLed(cursor) {
+	cursor.readString();
+	cursor.readUInt32();
+}
+
+function parseControllerData(payload, protocolVersion, deviceId) {
+	const cursor = new BufferCursor(payload);
+	const packetSize = cursor.readUInt32();
+	const deviceType = cursor.readInt32();
+	const name = cursor.readString();
+	const vendor = protocolVersion >= 1 ? cursor.readString() : "";
+	const description = cursor.readString();
+	const firmwareVersion = cursor.readString();
+	const serial = cursor.readString();
+	const location = cursor.readString();
+	const modeCount = cursor.readUInt16();
+	const activeMode = cursor.readInt32();
+	const modes = [];
+
+	for (let i = 0; i < modeCount; i++) {
+		modes.push(parseMode(cursor, protocolVersion, i));
+	}
+
+	const zoneCount = cursor.readUInt16();
+	const zones = [];
+	for (let i = 0; i < zoneCount; i++) {
+		zones.push(parseZone(cursor, protocolVersion, i));
+	}
+
+	const ledCountFromList = cursor.readUInt16();
+	for (let i = 0; i < ledCountFromList; i++) {
+		parseLed(cursor);
+	}
+
+	const colorCount = cursor.readUInt16();
+	cursor.skip(colorCount * 4);
+
+	const totalZoneLeds = zones.reduce(
+		(sum, zone) => sum + (Number.isFinite(zone.numLeds) ? zone.numLeds : 0),
+		0,
+	);
+
+	const ledCount = Math.max(colorCount, ledCountFromList, totalZoneLeds, 1);
+	const remaining = payload.length - cursor.offset;
+	if (remaining > 0) {
+		const tail = payload.subarray(cursor.offset);
+		const hasNonZeroTail = tail.some((value) => value !== 0);
+		if (hasNonZeroTail) {
+			throw new Error(
+				`OpenRGB controller parse left ${remaining} trailing bytes`,
+			);
+		}
+	}
+
+	return {
+		controller: {
+			id: deviceId,
+			packetSize,
+			deviceType,
+			name,
+			vendor,
+			description,
+			firmwareVersion,
+			serial,
+			location,
+			modeCount,
+			activeMode,
+			modes,
+			zoneCount,
+			zones,
+			ledCount,
+		},
+		usedVersion: protocolVersion,
+	};
+}
+
+function parseControllerDataWithFallback(payload, preferredVersion, deviceId) {
+	const normalizedPreferred = Number.isFinite(preferredVersion)
+		? Math.max(0, Math.min(4, Math.floor(preferredVersion)))
+		: DEFAULT_PROTOCOL_VERSION;
+	return parseControllerData(payload, normalizedPreferred, deviceId);
+}
+
+function parseProfileNames(payload) {
+	if (!payload.length) {
+		return [];
+	}
+	const cursor = new BufferCursor(payload);
+	if (payload.length >= 4) {
+		cursor.readUInt32();
+	}
+	const count = cursor.readUInt16();
+	const names = [];
+	for (let i = 0; i < count; i++) {
+		names.push(cursor.readString());
+	}
+	return names.filter((name) => name.length > 0);
+}
+
+function normalizeModeName(value) {
+	return String(value ?? "")
+		.trim()
+		.toLowerCase();
+}
+
+function parseThemeModeToken(value) {
+	const unwrapped = unwrapActionValue(value);
+	if (unwrapped === null || unwrapped === undefined) {
+		return null;
+	}
+
+	if (typeof unwrapped === "object") {
+		const fromId = parseThemeModeToken(unwrapped.id ?? unwrapped.value);
+		if (fromId) {
+			return fromId;
+		}
+		const modeName = coerceString(unwrapped.name ?? unwrapped.modeName, "");
+		if (modeName) {
+			return {
+				deviceId: null,
+				modeIndex: null,
+				modeName,
+			};
+		}
+	}
+
+	const text = String(unwrapped).trim();
+	if (!text) {
+		return null;
+	}
+
+	const scoped = text.match(/^openrgb-mode:(\d+):(\d+)$/i);
+	if (scoped) {
+		return {
+			deviceId: parseInt(scoped[1], 10),
+			modeIndex: parseInt(scoped[2], 10),
+			modeName: "",
+		};
+	}
+
+	if (/^\d+$/.test(text)) {
+		return {
+			deviceId: null,
+			modeIndex: parseInt(text, 10),
+			modeName: "",
+		};
+	}
+
+	return {
+		deviceId: null,
+		modeIndex: null,
+		modeName: text,
+	};
+}
+
+function packModePayload(mode, protocolVersion) {
+	const colors = Array.isArray(mode.colors) ? mode.colors : [];
+	const payloadSegments = [];
+
+	payloadSegments.push(Buffer.alloc(4));
+	payloadSegments[payloadSegments.length - 1].writeInt32LE(
+		Math.floor(coerceNumber(mode.id ?? mode.index, 0)),
+		0,
+	);
+	payloadSegments.push(packLengthPrefixedString(mode.name));
+
+	const value = Buffer.alloc(4);
+	value.writeInt32LE(Math.floor(coerceNumber(mode.value, 0)), 0);
+	payloadSegments.push(value);
+
+	const flags = Buffer.alloc(4);
+	flags.writeUInt32LE(Math.floor(coerceNumber(mode.flags, 0)) >>> 0, 0);
+	payloadSegments.push(flags);
+
+	const speedMin = Buffer.alloc(4);
+	speedMin.writeUInt32LE(Math.floor(coerceNumber(mode.speedMin, 0)) >>> 0, 0);
+	payloadSegments.push(speedMin);
+
+	const speedMax = Buffer.alloc(4);
+	speedMax.writeUInt32LE(Math.floor(coerceNumber(mode.speedMax, 0)) >>> 0, 0);
+	payloadSegments.push(speedMax);
+
+	if (protocolVersion >= 3) {
+		const brightnessMin = Buffer.alloc(4);
+		brightnessMin.writeUInt32LE(
+			Math.floor(coerceNumber(mode.brightnessMin, 0)) >>> 0,
+			0,
+		);
+		payloadSegments.push(brightnessMin);
+
+		const brightnessMax = Buffer.alloc(4);
+		brightnessMax.writeUInt32LE(
+			Math.floor(coerceNumber(mode.brightnessMax, 0)) >>> 0,
+			0,
+		);
+		payloadSegments.push(brightnessMax);
+	}
+
+	const colorsMin = Buffer.alloc(4);
+	colorsMin.writeUInt32LE(Math.floor(coerceNumber(mode.colorsMin, 0)) >>> 0, 0);
+	payloadSegments.push(colorsMin);
+
+	const colorsMax = Buffer.alloc(4);
+	colorsMax.writeUInt32LE(Math.floor(coerceNumber(mode.colorsMax, 0)) >>> 0, 0);
+	payloadSegments.push(colorsMax);
+
+	const speed = Buffer.alloc(4);
+	speed.writeUInt32LE(Math.floor(coerceNumber(mode.speed, 0)) >>> 0, 0);
+	payloadSegments.push(speed);
+
+	if (protocolVersion >= 3) {
+		const brightness = Buffer.alloc(4);
+		brightness.writeUInt32LE(
+			Math.floor(coerceNumber(mode.brightness, 0)) >>> 0,
+			0,
+		);
+		payloadSegments.push(brightness);
+	}
+
+	const direction = Buffer.alloc(4);
+	direction.writeUInt32LE(Math.floor(coerceNumber(mode.direction, 0)) >>> 0, 0);
+	payloadSegments.push(direction);
+
+	const colorMode = Buffer.alloc(4);
+	colorMode.writeUInt32LE(Math.floor(coerceNumber(mode.colorMode, 0)) >>> 0, 0);
+	payloadSegments.push(colorMode);
+
+	const colorCount = Buffer.alloc(2);
+	colorCount.writeUInt16LE(colors.length, 0);
+	payloadSegments.push(colorCount);
+
+	for (const color of colors) {
+		const rgba = Buffer.alloc(4);
+		rgba.writeUInt8(clamp(Math.round(coerceNumber(color?.r, 0)), 0, 255), 0);
+		rgba.writeUInt8(clamp(Math.round(coerceNumber(color?.g, 0)), 0, 255), 1);
+		rgba.writeUInt8(clamp(Math.round(coerceNumber(color?.b, 0)), 0, 255), 2);
+		rgba.writeUInt8(0, 3);
+		payloadSegments.push(rgba);
+	}
+
+	const body = Buffer.concat(payloadSegments);
+	const packetSize = Buffer.alloc(4);
+	packetSize.writeUInt32LE(body.length + 4, 0);
+	return Buffer.concat([packetSize, body]);
+}
+
+class OpenRGBSocket {
+	constructor(timeoutMs) {
+		this.timeoutMs = timeoutMs;
+		this.socket = null;
+		this.buffer = Buffer.alloc(0);
+		this.closed = false;
+		this.error = null;
+		this.pending = null;
+	}
+
+	async connect(host, port) {
+		if (this.socket && !this.closed) {
+			return;
+		}
+
+		this.buffer = Buffer.alloc(0);
+		this.closed = false;
+		this.error = null;
+
+		const socket = new net.Socket();
+		this.socket = socket;
+		socket.setNoDelay(true);
+
+		socket.on("data", (chunk) => {
+			this.buffer = Buffer.concat([this.buffer, chunk]);
+			if (this.pending) {
+				const { resolve, timer } = this.pending;
+				this.pending = null;
+				clearTimeout(timer);
+				resolve();
+			}
+		});
+
+		socket.on("error", (error) => {
+			this.error = error;
+			if (this.pending) {
+				const { reject, timer } = this.pending;
+				this.pending = null;
+				clearTimeout(timer);
+				reject(error);
+			}
+		});
+
+		socket.on("close", () => {
+			this.closed = true;
+			if (this.pending) {
+				const { reject, timer } = this.pending;
+				this.pending = null;
+				clearTimeout(timer);
+				reject(new Error("OpenRGB socket closed"));
+			}
+		});
+
+		await new Promise((resolve, reject) => {
+			let settled = false;
+			const timer = setTimeout(() => {
+				if (settled) return;
+				settled = true;
+				socket.destroy();
+				reject(new Error("OpenRGB connection timeout"));
+			}, this.timeoutMs);
+
+			socket.connect(port, host, () => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(timer);
+				resolve();
+			});
+
+			socket.once("error", (error) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(timer);
+				reject(error);
+			});
+		});
+	}
+
+	async write(buffer) {
+		if (!this.socket || this.closed) {
+			throw new Error("OpenRGB socket is not connected");
+		}
+
+		await new Promise((resolve, reject) => {
+			this.socket.write(buffer, (error) => {
+				if (error) {
+					reject(error);
+					return;
+				}
+				resolve();
+			});
+		});
+	}
+
+	writeFireAndForget(buffer) {
+		if (!this.socket || this.closed) {
+			throw new Error("OpenRGB socket is not connected");
+		}
+		this.socket.write(buffer);
+	}
+
+	async waitForData() {
+		if (this.error) {
+			throw this.error;
+		}
+		if (this.closed) {
+			throw new Error("OpenRGB socket closed");
+		}
+		if (this.buffer.length > 0) {
+			return;
+		}
+		if (this.pending) {
+			await this.pending.promise;
+			return;
+		}
+
+		let resolvePromise;
+		let rejectPromise;
+		const promise = new Promise((resolve, reject) => {
+			resolvePromise = resolve;
+			rejectPromise = reject;
+		});
+
+		const timer = setTimeout(() => {
+			if (!this.pending) return;
+			const { reject } = this.pending;
+			this.pending = null;
+			reject(new Error("OpenRGB read timeout"));
+		}, this.timeoutMs);
+
+		this.pending = {
+			promise,
+			resolve: resolvePromise,
+			reject: rejectPromise,
+			timer,
+		};
+
+		await promise;
+	}
+
+	async readExact(length) {
+		while (this.buffer.length < length) {
+			await this.waitForData();
+		}
+
+		const chunk = this.buffer.subarray(0, length);
+		this.buffer = this.buffer.subarray(length);
+		return chunk;
+	}
+
+	close() {
+		if (this.pending) {
+			const { reject, timer } = this.pending;
+			this.pending = null;
+			clearTimeout(timer);
+			reject(new Error("OpenRGB socket closed"));
+		}
+		if (this.socket) {
+			this.socket.destroy();
+		}
+		this.socket = null;
+		this.closed = true;
+	}
+}
+
+class OpenRGBPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._taskQueue = Promise.resolve();
+		this._socket = null;
+		this._protocolVersion = DEFAULT_PROTOCOL_VERSION;
+		this._connected = false;
+		this._connectionStatePublished = false;
+		this._lights = [];
+		this._deviceLedCounts = new Map();
+		this._deviceModes = new Map();
+		this._deviceState = new Map();
+		this._lastErrorMessage = "";
+		this._host = DEFAULTS.host;
+		this._port = DEFAULTS.port;
+		this._requestTimeoutMs = DISCOVERY_TIMEOUT_MS;
+	}
+
+	async onload() {
+		await this._runExclusive(async () => {
+			this._applySettings(this.settings);
+
+			try {
+				await this._discoverLightsInternal();
+				await this._setConnected(true);
+			} catch (error) {
+				await this._setConnected(false);
+				await this._recordError("Initial OpenRGB discovery failed", error);
+			}
+		});
+	}
+
+	async onunload() {
+		await this._runExclusive(async () => {
+			await this._setConnected(false);
+			await this._closeSocket();
+		});
+	}
+
+	async onsettingsupdate(settings) {
+		await this._runExclusive(async () => {
+			this._applySettings(settings);
+			await this._closeSocket();
+			await this._setConnected(false);
+
+			try {
+				await this._discoverLightsInternal();
+				await this._setConnected(true);
+			} catch (error) {
+				await this._recordError("OpenRGB rediscovery failed", error);
+			}
+		});
+	}
+
+	async validateAuth() {
+		return this._runExclusive(async () => {
+			try {
+				await this._ensureSocket();
+				const count = await this._requestControllerCount();
+				await this._setConnected(true);
+				return {
+					ok: true,
+					message: `Connected to OpenRGB at ${this._host}:${this._port}. Controllers: ${count}.`,
+				};
+			} catch (error) {
+				await this._setConnected(false);
+				await this._recordError("OpenRGB validation failed", error);
+				return {
+					ok: false,
+					message: `Unable to connect to OpenRGB at ${this._host}:${this._port}. ${this._errorMessage(error)}`,
+				};
+			}
+		});
+	}
+
+	async searchLights() {
+		return this._runExclusive(async () => {
+			const lights = await this._discoverLightsInternal();
+			await this._setConnected(true);
+			return lights;
+		});
+	}
+
+	async searchThemes() {
+		return this._runExclusive(async () => {
+			await this._discoverLightsInternal();
+			await this._setConnected(true);
+			return this._buildThemeModeOptions();
+		});
+	}
+
+	async addLight(data = {}) {
+		return this._runExclusive(async () => {
+			const numericId = Math.floor(coerceNumber(data.deviceId ?? data.id, NaN));
+			const customName = coerceString(data.name, "");
+			if (!Number.isFinite(numericId) || numericId < 0) {
+				throw new Error("A valid OpenRGB deviceId is required.");
+			}
+
+			let resolvedLight = null;
+			try {
+				await this._ensureSocket();
+				const controller = await this._requestControllerData(numericId);
+				resolvedLight = this._controllerToLight(controller);
+			} catch {
+				resolvedLight = {
+					id: `openrgb-${numericId}`,
+					name: customName || `OpenRGB Device ${numericId}`,
+					openrgbDeviceId: numericId,
+					manual: true,
+					location: "",
+					serial: "",
+					ledCount: 1,
+					zoneCount: 0,
+				};
+			}
+
+			if (customName) {
+				resolvedLight.name = customName;
+			}
+
+			this._mergeLights([resolvedLight]);
+			return this._lights;
+		});
+	}
+
+	async onLightChange(config = {}) {
+		const targets = this._resolveDeviceIdsFromLights(config.lights, true);
+		if (!targets.length) {
+			return;
+		}
+
+		void this._runExclusive(async () => {
+			try {
+				const modeSelection = parseThemeModeToken(
+					config.rawConfig?.theme ?? config.theme,
+				);
+				const isThemeRequest =
+					Boolean(config.rawConfig?.fromTheme) ||
+					(config.rawConfig &&
+						Object.prototype.hasOwnProperty.call(config.rawConfig, "theme"));
+				if (isThemeRequest && modeSelection) {
+					await this._applyModeUpdate(targets, modeSelection, {
+						allowNetworkLookups: true,
+						fireAndForget: false,
+						skipConnectIfUnavailable: false,
+					});
+					return;
+				}
+				if (isThemeRequest) {
+					await this._recordError(
+						"OpenRGB theme mode selection invalid",
+						new Error("Theme mode value could not be parsed."),
+					);
+					return;
+				}
+
+				await this._applyColorUpdate(targets, {
+					color: config.color,
+					brightness: config.brightness,
+					power: config.power,
+					transition: config.transition,
+					fireAndForget: true,
+					skipConnectIfUnavailable: true,
+					allowNetworkLookups: false,
+				});
+			} catch (error) {
+				await this._recordError("OpenRGB light update failed", error);
+			}
+		});
+	}
+
+	async refreshActionOptions(config = {}) {
+		return this._runExclusive(async () => {
+			const actionType = coerceString(config.actionType, "");
+			if (!actionType) {
+				return;
+			}
+
+			if (["load_profile", "save_profile"].includes(actionType)) {
+				let options = [];
+				try {
+					const profiles = await this._requestProfileList();
+					options = profiles.map((name) => ({ label: name, value: name }));
+				} catch {
+					options = [];
+				}
+
+				await this.lumia.updateActionFieldOptions({
+					actionType,
+					fieldKey: "profileName",
+					options,
+				});
+				return;
+			}
+
+		});
+	}
+
+	async actions(config) {
+		return this._runExclusive(async () => {
+			for (const action of config.actions) {
+				const values = action.value;
+				try {
+					switch (action.type) {
+						case "load_profile":
+							await this._handleLoadProfileAction(values);
+							break;
+						case "save_profile":
+							await this._handleSaveProfileAction(values);
+							break;
+						default:
+							break;
+					}
+				} catch (error) {
+					await this._recordError(
+						`Action ${action.type || "unknown"} failed`,
+						error,
+					);
+					throw error;
+				}
+			}
+		});
+	}
+
+	_applySettings(settings = {}) {
+		this._host = coerceString(settings.host, DEFAULTS.host);
+		this._port = clamp(
+			Math.floor(coerceNumber(settings.port, DEFAULTS.port)),
+			1,
+			65535,
+		);
+	}
+
+	async _runExclusive(task) {
+		const run = this._taskQueue.then(task, task);
+		this._taskQueue = run.then(
+			() => undefined,
+			() => undefined,
+		);
+		return run;
+	}
+
+	async _setConnected(state) {
+		// Always publish the first known state so stale persisted UI state is corrected.
+		if (this._connected === state && this._connectionStatePublished) {
+			return;
+		}
+		this._connected = state;
+		this._connectionStatePublished = true;
+		await this.lumia.updateConnection(state);
+	}
+
+	async _recordError(prefix, error) {
+		const message = `${prefix}: ${this._errorMessage(error)}`;
+		if (message === this._lastErrorMessage) {
+			return;
+		}
+		this._lastErrorMessage = message;
+		await this.lumia.addLog(`[openrgb] ${message}`);
+	}
+
+	_errorMessage(error) {
+		if (!error) return "Unknown error";
+		if (typeof error === "string") return error;
+		if (error?.message) return error.message;
+		return String(error);
+	}
+
+	async _closeSocket() {
+		if (this._socket) {
+			this._socket.close();
+			this._socket = null;
+		}
+	}
+
+	async _ensureSocket() {
+		if (this._socket && !this._socket.closed) {
+			return;
+		}
+		if (this._socket && this._socket.closed) {
+			await this._closeSocket();
+		}
+
+		const socket = new OpenRGBSocket(this._requestTimeoutMs);
+		await socket.connect(this._host, this._port);
+		this._socket = socket;
+
+		try {
+			const protocolRequest = Buffer.alloc(4);
+			protocolRequest.writeUInt32LE(DEFAULT_PROTOCOL_VERSION, 0);
+			const protocolPayload = await this._sendPacket(
+				0,
+				PACKET_TYPES.REQUEST_PROTOCOL_VERSION,
+				protocolRequest,
+				{ expectResponse: true },
+			);
+			if (protocolPayload.length >= 4) {
+				this._protocolVersion = Math.min(
+					DEFAULT_PROTOCOL_VERSION,
+					protocolPayload.readUInt32LE(0),
+				);
+			}
+
+			await this._sendPacket(
+				0,
+				PACKET_TYPES.SET_CLIENT_NAME,
+				Buffer.from(`${OPENRGB_CLIENT_NAME}\0`, "utf8"),
+				{ expectResponse: false },
+			);
+			await this._setConnected(true);
+		} catch (error) {
+			await this._closeSocket();
+			throw error;
+		}
+	}
+
+	async _sendPacket(deviceId, packetType, payload, options = {}) {
+		const expectResponse = options.expectResponse === true;
+		const expectedPacketType = options.expectedPacketType ?? packetType;
+		const fireAndForget = options.fireAndForget === true && !expectResponse;
+		const skipConnectIfUnavailable =
+			options.skipConnectIfUnavailable === true;
+
+		if (!this._socket) {
+			if (skipConnectIfUnavailable) {
+				await this._setConnected(false);
+				return Buffer.alloc(0);
+			}
+			await this._ensureSocket();
+		}
+		const packetPayload = payload || Buffer.alloc(0);
+
+		const header = Buffer.alloc(HEADER_SIZE);
+		HEADER_MAGIC.copy(header, 0);
+		header.writeUInt32LE(deviceId >>> 0, 4);
+		header.writeUInt32LE(packetType >>> 0, 8);
+		header.writeUInt32LE(packetPayload.length >>> 0, 12);
+
+		const socket = this._socket;
+		if (!socket) {
+			return Buffer.alloc(0);
+		}
+		try {
+			const packet = Buffer.concat([header, packetPayload]);
+			if (fireAndForget) {
+				socket.writeFireAndForget(packet);
+				return Buffer.alloc(0);
+			}
+
+			await socket.write(packet);
+			if (!expectResponse) {
+				return Buffer.alloc(0);
+			}
+			while (true) {
+				const packet = await this._readPacket();
+				if (packet.packetType === PACKET_TYPES.DEVICE_LIST_UPDATED) {
+					continue;
+				}
+				if (packet.packetType !== expectedPacketType) {
+					continue;
+				}
+				return packet.payload;
+			}
+		} catch (error) {
+			await this._closeSocket();
+			await this._setConnected(false);
+			throw error;
+		}
+	}
+
+	async _readPacket() {
+		const socket = this._socket;
+		const header = await socket.readExact(HEADER_SIZE);
+		if (!header.subarray(0, 4).equals(HEADER_MAGIC)) {
+			throw new Error("Invalid OpenRGB packet header magic.");
+		}
+		const packetType = header.readUInt32LE(8);
+		const payloadSize = header.readUInt32LE(12);
+		const payload =
+			payloadSize > 0 ? await socket.readExact(payloadSize) : Buffer.alloc(0);
+
+		return {
+			packetType,
+			payload,
+		};
+	}
+
+	async _requestControllerCount() {
+		const payload = await this._sendPacket(
+			0,
+			PACKET_TYPES.REQUEST_CONTROLLER_COUNT,
+			Buffer.alloc(0),
+			{ expectResponse: true },
+		);
+		if (payload.length < 4) {
+			throw new Error("OpenRGB returned an invalid controller count response.");
+		}
+		return payload.readUInt32LE(0);
+	}
+
+	async _requestControllerData(deviceId) {
+		const payloadVersion = Buffer.alloc(4);
+		payloadVersion.writeUInt32LE(this._protocolVersion, 0);
+		const payload = await this._sendPacket(
+			deviceId,
+			PACKET_TYPES.REQUEST_CONTROLLER_DATA,
+			payloadVersion,
+			{ expectResponse: true },
+		);
+		const parsed = parseControllerDataWithFallback(
+			payload,
+			this._protocolVersion,
+			deviceId,
+		);
+		if (parsed.usedVersion !== this._protocolVersion) {
+			this._protocolVersion = parsed.usedVersion;
+		}
+		return parsed.controller;
+	}
+
+	async _requestProfileList() {
+		const payload = await this._sendPacket(
+			0,
+			PACKET_TYPES.REQUEST_PROFILE_LIST,
+			Buffer.alloc(0),
+			{ expectResponse: true },
+		);
+		return parseProfileNames(payload);
+	}
+
+	async _loadProfile(name) {
+		await this._sendPacket(
+			0,
+			PACKET_TYPES.REQUEST_LOAD_PROFILE,
+			packCString(name),
+			{ expectResponse: false },
+		);
+	}
+
+	async _saveProfile(name) {
+		await this._sendPacket(
+			0,
+			PACKET_TYPES.REQUEST_SAVE_PROFILE,
+			packCString(name),
+			{ expectResponse: false },
+		);
+	}
+
+	async _discoverLightsInternal() {
+		await this._ensureSocket();
+		const controllerCount = await this._requestControllerCount();
+		const controllers = [];
+
+		for (let i = 0; i < controllerCount; i++) {
+			const controller = await this._requestControllerData(i);
+			controllers.push(controller);
+		}
+
+		const usedExistingLightIds = new Set();
+		const discoveredLights = [];
+		for (const controller of controllers) {
+			const existingLight = this._findExistingLightForController(
+				controller,
+				usedExistingLightIds,
+			);
+			if (existingLight) {
+				usedExistingLightIds.add(String(existingLight.id));
+			}
+			const light = this._controllerToLight(controller, existingLight);
+			discoveredLights.push(light);
+
+		}
+		this._setDiscoveredLights(discoveredLights);
+		return this._lights;
+	}
+
+	_isMeaningfulIdentityPart(value) {
+		const text = this._normalizeIdentityPart(value);
+		if (!text) {
+			return false;
+		}
+		return !["unknown", "n/a", "na", "none", "null", "undefined", "0"].includes(
+			text,
+		);
+	}
+
+	_normalizeIdentityPart(value) {
+		return String(value ?? "")
+			.trim()
+			.toLowerCase()
+			.replace(/\s+/g, " ");
+	}
+
+	_buildDeviceFingerprint(device = {}) {
+		const name = this._normalizeIdentityPart(device.name);
+		const vendor = this._normalizeIdentityPart(device.vendor);
+		const description = this._normalizeIdentityPart(device.description);
+		const serial = this._normalizeIdentityPart(device.serial);
+		const location = this._normalizeIdentityPart(device.location);
+		const firmwareVersion = this._normalizeIdentityPart(device.firmwareVersion);
+		const deviceType = String(
+			Number.isFinite(Number(device.deviceType)) ? Number(device.deviceType) : "",
+		);
+		const zoneCount = String(
+			Number.isFinite(Number(device.zoneCount)) ? Number(device.zoneCount) : 0,
+		);
+		const ledCount = String(
+			Number.isFinite(Number(device.ledCount)) ? Number(device.ledCount) : 0,
+		);
+		const zoneNames = Array.isArray(device.zones)
+			? device.zones
+					.map((zone) => this._normalizeIdentityPart(zone?.name))
+					.filter(Boolean)
+					.join("|")
+			: "";
+
+		let seed = "";
+		if (this._isMeaningfulIdentityPart(serial)) {
+			seed = `serial:${serial}|vendor:${vendor}|type:${deviceType}`;
+		} else if (this._isMeaningfulIdentityPart(location)) {
+			seed = `location:${location}|name:${name}|vendor:${vendor}|type:${deviceType}`;
+		} else {
+			seed = `name:${name}|vendor:${vendor}|description:${description}|fw:${firmwareVersion}|type:${deviceType}|zones:${zoneCount}|leds:${ledCount}|zoneNames:${zoneNames}`;
+		}
+
+		const hash = createHash("sha1").update(seed).digest("hex").slice(0, 16);
+		return {
+			fingerprint: `fp:${hash}`,
+			seed,
+		};
+	}
+
+	_buildStableLightId(controller) {
+		const { fingerprint } = this._buildDeviceFingerprint(controller);
+		let candidate = `openrgb-device-${fingerprint.replace(/^fp:/, "")}`;
+		let suffix = 1;
+		while (this._lights.some((light) => String(light.id) === candidate)) {
+			candidate = `openrgb-device-${fingerprint.replace(/^fp:/, "")}-${suffix}`;
+			suffix += 1;
+		}
+		return candidate;
+	}
+
+	_findExistingLightForController(controller, usedLightIds = new Set()) {
+		const { fingerprint } = this._buildDeviceFingerprint(controller);
+
+		const candidateLights = this._lights.filter(
+			(light) => !usedLightIds.has(String(light.id)),
+		);
+
+		const fingerprintMatch = candidateLights.find((light) => {
+			if (light.fingerprint && light.fingerprint === fingerprint) {
+				return true;
+			}
+			const derived = this._buildDeviceFingerprint(light);
+			return derived.fingerprint === fingerprint;
+		});
+		if (fingerprintMatch) {
+			return fingerprintMatch;
+		}
+
+		return (
+			candidateLights.find(
+				(light) => Number(light.openrgbDeviceId) === Number(controller.id),
+			) ||
+			null
+		);
+	}
+
+	_controllerToLight(controller, existingLight = null) {
+		this._deviceLedCounts.set(controller.id, controller.ledCount || 1);
+		this._deviceModes.set(controller.id, {
+			activeMode: controller.activeMode,
+			modes: Array.isArray(controller.modes) ? controller.modes : [],
+		});
+		const { fingerprint } = this._buildDeviceFingerprint(controller);
+
+		const stableId = existingLight?.id ?? this._buildStableLightId(controller);
+
+		return {
+			id: stableId,
+			openrgbDeviceId: controller.id,
+			name: controller.name || `OpenRGB Device ${controller.id}`,
+			serial: controller.serial || "",
+			location: controller.location || "",
+			vendor: controller.vendor || "",
+			description: controller.description || "",
+			firmwareVersion: controller.firmwareVersion || "",
+			deviceType: controller.deviceType,
+			ledCount: controller.ledCount,
+			zoneCount: controller.zoneCount,
+			modeCount: controller.modeCount,
+			fingerprint,
+		};
+	}
+
+	_setDiscoveredLights(discoveredLights) {
+		const manualLights = this._lights.filter((light) => light.manual === true);
+		const merged = new Map();
+
+		for (const light of manualLights) {
+			merged.set(String(light.id), { ...light });
+		}
+		for (const light of discoveredLights) {
+			merged.set(String(light.id), { ...light });
+		}
+
+		this._lights = Array.from(merged.values()).sort((a, b) =>
+			String(a.name || a.id).localeCompare(String(b.name || b.id)),
+		);
+	}
+
+	_mergeLights(newLights) {
+		const merged = new Map(
+			this._lights.map((light) => [String(light.id), { ...light }]),
+		);
+		for (const light of newLights) {
+			const key = String(light.id);
+			merged.set(key, {
+				...(merged.get(key) || {}),
+				...light,
+			});
+		}
+		this._lights = Array.from(merged.values()).sort((a, b) =>
+			String(a.name || a.id).localeCompare(String(b.name || b.id)),
+		);
+	}
+
+	_resolveDeviceIdFromAny(value) {
+		if (value === null || value === undefined) {
+			return null;
+		}
+
+		if (typeof value === "number" && Number.isFinite(value)) {
+			return Math.floor(value);
+		}
+
+		if (typeof value === "object") {
+			const byLightRef = this._resolveDeviceIdFromAny(
+				value.id ?? value.lightId ?? value.openrgbLightId,
+			);
+			if (byLightRef !== null && byLightRef >= 0) {
+				return byLightRef;
+			}
+			return this._resolveDeviceIdFromAny(
+				value.openrgbDeviceId ?? value.deviceId ?? value.value,
+			);
+		}
+
+		const text = String(value).trim();
+		if (!text) {
+			return null;
+		}
+
+		for (const light of this._lights) {
+			if (String(light.id) === text) {
+				const mapped = Math.floor(coerceNumber(light.openrgbDeviceId, NaN));
+				if (Number.isFinite(mapped) && mapped >= 0) {
+					return mapped;
+				}
+			}
+		}
+
+		if (/^\d+$/.test(text)) {
+			return parseInt(text, 10);
+		}
+
+		return null;
+	}
+
+	_resolveDeviceIdsFromLights(lights, fallbackToAll = true) {
+		const ids = new Set();
+		const list = Array.isArray(lights) ? lights : normalizeListInput(lights);
+
+		for (const item of list) {
+			const deviceId = this._resolveDeviceIdFromAny(item);
+			if (deviceId !== null && deviceId >= 0) {
+				ids.add(deviceId);
+			}
+		}
+
+		if (!ids.size && fallbackToAll) {
+			for (const light of this._lights) {
+				const deviceId = this._resolveDeviceIdFromAny(light);
+				if (deviceId !== null && deviceId >= 0) {
+					ids.add(deviceId);
+				}
+			}
+		}
+
+		return Array.from(ids.values());
+	}
+
+	_getDeviceModes(deviceId) {
+		const entry = this._deviceModes.get(deviceId);
+		if (!entry || !Array.isArray(entry.modes)) {
+			return [];
+		}
+		return entry.modes;
+	}
+
+	_buildThemeModeOptions() {
+		const options = [];
+
+		for (const light of this._lights) {
+			const deviceId = this._resolveDeviceIdFromAny(light);
+			if (deviceId === null || deviceId < 0) {
+				continue;
+			}
+			const modes = this._getDeviceModes(deviceId);
+			for (const mode of modes) {
+				const labelModeName = coerceString(mode?.name, `Mode ${mode?.index ?? 0}`);
+				options.push({
+					id: `openrgb-mode:${deviceId}:${mode.index}`,
+					name: `${light.name || light.id}: ${labelModeName}`,
+					parentId: light.id,
+					deviceId,
+					modeIndex: mode.index,
+					modeName: labelModeName,
+				});
+			}
+		}
+
+		return options;
+	}
+
+	async _resolveModeSelectionForDevice(deviceId, selection, options = {}) {
+		let modes = this._getDeviceModes(deviceId);
+		const allowNetworkLookups = options.allowNetworkLookups !== false;
+		if (!modes.length && allowNetworkLookups) {
+			const controller = await this._requestControllerData(deviceId);
+			this._deviceModes.set(deviceId, {
+				activeMode: controller.activeMode,
+				modes: Array.isArray(controller.modes) ? controller.modes : [],
+			});
+			modes = this._getDeviceModes(deviceId);
+		}
+		if (!modes.length) {
+			return null;
+		}
+
+		const targetDeviceId =
+			Number.isInteger(selection?.deviceId) && selection.deviceId >= 0
+				? selection.deviceId
+				: null;
+		const targetModeIndex =
+			Number.isInteger(selection?.modeIndex) && selection.modeIndex >= 0
+				? selection.modeIndex
+				: null;
+		const targetModeName = normalizeModeName(selection?.modeName);
+
+		if (targetDeviceId !== null && targetDeviceId === deviceId && targetModeIndex !== null) {
+			return (
+				modes.find((mode) => Number(mode?.index) === targetModeIndex) || null
+			);
+		}
+
+		if (targetModeName) {
+			const byName = modes.find(
+				(mode) => normalizeModeName(mode?.name) === targetModeName,
+			);
+			if (byName) {
+				return byName;
+			}
+		}
+
+		if (targetModeIndex !== null) {
+			const byIndex = modes.find(
+				(mode) => Number(mode?.index) === targetModeIndex,
+			);
+			if (byIndex) {
+				return byIndex;
+			}
+		}
+
+		return null;
+	}
+
+	_storeControllerModeState(controller) {
+		if (!controller || !Number.isFinite(controller.id)) {
+			return;
+		}
+		this._deviceModes.set(controller.id, {
+			activeMode: controller.activeMode,
+			modes: Array.isArray(controller.modes) ? controller.modes : [],
+		});
+	}
+
+	_isActiveModeMatch(controller, mode) {
+		const activeMode = Number(controller?.activeMode);
+		if (!Number.isFinite(activeMode)) {
+			return false;
+		}
+
+		const targetIndex = Number(mode?.index);
+		const targetId = Number(mode?.id);
+		const targetValue = Number(mode?.value);
+
+		if (
+			(Number.isFinite(targetIndex) && activeMode === targetIndex) ||
+			(Number.isFinite(targetId) && activeMode === targetId) ||
+			(Number.isFinite(targetValue) && activeMode === targetValue)
+		) {
+			return true;
+		}
+
+		const modes = Array.isArray(controller?.modes) ? controller.modes : [];
+		const activeModeEntry = modes.find((entry) => {
+			const entryIndex = Number(entry?.index);
+			const entryId = Number(entry?.id);
+			const entryValue = Number(entry?.value);
+			return (
+				(Number.isFinite(entryIndex) && entryIndex === activeMode) ||
+				(Number.isFinite(entryId) && entryId === activeMode) ||
+				(Number.isFinite(entryValue) && entryValue === activeMode)
+			);
+		});
+		if (!activeModeEntry) {
+			return false;
+		}
+
+		return (
+			Number(activeModeEntry?.index) === targetIndex ||
+			normalizeModeName(activeModeEntry?.name) === normalizeModeName(mode?.name)
+		);
+	}
+
+	_normalizeModeForApply(mode, deviceId) {
+		const flags = Math.floor(coerceNumber(mode?.flags, 0)) >>> 0;
+		const normalized = {
+			...mode,
+			colors: Array.isArray(mode?.colors)
+				? mode.colors
+						.map((color) => normalizeColor(color))
+						.filter((color) => color !== null)
+				: [],
+		};
+		const fallbackColor =
+			this._deviceState.get(deviceId)?.lastNonBlackColor || { r: 255, g: 255, b: 255 };
+
+		const brightness = coerceNumber(normalized.brightness, NaN);
+		if (!Number.isFinite(brightness) || brightness <= 0) {
+			const fallbackBrightness = clamp(
+				Math.round(coerceNumber(normalized.brightnessMax, 100)),
+				1,
+				100,
+			);
+			normalized.brightness = fallbackBrightness;
+		}
+
+		const speed = coerceNumber(normalized.speed, NaN);
+		if (!Number.isFinite(speed) || speed <= 0) {
+			const fallbackSpeed = Math.max(
+				1,
+				Math.round(
+					coerceNumber(
+						normalized.speedMax,
+						coerceNumber(normalized.speedMin, 100),
+					),
+				),
+			);
+			normalized.speed = fallbackSpeed;
+		}
+
+		const minColors = Math.max(0, Math.floor(coerceNumber(normalized.colorsMin, 0)));
+		if (minColors > 0) {
+			while (normalized.colors.length < minColors) {
+				normalized.colors.push({ ...fallbackColor });
+			}
+			if (normalized.colors.every((color) => isBlackColor(color))) {
+				normalized.colors[0] = { ...fallbackColor };
+			}
+		}
+
+		return normalized;
+	}
+
+	async _applyModeUpdate(deviceIds, selection, options = {}) {
+		const fireAndForget = options.fireAndForget === true;
+		const skipConnectIfUnavailable = options.skipConnectIfUnavailable === true;
+		const allowNetworkLookups = options.allowNetworkLookups !== false;
+		let matchedMode = false;
+
+		for (const deviceId of deviceIds) {
+			const mode = await this._resolveModeSelectionForDevice(
+				deviceId,
+				selection,
+				{ allowNetworkLookups },
+			);
+			if (!mode) {
+				continue;
+			}
+			matchedMode = true;
+
+			let beforeController = null;
+			try {
+				beforeController = await this._requestControllerData(deviceId);
+				this._storeControllerModeState(beforeController);
+			} catch {
+				beforeController = null;
+			}
+			const modeForApply = this._normalizeModeForApply(mode, deviceId);
+			const payload = packModePayload(modeForApply, this._protocolVersion);
+			await this._sendPacket(
+				deviceId,
+				PACKET_TYPES.RGBCONTROLLER_UPDATEMODE,
+				payload,
+				{
+					expectResponse: false,
+					fireAndForget,
+					skipConnectIfUnavailable,
+				},
+			);
+
+			let applied = false;
+			try {
+				await sleep(60);
+				const afterController = await this._requestControllerData(deviceId);
+				this._storeControllerModeState(afterController);
+				applied = this._isActiveModeMatch(afterController, mode);
+			} catch {
+				// Ignore verification read errors here; write already occurred.
+			}
+		}
+
+		if (!matchedMode) {
+			throw new Error(
+				"No matching OpenRGB mode was found for the selected theme option.",
+			);
+		}
+	}
+
+	async _resolveLedCount(deviceId, options = {}) {
+		if (this._deviceLedCounts.has(deviceId)) {
+			return Math.max(1, this._deviceLedCounts.get(deviceId));
+		}
+
+		const allowNetworkLookups = options.allowNetworkLookups !== false;
+		if (!allowNetworkLookups) {
+			return 1;
+		}
+
+		const controller = await this._requestControllerData(deviceId);
+		const ledCount = Math.max(1, controller.ledCount || 1);
+		this._deviceLedCounts.set(deviceId, ledCount);
+		return ledCount;
+	}
+
+	_normalizeTransitionMs(transition) {
+		const parsed = coerceNumber(transition, 0);
+		if (!Number.isFinite(parsed) || parsed <= 0) {
+			return 0;
+		}
+		return clamp(Math.round(parsed), 0, MAX_TRANSITION_MS);
+	}
+
+	async _applyColorUpdate(deviceIds, update) {
+		const normalizedColor = normalizeColor(update.color);
+		const fireAndForget = update.fireAndForget === true;
+		const skipConnectIfUnavailable = update.skipConnectIfUnavailable === true;
+		const allowNetworkLookups = update.allowNetworkLookups !== false;
+		const transitionMs = this._normalizeTransitionMs(update.transition);
+		const transitionSteps = transitionMs
+			? clamp(
+					Math.round(transitionMs / TRANSITION_STEP_MS),
+					1,
+					MAX_TRANSITION_STEPS,
+				)
+			: 0;
+		const transitionStepDelay = transitionSteps
+			? Math.max(1, Math.round(transitionMs / transitionSteps))
+			: 0;
+		const plans = [];
+
+		for (const deviceId of deviceIds) {
+			const previous = this._deviceState.get(deviceId) || {
+				color: { r: 255, g: 255, b: 255 },
+				brightness: 100,
+				power: true,
+				lastNonBlackColor: { r: 255, g: 255, b: 255 },
+			};
+
+			const hasExplicitColor = normalizedColor !== null;
+			const hasExplicitBrightness =
+				update.brightness !== undefined && update.brightness !== null;
+			const hasExplicitPower =
+				update.power !== undefined && update.power !== null;
+
+			let nextPower = hasExplicitPower
+				? coerceBoolean(update.power, true)
+				: previous.power;
+
+			// If a new non-black color is provided without explicit power,
+			// assume intent to turn the device on.
+			if (
+				!hasExplicitPower &&
+				hasExplicitColor &&
+				!isBlackColor(normalizedColor) &&
+				previous.power === false
+			) {
+				nextPower = true;
+			}
+
+			let nextColor = hasExplicitColor ? normalizedColor : previous.color;
+
+			// "Off" commands often include black; keep the previous on-color so
+			// turning back on restores expected color behavior.
+			if (!nextPower && hasExplicitColor && isBlackColor(normalizedColor)) {
+				nextColor = previous.color;
+			}
+
+			let nextBrightness;
+			if (hasExplicitBrightness) {
+				nextBrightness = clamp(
+					Math.round(coerceNumber(update.brightness, 100)),
+					0,
+					100,
+				);
+			} else if (hasExplicitColor && previous.brightness === 0) {
+				// Recovery path after an off/zero-brightness state.
+				nextBrightness = 100;
+			} else {
+				nextBrightness = previous.brightness;
+			}
+
+			let nextLastNonBlackColor = previous.lastNonBlackColor || previous.color;
+			if (!isBlackColor(nextColor)) {
+				nextLastNonBlackColor = nextColor;
+			}
+
+			const next = {
+				color: nextColor,
+				brightness: nextBrightness,
+				power: nextPower,
+				lastNonBlackColor: nextLastNonBlackColor,
+			};
+
+			const previousBaseColor =
+				isBlackColor(previous.color) && previous.lastNonBlackColor
+					? previous.lastNonBlackColor
+					: previous.color;
+			const previousOutputColor = previous.power
+				? applyBrightness(previousBaseColor, previous.brightness)
+				: { r: 0, g: 0, b: 0 };
+
+			const nextBaseColor =
+				isBlackColor(next.color) && next.lastNonBlackColor
+					? next.lastNonBlackColor
+					: next.color;
+			const outputColor = next.power
+				? applyBrightness(nextBaseColor, next.brightness)
+				: { r: 0, g: 0, b: 0 };
+
+			const ledCount = await this._resolveLedCount(deviceId, {
+				allowNetworkLookups,
+			});
+
+			try {
+				await this._sendPacket(
+					deviceId,
+					PACKET_TYPES.RGBCONTROLLER_SETCUSTOMMODE,
+					Buffer.alloc(0),
+					{
+						expectResponse: false,
+						fireAndForget,
+						skipConnectIfUnavailable,
+					},
+				);
+			} catch {
+				// Some devices ignore custom mode calls; continue with LED write.
+			}
+
+			plans.push({
+				deviceId,
+				ledCount,
+				fromColor: previousOutputColor,
+				toColor: outputColor,
+				nextState: next,
+			});
+		}
+
+		if (!plans.length) {
+			return;
+		}
+
+		const shouldFade = transitionSteps > 1;
+		if (shouldFade) {
+			const anyColorChange = plans.some(
+				(plan) => !colorsEqual(plan.fromColor, plan.toColor),
+			);
+			if (anyColorChange) {
+				for (let step = 1; step <= transitionSteps; step++) {
+					const t = step / transitionSteps;
+					for (const plan of plans) {
+						const colorPayload = buildUpdateLedsPayload(
+							plan.ledCount,
+							lerpColor(plan.fromColor, plan.toColor, t),
+						);
+							await this._sendPacket(
+								plan.deviceId,
+								PACKET_TYPES.RGBCONTROLLER_UPDATELEDS,
+								colorPayload,
+								{
+									expectResponse: false,
+									fireAndForget,
+									skipConnectIfUnavailable,
+								},
+							);
+						}
+					if (step < transitionSteps) {
+						await sleep(transitionStepDelay);
+					}
+				}
+			} else {
+				for (const plan of plans) {
+					const colorPayload = buildUpdateLedsPayload(
+						plan.ledCount,
+						plan.toColor,
+					);
+						await this._sendPacket(
+							plan.deviceId,
+							PACKET_TYPES.RGBCONTROLLER_UPDATELEDS,
+							colorPayload,
+							{
+								expectResponse: false,
+								fireAndForget,
+								skipConnectIfUnavailable,
+							},
+						);
+					}
+				}
+			} else {
+			for (const plan of plans) {
+				const colorPayload = buildUpdateLedsPayload(plan.ledCount, plan.toColor);
+				await this._sendPacket(
+					plan.deviceId,
+					PACKET_TYPES.RGBCONTROLLER_UPDATELEDS,
+					colorPayload,
+					{
+						expectResponse: false,
+						fireAndForget,
+						skipConnectIfUnavailable,
+					},
+				);
+			}
+		}
+
+		for (const plan of plans) {
+			this._deviceState.set(plan.deviceId, plan.nextState);
+		}
+	}
+
+	async _handleLoadProfileAction(values) {
+		const profileName = coerceString(values.profileName, "");
+		if (!profileName) {
+			throw new Error("Profile name is required.");
+		}
+		await this._loadProfile(profileName);
+	}
+
+	async _handleSaveProfileAction(values) {
+		const profileName = coerceString(values.profileName, "");
+		if (!profileName) {
+			throw new Error("Profile name is required.");
+		}
+		await this._saveProfile(profileName);
+	}
+}
+
+module.exports = OpenRGBPlugin;
+
+```
+
+## openrgb/manifest.json
 
 ```
 {
-  "name": "lumia-mock-lights-plugin",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Mock lights plugin for local testing of Lumia plugin light flows.",
-  "main": "main.js",
-  "dependencies": {
-    "@lumiastream/plugin": "^0.3.1"
-  }
+	"id": "openrgb",
+	"name": "OpenRGB",
+	"version": "1.0.1",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Control OpenRGB devices as Lumia lights and trigger OpenRGB profile actions (Corsair, Razer, ASUS, MSI, Gigabyte, ASRock, NZXT, SteelSeries, Logitech, HyperX, Cooler Master, and more).",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "lights",
+	"keywords": "openrgb, rgb, led, lights, keyboard, mouse, motherboard, corsair, razer, asus, msi, gigabyte, asrock, nzxt, steelseries, logitech, hyperx, coolermaster",
+	"icon": "openrgb.png",
+	"config": {
+		"settings": [
+			{
+				"key": "host",
+				"label": "OpenRGB Host",
+				"type": "text",
+				"defaultValue": "127.0.0.1",
+				"placeholder": "127.0.0.1",
+				"required": true,
+				"helperText": "Host running the OpenRGB SDK server."
+			},
+			{
+				"key": "port",
+				"label": "OpenRGB Port",
+				"type": "number",
+				"defaultValue": 6742,
+				"required": true,
+				"validation": {
+					"min": 1,
+					"max": 65535
+				},
+				"helperText": "Default OpenRGB SDK port is 6742."
+			}
+		],
+		"settings_tutorial": "---\n1) Open **OpenRGB** and enable the **SDK Server**.\n2) Confirm host/port (default `127.0.0.1:6742`).\n3) Save these settings in Lumia and activate the plugin.\n4) Use **Discover OpenRGB Devices** to import devices as selectable lights.\n---\n### Notes\n- On remote hosts, allow incoming TCP to the OpenRGB SDK port.\n- Some devices require a direct/custom mode before color writes. This plugin automatically attempts that.\n---",
+		"actions_tutorial": "---\n### OpenRGB Actions\n- **Load/Save Profile**: Trigger OpenRGB profile commands through the SDK.\n\nLight color/power/brightness are controlled through Lumia light actions and support software fade transitions via the `transition` value.\nStudio Themes now include OpenRGB mode options per discovered device.\n---",
+		"lights": {
+			"search": {
+				"buttonLabel": "Discover OpenRGB Devices",
+				"helperText": "Queries the OpenRGB SDK server for available RGB controllers."
+			},
+			"manualAdd": {
+				"buttonLabel": "Add OpenRGB Device ID",
+				"helperText": "Use this if discovery is blocked. Device ID is the zero-based index of the controller in OpenRGB's device list (top item = 0).",
+				"fields": [
+					{
+						"key": "deviceId",
+						"label": "OpenRGB Device ID",
+						"type": "number",
+						"required": true
+					},
+					{
+						"key": "name",
+						"label": "Custom Name (optional)",
+						"type": "text",
+						"required": false
+					}
+				]
+			},
+			"displayFields": [
+				{
+					"key": "name",
+					"label": "Name"
+				},
+				{
+					"key": "id",
+					"label": "ID"
+				},
+				{
+					"key": "location",
+					"label": "Location",
+					"fallback": "Unknown location"
+				},
+				{
+					"key": "ledCount",
+					"label": "LEDs",
+					"fallback": "Unknown LED count"
+				}
+			],
+			"emptyStateText": "No OpenRGB lights found yet. Run discovery or add a device ID manually."
+		},
+		"themeConfig": {
+			"keyForThemes": "effects",
+			"hasEffects": true,
+			"sceneType": "light-theme",
+			"showIndividualLights": true,
+			"displayKey": "name"
+		},
+		"actions": [
+			{
+				"type": "load_profile",
+				"label": "Load OpenRGB Profile",
+				"description": "Load an OpenRGB profile by name.",
+				"fields": [
+					{
+						"key": "profileName",
+						"label": "Profile Name",
+						"type": "select",
+						"allowTyping": true,
+						"allowVariables": true,
+						"dynamicOptions": true,
+						"options": [],
+						"required": true,
+						"placeholder": "example.orp"
+					}
+				]
+			},
+			{
+				"type": "save_profile",
+				"label": "Save OpenRGB Profile",
+				"description": "Save an OpenRGB profile by name.",
+				"fields": [
+					{
+						"key": "profileName",
+						"label": "Profile Name",
+						"type": "select",
+						"allowTyping": true,
+						"allowVariables": true,
+						"dynamicOptions": true,
+						"options": [],
+						"required": true,
+						"placeholder": "example.orp"
+					}
+				]
+			}
+		]
+	}
+}
+
+```
+
+## openrgb/package.json
+
+```
+{
+	"name": "lumia-openrgb",
+	"version": "1.0.0",
+	"private": true,
+	"description": "OpenRGB light integration plugin for Lumia Stream.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.3.2"
+	}
 }
 
 ```
@@ -6535,8 +9535,2220 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.1"
+		"@lumiastream/plugin": "^0.3.2"
 	}
+}
+
+```
+
+## settings_field_showcase/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const VARIABLE_NAMES = {
+	saveCount: "save_count",
+	lastSavedAt: "last_saved_at",
+	lastSavedValuesJson: "last_saved_values_json",
+};
+
+const FIELD_SPECS = [
+	{ key: "textField", label: "text", type: "text" },
+	{ key: "numberField", label: "number", type: "number" },
+	{ key: "textListField", label: "text_list", type: "text_list" },
+	{ key: "selectField", label: "select", type: "select" },
+	{ key: "multiselectField", label: "multiselect", type: "multiselect" },
+	{ key: "checkboxField", label: "checkbox", type: "checkbox" },
+	{ key: "sliderField", label: "slider", type: "slider" },
+	{ key: "hiddenTextField", label: "hidden_text", type: "text" },
+	{ key: "groupedTextField", label: "grouped_text", type: "text" },
+	{ key: "fileField", label: "file", type: "file" },
+	{ key: "passwordField", label: "password", type: "password" },
+	{ key: "toggleField", label: "toggle", type: "toggle" },
+	{ key: "textareaField", label: "textarea", type: "textarea" },
+	{ key: "emailField", label: "email", type: "email" },
+	{ key: "urlField", label: "url", type: "url" },
+	{ key: "colorField", label: "color", type: "color" },
+	{ key: "jsonField", label: "json", type: "json" },
+	{ key: "roiField", label: "roi", type: "roi" },
+];
+
+function asString(value, fallback = "") {
+	if (typeof value === "string") {
+		return value;
+	}
+	if (value === undefined || value === null) {
+		return fallback;
+	}
+	return String(value);
+}
+
+function asBoolean(value, fallback = false) {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (typeof value === "number") {
+		return value !== 0;
+	}
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (["1", "true", "yes", "on", "enabled"].includes(normalized)) {
+			return true;
+		}
+		if (["0", "false", "no", "off", "disabled"].includes(normalized)) {
+			return false;
+		}
+	}
+	return fallback;
+}
+
+function asNumber(value, fallback = 0) {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return parsed;
+		}
+	}
+	return fallback;
+}
+
+function asStringList(value) {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	const cleaned = value
+		.map((item) => asString(item).trim())
+		.filter((item) => item.length > 0);
+	return Array.from(new Set(cleaned));
+}
+
+function asJsonValue(value) {
+	if (value === undefined) {
+		return null;
+	}
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (!trimmed.length) {
+			return null;
+		}
+		try {
+			return JSON.parse(trimmed);
+		} catch {
+			return { _invalidJson: trimmed };
+		}
+	}
+	return value;
+}
+
+function asRoi(value) {
+	const parsed = asJsonValue(value);
+	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+		return null;
+	}
+
+	const unitToken = asString(parsed.unit, "ratio").toLowerCase();
+	const unit = unitToken === "pixels" || unitToken === "px" ? "pixels" : "ratio";
+	const max = unit === "ratio" ? 1 : Number.POSITIVE_INFINITY;
+	const clamp = (input) => Math.max(0, Math.min(max, input));
+
+	const x = clamp(asNumber(parsed.x, 0));
+	const y = clamp(asNumber(parsed.y, 0));
+	const width = clamp(asNumber(parsed.width, unit === "ratio" ? 1 : 500));
+	const height = clamp(asNumber(parsed.height, unit === "ratio" ? 1 : 500));
+	if (width <= 0 || height <= 0) {
+		return null;
+	}
+	return { x, y, width, height, unit };
+}
+
+function normalizeValueByType(type, value) {
+	switch (type) {
+		case "number":
+		case "slider":
+			return asNumber(value, 0);
+		case "checkbox":
+		case "toggle":
+			return asBoolean(value, false);
+		case "text_list":
+		case "multiselect":
+			return asStringList(value);
+		case "json":
+			return asJsonValue(value);
+		case "roi":
+			return asRoi(value);
+		case "password": {
+			const raw = asString(value, "");
+			if (!raw.length) {
+				return "";
+			}
+			return `***${raw.length} chars***`;
+		}
+		case "file":
+		case "text":
+		case "select":
+		case "textarea":
+		case "email":
+		case "url":
+		case "color":
+		default:
+			return asString(value, "");
+	}
+}
+
+function formatForOutput(value) {
+	if (typeof value === "string") {
+		return value;
+	}
+	try {
+		return JSON.stringify(value);
+	} catch {
+		return String(value);
+	}
+}
+
+function truncate(value, maxLength = 140) {
+	const text = asString(value, "");
+	if (text.length <= maxLength) {
+		return text;
+	}
+	return `${text.slice(0, maxLength - 3)}...`;
+}
+
+class SettingsFieldShowcasePlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._saveCount = 0;
+	}
+
+	async onload() {
+		await this.lumia.updateConnection(true);
+		await this._log("[settings_field_showcase] Loaded.");
+		await this._emitAllFieldValues(this.settings, { showToasts: false, reason: "load" });
+	}
+
+	async onunload() {
+		await this.lumia.updateConnection(false);
+	}
+
+	async onsettingsupdate(settings) {
+		await this._emitAllFieldValues(settings, { showToasts: true, reason: "save" });
+	}
+
+	async validateAuth() {
+		return { ok: true };
+	}
+
+	async _emitAllFieldValues(settings, options = {}) {
+		const showToasts = options.showToasts === true;
+		const reason = asString(options.reason, "save");
+		const snapshot = {};
+
+		for (const field of FIELD_SPECS) {
+			const normalized = normalizeValueByType(field.type, settings?.[field.key]);
+			const output = formatForOutput(normalized);
+			snapshot[field.key] = normalized;
+
+			await this._log(`[settings_field_showcase] ${field.label} (${field.key}) = ${output}`);
+
+			if (showToasts) {
+				await this.lumia.showToast({
+					message: `${field.label}: ${truncate(output, 90)}`,
+					time: 2600,
+				});
+			}
+		}
+
+		this._saveCount += 1;
+		const savedAt = new Date().toISOString();
+
+		await this.lumia.setVariable(VARIABLE_NAMES.saveCount, this._saveCount);
+		await this.lumia.setVariable(VARIABLE_NAMES.lastSavedAt, savedAt);
+		await this.lumia.setVariable(
+			VARIABLE_NAMES.lastSavedValuesJson,
+			JSON.stringify(
+				{
+					reason,
+					savedAt,
+					fields: snapshot,
+				},
+				null,
+				2,
+			),
+		);
+
+		if (showToasts) {
+			await this.lumia.showToast({
+				message: `Settings saved. Logged ${FIELD_SPECS.length} field values.`,
+				time: 3500,
+			});
+		}
+	}
+
+	async _log(message) {
+		await this.lumia.addLog(message);
+	}
+}
+
+module.exports = SettingsFieldShowcasePlugin;
+
+```
+
+## settings_field_showcase/manifest.json
+
+```
+{
+	"id": "settings_field_showcase",
+	"name": "Settings Field Showcase",
+	"version": "1.1.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Example plugin demonstrating every available settings field type with logging/toasts on save.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"icon": "",
+	"config": {
+		"settings_tutorial": "settings_tutorial.md",
+		"settings": [
+			{
+				"key": "textField",
+				"label": "Text Field",
+				"type": "text",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": "Hello Lumia",
+				"helperText": "Example of type `text`."
+			},
+			{
+				"key": "numberField",
+				"label": "Number Field",
+				"type": "number",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": 42,
+				"min": 0,
+				"max": 1000,
+				"helperText": "Example of type `number`."
+			},
+			{
+				"key": "textListField",
+				"label": "Text List Field",
+				"type": "text_list",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": ["alpha", "beta"],
+				"helperText": "Example of type `text_list`."
+			},
+			{
+				"key": "selectField",
+				"label": "Select Field",
+				"type": "select",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": "custom",
+				"options": [
+					{ "label": "Normal", "value": "normal" },
+					{ "label": "Custom", "value": "custom" },
+					{ "label": "Debug", "value": "debug" }
+				],
+				"helperText": "Example of type `select`."
+			},
+			{
+				"key": "multiselectField",
+				"label": "Multiselect Field",
+				"type": "multiselect",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": ["valorant", "overwatch"],
+				"options": [
+					{ "label": "Valorant", "value": "valorant" },
+					{ "label": "Rocket League", "value": "rocket_league" },
+					{ "label": "Overwatch", "value": "overwatch" },
+					{ "label": "League of Legends", "value": "league_of_legends" }
+				],
+				"helperText": "Example of type `multiselect`."
+			},
+			{
+				"key": "checkboxField",
+				"label": "Checkbox Field",
+				"type": "checkbox",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": true,
+				"helperText": "Example of type `checkbox`."
+			},
+			{
+				"key": "sliderField",
+				"label": "Slider Field",
+				"type": "slider",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": 65,
+				"min": 0,
+				"max": 100,
+				"step": 1,
+				"helperText": "Example of type `slider`."
+			},
+			{
+				"key": "toggleField",
+				"label": "Toggle Field",
+				"type": "toggle",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"defaultValue": true,
+				"helperText": "Controls visibleIf examples below."
+			},
+			{
+				"key": "hiddenTextField",
+				"label": "Hidden Text Field",
+				"type": "text",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"hidden": true,
+				"defaultValue": "hidden_default_value",
+				"helperText": "Demonstrates `hidden: true`."
+			},
+			{
+				"key": "groupedTextField",
+				"label": "Grouped Text Field",
+				"type": "text",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"group": {
+					"key": "visibility_group",
+					"label": "Grouped Visibility Fields",
+					"helperText": "This container demonstrates `group` and group-level `visibleIf`.",
+					"visibleIf": {
+						"key": "toggleField",
+						"equals": true
+					}
+				},
+				"defaultValue": "inside_group",
+				"helperText": "Example of grouped field."
+			},
+			{
+				"key": "fileField",
+				"label": "File Field",
+				"type": "file",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"group": "visibility_group",
+				"visibleIf": {
+					"key": "toggleField",
+					"equals": true
+				},
+				"helperText": "Example of type `file` with `visibleIf`."
+			},
+			{
+				"key": "passwordField",
+				"label": "Password Field",
+				"type": "password",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"group": "visibility_group",
+				"defaultValue": "super_secret_value",
+				"helperText": "Example of type `password`."
+			},
+			{
+				"key": "textareaField",
+				"label": "Textarea Field",
+				"type": "textarea",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"group": "visibility_group",
+				"rows": 4,
+				"defaultValue": "This is a multiline example.",
+				"visibleIf": {
+					"key": "checkboxField",
+					"equals": true
+				},
+				"helperText": "Example of type `textarea` with `visibleIf`."
+			},
+			{
+				"key": "emailField",
+				"label": "Email Field",
+				"type": "email",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"defaultValue": "name@example.com",
+				"helperText": "Example of type `email`."
+			},
+			{
+				"key": "urlField",
+				"label": "URL Field",
+				"type": "url",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"defaultValue": "https://lumiastream.com",
+				"helperText": "Example of type `url`."
+			},
+			{
+				"key": "colorField",
+				"label": "Color Field",
+				"type": "color",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"defaultValue": "#33aaff",
+				"helperText": "Example of type `color`."
+			},
+			{
+				"key": "jsonField",
+				"label": "JSON Field",
+				"type": "json",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"group": {
+					"key": "advanced_detection_group",
+					"label": "Advanced Detection Rules",
+					"helperText": "Grouped advanced examples with custom JSON + ROI.",
+					"order": 1
+				},
+				"rows": 8,
+				"visibleIf": {
+					"key": "selectField",
+					"equals": "custom"
+				},
+				"defaultValue": {
+					"rules": [
+						{ "name": "kill", "confidence": 0.9 },
+						{ "name": "goal", "confidence": 0.92 }
+					],
+					"cooldownMs": 1200
+				},
+				"helperText": "Example of type `json` with `visibleIf`."
+			},
+			{
+				"key": "roiField",
+				"label": "ROI Field",
+				"type": "roi",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"group": "advanced_detection_group",
+				"visibleIf": {
+					"key": "multiselectField",
+					"equals": "valorant"
+				},
+				"defaultValue": {
+					"x": 0.72,
+					"y": 0.02,
+					"width": 0.27,
+					"height": 0.45,
+					"unit": "ratio"
+				},
+				"helperText": "Example of type `roi` with `visibleIf` and array matching."
+			}
+		],
+		"variables": [
+			{
+				"name": "save_count",
+				"description": "How many times settings were saved/updated.",
+				"value": 0
+			},
+			{
+				"name": "last_saved_at",
+				"description": "Timestamp of the last settings save.",
+				"value": ""
+			},
+			{
+				"name": "last_saved_values_json",
+				"description": "JSON snapshot of values saved most recently.",
+				"value": ""
+			}
+		],
+		"alerts": []
+	}
+}
+
+```
+
+## settings_field_showcase/package.json
+
+```
+{
+	"name": "lumia-settings-field-showcase",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Example Lumia plugin demonstrating roi/json/multiselect/file/visibleIf settings.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.2.4"
+	}
+}
+
+```
+
+## settings_field_showcase/settings_tutorial.md
+
+```
+### Settings Field Showcase
+
+This example includes every supported settings field type:
+
+- `text`
+- `number`
+- `text_list`
+- `select`
+- `multiselect`
+- `checkbox`
+- `slider`
+- `file`
+- `password`
+- `toggle`
+- `textarea`
+- `email`
+- `url`
+- `color`
+- `json`
+- `roi`
+
+It also demonstrates field metadata:
+
+- `hidden`
+- `section`
+- `sectionOrder`
+- `group` (object and string forms)
+- `rows`
+- `visibleIf`
+
+When you save settings, the plugin:
+
+- logs each value
+- shows toast notifications
+- updates `save_count`, `last_saved_at`, and `last_saved_values_json`
+
+```
+
+## steam/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const DEFAULTS = {
+	pollInterval: 120,
+	minPollInterval: 15,
+	maxPollInterval: 900,
+	achievementRefreshSeconds: 180,
+	ownedGamesRefreshSeconds: 600,
+	userAgent: "LumiaStream Steam Plugin/1.0.0",
+	logThrottleMs: 5 * 60 * 1000,
+	matchThreshold: 0.7,
+};
+
+const STEAM_API_BASE = "https://api.steampowered.com";
+
+const ALERT_KEYS = {
+	onlineStateChanged: "online_state_changed",
+	achievementProgressChanged: "achievement_progress_changed",
+	currentGameChanged: "current_game_changed",
+};
+
+const VARIABLE_NAMES = {
+	steamId: "steamid",
+	username: "persona_username",
+	onlineStatus: "online_status",
+	lastLogoff: "last_logoff",
+	profileUrl: "profile_url",
+	avatar: "avatar",
+	currentGameName: "current_game_name",
+	currentGameAppId: "current_game_appid",
+	gameCount: "game_count",
+	currentGameAchievementCount: "current_game_achievement_count",
+	currentGameAchievementUnlocked: "current_game_achievement_unlocked_count",
+	requestedGameAppId: "requested_game_appid",
+	requestedGameName: "requested_game_name",
+	requestedGameAchievementCount: "requested_game_achievement_count",
+	requestedGameAchievementUnlocked: "requested_game_achievement_unlocked",
+	requestedGameAchievements: "requested_game_achievements",
+};
+
+class SteamPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._pollTimer = null;
+		this._refreshPromise = null;
+		this._lastConnectionState = null;
+		this._lastVariables = new Map();
+		this._logTimestamps = new Map();
+		this._globalBackoffUntil = 0;
+		this._authFailure = false;
+		this._resolvedSteamId = "";
+		this._hasInitialSync = false;
+		this._lastPersonaState = null;
+		this._lastCurrentGameAppId = null;
+		this._lastCurrentGameName = "";
+		this._lastAchievementAppId = null;
+		this._lastAchievementUnlocked = null;
+		this._lastAchievementCount = null;
+		this._lastOwnedFetchAt = 0;
+		this._lastAchievementsFetchAt = 0;
+		this._lastAchievementFetchAppId = 0;
+	}
+
+	async onload() {
+		if (!this._hasRequiredSettings()) {
+			await this._log("Missing Steam API key or Steam ID.", "warn");
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		await this._refreshData({ reason: "startup" });
+		this._schedulePolling();
+	}
+
+	async onunload() {
+		this._clearPolling();
+		await this._updateConnectionState(false);
+	}
+
+	async onsettingsupdate(settings, previous = {}) {
+		const pollChanged =
+			this._pollInterval(settings) !== this._pollInterval(previous);
+		const keyChanged = (settings?.apiKey ?? "") !== (previous?.apiKey ?? "");
+		const idChanged =
+			(settings?.steamIdOrVanity ?? "") !== (previous?.steamIdOrVanity ?? "");
+
+		if (pollChanged) {
+			this._schedulePolling();
+		}
+
+		if (keyChanged || idChanged) {
+			this._authFailure = false;
+			this._globalBackoffUntil = 0;
+			this._resolvedSteamId = "";
+			this._hasInitialSync = false;
+			this._lastPersonaState = null;
+			this._lastCurrentGameAppId = null;
+			this._lastCurrentGameName = "";
+			this._lastAchievementAppId = null;
+			this._lastAchievementUnlocked = null;
+			this._lastAchievementCount = null;
+			this._lastOwnedFetchAt = 0;
+			this._lastAchievementsFetchAt = 0;
+			this._lastAchievementFetchAppId = 0;
+		}
+
+		await this._refreshData({ reason: "settings-update" });
+	}
+
+	async actions(config) {
+		for (const action of config.actions) {
+			const params = action.value;
+			try {
+				switch (action.type) {
+					case "refresh":
+						await this._refreshData({ reason: "manual-action" });
+						break;
+					case "fetch_game":
+						await this._handleFetchGame(params);
+						break;
+				}
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(
+					`Action ${action.type ?? "unknown"} failed: ${message}`,
+					"error",
+				);
+			}
+		}
+	}
+
+	async validateAuth() {
+		if (!this._hasRequiredSettings()) {
+			return {
+				ok: false,
+				message: "Missing Steam API key or Steam ID.",
+			};
+		}
+
+		try {
+			const steamId = await this._resolveSteamId();
+			await this._fetchPlayerSummary(steamId);
+			return { ok: true };
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(`Steam validation failed: ${message}`, "error");
+			return { ok: false, message };
+		}
+	}
+
+	_tag() {
+		return `[${this.manifest?.id ?? "steam"}]`;
+	}
+
+	async _log(message, severity = "info") {
+		const prefix = this._tag();
+		const decorated =
+			severity === "warn"
+				? `${prefix} ⚠️ ${message}`
+				: severity === "error"
+					? `${prefix} ❌ ${message}`
+					: `${prefix} ${message}`;
+
+		await this.lumia.addLog(decorated);
+	}
+
+	async _logThrottled(
+		key,
+		message,
+		severity = "info",
+		intervalMs = DEFAULTS.logThrottleMs,
+	) {
+		const now = Date.now();
+		const last = this._logTimestamps.get(key) ?? 0;
+		if (now - last < intervalMs) {
+			return;
+		}
+		this._logTimestamps.set(key, now);
+		await this._log(message, severity);
+	}
+
+	async _refreshData({ reason } = {}) {
+		if (!this._hasRequiredSettings()) {
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		if (this._authFailure) {
+			return;
+		}
+
+		const now = Date.now();
+		if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
+			return;
+		}
+
+		if (this._refreshPromise) {
+			return this._refreshPromise;
+		}
+
+		this._refreshPromise = (async () => {
+			try {
+				const steamId = await this._resolveSteamId();
+				const forceFullRefresh =
+					reason === "startup" ||
+					reason === "settings-update" ||
+					reason === "manual-action";
+				const now = Date.now();
+
+				const summaryResult = await this._safeFetch("summary", () =>
+					this._fetchPlayerSummary(steamId),
+				);
+				const achievementAppId = this._determineAchievementAppId(summaryResult.data);
+				if (!achievementAppId) {
+					this._lastAchievementFetchAppId = 0;
+					this._lastAchievementsFetchAt = 0;
+				}
+
+				const shouldFetchOwned =
+					forceFullRefresh ||
+					!this._lastOwnedFetchAt ||
+					now - this._lastOwnedFetchAt >= this._ownedGamesRefreshMs();
+				let ownedResult = { ok: false, data: null };
+				if (shouldFetchOwned) {
+					ownedResult = await this._safeFetch("owned games", () =>
+						this._fetchOwnedGames(steamId),
+					);
+					if (ownedResult.ok) {
+						this._lastOwnedFetchAt = Date.now();
+					}
+				}
+
+				const shouldFetchAchievements =
+					Boolean(achievementAppId) &&
+					(forceFullRefresh ||
+						this._lastAchievementFetchAppId !== achievementAppId ||
+						!this._lastAchievementsFetchAt ||
+						now - this._lastAchievementsFetchAt >= this._achievementRefreshMs());
+
+				let achievementsResult = { ok: false, data: null };
+				if (shouldFetchAchievements) {
+					achievementsResult = await this._safeFetch("achievements", () =>
+						this._fetchAchievements(steamId, achievementAppId),
+					);
+					if (achievementsResult.ok) {
+						this._lastAchievementsFetchAt = Date.now();
+						this._lastAchievementFetchAppId = achievementAppId;
+					}
+				}
+
+				await this._applySummary(summaryResult.data, steamId);
+				if (shouldFetchOwned) {
+					await this._applyOwnedGames(ownedResult.data);
+				}
+				if (shouldFetchAchievements || !achievementAppId) {
+					await this._applyAchievements(achievementsResult.data);
+				}
+				await this._emitAlerts({
+					summary: summaryResult.data,
+					achievementAppId,
+					achievements: shouldFetchAchievements ? achievementsResult.data : null,
+				});
+
+				const hadSuccessfulRefresh =
+					summaryResult.ok ||
+					(shouldFetchOwned && ownedResult.ok) ||
+					(shouldFetchAchievements && achievementsResult.ok);
+
+				await this._updateConnectionState(hadSuccessfulRefresh);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._logThrottled(
+					"refresh-failure",
+					`Failed to refresh Steam data: ${message}`,
+					"warn",
+				);
+				await this._updateConnectionState(false);
+			}
+			this._refreshPromise = null;
+		})();
+
+		return this._refreshPromise;
+	}
+
+	async _resolveSteamId() {
+		if (this._resolvedSteamId) {
+			return this._resolvedSteamId;
+		}
+
+		const input = this._normalizeSteamIdentifier(
+			this._coerceString(this.settings?.steamIdOrVanity, "").trim(),
+		);
+		if (!input) {
+			throw new Error("Missing Steam ID or vanity name.");
+		}
+
+		if (/^\d{17}$/.test(input)) {
+			this._resolvedSteamId = input;
+			return input;
+		}
+
+		const resolved = await this._fetchResolveVanity(input);
+		const steamId = this._coerceString(resolved?.steamid, "");
+		if (!steamId) {
+			throw new Error("Could not resolve vanity URL.");
+		}
+
+		this._resolvedSteamId = steamId;
+		return steamId;
+	}
+
+	_normalizeSteamIdentifier(value) {
+		if (!value) return "";
+		const raw = String(value).trim();
+		if (!raw) return "";
+
+		const profileMatch = raw.match(
+			/^https?:\/\/steamcommunity\.com\/(id|profiles)\/([^\/?#]+).*$/i,
+		);
+		if (profileMatch) {
+			const [, type, identifier] = profileMatch;
+			if (type.toLowerCase() === "profiles") {
+				return identifier;
+			}
+			return identifier;
+		}
+
+		return raw;
+	}
+
+	async _fetchResolveVanity(vanity) {
+		const url = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v1/?key=${encodeURIComponent(
+			this._apiKey(),
+		)}&vanityurl=${encodeURIComponent(vanity)}&url_type=1`;
+		const response = await this._fetchJson(url);
+		return response?.response ?? null;
+	}
+
+	async _fetchPlayerSummary(steamId) {
+		const url = `${STEAM_API_BASE}/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(
+			this._apiKey(),
+		)}&steamids=${encodeURIComponent(steamId)}`;
+		const response = await this._fetchJson(url);
+		return response?.response?.players?.[0] ?? null;
+	}
+
+	async _fetchOwnedGames(steamId) {
+		const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
+			this._apiKey(),
+		)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=0&include_played_free_games=1`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchAchievements(steamId, appId) {
+		const targetAppId = this._coerceNumber(appId, 0);
+		if (!targetAppId) {
+			return null;
+		}
+
+		const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?key=${encodeURIComponent(
+			this._apiKey(),
+		)}&steamid=${encodeURIComponent(steamId)}&appid=${targetAppId}`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchOwnedGamesWithInfo(steamId) {
+		const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
+			this._apiKey(),
+		)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=1&include_played_free_games=1`;
+		return this._fetchJson(url);
+	}
+
+	_determineAchievementAppId(summary) {
+		const summaryGameId = this._coerceNumber(summary?.gameid, 0);
+		if (summaryGameId) {
+			return summaryGameId;
+		}
+		return 0;
+	}
+
+	async _fetchJson(url) {
+		let response = await this._request(url);
+
+		if (response.status === 429) {
+			const retryAfter = this._coerceNumber(
+				response.headers.get("Retry-After"),
+				60,
+			);
+			this._applyGlobalBackoff(retryAfter);
+			throw new Error(`Rate limited (429). Backing off for ${retryAfter}s.`);
+		}
+
+		if (response.status === 401 || response.status === 403) {
+			this._authFailure = true;
+			this._clearPolling();
+			await this._showApiKeyFailureToast();
+			throw new Error("Unauthorized. Check your Steam API key.");
+		}
+
+		if (!response.ok) {
+			const body = await response.text();
+			const trimmed = this._truncateError(body);
+			throw new Error(
+				`Steam API error (${response.status}) on ${url}: ${trimmed || "No response body"}`,
+			);
+		}
+
+		return response.json();
+	}
+
+	async _request(url) {
+		const headers = {
+			Accept: "application/json",
+			"User-Agent": DEFAULTS.userAgent,
+		};
+
+		return fetch(url, { headers });
+	}
+
+	async _applySummary(summary, steamId) {
+		if (!summary) {
+			await this._setVariableIfChanged(VARIABLE_NAMES.steamId, steamId);
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.steamId,
+			this._coerceString(summary?.steamid ?? steamId, ""),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.username,
+			this._coerceString(summary?.personaname, ""),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.onlineStatus,
+			this._mapPersonaState(this._coerceNumber(summary?.personastate, 0)),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastLogoff,
+			this._coerceNumber(summary?.lastlogoff, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.profileUrl,
+			this._coerceString(summary?.profileurl, ""),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.avatar,
+			this._coerceString(summary?.avatarfull, ""),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.currentGameName,
+			this._coerceString(summary?.gameextrainfo, ""),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.currentGameAppId,
+			this._coerceNumber(summary?.gameid, 0),
+		);
+	}
+
+	async _applyOwnedGames(owned) {
+		if (!owned) {
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.gameCount,
+			this._coerceNumber(owned?.response?.game_count, 0),
+		);
+	}
+
+	async _applyAchievements(payload) {
+		if (!payload) {
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.currentGameAchievementCount,
+				0,
+			);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.currentGameAchievementUnlocked,
+				0,
+			);
+			return;
+		}
+
+		const achievements = Array.isArray(payload?.playerstats?.achievements)
+			? payload.playerstats.achievements
+			: [];
+		const unlocked = achievements.filter((a) => a?.achieved === 1).length;
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.currentGameAchievementCount,
+			achievements.length,
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.currentGameAchievementUnlocked,
+			unlocked,
+		);
+	}
+
+	async _emitAlerts({ summary, achievementAppId, achievements }) {
+		if (this.settings?.enableAlerts === false) {
+			return;
+		}
+
+		const hasSummary = Boolean(summary && typeof summary === "object");
+		// Do not emit status/game-change alerts until we have at least one real
+		// profile snapshot to use as baseline.
+		if (!hasSummary) {
+			return;
+		}
+		const personaStateRaw = hasSummary
+			? this._coerceNumber(summary?.personastate, 0)
+			: null;
+		const personaState =
+			personaStateRaw === null ? null : this._mapPersonaState(personaStateRaw);
+		const currentGameAppId = this._coerceNumber(summary?.gameid, 0);
+		const currentGameName = this._coerceString(summary?.gameextrainfo, "");
+
+		const achievementList = Array.isArray(
+			achievements?.playerstats?.achievements,
+		)
+			? achievements.playerstats.achievements
+			: null;
+		const unlocked = achievementList
+			? achievementList.filter((a) => a?.achieved === 1).length
+			: 0;
+		const total = achievementList ? achievementList.length : 0;
+		const alertVars = this._buildAlertVariables({
+			summary,
+			onlineStatus: personaState,
+			achievementUnlocked: unlocked,
+			achievementCount: total,
+		});
+
+		if (!this._hasInitialSync) {
+			this._lastPersonaState = personaState;
+			this._lastCurrentGameAppId = currentGameAppId || null;
+			this._lastCurrentGameName = currentGameName;
+			this._lastAchievementAppId = achievementAppId || null;
+			this._lastAchievementUnlocked = achievementList ? unlocked : null;
+			this._lastAchievementCount = achievementList ? total : null;
+			this._hasInitialSync = true;
+			return;
+		}
+
+		if (
+			personaState !== null &&
+			this._lastPersonaState !== null &&
+			personaState !== this._lastPersonaState
+		) {
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.onlineStateChanged,
+				...this._buildAlertPayload(alertVars, {
+					dynamicValue: alertVars.online_status,
+				}),
+			});
+		}
+
+		if (
+			achievementList &&
+			achievementAppId &&
+			this._lastAchievementAppId === achievementAppId &&
+			this._lastAchievementUnlocked !== null &&
+			unlocked !== this._lastAchievementUnlocked
+		) {
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.achievementProgressChanged,
+				...this._buildAlertPayload(alertVars, {
+					dynamicValue: `${alertVars.current_game_achievement_unlocked_count}/${alertVars.current_game_achievement_count}`,
+				}),
+			});
+		}
+
+		const previousGameAppId = this._lastCurrentGameAppId;
+		const previousGameName = this._lastCurrentGameName;
+		const changedToNewGame =
+			Boolean(currentGameAppId) &&
+			(previousGameAppId === null || currentGameAppId !== previousGameAppId);
+		const changedToNoGame =
+			!currentGameAppId &&
+			previousGameAppId !== null &&
+			Boolean(this.settings?.alertGameChangedWhenStopped ?? true);
+
+		if (changedToNewGame || changedToNoGame) {
+			const dynamicValue = changedToNoGame
+				? "Stopped Playing"
+				: alertVars.current_game_name;
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.currentGameChanged,
+				...this._buildAlertPayload(alertVars, {
+					dynamicValue,
+					extraSettings: changedToNoGame
+						? { previous_game_name: previousGameName ?? "" }
+						: undefined,
+				}),
+			});
+		}
+
+		if (personaState !== null) {
+			this._lastPersonaState = personaState;
+		}
+		if (currentGameAppId) {
+			this._lastCurrentGameAppId = currentGameAppId;
+		} else {
+			this._lastCurrentGameAppId = null;
+		}
+		this._lastCurrentGameName = currentGameName;
+		if (achievementAppId && achievementList) {
+			this._lastAchievementAppId = achievementAppId;
+			this._lastAchievementUnlocked = unlocked;
+			this._lastAchievementCount = total;
+		}
+	}
+
+	async _handleFetchGame(params = {}) {
+		if (!this._hasRequiredSettings()) {
+			await this._log("Missing Steam API key or Steam ID.", "warn");
+			return;
+		}
+
+		const gameInput = this._coerceString(params?.game, "").trim();
+		if (!gameInput) {
+			await this._log("Game name or App ID is required.", "warn");
+			return;
+		}
+
+		const steamId = await this._resolveSteamId();
+		let appId = null;
+		let gameName = "";
+
+		const numericOnly = gameInput.match(/^\d+$/);
+		if (numericOnly) {
+			appId = this._coerceNumber(numericOnly[0], 0);
+		}
+
+		let ownedGames = null;
+		if (!appId || !gameName) {
+			ownedGames = await this._fetchOwnedGamesWithInfo(steamId);
+			const games = Array.isArray(ownedGames?.response?.games)
+				? ownedGames.response.games
+				: [];
+			if (!appId) {
+				const match = this._resolveGameFromOwnedGames(games, gameInput);
+				if (!match) {
+					await this._log(`No close match found for '${gameInput}'.`, "warn");
+					await this._showActionToast(
+						`No owned game matched '${gameInput}'.`,
+						"warn",
+					);
+					return;
+				}
+				appId = match.appid;
+				gameName = match.name;
+			} else {
+				const found = games.find(
+					(game) => String(game?.appid) === String(appId),
+				);
+				gameName = this._coerceString(found?.name, "");
+			}
+
+			// No search results variable exposed.
+		}
+
+		if (!appId) {
+			await this._log(`Unable to resolve game '${gameInput}'.`, "warn");
+			await this._showActionToast(
+				`Unable to resolve game '${gameInput}'.`,
+				"warn",
+			);
+			return;
+		}
+
+		const achievements = await this._fetchAchievements(steamId, appId);
+		const list = Array.isArray(achievements?.playerstats?.achievements)
+			? achievements.playerstats.achievements
+			: [];
+		const unlocked = list.filter((a) => a?.achieved === 1).length;
+
+		await this._setVariableIfChanged(VARIABLE_NAMES.requestedGameAppId, appId);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.requestedGameName,
+			gameName || this._coerceString(gameInput, ""),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.requestedGameAchievementCount,
+			list.length,
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.requestedGameAchievementUnlocked,
+			unlocked,
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.requestedGameAchievements,
+			JSON.stringify(achievements ?? {}),
+		);
+
+		await this._showActionToast(
+			gameName
+				? `Fetched achievements for ${gameName}. Requested game variables updated.`
+				: `Fetched achievements for App ID ${appId}. Requested game variables updated.`,
+			"success",
+		);
+	}
+
+	_resolveGameFromOwnedGames(games, input) {
+		const ranked = this._rankGameMatches(games, input);
+		if (!ranked.length) return null;
+		const best = ranked[0];
+		if (best.score < DEFAULTS.matchThreshold) {
+			return null;
+		}
+		return best;
+	}
+
+	_rankGameMatches(games, input) {
+		const normalizedInput = this._normalizeMatchText(input);
+		if (!normalizedInput) return [];
+
+		const results = [];
+		for (const game of games) {
+			const name = this._coerceString(game?.name, "");
+			if (!name) continue;
+			const score = this._scoreMatch(name, normalizedInput);
+			if (score <= 0) continue;
+			results.push({
+				appid: game.appid,
+				name,
+				score: Number(score.toFixed(3)),
+			});
+		}
+
+		results.sort((a, b) => b.score - a.score);
+		return results.slice(0, 10);
+	}
+
+	_scoreMatch(name, normalizedInput) {
+		const normalizedName = this._normalizeMatchText(name);
+		if (!normalizedName) return 0;
+
+		if (normalizedName === normalizedInput) return 1;
+		if (normalizedName.startsWith(normalizedInput)) return 0.95;
+		if (normalizedInput.startsWith(normalizedName)) return 0.9;
+		if (
+			normalizedName.includes(normalizedInput) ||
+			normalizedInput.includes(normalizedName)
+		) {
+			return 0.85;
+		}
+		const distance = this._levenshtein(normalizedName, normalizedInput);
+		const maxLen = Math.max(normalizedName.length, normalizedInput.length);
+		return maxLen ? 1 - distance / maxLen : 0;
+	}
+
+	_normalizeMatchText(value) {
+		return this._coerceString(value, "")
+			.toLowerCase()
+			.replace(/\s+/g, " ")
+			.trim();
+	}
+
+	_mapPersonaState(value) {
+		const map = {
+			0: "Offline",
+			1: "Online",
+			2: "Busy",
+			3: "Away",
+			4: "Snooze",
+			5: "Looking to Trade",
+			6: "Looking to Play",
+		};
+		return map[value] ?? "Offline";
+	}
+
+	_buildAlertVariables({
+		summary,
+		onlineStatus,
+		achievementUnlocked,
+		achievementCount,
+	}) {
+		return {
+			persona_username: this._coerceString(summary?.personaname, ""),
+			online_status: this._coerceString(onlineStatus, ""),
+			current_game_name: this._coerceString(summary?.gameextrainfo, ""),
+			current_game_appid: this._coerceNumber(summary?.gameid, 0),
+			current_game_achievement_unlocked_count: this._coerceNumber(
+				achievementUnlocked,
+				0,
+			),
+			current_game_achievement_count: this._coerceNumber(achievementCount, 0),
+		};
+	}
+
+	_buildAlertPayload(variables, { dynamicValue, extraSettings } = {}) {
+		const value =
+			dynamicValue ??
+			variables.current_game_name ??
+			variables.persona_username ??
+			"";
+		return {
+			dynamic: {
+				value,
+				online_status: variables.online_status,
+			},
+			extraSettings: {
+				...(variables ?? {}),
+				...(extraSettings ?? {}),
+			},
+		};
+	}
+
+	_levenshtein(a, b) {
+		if (a === b) return 0;
+		if (!a) return b.length;
+		if (!b) return a.length;
+
+		const matrix = Array.from({ length: a.length + 1 }, () =>
+			new Array(b.length + 1).fill(0),
+		);
+
+		for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+		for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+
+		for (let i = 1; i <= a.length; i++) {
+			for (let j = 1; j <= b.length; j++) {
+				const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+				matrix[i][j] = Math.min(
+					matrix[i - 1][j] + 1,
+					matrix[i][j - 1] + 1,
+					matrix[i - 1][j - 1] + cost,
+				);
+			}
+		}
+
+		return matrix[a.length][b.length];
+	}
+
+	_applyGlobalBackoff(seconds) {
+		const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
+		const until = Date.now() + delayMs;
+		if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
+			this._globalBackoffUntil = until;
+		}
+	}
+
+	async _showApiKeyFailureToast() {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message: "Invalid Steam API key. Update the plugin settings.",
+				time: 6,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	async _showActionToast(message, type = "info") {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message,
+				time: 4,
+				type,
+			});
+		} catch (error) {
+			return;
+		}
+	}
+
+	_schedulePolling() {
+		this._clearPolling();
+
+		const intervalSeconds = this._pollInterval(this.settings);
+		if (!this._hasRequiredSettings() || intervalSeconds <= 0) {
+			return;
+		}
+
+		this._pollTimer = setInterval(() => {
+			void this._refreshData({ reason: "poll" });
+		}, intervalSeconds * 1000);
+	}
+
+	_clearPolling() {
+		if (this._pollTimer) {
+			clearInterval(this._pollTimer);
+			this._pollTimer = null;
+		}
+	}
+
+	_hasRequiredSettings() {
+		return Boolean(this._apiKey() && this._steamIdInput());
+	}
+
+	_apiKey() {
+		return this._coerceString(this.settings?.apiKey, "");
+	}
+
+	_steamIdInput() {
+		return this._coerceString(this.settings?.steamIdOrVanity, "");
+	}
+
+	_pollInterval(settings = this.settings) {
+		const interval = this._coerceNumber(
+			settings?.pollInterval,
+			DEFAULTS.pollInterval,
+		);
+		if (!Number.isFinite(interval)) {
+			return DEFAULTS.pollInterval;
+		}
+		return Math.min(
+			Math.max(interval, DEFAULTS.minPollInterval),
+			DEFAULTS.maxPollInterval,
+		);
+	}
+
+	_achievementRefreshMs(settings = this.settings) {
+		const pollSeconds = this._pollInterval(settings);
+		const refreshSeconds = Math.max(
+			DEFAULTS.achievementRefreshSeconds,
+			pollSeconds * 2,
+		);
+		return refreshSeconds * 1000;
+	}
+
+	_ownedGamesRefreshMs(settings = this.settings) {
+		const pollSeconds = this._pollInterval(settings);
+		const refreshSeconds = Math.max(
+			DEFAULTS.ownedGamesRefreshSeconds,
+			pollSeconds * 5,
+		);
+		return refreshSeconds * 1000;
+	}
+
+	async _updateConnectionState(state) {
+		if (this._lastConnectionState === state) {
+			return;
+		}
+
+		this._lastConnectionState = state;
+
+		if (typeof this.lumia.updateConnection === "function") {
+			try {
+				await this.lumia.updateConnection(state);
+			} catch (error) {
+				const message = this._errorMessage(error);
+				await this._log(
+					`Failed to update connection state: ${message}`,
+					"warn",
+				);
+			}
+		}
+	}
+
+	async _safeFetch(label, fn) {
+		try {
+			return { ok: true, data: await fn() };
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._logThrottled(
+				`fetch:${label}:${message}`,
+				`${label} fetch failed: ${message}`,
+				"warn",
+			);
+			return { ok: false, data: null };
+		}
+	}
+
+	async _setVariable(name, value) {
+		if (typeof this.lumia.setVariable !== "function") {
+			return;
+		}
+
+		await this.lumia.setVariable(name, value);
+	}
+
+	async _setVariableIfChanged(name, value) {
+		const normalized = this._normalizeValue(value);
+		const previous = this._lastVariables.get(name);
+		if (this._valuesEqual(previous, normalized)) {
+			return false;
+		}
+		this._lastVariables.set(name, normalized);
+		await this._setVariable(name, value);
+		return true;
+	}
+
+	_normalizeValue(value) {
+		if (value === null || value === undefined) {
+			return "";
+		}
+		if (typeof value === "object") {
+			try {
+				return JSON.stringify(value);
+			} catch (error) {
+				return String(value);
+			}
+		}
+		return String(value);
+	}
+
+	_valuesEqual(a, b) {
+		return a === b;
+	}
+
+	_errorMessage(error) {
+		if (!error) {
+			return "Unknown error";
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		return error?.message || String(error);
+	}
+
+	_truncateError(value) {
+		if (!value) {
+			return "";
+		}
+		const trimmed = String(value).replace(/\s+/g, " ").trim();
+		return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+	}
+
+	_coerceNumber(value, fallback = 0) {
+		const number = Number(value);
+		return Number.isFinite(number) ? number : fallback;
+	}
+
+	_coerceString(value, fallback = "") {
+		if (typeof value === "string") {
+			return value;
+		}
+		if (value === null || value === undefined) {
+			return fallback;
+		}
+		return String(value);
+	}
+}
+
+module.exports = SteamPlugin;
+
+```
+
+## steam/manifest.json
+
+```
+{
+	"id": "steam",
+	"name": "Steam",
+	"version": "1.0.2",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Track Steam profile status, current/recent games, and achievements in Lumia with optional alerts and actions.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "games",
+	"keywords": "steam, steam api, gaming, profile, online status, achievements, recently played",
+	"icon": "steam.png",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "Steam Web API Key",
+				"type": "password",
+				"helperText": "Required for all Steam Web API requests.",
+				"required": true
+			},
+			{
+				"key": "steamIdOrVanity",
+				"label": "Steam ID or Vanity Name",
+				"type": "text",
+				"helperText": "Enter a SteamID64 or a vanity URL name.",
+				"required": true
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 15,
+				"min": 15,
+				"max": 900,
+				"helperText": "How often to refresh current status/game (15-900 seconds). Achievements and owned games refresh less frequently automatically."
+			},
+			{
+				"key": "alertGameChangedWhenStopped",
+				"label": "Alert When Game Stops",
+				"type": "checkbox",
+				"defaultValue": true,
+				"helperText": "When enabled, Game Changed alerts also trigger when you stop playing."
+			}
+		],
+		"settings_tutorial": "---\n### Steam Web API Key\n1) Open the [Steam Web API Key page](https://steamcommunity.com/dev/apikey) and sign in.\n2) Enter a domain name (you can use `localhost`).\n3) Accept the terms and click **Register**.\n4) Copy the generated key and paste it into **Steam Web API Key**.\n\n### Steam ID\n1) Open your Steam profile.\n2) Paste **any** of the following into **Steam ID / Vanity Name**:\n   - Your SteamID64 (from account details)\n   - Your vanity profile name\n   - Your full profile URL (example: `https://steamcommunity.com/id/yourname` or `https://steamcommunity.com/profiles/7656119...`)\n\n### Achievements\nAchievement stats are pulled automatically from your **current** game while you are playing.\n---",
+		"actions_tutorial": "---\n---\n### Fetch Game Achievements\nUse **Fetch Achievements For Game** to query a specific game by name or App ID.\nThe results are stored in the requested game variables.\n---",
+		"actions": [
+			{
+				"type": "fetch_game",
+				"label": "Fetch Achievements For Game",
+				"description": "Fetch achievements by game name or App ID (owned games only).",
+				"fields": [
+					{
+						"key": "game",
+						"label": "Game Name or App ID",
+						"type": "text",
+						"placeholder": "ex: Sonic or 1145360",
+						"helperText": "Searches your owned games library for a match.",
+						"allowVariables": true
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "steamid",
+				"description": "SteamID64.",
+				"value": ""
+			},
+			{
+				"name": "persona_username",
+				"description": "Username (Steam persona name).",
+				"value": ""
+			},
+			{
+				"name": "online_status",
+				"description": "Online status (text).",
+				"value": "Offline"
+			},
+			{
+				"name": "profile_url",
+				"description": "Profile URL.",
+				"value": ""
+			},
+			{
+				"name": "avatar",
+				"description": "Avatar URL.",
+				"value": ""
+			},
+			{
+				"name": "current_game_name",
+				"description": "Current in-game name (if playing).",
+				"value": ""
+			},
+			{
+				"name": "current_game_appid",
+				"description": "Current in-game app ID (if playing).",
+				"value": 0
+			},
+			{
+				"name": "game_count",
+				"description": "Owned games count.",
+				"value": 0
+			},
+			{
+				"name": "current_game_achievement_count",
+				"description": "Total achievements for the current/last played game.",
+				"value": 0
+			},
+			{
+				"name": "current_game_achievement_unlocked_count",
+				"description": "Unlocked achievements for the current/last played game.",
+				"value": 0
+			},
+			{
+				"name": "requested_game_appid",
+				"description": "App ID for the last requested game.",
+				"value": 0
+			},
+			{
+				"name": "requested_game_name",
+				"description": "Name for the last requested game.",
+				"value": ""
+			},
+			{
+				"name": "requested_game_achievement_count",
+				"description": "Total achievements for the last requested game.",
+				"value": 0
+			},
+			{
+				"name": "requested_game_achievement_unlocked",
+				"description": "Unlocked achievements for the last requested game.",
+				"value": 0
+			},
+			{
+				"name": "requested_game_achievements",
+				"description": "JSON payload of achievements for the last requested game.",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Online Status Changed",
+				"key": "online_state_changed",
+				"acceptedVariables": ["persona_username", "online_status"],
+				"defaultMessage": "{{persona_username}} is now {{online_status}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_SELECTION",
+						"description": "Pick a online for status.",
+						"selections": [
+							{
+								"label": "Online",
+								"value": "online",
+								"message": "{{persona_username}} is now Online."
+							},
+							{
+								"label": "Offline",
+								"value": "offline",
+								"message": "{{persona_username}} went Offline."
+							},
+							{
+								"label": "Busy",
+								"value": "busy",
+								"message": "{{persona_username}} is Busy."
+							},
+							{
+								"label": "Away",
+								"value": "away",
+								"message": "{{persona_username}} is Away."
+							},
+							{
+								"label": "Snooze",
+								"value": "snooze",
+								"message": "{{persona_username}} is Snoozing."
+							},
+							{
+								"label": "Looking To Trade",
+								"value": "trade",
+								"message": "{{persona_username}} is Looking to Trade."
+							},
+							{
+								"label": "Looking To Play",
+								"value": "play",
+								"message": "{{persona_username}} is Looking to Play."
+							}
+						]
+					}
+				]
+			},
+			{
+				"title": "Achievement Unlocked",
+				"key": "achievement_progress_changed",
+				"acceptedVariables": [
+					"current_game_name",
+					"current_game_achievement_unlocked_count",
+					"current_game_achievement_count"
+				],
+				"defaultMessage": "{{current_game_name}} achievements: {{current_game_achievement_unlocked_count}}/{{current_game_achievement_count}}."
+			},
+			{
+				"title": "Game Changed",
+				"key": "current_game_changed",
+				"acceptedVariables": ["current_game_name", "current_game_appid"],
+				"defaultMessage": "Now playing {{current_game_name}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Game Name"
+					}
+				]
+			}
+		]
+	}
+}
+
+```
+
+## steam/package.json
+
+```
+{
+	"name": "lumia-example-steam",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Example Lumia Stream plugin that pulls Steam data from the Steam Web API.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.2.4"
+	}
+}
+
+```
+
+## typescript_plugin/README.md
+
+```
+# TypeScript Plugin Example
+
+This example shows a full Lumia Stream plugin workflow in TypeScript.
+
+## What This Example Demonstrates
+
+- Typed plugin lifecycle methods (`onload`, `onunload`, `onsettingsupdate`, `actions`)
+- Typed settings and action payload parsing
+- Variable updates (`last_username`, `last_message`, `last_heartbeat`)
+- Triggering a Lumia alert from an action
+
+## Project Layout
+
+- `manifest.json` plugin metadata and UI config
+- `src/main.ts` plugin implementation in TypeScript
+- `tsconfig.json` TypeScript compiler setup
+- `package.json` install/build/validate/package scripts
+
+## Setup
+
+```bash
+cd examples/typescript_plugin
+npm install
+npm run build
+npm run validate
+```
+
+After `npm run build`, the runtime entrypoint is `dist/main.js` (defined by `manifest.main`).
+If you copy this example outside this SDK repo, use `npx lumia-plugin validate .` instead.
+
+## How It Works
+
+- On load, the plugin syncs default values to variables and starts a heartbeat timer.
+- The heartbeat updates `last_heartbeat` on an interval configured in settings.
+- The `send_sample_alert` action accepts optional `username`/`message` overrides.
+- Each action run updates variables and triggers `ts_sample_alert`.
+
+## Package For Distribution
+
+```bash
+npm run package
+```
+
+This runs TypeScript compilation and then builds a `.lumiaplugin` archive with the local CLI script.
+If you copy this example outside this SDK repo, use `npx lumia-plugin build .` instead.
+
+```
+
+## typescript_plugin/manifest.json
+
+```
+{
+	"id": "typescript_plugin_example",
+	"name": "TypeScript Plugin Example",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "",
+	"website": "",
+	"repository": "",
+	"description": "Example TypeScript plugin that shows typed settings, actions, variables, and alerts.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"main": "dist/main.js",
+	"keywords": "typescript, sample, lumia, plugin",
+	"config": {
+		"settings": [
+			{
+				"key": "defaultMessage",
+				"label": "Default Message",
+				"type": "text",
+				"defaultValue": "Hello from TypeScript Plugin Example!",
+				"helperText": "Used when the action does not include a message."
+			},
+			{
+				"key": "heartbeatInterval",
+				"label": "Heartbeat Interval (seconds)",
+				"type": "number",
+				"defaultValue": 15,
+				"min": 5,
+				"max": 300,
+				"helperText": "How often to refresh the heartbeat variable."
+			}
+		],
+		"actions": [
+			{
+				"type": "send_sample_alert",
+				"label": "Send Sample Alert",
+				"description": "Triggers the sample alert and updates plugin variables.",
+				"fields": [
+					{
+						"key": "username",
+						"label": "Username",
+						"type": "text",
+						"defaultValue": "Viewer"
+					},
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "text",
+						"defaultValue": "Hello from TypeScript Plugin Example!"
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "last_username",
+				"description": "Most recent username used by the action.",
+				"value": ""
+			},
+			{
+				"name": "last_message",
+				"description": "Most recent message used by the action.",
+				"value": ""
+			},
+			{
+				"name": "last_heartbeat",
+				"description": "ISO timestamp from the plugin heartbeat loop.",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "TypeScript Sample Alert",
+				"key": "ts_sample_alert",
+				"acceptedVariables": ["last_username", "last_message"],
+				"defaultMessage": "{{last_username}}: {{last_message}}"
+			}
+		]
+	}
+}
+
+```
+
+## typescript_plugin/package.json
+
+```
+{
+	"name": "lumia-typescript-plugin-example",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Example Lumia Stream plugin written in TypeScript.",
+	"main": "dist/main.js",
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"watch": "tsc -w -p tsconfig.json",
+		"validate": "node ../../cli/scripts/validate-plugin.js .",
+		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
+	},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.3.2"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.30",
+		"typescript": "^5.3.3"
+	}
+}
+
+```
+
+## typescript_plugin/src/main.ts
+
+```
+import {
+	Plugin,
+	type PluginActionPayload,
+	type PluginContext,
+	type PluginManifest,
+} from "@lumiastream/plugin";
+
+type ExampleSettings = {
+	defaultMessage?: string;
+	heartbeatInterval?: number;
+};
+
+type SendSampleAlertActionValue = {
+	username?: string;
+	message?: string;
+};
+
+const DEFAULTS = {
+	defaultMessage: "Hello from TypeScript Plugin Example!",
+	defaultUsername: "Viewer",
+	heartbeatInterval: 15,
+} as const;
+
+const VARIABLE_NAMES = {
+	lastUsername: "last_username",
+	lastMessage: "last_message",
+	lastHeartbeat: "last_heartbeat",
+} as const;
+
+class TypeScriptPluginExample extends Plugin {
+	private heartbeatTimer?: NodeJS.Timeout;
+
+	constructor(manifest: PluginManifest, context: PluginContext) {
+		super(manifest, context);
+	}
+
+	async onload(): Promise<void> {
+		await this.syncDefaults();
+		this.startHeartbeat();
+	}
+
+	async onunload(): Promise<void> {
+		this.stopHeartbeat();
+	}
+
+	async onsettingsupdate(
+		settings: Record<string, unknown>,
+		previousSettings: Record<string, unknown>,
+	): Promise<void> {
+		const nextSettings = settings as ExampleSettings;
+		const previous = previousSettings as ExampleSettings;
+		const nextInterval = Number(
+			nextSettings.heartbeatInterval ?? DEFAULTS.heartbeatInterval,
+		);
+		const previousInterval = Number(
+			previous.heartbeatInterval ?? DEFAULTS.heartbeatInterval,
+		);
+
+		if (
+			nextSettings.defaultMessage !== previous.defaultMessage ||
+			nextInterval !== previousInterval
+		) {
+			await this.syncDefaults(nextSettings);
+			this.startHeartbeat();
+		}
+	}
+
+	async actions(config: { actions: PluginActionPayload[] }): Promise<void> {
+		for (const action of config.actions) {
+			if (action.type === "send_sample_alert") {
+				await this.sendSampleAlert(action.value as SendSampleAlertActionValue);
+			}
+		}
+	}
+
+	private getTypedSettings(
+		source: ExampleSettings = this.settings as ExampleSettings,
+	): Required<ExampleSettings> {
+		const parsedInterval = Number(
+			source.heartbeatInterval ?? DEFAULTS.heartbeatInterval,
+		);
+		const heartbeatInterval = Number.isFinite(parsedInterval)
+			? Math.min(300, Math.max(5, parsedInterval))
+			: DEFAULTS.heartbeatInterval;
+
+		return {
+			defaultMessage:
+				source.defaultMessage?.trim() || DEFAULTS.defaultMessage,
+			heartbeatInterval,
+		};
+	}
+
+	private async syncDefaults(settings?: ExampleSettings): Promise<void> {
+		const typedSettings = this.getTypedSettings(settings);
+		await this.lumia.setVariable(
+			VARIABLE_NAMES.lastMessage,
+			typedSettings.defaultMessage,
+		);
+	}
+
+	private startHeartbeat(): void {
+		this.stopHeartbeat();
+		const { heartbeatInterval } = this.getTypedSettings();
+
+		this.heartbeatTimer = setInterval(() => {
+			void this.lumia.setVariable(
+				VARIABLE_NAMES.lastHeartbeat,
+				new Date().toISOString(),
+			);
+		}, heartbeatInterval * 1000);
+	}
+
+	private stopHeartbeat(): void {
+		if (!this.heartbeatTimer) return;
+		clearInterval(this.heartbeatTimer);
+		this.heartbeatTimer = undefined;
+	}
+
+	private async sendSampleAlert(
+		data: SendSampleAlertActionValue,
+	): Promise<void> {
+		const { defaultMessage } = this.getTypedSettings();
+		const username = data.username?.trim() || DEFAULTS.defaultUsername;
+		const message = data.message?.trim() || defaultMessage;
+
+		await this.lumia.setVariable(VARIABLE_NAMES.lastUsername, username);
+		await this.lumia.setVariable(VARIABLE_NAMES.lastMessage, message);
+
+		try {
+			await this.lumia.triggerAlert({
+				alert: "ts_sample_alert",
+				dynamic: {
+					name: "message",
+					value: message,
+				},
+				extraSettings: {
+					username,
+					message,
+				},
+			});
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`send_sample_alert failed: ${errorMessage}`,
+			);
+		}
+	}
+}
+
+export = TypeScriptPluginExample;
+
+```
+
+## typescript_plugin/tsconfig.json
+
+```
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "CommonJS",
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"strict": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["dist", "node_modules"]
 }
 
 ```

@@ -1,0 +1,20 @@
+{
+	"name": "lumia-typescript-plugin-example",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Example Lumia Stream plugin written in TypeScript.",
+	"main": "dist/main.js",
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"watch": "tsc -w -p tsconfig.json",
+		"validate": "node ../../cli/scripts/validate-plugin.js .",
+		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
+	},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.3.3"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.30",
+		"typescript": "^5.3.3"
+	}
+}

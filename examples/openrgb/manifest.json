@@ -1,0 +1,132 @@
+{
+	"id": "openrgb",
+	"name": "OpenRGB",
+	"version": "1.0.1",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Control OpenRGB devices as Lumia lights and trigger OpenRGB profile actions (Corsair, Razer, ASUS, MSI, Gigabyte, ASRock, NZXT, SteelSeries, Logitech, HyperX, Cooler Master, and more).",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "lights",
+	"keywords": "openrgb, rgb, led, lights, keyboard, mouse, motherboard, corsair, razer, asus, msi, gigabyte, asrock, nzxt, steelseries, logitech, hyperx, coolermaster",
+	"icon": "openrgb.png",
+	"config": {
+		"settings": [
+			{
+				"key": "host",
+				"label": "OpenRGB Host",
+				"type": "text",
+				"defaultValue": "127.0.0.1",
+				"placeholder": "127.0.0.1",
+				"required": true,
+				"helperText": "Host running the OpenRGB SDK server."
+			},
+			{
+				"key": "port",
+				"label": "OpenRGB Port",
+				"type": "number",
+				"defaultValue": 6742,
+				"required": true,
+				"validation": {
+					"min": 1,
+					"max": 65535
+				},
+				"helperText": "Default OpenRGB SDK port is 6742."
+			}
+		],
+		"settings_tutorial": "---\n1) Open **OpenRGB** and enable the **SDK Server**.\n2) Confirm host/port (default `127.0.0.1:6742`).\n3) Save these settings in Lumia and activate the plugin.\n4) Use **Discover OpenRGB Devices** to import devices as selectable lights.\n---\n### Notes\n- On remote hosts, allow incoming TCP to the OpenRGB SDK port.\n- Some devices require a direct/custom mode before color writes. This plugin automatically attempts that.\n---",
+		"actions_tutorial": "---\n### OpenRGB Actions\n- **Load/Save Profile**: Trigger OpenRGB profile commands through the SDK.\n\nLight color/power/brightness are controlled through Lumia light actions and support software fade transitions via the `transition` value.\nStudio Themes now include OpenRGB mode options per discovered device.\n---",
+		"lights": {
+			"search": {
+				"buttonLabel": "Discover OpenRGB Devices",
+				"helperText": "Queries the OpenRGB SDK server for available RGB controllers."
+			},
+			"manualAdd": {
+				"buttonLabel": "Add OpenRGB Device ID",
+				"helperText": "Use this if discovery is blocked. Device ID is the zero-based index of the controller in OpenRGB's device list (top item = 0).",
+				"fields": [
+					{
+						"key": "deviceId",
+						"label": "OpenRGB Device ID",
+						"type": "number",
+						"required": true
+					},
+					{
+						"key": "name",
+						"label": "Custom Name (optional)",
+						"type": "text",
+						"required": false
+					}
+				]
+			},
+			"displayFields": [
+				{
+					"key": "name",
+					"label": "Name"
+				},
+				{
+					"key": "id",
+					"label": "ID"
+				},
+				{
+					"key": "location",
+					"label": "Location",
+					"fallback": "Unknown location"
+				},
+				{
+					"key": "ledCount",
+					"label": "LEDs",
+					"fallback": "Unknown LED count"
+				}
+			],
+			"emptyStateText": "No OpenRGB lights found yet. Run discovery or add a device ID manually."
+		},
+		"themeConfig": {
+			"keyForThemes": "effects",
+			"hasEffects": true,
+			"sceneType": "light-theme",
+			"showIndividualLights": true,
+			"displayKey": "name"
+		},
+		"actions": [
+			{
+				"type": "load_profile",
+				"label": "Load OpenRGB Profile",
+				"description": "Load an OpenRGB profile by name.",
+				"fields": [
+					{
+						"key": "profileName",
+						"label": "Profile Name",
+						"type": "select",
+						"allowTyping": true,
+						"allowVariables": true,
+						"dynamicOptions": true,
+						"options": [],
+						"required": true,
+						"placeholder": "example.orp"
+					}
+				]
+			},
+			{
+				"type": "save_profile",
+				"label": "Save OpenRGB Profile",
+				"description": "Save an OpenRGB profile by name.",
+				"fields": [
+					{
+						"key": "profileName",
+						"label": "Profile Name",
+						"type": "select",
+						"allowTyping": true,
+						"allowVariables": true,
+						"dynamicOptions": true,
+						"options": [],
+						"required": true,
+						"placeholder": "example.orp"
+					}
+				]
+			}
+		]
+	}
+}

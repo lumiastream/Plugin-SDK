@@ -1,0 +1,124 @@
+{
+	"id": "ntfy",
+	"name": "ntfy",
+	"version": "1.0.1",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Subscribe to ntfy topics and trigger Lumia alerts/variables for incoming notifications.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "apps",
+	"keywords": "ntfy, notifications, subscribe, websocket, alerts",
+	"icon": "ntfy.png",
+	"config": {
+		"settings": [
+			{
+				"key": "baseUrl",
+				"label": "Server Base URL",
+				"type": "url",
+				"defaultValue": "https://ntfy.sh",
+				"placeholder": "https://ntfy.sh",
+				"helperText": "Base URL for your ntfy server (hosted or self-hosted).",
+				"required": true
+			},
+			{
+				"key": "topics",
+				"label": "Topics",
+				"type": "text",
+				"placeholder": "alerts,stream,home",
+				"helperText": "Comma-separated list of ntfy topics to subscribe to.",
+				"required": true
+			},
+			{
+				"key": "authType",
+				"label": "Authentication Type",
+				"type": "select",
+				"defaultValue": "none",
+				"options": [
+					{
+						"label": "None",
+						"value": "none"
+					},
+					{
+						"label": "Access Token",
+						"value": "token"
+					},
+					{
+						"label": "Username + Password",
+						"value": "basic"
+					}
+				],
+				"helperText": "Use an access token (recommended) or username/password if your server requires auth."
+			},
+			{
+				"key": "accessToken",
+				"label": "Access Token",
+				"type": "password",
+				"placeholder": "ntfy access token",
+				"helperText": "Paste a personal access token if auth type is Access Token."
+			},
+			{
+				"key": "username",
+				"label": "Username",
+				"type": "text",
+				"placeholder": "ntfy username",
+				"helperText": "Used when Authentication Type is Username + Password."
+			},
+			{
+				"key": "password",
+				"label": "Password",
+				"type": "password",
+				"placeholder": "ntfy password",
+				"helperText": "Used when Authentication Type is Username + Password."
+			},
+			{
+				"key": "minPriority",
+				"label": "Minimum Priority",
+				"type": "number",
+				"defaultValue": 1,
+				"min": 1,
+				"max": 5,
+				"helperText": "Ignore messages below this priority (1-5)."
+			},
+			{
+				"key": "tagFilter",
+				"label": "Required Tags",
+				"type": "text",
+				"placeholder": "alert,lumia",
+				"helperText": "Optional comma-separated tags that must be present on a message."
+			},
+			{
+				"key": "messageRegex",
+				"label": "Message Regex",
+				"type": "text",
+				"placeholder": "error|warning",
+				"helperText": "Optional regex filter applied to title + message (case-insensitive)."
+			}
+		],
+		"settings_tutorial": "---\n1) Enter your ntfy server base URL (hosted or self-hosted).\n2) Add one or more topics (comma-separated).\n3) If your server requires auth, choose **Access Token** (recommended) or **Username + Password**.\n\n### Notes\n- Access tokens and Basic auth are supported for subscriptions.\n- Topics are case-sensitive and should match your ntfy publisher topics.\n---",
+		"variables": [],
+		"alerts": [
+			{
+				"title": "Notification",
+				"key": "notification",
+				"acceptedVariables": [
+					"title",
+					"message",
+					"topic",
+					"priority",
+					"tags",
+					"id",
+					"time",
+					"click",
+					"icon",
+					"attachment_url",
+					"event"
+				],
+				"defaultMessage": "Notification: {{title}} {{message}}"
+			}
+		],
+		"actions": [],
+		"actions_tutorial": "---\n### Actions\nThis plugin runs automatically and does not expose actions.\n---"
+	}
+}

@@ -204,6 +204,80 @@ Settings create a configuration UI for users:
 }
 ```
 
+#### Organizing Settings with Sections and Groups
+
+Use these layout properties to keep plugin settings easy to navigate:
+
+- `section`: creates top-level settings tabs
+- `sectionOrder`: controls tab order (ascending)
+- `group`: creates a grouped container inside a section for related fields
+
+Quick guidance:
+
+- Use only `section` when you just need tabs.
+- Add `group` when a tab has multiple clusters (for example, one cluster per game).
+
+UI rendering shape:
+
+```text
+Plugin Settings
+├─ Tab: Connection            (section="Connection")
+│  ├─ Field: API Key
+│  └─ Field: Poll Interval
+└─ Tab: Detection             (section="Detection")
+   ├─ Group: Valorant Rules   (group="valorant_rules")
+   │  ├─ Field: Kill Template
+   │  └─ Field: ROI
+   └─ Group: Rocket Rules     (group="rocket_rules")
+      ├─ Field: Goal Template
+      └─ Field: ROI
+```
+
+Example:
+
+```json
+{
+	"config": {
+		"settings": [
+			{
+				"key": "enabledGames",
+				"label": "Enabled Games",
+				"type": "multiselect",
+				"section": "Detection",
+				"sectionOrder": 2,
+				"options": [
+					{ "label": "Valorant", "value": "valorant" },
+					{ "label": "Overwatch", "value": "overwatch" }
+				]
+			},
+			{
+				"key": "valorantTemplate",
+				"label": "Valorant Kill Template",
+				"type": "file",
+				"section": "Detection",
+				"group": {
+					"key": "valorant_rules",
+					"label": "Valorant Rules",
+					"visibleIf": {
+						"key": "enabledGames",
+						"equals": "valorant"
+					}
+				}
+			},
+			{
+				"key": "valorantRoi",
+				"label": "Valorant ROI",
+				"type": "roi",
+				"section": "Detection",
+				"group": "valorant_rules"
+			}
+		]
+	}
+}
+```
+
+For complete behavior details (including `visibleIf`, fallback rules, and shorthand/object group forms), see `docs/field-types-reference.md`.
+
 Avoid adding settings that exist only for testing or debugging. Keep settings user-facing and essential.
 
 If you provide `settings_tutorial` (markdown or a relative `.md` file path), it renders as a setup guide in the auth screen.
@@ -243,6 +317,28 @@ Use `text_list` when you need users to enter multiple values (stored as an array
 ### OAuth (Lumia-managed)
 
 Plugins can request OAuth via Lumia's auth service so users can authorize in-app and store tokens in plugin settings. To enable this, add an `oauth` block under `config`.
+
+UI rendering shape:
+
+```text
+Plugin Auth Screen
+├─ OAuth Card
+│  ├─ Title: OAuth
+│  ├─ Helper Text                  (oauth.helperText)
+│  ├─ Button: Authorize            (oauth.buttonLabel)
+│  ├─ Button: Copy auth link
+│  └─ Status / Error Text
+└─ Settings Form
+   └─ Regular plugin settings fields (config.settings)
+```
+
+OAuth flow:
+
+1. User clicks **Authorize**.
+2. Lumia opens the OAuth URL (in-app or browser based on `openInBrowser`).
+3. Provider redirects back to Lumia.
+4. Lumia maps returned tokens to plugin settings via `tokenKeys`.
+5. Tokens are available in runtime as `this.settings.<tokenKey>`.
 
 ```json
 {
@@ -679,90 +775,58 @@ Example manifest entry with variations:
 		},
 		{
 			"type": "GIFT_SUB_EQUAL",
-			"description": "Exact gift bundle size (compares dynamic.giftAmount)."
+			"description": "Exact gift bundle size (compares when dynamic.name is giftAmount)."
 		},
 		{
 			"type": "GIFT_SUB_GREATER",
-			"description": "Gift bundle size or larger (compares dynamic.giftAmount)."
+			"description": "Gift bundle size or larger (compares when dynamic.name is giftAmount)."
 		}
 	]
 }
 ```
 
-At runtime, trigger the alert with the fields expected by the selected condition types:
+At runtime, trigger the alert with variation data in `dynamic` and alert variables in `extraSettings`:
 
-```ts
+```js
 await this.lumia.triggerAlert({
-	alert: "giftedMembership",
-	dynamic: {
-		value: "Tier2", // checked by EQUAL_SELECTION
-		isGift: true,
-		giftAmount: 5, // checked by GIFT_SUB_EQUAL / GIFT_SUB_GREATER
-		gifter: "StreamerFan42",
-		recipient: "LuckyViewer",
-		gift_count: 5,
-	},
-	extraSettings: {
-		gifter: "StreamerFan42",
-		recipient: "LuckyViewer",
-		gift_count: 5,
-	},
+    alert: "giftedMembership",
+    dynamic: {
+        name: "value", // variation field/condition key
+        value: "Tier2", // value compared by EQUAL_SELECTION
+    },
+    extraSettings: {
+        gifter: "StreamerFan42",
+        recipient: "LuckyViewer",
+        gift_count: 5,
+    },
 });
 ```
 
-Pass alert variables through both `dynamic` and `extraSettings` so templates and variations have the same data.
+Important:
+
+- `dynamic` is only for `variationConditions`.
+- `dynamic` can only register two keys: `name` and `value`.
+- `extraSettings` can contain any key/value pairs and is the payload used for alert variables/templates.
+
+If you need multiple variation comparisons, trigger separate alerts with the appropriate `{ name, value }` pair for each event.
 
 If no matching selection is found for the provided condition values (or no `dynamic` payload is supplied), Lumia falls back to the base alert configuration and `defaultMessage`.
 
 To also show a plugin-triggered alert inside the Event List, opt in explicitly:
 
-```ts
+```js
 await this.lumia.triggerAlert({
-	alert: "giftedMembership",
-	showInEventList: true,
-	extraSettings: {
-		gifter: "StreamerFan42",
-		recipient: "LuckyViewer",
-		gift_count: 5,
-	},
+    alert: "giftedMembership",
+    showInEventList: true,
+    extraSettings: {
+        gifter: "StreamerFan42",
+        recipient: "LuckyViewer",
+        gift_count: 5,
+    },
 });
 ```
 
-Tip: `LumiaDynamicCondition` in `lumia-types/src/alert.types.ts:99` lists every property (`value`, `currency`, `subMonths`, `giftAmount`, etc.) that variation checkers use.
-},
-{
-"label": "10-pack",
-"value": 10,
-"message": "{{gifter}} unleashed 10 memberships! Show some love!"
-}
-]
-}
-]
-}
-
-````
-
-At runtime, trigger the alert with the variation value that matches one of the configured selections:
-
-```ts
-await this.lumia.triggerAlert({
-	alert: "giftedMembership",
-	dynamic: {
-		name: "giftCount",
-		value: 5,
-		gifter: "StreamerFan42",
-		recipient: "LuckyViewer",
-		gift_count: 5
-	},
-	extraSettings: {
-		gifter: "StreamerFan42",
-		recipient: "LuckyViewer",
-		gift_count: 5
-	}
-});
-````
-
-If no matching selection is found for the provided value (or `dynamic` is omitted), Lumia defaults to the base alert configuration and `defaultMessage`.
+Tip: `LumiaDynamicCondition` in `lumia-types/src/alert.types.ts:99` documents valid `dynamic.name` values used by variation checkers (`value`, `currency`, `subMonths`, `giftAmount`, etc.).
 
 ## Complete Example
 

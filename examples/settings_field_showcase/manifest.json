@@ -1,0 +1,264 @@
+{
+	"id": "settings_field_showcase",
+	"name": "Settings Field Showcase",
+	"version": "1.1.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Example plugin demonstrating every available settings field type with logging/toasts on save.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"icon": "",
+	"config": {
+		"settings_tutorial": "settings_tutorial.md",
+		"settings": [
+			{
+				"key": "textField",
+				"label": "Text Field",
+				"type": "text",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": "Hello Lumia",
+				"helperText": "Example of type `text`."
+			},
+			{
+				"key": "numberField",
+				"label": "Number Field",
+				"type": "number",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": 42,
+				"min": 0,
+				"max": 1000,
+				"helperText": "Example of type `number`."
+			},
+			{
+				"key": "textListField",
+				"label": "Text List Field",
+				"type": "text_list",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": ["alpha", "beta"],
+				"helperText": "Example of type `text_list`."
+			},
+			{
+				"key": "selectField",
+				"label": "Select Field",
+				"type": "select",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": "custom",
+				"options": [
+					{ "label": "Normal", "value": "normal" },
+					{ "label": "Custom", "value": "custom" },
+					{ "label": "Debug", "value": "debug" }
+				],
+				"helperText": "Example of type `select`."
+			},
+			{
+				"key": "multiselectField",
+				"label": "Multiselect Field",
+				"type": "multiselect",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": ["valorant", "overwatch"],
+				"options": [
+					{ "label": "Valorant", "value": "valorant" },
+					{ "label": "Rocket League", "value": "rocket_league" },
+					{ "label": "Overwatch", "value": "overwatch" },
+					{ "label": "League of Legends", "value": "league_of_legends" }
+				],
+				"helperText": "Example of type `multiselect`."
+			},
+			{
+				"key": "checkboxField",
+				"label": "Checkbox Field",
+				"type": "checkbox",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": true,
+				"helperText": "Example of type `checkbox`."
+			},
+			{
+				"key": "sliderField",
+				"label": "Slider Field",
+				"type": "slider",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": 65,
+				"min": 0,
+				"max": 100,
+				"step": 1,
+				"helperText": "Example of type `slider`."
+			},
+			{
+				"key": "toggleField",
+				"label": "Toggle Field",
+				"type": "toggle",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"defaultValue": true,
+				"helperText": "Controls visibleIf examples below."
+			},
+			{
+				"key": "hiddenTextField",
+				"label": "Hidden Text Field",
+				"type": "text",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"hidden": true,
+				"defaultValue": "hidden_default_value",
+				"helperText": "Demonstrates `hidden: true`."
+			},
+			{
+				"key": "groupedTextField",
+				"label": "Grouped Text Field",
+				"type": "text",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"group": {
+					"key": "visibility_group",
+					"label": "Grouped Visibility Fields",
+					"helperText": "This container demonstrates `group` and group-level `visibleIf`.",
+					"visibleIf": {
+						"key": "toggleField",
+						"equals": true
+					}
+				},
+				"defaultValue": "inside_group",
+				"helperText": "Example of grouped field."
+			},
+			{
+				"key": "fileField",
+				"label": "File Field",
+				"type": "file",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"group": "visibility_group",
+				"visibleIf": {
+					"key": "toggleField",
+					"equals": true
+				},
+				"helperText": "Example of type `file` with `visibleIf`."
+			},
+			{
+				"key": "passwordField",
+				"label": "Password Field",
+				"type": "password",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"group": "visibility_group",
+				"defaultValue": "super_secret_value",
+				"helperText": "Example of type `password`."
+			},
+			{
+				"key": "textareaField",
+				"label": "Textarea Field",
+				"type": "textarea",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"group": "visibility_group",
+				"rows": 4,
+				"defaultValue": "This is a multiline example.",
+				"visibleIf": {
+					"key": "checkboxField",
+					"equals": true
+				},
+				"helperText": "Example of type `textarea` with `visibleIf`."
+			},
+			{
+				"key": "emailField",
+				"label": "Email Field",
+				"type": "email",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"defaultValue": "name@example.com",
+				"helperText": "Example of type `email`."
+			},
+			{
+				"key": "urlField",
+				"label": "URL Field",
+				"type": "url",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"defaultValue": "https://lumiastream.com",
+				"helperText": "Example of type `url`."
+			},
+			{
+				"key": "colorField",
+				"label": "Color Field",
+				"type": "color",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"defaultValue": "#33aaff",
+				"helperText": "Example of type `color`."
+			},
+			{
+				"key": "jsonField",
+				"label": "JSON Field",
+				"type": "json",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"group": {
+					"key": "advanced_detection_group",
+					"label": "Advanced Detection Rules",
+					"helperText": "Grouped advanced examples with custom JSON + ROI.",
+					"order": 1
+				},
+				"rows": 8,
+				"visibleIf": {
+					"key": "selectField",
+					"equals": "custom"
+				},
+				"defaultValue": {
+					"rules": [
+						{ "name": "kill", "confidence": 0.9 },
+						{ "name": "goal", "confidence": 0.92 }
+					],
+					"cooldownMs": 1200
+				},
+				"helperText": "Example of type `json` with `visibleIf`."
+			},
+			{
+				"key": "roiField",
+				"label": "ROI Field",
+				"type": "roi",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"group": "advanced_detection_group",
+				"visibleIf": {
+					"key": "multiselectField",
+					"equals": "valorant"
+				},
+				"defaultValue": {
+					"x": 0.72,
+					"y": 0.02,
+					"width": 0.27,
+					"height": 0.45,
+					"unit": "ratio"
+				},
+				"helperText": "Example of type `roi` with `visibleIf` and array matching."
+			}
+		],
+		"variables": [
+			{
+				"name": "save_count",
+				"description": "How many times settings were saved/updated.",
+				"value": 0
+			},
+			{
+				"name": "last_saved_at",
+				"description": "Timestamp of the last settings save.",
+				"value": ""
+			},
+			{
+				"name": "last_saved_values_json",
+				"description": "JSON snapshot of values saved most recently.",
+				"value": ""
+			}
+		],
+		"alerts": []
+	}
+}

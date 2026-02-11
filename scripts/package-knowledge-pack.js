@@ -20,18 +20,30 @@ const defaultEntries = [
 ];
 
 const outputDefault = "gpt-knowledge/lumia-plugin-sdk-docs";
-const bannedSegments = new Set(["node_modules"]);
-const bannedExtensions = new Set([
-	".lumiaplugin",
-	".png",
-	".jpg",
-	".jpeg",
-	".gif",
-	".mp4",
-	".mov",
-	".webp",
-	".svg",
+const bannedSegments = new Set(["node_modules", "dist"]);
+const bannedFileNames = new Set([
+	"package-lock.json",
+	"yarn.lock",
+	"pnpm-lock.yaml",
+	"bun.lockb",
 ]);
+const allowedExtensions = new Set([
+	".md",
+	".txt",
+	".json",
+	".js",
+	".cjs",
+	".mjs",
+	".ts",
+	".cts",
+	".mts",
+	".tsx",
+	".jsx",
+	".yml",
+	".yaml",
+	".toml",
+]);
+const allowedExtensionlessFileNames = new Set(["LICENSE"]);
 
 const aggregatedRoots = new Map([
 	[
@@ -78,24 +90,48 @@ function hasBannedSegment(entryPath) {
 		.some((segment) => bannedSegments.has(segment));
 }
 
-function hasBannedExtension(entryPath) {
-	return bannedExtensions.has(path.extname(entryPath).toLowerCase());
+function hasBannedFileName(entryPath) {
+	return bannedFileNames.has(path.basename(entryPath));
+}
+
+function isAllowedFile(entryPath) {
+	const baseName = path.basename(entryPath);
+	if (allowedExtensionlessFileNames.has(baseName)) {
+		return true;
+	}
+	const extension = path.extname(baseName).toLowerCase();
+	return allowedExtensions.has(extension);
+}
+
+function allowedFileTypesLabel() {
+	return [
+		...Array.from(allowedExtensions),
+		...Array.from(allowedExtensionlessFileNames),
+	].join(", ");
 }
 
 async function ensureEntry(entryPath) {
 	const absolutePath = path.resolve(projectRoot, entryPath);
 	await fsp.access(absolutePath);
+	const stats = await fsp.stat(absolutePath);
 
 	if (hasBannedSegment(entryPath)) {
 		console.warn(
-			`Skipping "${entryPath}" because node_modules content is not allowed.`,
+			`Skipping "${entryPath}" because it contains an excluded directory segment.`,
 		);
 		return null;
 	}
 
-	if (hasBannedExtension(entryPath)) {
+	if (hasBannedFileName(entryPath)) {
 		console.warn(
-			`Skipping "${entryPath}" because ${path.extname(entryPath)} files are not allowed.`,
+			`Skipping "${entryPath}" because ${path.basename(entryPath)} is not allowed.`,
+		);
+		return null;
+	}
+
+	if (stats.isFile() && !isAllowedFile(entryPath)) {
+		console.warn(
+			`Skipping "${entryPath}" because only allowlisted file types are bundled (${allowedFileTypesLabel()}).`,
 		);
 		return null;
 	}
@@ -106,13 +142,19 @@ async function ensureEntry(entryPath) {
 async function copyEntry(entryPath, outputRoot) {
 	if (hasBannedSegment(entryPath)) {
 		console.warn(
-			`Skipping "${entryPath}" because node_modules content is not allowed.`,
+			`Skipping "${entryPath}" because it contains an excluded directory segment.`,
+		);
+		return;
+	}
+
+	if (hasBannedFileName(entryPath)) {
+		console.warn(
+			`Skipping "${entryPath}" because ${path.basename(entryPath)} is not allowed.`,
 		);
 		return;
 	}
 
 	const source = path.resolve(projectRoot, entryPath);
-	const destination = path.resolve(projectRoot, outputRoot, entryPath);
 	const stats = await fsp.stat(source);
 
 	if (stats.isDirectory()) {
@@ -123,7 +165,7 @@ async function copyEntry(entryPath, outputRoot) {
 			}
 
 			const childPath = path.join(entryPath, child.name);
-			if (hasBannedSegment(childPath) || hasBannedExtension(childPath)) {
+			if (hasBannedSegment(childPath)) {
 				continue;
 			}
 
@@ -136,9 +178,9 @@ async function copyEntry(entryPath, outputRoot) {
 		throw new Error(`Skipping "${entryPath}" (not a file or directory).`);
 	}
 
-	if (hasBannedExtension(entryPath)) {
+	if (!isAllowedFile(entryPath)) {
 		console.warn(
-			`Skipping "${entryPath}" because ${path.extname(entryPath)} files are not allowed.`,
+			`Skipping "${entryPath}" because only allowlisted file types are bundled (${allowedFileTypesLabel()}).`,
 		);
 		return;
 	}
@@ -168,10 +210,7 @@ async function bundleDirectory(rootRelativePath, outputRoot, bundleConfig) {
 					continue;
 				}
 				const nextRelative = path.join(currentRelativePath, entry.name);
-				if (
-					hasBannedSegment(nextRelative) ||
-					hasBannedExtension(nextRelative)
-				) {
+				if (hasBannedSegment(nextRelative)) {
 					continue;
 				}
 				await walk(nextRelative);
@@ -183,7 +222,11 @@ async function bundleDirectory(rootRelativePath, outputRoot, bundleConfig) {
 			return;
 		}
 
-		if (hasBannedExtension(currentRelativePath)) {
+		if (hasBannedFileName(currentRelativePath)) {
+			return;
+		}
+
+		if (!isAllowedFile(currentRelativePath)) {
 			return;
 		}
 

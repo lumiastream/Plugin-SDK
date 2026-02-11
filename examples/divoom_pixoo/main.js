@@ -48,11 +48,9 @@ class DivoomPixooPlugin extends Plugin {
 		}
 	}
 
-	async actions(config = {}) {
-		const actionList = Array.isArray(config.actions) ? config.actions : [];
-
-		for (const action of actionList) {
-			const params = action?.value ?? {};
+	async actions(config) {
+		for (const action of config.actions) {
+			const params = action.value;
 
 			try {
 				switch (action.type) {

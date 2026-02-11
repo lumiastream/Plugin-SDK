@@ -1,0 +1,11 @@
+{
+	"name": "lumia_plugin-eve-online",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that pulls EVE Online character data from ESI.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.3.3"
+	}
+}
