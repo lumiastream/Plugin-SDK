@@ -110,11 +110,6 @@
         "name": "latest_activity_start",
         "description": "Start time of the current active session.",
         "value": ""
-      },
-      {
-        "name": "last_updated",
-        "description": "ISO timestamp when the Fitbit data was last refreshed.",
-        "value": ""
       }
     ]
   }

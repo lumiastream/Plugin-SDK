@@ -1977,7 +1977,6 @@ const VARIABLE_NAMES = {
 	paceSource: "pace_source",
 	latestActivityName: "latest_activity_name",
 	latestActivityStart: "latest_activity_start",
-	lastUpdated: "last_updated",
 };
 
 class FitbitPlugin extends Plugin {
@@ -2216,23 +2215,9 @@ class FitbitPlugin extends Plugin {
 			{ name: VARIABLE_NAMES.latestActivityStart, value: latestStart },
 		];
 
-		let anyChanged = false;
 		await Promise.all(
-			updates.map(({ name, value }) =>
-				this._setVariableIfChanged(name, value).then((changed) => {
-					if (changed) {
-						anyChanged = true;
-					}
-				}),
-			),
+			updates.map(({ name, value }) => this._setVariableIfChanged(name, value)),
 		);
-
-		if (anyChanged) {
-			await this._setVariableIfChanged(
-				VARIABLE_NAMES.lastUpdated,
-				new Date().toISOString(),
-			);
-		}
 	}
 
 	_deriveActiveMetrics({
@@ -2856,7 +2841,6 @@ class FitbitPlugin extends Plugin {
 			this._setVariableIfChanged(VARIABLE_NAMES.paceSource, ""),
 			this._setVariableIfChanged(VARIABLE_NAMES.latestActivityName, ""),
 			this._setVariableIfChanged(VARIABLE_NAMES.latestActivityStart, ""),
-			this._setVariableIfChanged(VARIABLE_NAMES.lastUpdated, ""),
 		]);
 	}
 
@@ -3086,11 +3070,6 @@ module.exports = FitbitPlugin;
         "name": "latest_activity_start",
         "description": "Start time of the current active session.",
         "value": ""
-      },
-      {
-        "name": "last_updated",
-        "description": "ISO timestamp when the Fitbit data was last refreshed.",
-        "value": ""
       }
     ]
   }
@@ -3136,7 +3115,6 @@ const VARIABLE_NAMES = {
   count: "article_count",
   collection: "recent_articles",
   keyword: "keyword",
-  lastUpdated: "last_updated",
 };
 
 class HotNewsPlugin extends Plugin {
@@ -3286,7 +3264,6 @@ class HotNewsPlugin extends Plugin {
       : [];
 
     const keyword = options.keyword ?? this._keyword();
-    const nowIso = new Date().toISOString();
     const latest = articles[0] ?? null;
     const unseenArticle = this._findFirstUnseen(articles);
     const articleSummaries = articles.slice(0, 20).map((article) => ({
@@ -3315,7 +3292,6 @@ class HotNewsPlugin extends Plugin {
         })
       ),
       this._setVariable(VARIABLE_NAMES.keyword, keyword || ""),
-      this._setVariable(VARIABLE_NAMES.lastUpdated, nowIso),
     ]);
 
     for (const article of articles) {
@@ -3455,7 +3431,6 @@ class HotNewsPlugin extends Plugin {
         JSON.stringify({ keyword: "", count: 0, articles: [] })
       ),
       this._setVariable(VARIABLE_NAMES.keyword, this._keyword() || ""),
-      this._setVariable(VARIABLE_NAMES.lastUpdated, ""),
     ]);
   }
 
@@ -3955,11 +3930,6 @@ module.exports = HotNewsPlugin;
       {
         "name": "keyword",
         "description": "Keyword used for the latest refresh.",
-        "value": ""
-      },
-      {
-        "name": "last_updated",
-        "description": "ISO timestamp of the last successful NewsAPI sync.",
         "value": ""
       }
     ],

@@ -17,7 +17,6 @@ const VARIABLE_NAMES = {
   count: "article_count",
   collection: "recent_articles",
   keyword: "keyword",
-  lastUpdated: "last_updated",
 };
 
 class HotNewsPlugin extends Plugin {
@@ -167,7 +166,6 @@ class HotNewsPlugin extends Plugin {
       : [];
 
     const keyword = options.keyword ?? this._keyword();
-    const nowIso = new Date().toISOString();
     const latest = articles[0] ?? null;
     const unseenArticle = this._findFirstUnseen(articles);
     const articleSummaries = articles.slice(0, 20).map((article) => ({
@@ -196,7 +194,6 @@ class HotNewsPlugin extends Plugin {
         })
       ),
       this._setVariable(VARIABLE_NAMES.keyword, keyword || ""),
-      this._setVariable(VARIABLE_NAMES.lastUpdated, nowIso),
     ]);
 
     for (const article of articles) {
@@ -336,7 +333,6 @@ class HotNewsPlugin extends Plugin {
         JSON.stringify({ keyword: "", count: 0, articles: [] })
       ),
       this._setVariable(VARIABLE_NAMES.keyword, this._keyword() || ""),
-      this._setVariable(VARIABLE_NAMES.lastUpdated, ""),
     ]);
   }
 

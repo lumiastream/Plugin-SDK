@@ -378,11 +378,6 @@
         "name": "keyword",
         "description": "Keyword used for the latest refresh.",
         "value": ""
-      },
-      {
-        "name": "last_updated",
-        "description": "ISO timestamp of the last successful NewsAPI sync.",
-        "value": ""
       }
     ],
     "actions_tutorial": "---\n### Actions\nThis plugin runs on a poll interval and does not expose actions. Update settings to change coverage or refresh timing.\n---"

@@ -25,7 +25,6 @@ const VARIABLE_NAMES = {
 	paceSource: "pace_source",
 	latestActivityName: "latest_activity_name",
 	latestActivityStart: "latest_activity_start",
-	lastUpdated: "last_updated",
 };
 
 class FitbitPlugin extends Plugin {
@@ -264,23 +263,9 @@ class FitbitPlugin extends Plugin {
 			{ name: VARIABLE_NAMES.latestActivityStart, value: latestStart },
 		];
 
-		let anyChanged = false;
 		await Promise.all(
-			updates.map(({ name, value }) =>
-				this._setVariableIfChanged(name, value).then((changed) => {
-					if (changed) {
-						anyChanged = true;
-					}
-				}),
-			),
+			updates.map(({ name, value }) => this._setVariableIfChanged(name, value)),
 		);
-
-		if (anyChanged) {
-			await this._setVariableIfChanged(
-				VARIABLE_NAMES.lastUpdated,
-				new Date().toISOString(),
-			);
-		}
 	}
 
 	_deriveActiveMetrics({
@@ -904,7 +889,6 @@ class FitbitPlugin extends Plugin {
 			this._setVariableIfChanged(VARIABLE_NAMES.paceSource, ""),
 			this._setVariableIfChanged(VARIABLE_NAMES.latestActivityName, ""),
 			this._setVariableIfChanged(VARIABLE_NAMES.latestActivityStart, ""),
-			this._setVariableIfChanged(VARIABLE_NAMES.lastUpdated, ""),
 		]);
 	}
 
