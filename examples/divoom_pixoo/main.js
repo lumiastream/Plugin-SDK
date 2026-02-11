@@ -20,11 +20,22 @@ class DivoomPixooPlugin extends Plugin {
 
 		// PicID counter for Draw/SendHttpGif (resets at 1000 like pixoo-api library)
 		this.picIdCounter = 0;
+		this._connected = false;
+		this._connectionStatePublished = false;
 	}
 
 	async onload() {
-		await this.resetHttpGifId();
-		await this.testConnection();
+		try {
+			await this.resetHttpGifId();
+			await this.testConnection();
+		} catch (error) {
+			await this.setConnectionState(false);
+			throw error;
+		}
+	}
+
+	async onunload() {
+		await this.setConnectionState(false);
 	}
 
 	async onsettingsupdate(settings, previousSettings) {
@@ -130,6 +141,7 @@ class DivoomPixooPlugin extends Plugin {
 			await this.lumia.showToast({
 				message: "Please configure Pixoo device IP address in settings",
 			});
+			await this.setConnectionState(false);
 			return false;
 		}
 
@@ -138,6 +150,7 @@ class DivoomPixooPlugin extends Plugin {
 		if (result.success) {
 			this.connectionHealth.lastSuccessTime = Date.now();
 			this.connectionHealth.consecutiveFailures = 0;
+			await this.setConnectionState(true);
 			return true;
 		} else {
 			await this.lumia.addLog(
@@ -147,6 +160,7 @@ class DivoomPixooPlugin extends Plugin {
 				message: `Failed to connect to Pixoo: ${result.error}`,
 			});
 			this.connectionHealth.consecutiveFailures++;
+			await this.setConnectionState(false);
 			return false;
 		}
 	}
@@ -509,6 +523,7 @@ class DivoomPixooPlugin extends Plugin {
 
 		const deviceAddress = this.getDeviceAddress();
 		if (!deviceAddress) {
+			this.setConnectionStateSafe(false);
 			return {
 				success: false,
 				error: "Device address not configured",
@@ -567,6 +582,7 @@ class DivoomPixooPlugin extends Plugin {
 						this.connectionHealth.consecutiveFailures = 0;
 						this.connectionHealth.commandsSinceRefresh++;
 						this.lastPushTime = Date.now();
+						this.setConnectionStateSafe(true);
 
 						resolve({
 							success: true,
@@ -575,6 +591,7 @@ class DivoomPixooPlugin extends Plugin {
 					} else {
 						// Track failure
 						this.connectionHealth.consecutiveFailures++;
+						this.setConnectionStateSafe(false);
 
 						resolve({
 							success: false,
@@ -596,6 +613,7 @@ class DivoomPixooPlugin extends Plugin {
 					await new Promise((r) => setTimeout(r, 1000));
 					resolve(await this.sendCommand(command, payload, retryCount + 1));
 				} else {
+					this.setConnectionStateSafe(false);
 					resolve({
 						success: false,
 						error: error.message,
@@ -610,6 +628,29 @@ class DivoomPixooPlugin extends Plugin {
 			request.write(body);
 			request.end();
 		});
+	}
+
+	async setConnectionState(state) {
+		const normalized = Boolean(state);
+		if (this._connected === normalized && this._connectionStatePublished) {
+			return;
+		}
+
+		this._connected = normalized;
+		this._connectionStatePublished = true;
+
+		try {
+			await this.lumia.updateConnection(normalized);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			await this.lumia.addLog(
+				`[Divoom Pixoo] Failed to update connection state: ${message}`,
+			);
+		}
+	}
+
+	setConnectionStateSafe(state) {
+		void this.setConnectionState(state);
 	}
 
 	// ============================================================================
