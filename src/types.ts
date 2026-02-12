@@ -93,9 +93,7 @@ export interface PluginSetting {
 	type:
 		| "text"
 		| "number"
-		| "text_list"
 		| "select"
-		| "multiselect"
 		| "checkbox"
 		| "slider"
 		| "file"
@@ -110,8 +108,12 @@ export interface PluginSetting {
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
-	options?: Array<{ label: string; value: string | number | boolean }>;
+	options?: Array<{ id?: string; label: string; value: string | number | boolean }>;
 	allowTyping?: boolean;
+	multiple?: boolean;
+	lookup?: boolean;
+	dynamicOptions?: boolean;
+	refreshOnChange?: boolean;
 	rows?: number;
 	section?: string;
 	sectionOrder?: number;
@@ -612,7 +614,6 @@ export interface PluginFormField {
 		| "url"
 		| "textarea"
 		| "select"
-		| "multiselect"
 		| "checkbox"
 		| "toggle"
 		| "color"
@@ -639,7 +640,11 @@ export interface PluginFormField {
 		minLength?: number;
 		custom?: string;
 	};
-	options?: Array<{ label: string; value: any }>;
+	options?: Array<{ id?: string; label: string; value: any }>;
+	multiple?: boolean;
+	lookup?: boolean;
+	dynamicOptions?: boolean;
+	refreshOnChange?: boolean;
 	disabled?: boolean;
 	hidden?: boolean;
 	visibleIf?: PluginVisibleIfCondition;

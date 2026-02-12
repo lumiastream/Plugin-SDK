@@ -9,9 +9,13 @@ const VARIABLE_NAMES = {
 const FIELD_SPECS = [
 	{ key: "textField", label: "text", type: "text" },
 	{ key: "numberField", label: "number", type: "number" },
-	{ key: "textListField", label: "text_list", type: "text_list" },
 	{ key: "selectField", label: "select", type: "select" },
-	{ key: "multiselectField", label: "multiselect", type: "multiselect" },
+	{
+		key: "selectMultipleField",
+		label: "select_multiple",
+		type: "select",
+		multiple: true,
+	},
 	{ key: "checkboxField", label: "checkbox", type: "checkbox" },
 	{ key: "sliderField", label: "slider", type: "slider" },
 	{ key: "hiddenTextField", label: "hidden_text", type: "text" },
@@ -118,7 +122,7 @@ function asRoi(value) {
 	return { x, y, width, height, unit };
 }
 
-function normalizeValueByType(type, value) {
+function normalizeValueByType(type, value, field = {}) {
 	switch (type) {
 		case "number":
 		case "slider":
@@ -126,9 +130,11 @@ function normalizeValueByType(type, value) {
 		case "checkbox":
 		case "toggle":
 			return asBoolean(value, false);
-		case "text_list":
-		case "multiselect":
-			return asStringList(value);
+		case "select":
+			if (field?.multiple) {
+				return asStringList(value);
+			}
+			return asString(value, "");
 		case "json":
 			return asJsonValue(value);
 		case "roi":
@@ -142,7 +148,6 @@ function normalizeValueByType(type, value) {
 		}
 		case "file":
 		case "text":
-		case "select":
 		case "textarea":
 		case "email":
 		case "url":
@@ -201,7 +206,7 @@ class SettingsFieldShowcasePlugin extends Plugin {
 		const snapshot = {};
 
 		for (const field of FIELD_SPECS) {
-			const normalized = normalizeValueByType(field.type, settings?.[field.key]);
+			const normalized = normalizeValueByType(field.type, settings?.[field.key], field);
 			const output = formatForOutput(normalized);
 			snapshot[field.key] = normalized;
 

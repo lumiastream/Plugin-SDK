@@ -35,18 +35,10 @@
 				"helperText": "Example of type `number`."
 			},
 			{
-				"key": "textListField",
-				"label": "Text List Field",
-				"type": "text_list",
-				"section": "Basics",
-				"sectionOrder": 1,
-				"defaultValue": ["alpha", "beta"],
-				"helperText": "Example of type `text_list`."
-			},
-			{
 				"key": "selectField",
 				"label": "Select Field",
 				"type": "select",
+				"allowTyping": true,
 				"section": "Basics",
 				"sectionOrder": 1,
 				"defaultValue": "custom",
@@ -55,12 +47,14 @@
 					{ "label": "Custom", "value": "custom" },
 					{ "label": "Debug", "value": "debug" }
 				],
-				"helperText": "Example of type `select`."
+				"helperText": "Example of type `select` with `allowTyping: true`."
 			},
 			{
-				"key": "multiselectField",
-				"label": "Multiselect Field",
-				"type": "multiselect",
+				"key": "selectMultipleField",
+				"label": "Select (Multiple) Field",
+				"type": "select",
+				"multiple": true,
+				"allowTyping": true,
 				"section": "Basics",
 				"sectionOrder": 1,
 				"defaultValue": ["valorant", "overwatch"],
@@ -70,7 +64,7 @@
 					{ "label": "Overwatch", "value": "overwatch" },
 					{ "label": "League of Legends", "value": "league_of_legends" }
 				],
-				"helperText": "Example of type `multiselect`."
+				"helperText": "Example of type `select` with `multiple: true` and `allowTyping: true`."
 			},
 			{
 				"key": "checkboxField",
@@ -229,7 +223,7 @@
 				"sectionOrder": 3,
 				"group": "advanced_detection_group",
 				"visibleIf": {
-					"key": "multiselectField",
+					"key": "selectMultipleField",
 					"equals": "valorant"
 				},
 				"defaultValue": {

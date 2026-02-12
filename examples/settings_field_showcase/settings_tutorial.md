@@ -4,9 +4,9 @@ This example includes every supported settings field type:
 
 - `text`
 - `number`
-- `text_list`
 - `select`
-- `multiselect`
+- `select` with `multiple: true`
+- `allowTyping` on `select` for freeform values
 - `checkbox`
 - `slider`
 - `file`
