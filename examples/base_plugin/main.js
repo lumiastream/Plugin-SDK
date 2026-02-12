@@ -79,7 +79,7 @@ class ShowcasePluginTemplate extends Plugin {
 				},
 			});
 		} catch (error) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`Sample alert failed: ${error?.message ?? String(error)}`
 			);
 		}

@@ -247,7 +247,7 @@ class SettingsFieldShowcasePlugin extends Plugin {
 	}
 
 	async _log(message) {
-		await this.lumia.addLog(message);
+		await this.lumia.log(message);
 	}
 }
 

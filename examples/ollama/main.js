@@ -517,7 +517,7 @@ class OllamaPlugin extends Plugin {
 				await this.lumia.updateConnection(state);
 			} catch (error) {
 				const message = this._errorMessage(error);
-				await this.lumia.addLog(
+				await this.lumia.log(
 					`[Ollama] Failed to update connection: ${message}`,
 				);
 			}

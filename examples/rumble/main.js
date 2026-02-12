@@ -474,7 +474,7 @@ class RumblePlugin extends Plugin {
 			return true;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(`[Rumble] Auth validation failed: ${message}`);
+			await this.lumia.log(`[Rumble] Auth validation failed: ${message}`);
 			return false;
 		}
 	}
@@ -507,7 +507,7 @@ class RumblePlugin extends Plugin {
 		const { showToast = true } = options;
 
 		if (!this.apiKey) {
-			await this.lumia.addLog("[Rumble] Missing API key, cannot start polling");
+			await this.lumia.log("[Rumble] Missing API key, cannot start polling");
 			if (showToast) {
 				await this.lumia.showToast({
 					message: "Rumble API key required to poll",
@@ -584,7 +584,7 @@ class RumblePlugin extends Plugin {
 				await this.stopPolling(false);
 				await this.startPolling({ showToast: false });
 			}
-			await this.lumia.addLog(`[Rumble] Error polling API: ${message}`);
+			await this.lumia.log(`[Rumble] Error polling API: ${message}`);
 			await this.lumia.updateConnection(false);
 		}
 	}

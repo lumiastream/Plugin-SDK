@@ -108,7 +108,7 @@ class ShowcasePluginTemplate extends Plugin {
 				},
 			});
 		} catch (error) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`Sample alert failed: ${error?.message ?? String(error)}`
 			);
 		}
@@ -260,7 +260,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -384,13 +384,13 @@ class DivoomPixooPlugin extends Plugin {
 						break;
 
 					default:
-						await this.lumia.addLog(
+						await this.lumia.log(
 							`[Divoom Pixoo] Unknown action: ${String(action.type)}`,
 						);
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.addLog(
+				await this.lumia.log(
 					`[Divoom Pixoo] Error in action ${action.type}: ${message}`,
 				);
 			}
@@ -404,7 +404,7 @@ class DivoomPixooPlugin extends Plugin {
 	async testConnection() {
 		const address = this.getDeviceAddress();
 		if (!address) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[Divoom Pixoo] ⚠️ Device address not configured",
 			);
 			await this.lumia.showToast({
@@ -422,7 +422,7 @@ class DivoomPixooPlugin extends Plugin {
 			await this.setConnectionState(true);
 			return true;
 		} else {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] ❌ Connection failed: ${result.error}`,
 			);
 			await this.lumia.showToast({
@@ -447,7 +447,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendCommand("Device/GetDeviceTime", {});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[Divoom Pixoo] Connection refresh failed, will retry",
 			);
 		}
@@ -464,7 +464,7 @@ class DivoomPixooPlugin extends Plugin {
 		});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to set brightness: ${result.error}`,
 			);
 		}
@@ -518,7 +518,7 @@ class DivoomPixooPlugin extends Plugin {
 	async sendText({ message, color, scrollSpeed, direction, repeat, align }) {
 		const trimmed = message.trim();
 		if (!trimmed) {
-			await this.lumia.addLog("[Divoom Pixoo] Text message cannot be empty");
+			await this.lumia.log("[Divoom Pixoo] Text message cannot be empty");
 			return false;
 		}
 
@@ -553,7 +553,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendCommand("Draw/SendHttpText", payload);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to send text: ${result.error}`,
 			);
 		}
@@ -578,7 +578,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendHttpGif(base64Data, width);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to clear screen: ${result.error}`,
 			);
 		}
@@ -620,7 +620,7 @@ class DivoomPixooPlugin extends Plugin {
 		}
 
 		if (drawnCount === 0) {
-			await this.lumia.addLog("[Divoom Pixoo] No valid pixels to draw");
+			await this.lumia.log("[Divoom Pixoo] No valid pixels to draw");
 			return false;
 		}
 
@@ -629,7 +629,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendHttpGif(base64Data, width);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to draw pixels: ${result.error}`,
 			);
 		}
@@ -679,7 +679,7 @@ class DivoomPixooPlugin extends Plugin {
 		}
 
 		if (drawnCount === 0) {
-			await this.lumia.addLog("[Divoom Pixoo] No valid rectangles to draw");
+			await this.lumia.log("[Divoom Pixoo] No valid rectangles to draw");
 			return false;
 		}
 
@@ -688,7 +688,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendHttpGif(base64Data, width);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to draw rectangles: ${result.error}`,
 			);
 		}
@@ -697,7 +697,7 @@ class DivoomPixooPlugin extends Plugin {
 
 	async playGifFromUrl(url) {
 		if (!url || typeof url !== "string" || !url.startsWith("http")) {
-			await this.lumia.addLog("[Divoom Pixoo] Invalid GIF URL");
+			await this.lumia.log("[Divoom Pixoo] Invalid GIF URL");
 			return false;
 		}
 
@@ -712,7 +712,7 @@ class DivoomPixooPlugin extends Plugin {
 		});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to play GIF: ${result.error}`,
 			);
 		}
@@ -725,7 +725,7 @@ class DivoomPixooPlugin extends Plugin {
 		});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to set screen power: ${result.error}`,
 			);
 		}
@@ -740,7 +740,7 @@ class DivoomPixooPlugin extends Plugin {
 		});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to play buzzer: ${result.error}`,
 			);
 		}
@@ -763,7 +763,7 @@ class DivoomPixooPlugin extends Plugin {
 	async sendRaw(command, payload) {
 		const trimmed = command.trim();
 		if (!trimmed) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[Divoom Pixoo] Raw command requires a command string",
 			);
 			return false;
@@ -773,7 +773,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendCommand(trimmed, extra);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Raw command failed: ${result.error}`,
 			);
 		}
@@ -876,7 +876,7 @@ class DivoomPixooPlugin extends Plugin {
 				// Retry logic for network errors
 				const maxRetries = 2;
 				if (retryCount < maxRetries) {
-					await this.lumia.addLog(
+					await this.lumia.log(
 						`[Divoom Pixoo] Network error, retrying (${retryCount + 1}/${maxRetries})...`,
 					);
 					await new Promise((r) => setTimeout(r, 1000));
@@ -912,7 +912,7 @@ class DivoomPixooPlugin extends Plugin {
 			await this.lumia.updateConnection(normalized);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to update connection state: ${message}`,
 			);
 		}
@@ -964,7 +964,7 @@ class DivoomPixooPlugin extends Plugin {
 		try {
 			return JSON.parse(value);
 		} catch (error) {
-			void this.lumia.addLog(
+			void this.lumia.log(
 				`[Divoom Pixoo] Failed to parse JSON: ${error.message}`,
 			);
 			return {};
@@ -1374,7 +1374,7 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -1559,7 +1559,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.addLog(`[ElevenLabs] Action failed: ${message}`);
+				await this.lumia.log(`[ElevenLabs] Action failed: ${message}`);
 			}
 		}
 	}
@@ -1568,19 +1568,19 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const settings = this.getSettingsSnapshot();
 		let message = trimString(data.message || data.text, "");
 		if (!message) {
-			await this.lumia.addLog("[ElevenLabs] Missing message text");
+			await this.lumia.log("[ElevenLabs] Missing message text");
 			return;
 		}
 
 		const apiKey = settings.apiKey;
 		if (!apiKey) {
-			await this.lumia.addLog("[ElevenLabs] Missing API key");
+			await this.lumia.log("[ElevenLabs] Missing API key");
 			return;
 		}
 
 		const voiceId = trimString(data.voiceId, "");
 		if (!voiceId) {
-			await this.lumia.addLog("[ElevenLabs] Missing Voice ID");
+			await this.lumia.log("[ElevenLabs] Missing Voice ID");
 			return;
 		}
 		const modelId = trimString(data.modelId, DEFAULTS.modelId);
@@ -1669,7 +1669,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const settings = this.getSettingsSnapshot();
 		const apiKey = settings.apiKey;
 		if (!apiKey) {
-			await this.lumia.addLog("[ElevenLabs] Missing API key");
+			await this.lumia.log("[ElevenLabs] Missing API key");
 			return;
 		}
 
@@ -1678,7 +1678,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 			data.compositionPlanJson || data.composition_plan || "",
 		);
 		if (!prompt && !compositionPlan) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[ElevenLabs] Provide a prompt or composition plan",
 			);
 			return;
@@ -1759,7 +1759,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 		if (saveToDesktop) {
 			const desktopPath = getDesktopPath();
 			if (!desktopPath) {
-				await this.lumia.addLog("[ElevenLabs] Could not resolve Desktop path");
+				await this.lumia.log("[ElevenLabs] Could not resolve Desktop path");
 				return;
 			}
 			const filename = buildMusicFilename(outputFormat);
@@ -1974,7 +1974,7 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -2137,7 +2137,7 @@ class EveOnlinePlugin extends Plugin {
 					? `${prefix} ❌ ${message}`
 					: `${prefix} ${message}`;
 
-		await this.lumia.addLog(decorated);
+		await this.lumia.log(decorated);
 	}
 
 	async _refreshData({ reason } = {}) {
@@ -3325,7 +3325,7 @@ module.exports = EveOnlinePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -3377,7 +3377,7 @@ class MinecraftServerPlugin extends Plugin {
 		if (this.settings?.serverHost) {
 			await this.startPolling();
 		} else if (!this.settings?.serverHost) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[Minecraft Server] Server address not configured. Please configure in settings.",
 			);
 		}
@@ -3430,7 +3430,7 @@ class MinecraftServerPlugin extends Plugin {
 			await this.serverListPing(host, port);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Minecraft Server] Auth validation failed: ${message}`,
 			);
 			return {
@@ -3451,7 +3451,7 @@ class MinecraftServerPlugin extends Plugin {
 			await this.queryServer(host, queryPort);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Minecraft Server] Query validation failed: ${message}`,
 			);
 			return {
@@ -3512,7 +3512,7 @@ class MinecraftServerPlugin extends Plugin {
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
-					await this.lumia.addLog(
+					await this.lumia.log(
 						`[Minecraft Server] Query failed: ${message}`,
 					);
 				}
@@ -4329,7 +4329,7 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -4494,7 +4494,7 @@ class NtfyPlugin extends Plugin {
 				? `${prefix} WARNING: ${message}`
 				: `${prefix} ERROR: ${message}`;
 
-		await this.lumia.addLog(decorated);
+		await this.lumia.log(decorated);
 	}
 
 	async _logThrottled(
@@ -5208,7 +5208,7 @@ module.exports = NtfyPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -5736,7 +5736,7 @@ class OllamaPlugin extends Plugin {
 				await this.lumia.updateConnection(state);
 			} catch (error) {
 				const message = this._errorMessage(error);
-				await this.lumia.addLog(
+				await this.lumia.log(
 					`[Ollama] Failed to update connection: ${message}`,
 				);
 			}
@@ -5904,7 +5904,7 @@ module.exports = OllamaPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.3.3"
+    "@lumiastream/plugin": "^0.3.5"
   }
 }
 
@@ -7074,7 +7074,7 @@ class OpenRGBPlugin extends Plugin {
 			return;
 		}
 		this._lastErrorMessage = message;
-		await this.lumia.addLog(`[openrgb] ${message}`);
+		await this.lumia.log(`[openrgb] ${message}`);
 	}
 
 	_errorMessage(error) {
@@ -8137,7 +8137,7 @@ module.exports = OpenRGBPlugin;
 	"description": "OpenRGB light integration plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -8622,7 +8622,7 @@ class RumblePlugin extends Plugin {
 			return true;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(`[Rumble] Auth validation failed: ${message}`);
+			await this.lumia.log(`[Rumble] Auth validation failed: ${message}`);
 			return false;
 		}
 	}
@@ -8655,7 +8655,7 @@ class RumblePlugin extends Plugin {
 		const { showToast = true } = options;
 
 		if (!this.apiKey) {
-			await this.lumia.addLog("[Rumble] Missing API key, cannot start polling");
+			await this.lumia.log("[Rumble] Missing API key, cannot start polling");
 			if (showToast) {
 				await this.lumia.showToast({
 					message: "Rumble API key required to poll",
@@ -8732,7 +8732,7 @@ class RumblePlugin extends Plugin {
 				await this.stopPolling(false);
 				await this.startPolling({ showToast: false });
 			}
-			await this.lumia.addLog(`[Rumble] Error polling API: ${message}`);
+			await this.lumia.log(`[Rumble] Error polling API: ${message}`);
 			await this.lumia.updateConnection(false);
 		}
 	}
@@ -9535,7 +9535,7 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -9793,7 +9793,7 @@ class SettingsFieldShowcasePlugin extends Plugin {
 	}
 
 	async _log(message) {
-		await this.lumia.addLog(message);
+		await this.lumia.log(message);
 	}
 }
 
@@ -10076,7 +10076,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -10289,7 +10289,7 @@ class SteamPlugin extends Plugin {
 					? `${prefix} ❌ ${message}`
 					: `${prefix} ${message}`;
 
-		await this.lumia.addLog(decorated);
+		await this.lumia.log(decorated);
 	}
 
 	async _logThrottled(
@@ -11405,7 +11405,7 @@ module.exports = SteamPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	}
 }
 
@@ -11565,7 +11565,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.3"
+		"@lumiastream/plugin": "^0.3.5"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
@@ -11721,7 +11721,7 @@ class TypeScriptPluginExample extends Plugin {
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`send_sample_alert failed: ${errorMessage}`,
 			);
 		}

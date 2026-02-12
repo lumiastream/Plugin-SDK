@@ -551,7 +551,19 @@ export interface ILumiaAPI {
 	}) => Promise<boolean>;
 	getLights: () => Promise<any>;
 	showToast: (params: { message: string; time?: number }) => Promise<boolean>;
-	addLog: (message: string) => Promise<boolean>;
+	log: (
+		params: { message?: unknown; level?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug'; type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug' } | string | number,
+		type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug',
+	) => Promise<boolean>;
+	dashboardLog: (
+		params: { message?: unknown; level?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug'; type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug' } | string | number,
+		type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug',
+	) => Promise<boolean>;
+	/** @deprecated Alias of `log`. Use `dashboardLog` for Lumia dashboard log feed entries. */
+	addLog?: (
+		params: { message?: unknown; level?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug'; type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug' } | string | number,
+		type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug',
+	) => Promise<boolean>;
 	chatbot: (params: {
 		message: string;
 		site?: string | string[];

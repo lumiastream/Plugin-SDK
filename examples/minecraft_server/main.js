@@ -41,7 +41,7 @@ class MinecraftServerPlugin extends Plugin {
 		if (this.settings?.serverHost) {
 			await this.startPolling();
 		} else if (!this.settings?.serverHost) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[Minecraft Server] Server address not configured. Please configure in settings.",
 			);
 		}
@@ -94,7 +94,7 @@ class MinecraftServerPlugin extends Plugin {
 			await this.serverListPing(host, port);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Minecraft Server] Auth validation failed: ${message}`,
 			);
 			return {
@@ -115,7 +115,7 @@ class MinecraftServerPlugin extends Plugin {
 			await this.queryServer(host, queryPort);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Minecraft Server] Query validation failed: ${message}`,
 			);
 			return {
@@ -176,7 +176,7 @@ class MinecraftServerPlugin extends Plugin {
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
-					await this.lumia.addLog(
+					await this.lumia.log(
 						`[Minecraft Server] Query failed: ${message}`,
 					);
 				}
