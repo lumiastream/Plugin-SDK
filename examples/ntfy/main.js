@@ -154,7 +154,7 @@ class NtfyPlugin extends Plugin {
 				? `${prefix} WARNING: ${message}`
 				: `${prefix} ERROR: ${message}`;
 
-		await this.lumia.addLog(decorated);
+		await this.lumia.log(decorated);
 	}
 
 	async _logThrottled(

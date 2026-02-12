@@ -141,7 +141,7 @@ class TypeScriptPluginExample extends Plugin {
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`send_sample_alert failed: ${errorMessage}`,
 			);
 		}

@@ -1123,7 +1123,7 @@ class OpenRGBPlugin extends Plugin {
 			return;
 		}
 		this._lastErrorMessage = message;
-		await this.lumia.addLog(`[openrgb] ${message}`);
+		await this.lumia.log(`[openrgb] ${message}`);
 	}
 
 	_errorMessage(error) {

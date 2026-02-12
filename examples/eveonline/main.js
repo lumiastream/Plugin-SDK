@@ -152,7 +152,7 @@ class EveOnlinePlugin extends Plugin {
 					? `${prefix} ❌ ${message}`
 					: `${prefix} ${message}`;
 
-		await this.lumia.addLog(decorated);
+		await this.lumia.log(decorated);
 	}
 
 	async _refreshData({ reason } = {}) {

@@ -174,7 +174,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.addLog(`[ElevenLabs] Action failed: ${message}`);
+				await this.lumia.log(`[ElevenLabs] Action failed: ${message}`);
 			}
 		}
 	}
@@ -183,19 +183,19 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const settings = this.getSettingsSnapshot();
 		let message = trimString(data.message || data.text, "");
 		if (!message) {
-			await this.lumia.addLog("[ElevenLabs] Missing message text");
+			await this.lumia.log("[ElevenLabs] Missing message text");
 			return;
 		}
 
 		const apiKey = settings.apiKey;
 		if (!apiKey) {
-			await this.lumia.addLog("[ElevenLabs] Missing API key");
+			await this.lumia.log("[ElevenLabs] Missing API key");
 			return;
 		}
 
 		const voiceId = trimString(data.voiceId, "");
 		if (!voiceId) {
-			await this.lumia.addLog("[ElevenLabs] Missing Voice ID");
+			await this.lumia.log("[ElevenLabs] Missing Voice ID");
 			return;
 		}
 		const modelId = trimString(data.modelId, DEFAULTS.modelId);
@@ -284,7 +284,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const settings = this.getSettingsSnapshot();
 		const apiKey = settings.apiKey;
 		if (!apiKey) {
-			await this.lumia.addLog("[ElevenLabs] Missing API key");
+			await this.lumia.log("[ElevenLabs] Missing API key");
 			return;
 		}
 
@@ -293,7 +293,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 			data.compositionPlanJson || data.composition_plan || "",
 		);
 		if (!prompt && !compositionPlan) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[ElevenLabs] Provide a prompt or composition plan",
 			);
 			return;
@@ -374,7 +374,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 		if (saveToDesktop) {
 			const desktopPath = getDesktopPath();
 			if (!desktopPath) {
-				await this.lumia.addLog("[ElevenLabs] Could not resolve Desktop path");
+				await this.lumia.log("[ElevenLabs] Could not resolve Desktop path");
 				return;
 			}
 			const filename = buildMusicFilename(outputFormat);

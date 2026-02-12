@@ -113,13 +113,13 @@ class DivoomPixooPlugin extends Plugin {
 						break;
 
 					default:
-						await this.lumia.addLog(
+						await this.lumia.log(
 							`[Divoom Pixoo] Unknown action: ${String(action.type)}`,
 						);
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.addLog(
+				await this.lumia.log(
 					`[Divoom Pixoo] Error in action ${action.type}: ${message}`,
 				);
 			}
@@ -133,7 +133,7 @@ class DivoomPixooPlugin extends Plugin {
 	async testConnection() {
 		const address = this.getDeviceAddress();
 		if (!address) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[Divoom Pixoo] ⚠️ Device address not configured",
 			);
 			await this.lumia.showToast({
@@ -151,7 +151,7 @@ class DivoomPixooPlugin extends Plugin {
 			await this.setConnectionState(true);
 			return true;
 		} else {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] ❌ Connection failed: ${result.error}`,
 			);
 			await this.lumia.showToast({
@@ -176,7 +176,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendCommand("Device/GetDeviceTime", {});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[Divoom Pixoo] Connection refresh failed, will retry",
 			);
 		}
@@ -193,7 +193,7 @@ class DivoomPixooPlugin extends Plugin {
 		});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to set brightness: ${result.error}`,
 			);
 		}
@@ -247,7 +247,7 @@ class DivoomPixooPlugin extends Plugin {
 	async sendText({ message, color, scrollSpeed, direction, repeat, align }) {
 		const trimmed = message.trim();
 		if (!trimmed) {
-			await this.lumia.addLog("[Divoom Pixoo] Text message cannot be empty");
+			await this.lumia.log("[Divoom Pixoo] Text message cannot be empty");
 			return false;
 		}
 
@@ -282,7 +282,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendCommand("Draw/SendHttpText", payload);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to send text: ${result.error}`,
 			);
 		}
@@ -307,7 +307,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendHttpGif(base64Data, width);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to clear screen: ${result.error}`,
 			);
 		}
@@ -349,7 +349,7 @@ class DivoomPixooPlugin extends Plugin {
 		}
 
 		if (drawnCount === 0) {
-			await this.lumia.addLog("[Divoom Pixoo] No valid pixels to draw");
+			await this.lumia.log("[Divoom Pixoo] No valid pixels to draw");
 			return false;
 		}
 
@@ -358,7 +358,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendHttpGif(base64Data, width);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to draw pixels: ${result.error}`,
 			);
 		}
@@ -408,7 +408,7 @@ class DivoomPixooPlugin extends Plugin {
 		}
 
 		if (drawnCount === 0) {
-			await this.lumia.addLog("[Divoom Pixoo] No valid rectangles to draw");
+			await this.lumia.log("[Divoom Pixoo] No valid rectangles to draw");
 			return false;
 		}
 
@@ -417,7 +417,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendHttpGif(base64Data, width);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to draw rectangles: ${result.error}`,
 			);
 		}
@@ -426,7 +426,7 @@ class DivoomPixooPlugin extends Plugin {
 
 	async playGifFromUrl(url) {
 		if (!url || typeof url !== "string" || !url.startsWith("http")) {
-			await this.lumia.addLog("[Divoom Pixoo] Invalid GIF URL");
+			await this.lumia.log("[Divoom Pixoo] Invalid GIF URL");
 			return false;
 		}
 
@@ -441,7 +441,7 @@ class DivoomPixooPlugin extends Plugin {
 		});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to play GIF: ${result.error}`,
 			);
 		}
@@ -454,7 +454,7 @@ class DivoomPixooPlugin extends Plugin {
 		});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to set screen power: ${result.error}`,
 			);
 		}
@@ -469,7 +469,7 @@ class DivoomPixooPlugin extends Plugin {
 		});
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to play buzzer: ${result.error}`,
 			);
 		}
@@ -492,7 +492,7 @@ class DivoomPixooPlugin extends Plugin {
 	async sendRaw(command, payload) {
 		const trimmed = command.trim();
 		if (!trimmed) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				"[Divoom Pixoo] Raw command requires a command string",
 			);
 			return false;
@@ -502,7 +502,7 @@ class DivoomPixooPlugin extends Plugin {
 		const result = await this.sendCommand(trimmed, extra);
 
 		if (!result.success) {
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Raw command failed: ${result.error}`,
 			);
 		}
@@ -605,7 +605,7 @@ class DivoomPixooPlugin extends Plugin {
 				// Retry logic for network errors
 				const maxRetries = 2;
 				if (retryCount < maxRetries) {
-					await this.lumia.addLog(
+					await this.lumia.log(
 						`[Divoom Pixoo] Network error, retrying (${retryCount + 1}/${maxRetries})...`,
 					);
 					await new Promise((r) => setTimeout(r, 1000));
@@ -641,7 +641,7 @@ class DivoomPixooPlugin extends Plugin {
 			await this.lumia.updateConnection(normalized);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.addLog(
+			await this.lumia.log(
 				`[Divoom Pixoo] Failed to update connection state: ${message}`,
 			);
 		}
@@ -693,7 +693,7 @@ class DivoomPixooPlugin extends Plugin {
 		try {
 			return JSON.parse(value);
 		} catch (error) {
-			void this.lumia.addLog(
+			void this.lumia.log(
 				`[Divoom Pixoo] Failed to parse JSON: ${error.message}`,
 			);
 			return {};
