@@ -260,7 +260,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.2"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -1374,7 +1374,7 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.2"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -1974,7 +1974,7 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.2"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -3325,7 +3325,7 @@ module.exports = EveOnlinePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -4329,7 +4329,7 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.2"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -5208,7 +5208,7 @@ module.exports = NtfyPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.3"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -5904,7 +5904,7 @@ module.exports = OllamaPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.2.3"
+    "@lumiastream/plugin": "^0.3.3"
   }
 }
 
@@ -8137,7 +8137,7 @@ module.exports = OpenRGBPlugin;
 	"description": "OpenRGB light integration plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.2"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -9535,7 +9535,7 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.2"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -9555,9 +9555,13 @@ const VARIABLE_NAMES = {
 const FIELD_SPECS = [
 	{ key: "textField", label: "text", type: "text" },
 	{ key: "numberField", label: "number", type: "number" },
-	{ key: "textListField", label: "text_list", type: "text_list" },
 	{ key: "selectField", label: "select", type: "select" },
-	{ key: "multiselectField", label: "multiselect", type: "multiselect" },
+	{
+		key: "selectMultipleField",
+		label: "select_multiple",
+		type: "select",
+		multiple: true,
+	},
 	{ key: "checkboxField", label: "checkbox", type: "checkbox" },
 	{ key: "sliderField", label: "slider", type: "slider" },
 	{ key: "hiddenTextField", label: "hidden_text", type: "text" },
@@ -9664,7 +9668,7 @@ function asRoi(value) {
 	return { x, y, width, height, unit };
 }
 
-function normalizeValueByType(type, value) {
+function normalizeValueByType(type, value, field = {}) {
 	switch (type) {
 		case "number":
 		case "slider":
@@ -9672,9 +9676,11 @@ function normalizeValueByType(type, value) {
 		case "checkbox":
 		case "toggle":
 			return asBoolean(value, false);
-		case "text_list":
-		case "multiselect":
-			return asStringList(value);
+		case "select":
+			if (field?.multiple) {
+				return asStringList(value);
+			}
+			return asString(value, "");
 		case "json":
 			return asJsonValue(value);
 		case "roi":
@@ -9688,7 +9694,6 @@ function normalizeValueByType(type, value) {
 		}
 		case "file":
 		case "text":
-		case "select":
 		case "textarea":
 		case "email":
 		case "url":
@@ -9747,7 +9752,7 @@ class SettingsFieldShowcasePlugin extends Plugin {
 		const snapshot = {};
 
 		for (const field of FIELD_SPECS) {
-			const normalized = normalizeValueByType(field.type, settings?.[field.key]);
+			const normalized = normalizeValueByType(field.type, settings?.[field.key], field);
 			const output = formatForOutput(normalized);
 			snapshot[field.key] = normalized;
 
@@ -9836,18 +9841,10 @@ module.exports = SettingsFieldShowcasePlugin;
 				"helperText": "Example of type `number`."
 			},
 			{
-				"key": "textListField",
-				"label": "Text List Field",
-				"type": "text_list",
-				"section": "Basics",
-				"sectionOrder": 1,
-				"defaultValue": ["alpha", "beta"],
-				"helperText": "Example of type `text_list`."
-			},
-			{
 				"key": "selectField",
 				"label": "Select Field",
 				"type": "select",
+				"allowTyping": true,
 				"section": "Basics",
 				"sectionOrder": 1,
 				"defaultValue": "custom",
@@ -9856,12 +9853,14 @@ module.exports = SettingsFieldShowcasePlugin;
 					{ "label": "Custom", "value": "custom" },
 					{ "label": "Debug", "value": "debug" }
 				],
-				"helperText": "Example of type `select`."
+				"helperText": "Example of type `select` with `allowTyping: true`."
 			},
 			{
-				"key": "multiselectField",
-				"label": "Multiselect Field",
-				"type": "multiselect",
+				"key": "selectMultipleField",
+				"label": "Select (Multiple) Field",
+				"type": "select",
+				"multiple": true,
+				"allowTyping": true,
 				"section": "Basics",
 				"sectionOrder": 1,
 				"defaultValue": ["valorant", "overwatch"],
@@ -9871,7 +9870,7 @@ module.exports = SettingsFieldShowcasePlugin;
 					{ "label": "Overwatch", "value": "overwatch" },
 					{ "label": "League of Legends", "value": "league_of_legends" }
 				],
-				"helperText": "Example of type `multiselect`."
+				"helperText": "Example of type `select` with `multiple: true` and `allowTyping: true`."
 			},
 			{
 				"key": "checkboxField",
@@ -10030,7 +10029,7 @@ module.exports = SettingsFieldShowcasePlugin;
 				"sectionOrder": 3,
 				"group": "advanced_detection_group",
 				"visibleIf": {
-					"key": "multiselectField",
+					"key": "selectMultipleField",
 					"equals": "valorant"
 				},
 				"defaultValue": {
@@ -10073,11 +10072,11 @@ module.exports = SettingsFieldShowcasePlugin;
 	"name": "lumia-settings-field-showcase",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Example Lumia plugin demonstrating roi/json/multiselect/file/visibleIf settings.",
+	"description": "Example Lumia plugin demonstrating roi/json/select+multiple/file/visibleIf settings.",
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -10092,9 +10091,9 @@ This example includes every supported settings field type:
 
 - `text`
 - `number`
-- `text_list`
 - `select`
-- `multiselect`
+- `select` with `multiple: true`
+- `allowTyping` on `select` for freeform values
 - `checkbox`
 - `slider`
 - `file`
@@ -11406,7 +11405,7 @@ module.exports = SteamPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.2.4"
+		"@lumiastream/plugin": "^0.3.3"
 	}
 }
 
@@ -11566,7 +11565,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.2"
+		"@lumiastream/plugin": "^0.3.3"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
