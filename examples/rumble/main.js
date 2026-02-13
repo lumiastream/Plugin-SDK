@@ -297,11 +297,51 @@ function buildAlertVariables(state) {
 	};
 }
 
-function buildAlertPayload(vars, dynamicOverrides = {}) {
+function buildAlertIdentity(state) {
+	const username = coerceString(state?.channelName, "rumble");
+	const displayname = coerceString(state?.channelName, username);
+	const avatar = coerceString(state?.channelImage, "");
+	const userId = coerceString(state?.videoId, "");
 	return {
-		dynamic: { ...vars, ...dynamicOverrides },
-		extraSettings: { ...vars },
+		username,
+		displayname,
+		avatar: avatar || undefined,
+		userId: userId || undefined,
 	};
+}
+
+function buildAlertPayload(
+	vars,
+	{ state, name, value, extraSettings = {} } = {},
+) {
+	const identity = buildAlertIdentity(state);
+	const normalizedDynamic = buildAlertDynamic({ name, value });
+	return {
+		dynamic: normalizedDynamic,
+		extraSettings: {
+			...vars,
+			...extraSettings,
+			username: identity.username,
+			displayname: identity.displayname,
+			avatar: identity.avatar,
+			userId: identity.userId,
+			name: normalizedDynamic.name,
+			value: normalizedDynamic.value,
+		},
+	};
+}
+
+function buildAlertDynamic({ name, value } = {}) {
+	const normalizedName = coerceString(name, "");
+	let normalizedValue = value;
+	if (
+		typeof normalizedValue !== "string" &&
+		typeof normalizedValue !== "number" &&
+		typeof normalizedValue !== "boolean"
+	) {
+		normalizedValue = coerceString(normalizedValue, "");
+	}
+	return { name: normalizedName, value: normalizedValue };
 }
 
 function normalizeAvatar(value) {
@@ -343,6 +383,181 @@ function extractChatAvatar(message) {
 	);
 }
 
+function hasTruthyField(message, fields = []) {
+	for (const field of fields) {
+		const value = resolvePath(message, field.split("."));
+		if (coerceBoolean(value, false)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function coerceTier(value) {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return Math.max(0, Math.floor(value));
+	}
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (!normalized) {
+			return 0;
+		}
+		const parsedDirect = Number(normalized);
+		if (Number.isFinite(parsedDirect)) {
+			return Math.max(0, Math.floor(parsedDirect));
+		}
+		const match =
+			normalized.match(/tier[^0-9]*([0-9]+)/) || normalized.match(/([0-9]+)/);
+		if (match?.[1]) {
+			const parsed = Number(match[1]);
+			if (Number.isFinite(parsed)) {
+				return Math.max(0, Math.floor(parsed));
+			}
+		}
+	}
+	return 0;
+}
+
+function extractRoleTokens(message) {
+	const rawValues = [
+		message?.role,
+		message?.user_role,
+		message?.userRole,
+		message?.roles,
+		message?.user_roles,
+		message?.userRoles,
+		message?.badge,
+		message?.badges,
+		message?.user?.role,
+		message?.user?.roles,
+		message?.user?.badge,
+		message?.user?.badges,
+	];
+	const tokens = new Set();
+	for (const value of rawValues) {
+		if (Array.isArray(value)) {
+			for (const entry of value) {
+				const text =
+					typeof entry === "string"
+						? entry
+						: coerceString(entry?.name || entry?.id || entry?.badge, "");
+				const normalized = text.trim().toLowerCase();
+				if (normalized) {
+					tokens.add(normalized);
+				}
+			}
+			continue;
+		}
+		const normalized = coerceString(value, "").trim().toLowerCase();
+		if (normalized) {
+			tokens.add(normalized);
+		}
+	}
+	return tokens;
+}
+
+function extractChatBadges(message) {
+	if (!message || typeof message !== "object") {
+		return [];
+	}
+	return normalizeBadges(
+		message.badges ||
+			message.user_badges ||
+			message.badge ||
+			message.user?.badges ||
+			message.user?.badge ||
+			[],
+	);
+}
+
+function extractChatUserId(message) {
+	if (!message || typeof message !== "object") {
+		return "";
+	}
+	return coerceString(
+		message.user_id ||
+			message.userid ||
+			message.id_user ||
+			message.user?.id ||
+			message.user?.user_id,
+		"",
+	);
+}
+
+function extractChatUserLevels(message) {
+	const tokens = extractRoleTokens(message);
+	const tier = Math.max(
+		coerceTier(message?.subscription_tier),
+		coerceTier(message?.sub_tier),
+		coerceTier(message?.tier),
+		coerceTier(message?.user?.subscription_tier),
+		coerceTier(message?.user?.sub_tier),
+		coerceTier(message?.user?.tier),
+	);
+
+	const isSelf =
+		hasTruthyField(message, [
+			"is_self",
+			"isSelf",
+			"is_broadcaster",
+			"isBroadcaster",
+			"user.is_self",
+			"user.is_broadcaster",
+		]) ||
+		[...tokens].some((token) =>
+			["broadcaster", "streamer", "owner", "creator"].some((word) =>
+				token.includes(word),
+			),
+		);
+
+	const mod =
+		hasTruthyField(message, ["is_mod", "isMod", "user.is_mod"]) ||
+		[...tokens].some((token) => token.includes("moderator") || token === "mod");
+
+	const vip =
+		hasTruthyField(message, ["is_vip", "isVip", "user.is_vip"]) ||
+		[...tokens].some((token) => token.includes("vip"));
+
+	const tier3 =
+		tier >= 3 ||
+		[...tokens].some(
+			(token) => token.includes("tier3") || token.includes("tier_3"),
+		);
+	const tier2 =
+		tier >= 2 ||
+		tier3 ||
+		[...tokens].some(
+			(token) => token.includes("tier2") || token.includes("tier_2"),
+		);
+
+	const subscriber =
+		hasTruthyField(message, [
+			"is_subscriber",
+			"isSubscriber",
+			"is_member",
+			"isMember",
+			"user.is_subscriber",
+			"user.is_member",
+		]) ||
+		tier >= 1 ||
+		tier2 ||
+		tier3 ||
+		[...tokens].some((token) =>
+			["subscriber", "member", "supporter", "founder"].some((word) =>
+				token.includes(word),
+			),
+		);
+
+	const follower =
+		hasTruthyField(message, [
+			"is_follower",
+			"isFollower",
+			"user.is_follower",
+		]) || [...tokens].some((token) => token.includes("follower"));
+
+	return { isSelf, mod, vip, tier3, tier2, subscriber, follower };
+}
+
 function parseChatTimestamp(value) {
 	const parsed = parseTimestamp(value);
 	return parsed ? parsed.getTime() : 0;
@@ -363,6 +578,7 @@ class RumblePlugin extends Plugin {
 		this.failureCount = 0;
 		this.backoffMultiplier = 1;
 		this.offline = false;
+		this.lastConnectionState = null;
 	}
 
 	createEmptyState() {
@@ -534,7 +750,10 @@ class RumblePlugin extends Plugin {
 		}
 
 		const intervalSeconds = Math.min(
-			Math.max(Math.round(normalizedInterval * this.backoffMultiplier), MIN_POLL_INTERVAL),
+			Math.max(
+				Math.round(normalizedInterval * this.backoffMultiplier),
+				MIN_POLL_INTERVAL,
+			),
 			MAX_POLL_INTERVAL * 4,
 		);
 
@@ -553,7 +772,7 @@ class RumblePlugin extends Plugin {
 			this.pollIntervalId = null;
 		}
 
-		await this.lumia.updateConnection(false);
+		await this.updateConnectionState(false);
 	}
 
 	// Poll the Rumble endpoint once, then delegate processing to the diff logic.
@@ -572,7 +791,7 @@ class RumblePlugin extends Plugin {
 			await this.processStreamData(data);
 			this.failureCount = 0;
 			this.backoffMultiplier = 1;
-			await this.lumia.updateConnection(true);
+			await this.updateConnectionState(true);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			this.failureCount += 1;
@@ -585,8 +804,16 @@ class RumblePlugin extends Plugin {
 				await this.startPolling({ showToast: false });
 			}
 			await this.lumia.log(`[Rumble] Error polling API: ${message}`);
-			await this.lumia.updateConnection(false);
+			await this.updateConnectionState(false);
 		}
+	}
+
+	async updateConnectionState(nextState) {
+		if (this.lastConnectionState === nextState) {
+			return;
+		}
+		this.lastConnectionState = nextState;
+		await this.lumia.updateConnection(nextState);
 	}
 
 	buildStateFromData(data = {}) {
@@ -726,7 +953,6 @@ class RumblePlugin extends Plugin {
 		);
 		setIfChanged("started_at", startedIso, prevStartedIso);
 		setIfChanged("scheduled_start", scheduledIso, prevScheduledIso);
-		setIfChanged("last_polled", nowIso, previousState?.lastPolledIso);
 
 		if (updates.length) {
 			await Promise.all(updates);
@@ -749,8 +975,12 @@ class RumblePlugin extends Plugin {
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.STREAM_START,
 			...buildAlertPayload(alertVars, {
-				name: state.title,
+				state,
+				name: state.title || state.channelName || "rumble",
 				value: this.streamCounter,
+				extraSettings: {
+					stream_counter: this.streamCounter,
+				},
 			}),
 		});
 	}
@@ -761,8 +991,12 @@ class RumblePlugin extends Plugin {
 		await this.lumia.triggerAlert({
 			alert: ALERT_TYPES.STREAM_END,
 			...buildAlertPayload(alertVars, {
+				state,
+				name: state.channelName || state.title || "rumble",
 				value: state.viewers,
-				total: this.streamCounter,
+				extraSettings: {
+					total: this.streamCounter,
+				},
 			}),
 		});
 
@@ -782,8 +1016,14 @@ class RumblePlugin extends Plugin {
 			alert: ALERT_TYPES.FOLLOWER,
 			showInEventList: true,
 			...buildAlertPayload(alertVars, {
+				state,
+				name: state.channelName || "rumble",
 				value: delta,
-				total: state.followers,
+				extraSettings: {
+					amount: delta,
+					total: state.followers,
+					followers: state.followers,
+				},
 			}),
 		});
 	}
@@ -800,8 +1040,14 @@ class RumblePlugin extends Plugin {
 			alert: ALERT_TYPES.LIKE,
 			showInEventList: true,
 			...buildAlertPayload(alertVars, {
+				state,
+				name: state.channelName || "rumble",
 				value: delta,
-				total: state.likes,
+				extraSettings: {
+					amount: delta,
+					total: state.likes,
+					likes: state.likes,
+				},
 			}),
 		});
 	}
@@ -818,8 +1064,14 @@ class RumblePlugin extends Plugin {
 			alert: ALERT_TYPES.DISLIKE,
 			showInEventList: true,
 			...buildAlertPayload(alertVars, {
+				state,
+				name: state.channelName || "rumble",
 				value: delta,
-				total: state.dislikes,
+				extraSettings: {
+					amount: delta,
+					total: state.dislikes,
+					dislikes: state.dislikes,
+				},
 			}),
 		});
 	}
@@ -836,8 +1088,14 @@ class RumblePlugin extends Plugin {
 			alert: ALERT_TYPES.SUB,
 			showInEventList: true,
 			...buildAlertPayload(alertVars, {
+				state,
+				name: state.channelName || "rumble",
 				value: delta,
-				total: state.subs,
+				extraSettings: {
+					amount: delta,
+					total: state.subs,
+					subs: state.subs,
+				},
 			}),
 		});
 	}
@@ -854,8 +1112,14 @@ class RumblePlugin extends Plugin {
 			alert: ALERT_TYPES.SUB_GIFT,
 			showInEventList: true,
 			...buildAlertPayload(alertVars, {
+				state,
+				name: state.channelName || "rumble",
 				value: delta,
-				total: state.subGifts,
+				extraSettings: {
+					amount: delta,
+					total: state.subGifts,
+					sub_gifts: state.subGifts,
+				},
 			}),
 		});
 	}
@@ -879,8 +1143,15 @@ class RumblePlugin extends Plugin {
 			alert: ALERT_TYPES.RANT,
 			showInEventList: true,
 			...buildAlertPayload(alertVars, {
+				state,
+				name: state.channelName || "rumble",
 				value: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
-				total: roundToTwo(state.rantAmount),
+				extraSettings: {
+					amount: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
+					total: roundToTwo(state.rantAmount),
+					rants: state.rants,
+					rant_amount: roundToTwo(state.rantAmount),
+				},
 			}),
 		});
 	}
@@ -907,7 +1178,10 @@ class RumblePlugin extends Plugin {
 
 		const normalized = combined
 			.map((message) => {
-				const username = coerceString(message?.username, "");
+				const username = coerceString(
+					message?.username || message?.user?.username || message?.displayname,
+					"",
+				);
 				const text = coerceString(message?.text ?? message?.message, "");
 				const timestamp = parseChatTimestamp(
 					message?.created_on ?? message?.created_at,
@@ -917,6 +1191,9 @@ class RumblePlugin extends Plugin {
 					text,
 					timestamp,
 					avatar: extractChatAvatar(message),
+					userId: extractChatUserId(message),
+					badges: extractChatBadges(message),
+					userLevels: extractChatUserLevels(message),
 				};
 			})
 			.filter((message) => message.username && message.text);
@@ -981,6 +1258,9 @@ class RumblePlugin extends Plugin {
 				message: message.text,
 				avatar: message.avatar || undefined,
 				messageId: `rumble-${message.timestamp}-${message.username}`,
+				badges: message.badges?.length ? message.badges : undefined,
+				userId: message.userId || undefined,
+				userLevels: message.userLevels,
 			});
 		}
 	}

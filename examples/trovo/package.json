@@ -1,0 +1,12 @@
+{
+	"name": "lumia-trovo",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream Trovo plugin with realtime chat/events, alerts, variables, and actions.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.3.6",
+		"ws": "^8.18.3"
+	}
+}

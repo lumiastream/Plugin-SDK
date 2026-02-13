@@ -108,7 +108,11 @@ export interface PluginSetting {
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
-	options?: Array<{ id?: string; label: string; value: string | number | boolean }>;
+	options?: Array<{
+		id?: string;
+		label: string;
+		value: string | number | boolean;
+	}>;
 	allowTyping?: boolean;
 	multiple?: boolean;
 	lookup?: boolean;
@@ -311,7 +315,41 @@ export interface PluginIntegrationConfig {
 	variableFunctions?: PluginVariableFunctionDefinition[];
 	lights?: PluginLightsConfig;
 	oauth?: PluginOAuthConfig;
+	hasChatbot?: boolean;
+	modcommandOptions?: PluginModCommandOption[];
 	[key: string]: any;
+}
+
+export type PluginModCommandOption =
+	| "delete"
+	| "copy"
+	| "translate"
+	| "shoutout"
+	| "ban"
+	| "unban"
+	| "timeout"
+	| "add-vip"
+	| "remove-vip"
+	| "add-moderator"
+	| "remove-moderator";
+
+export interface PluginModCommandPayload {
+	username?: string;
+	message: string;
+	userToChatAs?: string;
+	reason?: string;
+	language?: string;
+	duration?: number;
+}
+
+export interface PluginChatbotHandlerOptions {
+	message: string;
+	userToChatAs?: string;
+	chatAsSelf?: boolean;
+	color?: string;
+	replyParentMessageId?: string;
+	username?: string;
+	extraSettings?: Record<string, any>;
 }
 
 export interface PluginManifest {
@@ -395,6 +433,10 @@ export interface PluginTriggerAlertOptions {
 }
 
 export interface PluginDisplayChatOptions {
+	/**
+	 * Show the message in chat without triggering command parsing.
+	 */
+	skipCommandProcessing?: boolean;
 	username: string;
 	displayname?: string;
 	message: string;
@@ -403,25 +445,29 @@ export interface PluginDisplayChatOptions {
 	badges?: string[];
 	messageId?: string;
 	channel?: string;
-	user?: {
+	userId?: string;
+	userLevels?: {
 		isSelf?: boolean;
-		broadcaster?: boolean;
 		mod?: boolean;
 		vip?: boolean;
-		subscriber?: boolean;
-		member?: boolean;
-		tier1?: boolean;
-		tier2?: boolean;
 		tier3?: boolean;
+		tier2?: boolean;
+		subscriber?: boolean;
 		follower?: boolean;
-		regular?: boolean;
-		badges?: Record<string, any> | string[];
-		userId?: string;
 	};
+	/**
+	 * Emotes payload.
+	 *
+	 * Supports:
+	 * - Twitch index string (e.g. "25:0-4/1902:6-10")
+	 * - Common plugin JSON format:
+	 *   [{ id?: string, url?: string, urls?: string[], start: number, end: number }]
+	 *   or { emotes: [...] }
+	 *
+	 * start/end are inclusive character offsets in `message`.
+	 */
 	emotesRaw?: string;
-	emotesPack?: Record<string, any> | any[];
 	isCheer?: boolean;
-	extraInfo?: Record<string, any>;
 }
 
 export interface PluginContext {
@@ -508,12 +554,18 @@ export interface ILumiaAPI {
 	/**
 	 * Acquire a shared BLE noble runtime with plugin-scoped listeners and scan controls.
 	 */
-	acquireSharedNoble: (options?: { key?: string }) => Promise<PluginSharedNobleClient>;
+	acquireSharedNoble: (options?: {
+		key?: string;
+	}) => Promise<PluginSharedNobleClient>;
 	/**
 	 * Release one reference to the shared BLE noble runtime.
 	 */
 	releaseSharedNoble: (options?: { key?: string }) => Promise<boolean>;
-	updateActionFieldOptions: (params: { actionType: string; fieldKey: string; options: PluginActionFieldOption[] }) => Promise<boolean>;
+	updateActionFieldOptions: (params: {
+		actionType: string;
+		fieldKey: string;
+		options: PluginActionFieldOption[];
+	}) => Promise<boolean>;
 	setVariable: (name: string, value: any) => Promise<void>;
 	getVariable: (name: string) => Promise<any>;
 	callCommand: (name: string, variableValues?: any) => Promise<any>;
@@ -552,17 +604,38 @@ export interface ILumiaAPI {
 	getLights: () => Promise<any>;
 	showToast: (params: { message: string; time?: number }) => Promise<boolean>;
 	log: (
-		params: { message?: unknown; level?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug'; type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug' } | string | number,
-		type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug',
+		params:
+			| {
+					message?: unknown;
+					level?: "info" | "warn" | "warning" | "error" | "success" | "debug";
+					type?: "info" | "warn" | "warning" | "error" | "success" | "debug";
+			  }
+			| string
+			| number,
+		type?: "info" | "warn" | "warning" | "error" | "success" | "debug",
 	) => Promise<boolean>;
 	dashboardLog: (
-		params: { message?: unknown; level?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug'; type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug' } | string | number,
-		type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug',
+		params:
+			| {
+					message?: unknown;
+					level?: "info" | "warn" | "warning" | "error" | "success" | "debug";
+					type?: "info" | "warn" | "warning" | "error" | "success" | "debug";
+			  }
+			| string
+			| number,
+		type?: "info" | "warn" | "warning" | "error" | "success" | "debug",
 	) => Promise<boolean>;
 	/** @deprecated Alias of `log`. Use `dashboardLog` for Lumia dashboard log feed entries. */
 	addLog?: (
-		params: { message?: unknown; level?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug'; type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug' } | string | number,
-		type?: 'info' | 'warn' | 'warning' | 'error' | 'success' | 'debug',
+		params:
+			| {
+					message?: unknown;
+					level?: "info" | "warn" | "warning" | "error" | "success" | "debug";
+					type?: "info" | "warn" | "warning" | "error" | "success" | "debug";
+			  }
+			| string
+			| number,
+		type?: "info" | "warn" | "warning" | "error" | "success" | "debug",
 	) => Promise<boolean>;
 	chatbot: (params: {
 		message: string;
@@ -588,11 +661,20 @@ export interface PluginRuntime {
 	onload(): Promise<void>;
 	onunload(): Promise<void>;
 	onupdate?(oldVersion: string, newVersion: string): Promise<void>;
-	actions?(config: { actions: PluginActionPayload[]; extraSettings?: Record<string, unknown> }): Promise<void>;
+	chatbot?(config: PluginChatbotHandlerOptions): Promise<boolean | void> | boolean | void;
+	modCommand?(type: PluginModCommandOption, value: PluginModCommandPayload): Promise<boolean | void> | boolean | void;
+	actions?(config: {
+		actions: PluginActionPayload[];
+		extraSettings?: Record<string, unknown>;
+	}): Promise<void>;
 	variableFunction?(
 		config: PluginVariableFunctionContext,
 	): Promise<string | PluginVariableFunctionResult | undefined>;
-	refreshActionOptions?(config: { actionType: string; values?: Record<string, any>; action?: any }): Promise<void>;
+	refreshActionOptions?(config: {
+		actionType: string;
+		values?: Record<string, any>;
+		action?: any;
+	}): Promise<void>;
 	searchLights?(config?: Record<string, any>): Promise<any>;
 	searchThemes?(config?: Record<string, any>): Promise<any>;
 	addLight?(config: Record<string, any>): Promise<any>;

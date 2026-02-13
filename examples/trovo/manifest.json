@@ -1,0 +1,485 @@
+{
+	"id": "trovo_live",
+	"name": "Trovo",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Trovo Live integration with chat, alerts, chatbot, moderation, variables, and stream actions.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "platforms",
+	"keywords": "trovo, livestream, chat, alerts, spells",
+	"icon": "trovo.png",
+	"config": {
+		"hasChatbot": true,
+		"oauth": {
+			"buttonLabel": "Authorize Trovo",
+			"helperText": "Connect your Trovo account to stream chat/events and auto-refresh tokens.",
+			"openInBrowser": true,
+			"scopes": [
+				"user_details_self",
+				"chat_connect",
+				"chat_send_self",
+				"channel_details_self",
+				"channel_subscriptions",
+				"channel_update_self",
+				"manage_messages",
+				"send_to_my_channel"
+			],
+			"tokenKeys": {
+				"accessToken": "accessToken",
+				"refreshToken": "refreshToken",
+				"tokenSecret": "tokenSecret"
+			}
+		},
+		"settings": [
+			{
+				"key": "accessToken",
+				"label": "Access Token",
+				"type": "password",
+				"helperText": "Auto-filled after OAuth completes.",
+				"disabled": true,
+				"required": false
+			},
+			{
+				"key": "refreshToken",
+				"label": "Refresh Token",
+				"type": "password",
+				"helperText": "Auto-filled after OAuth completes.",
+				"disabled": true,
+				"required": false
+			},
+			{
+				"key": "entranceOnlyWhenLive",
+				"label": "Entrance Alerts Only While Live",
+				"type": "toggle",
+				"defaultValue": true
+			},
+			{
+				"key": "firstChatterOnlyWhenLive",
+				"label": "First Chatter Alerts Only While Live",
+				"type": "toggle",
+				"defaultValue": true
+			}
+		],
+		"modcommandOptions": [
+			"delete",
+			"ban",
+			"unban",
+			"timeout",
+			"add-moderator",
+			"remove-moderator"
+		],
+		"settings_tutorial": "---\n### Setup\n1) Click **Authorize Trovo** in the OAuth section.\n2) Save the plugin; it will fetch your profile and chat token, then connect to Trovo websocket chat.\n\n### Notes\n- Access/refresh tokens are filled automatically by OAuth and refreshed at runtime.\n- Channel ID and username are auto-detected from Trovo API.\n- Entrance and first chatter alerts can be limited to live sessions with the provided toggles.\n---",
+		"actions_tutorial": "---\n### Actions\n- **Send Chat Message**: post a message to Trovo chat.\n- **Update Live Title**: update your Trovo stream title via channel API.\n- **Update Category**: find the closest Trovo category from your text and update it.\n- **Host Channel**: run `/host username` command.\n- **Unhost Channel**: run `/unhost` command.\n- **Set Title (Command)**: run `/settitle title` command.\n- **Trigger Alert**: fire one Trovo alert manually for testing.\n---",
+		"actions": [
+			{
+				"type": "send_chat",
+				"label": "Send Chat Message",
+				"description": "Send a chatbot message to Trovo.",
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "text",
+						"required": true,
+						"allowVariables": true
+					},
+					{
+						"key": "chatAsSelf",
+						"label": "Chat As Self",
+						"type": "checkbox",
+						"defaultValue": false
+					},
+					{
+						"key": "color",
+						"label": "Message Color (optional)",
+						"type": "color"
+					}
+				]
+			},
+			{
+				"type": "update_live_title",
+				"label": "Update Live Title",
+				"description": "Update the Trovo live title for your channel.",
+				"fields": [
+					{
+						"key": "liveTitle",
+						"label": "Live Title",
+						"type": "text",
+						"required": true,
+						"allowVariables": true
+					}
+				]
+			},
+			{
+				"type": "update_category",
+				"label": "Update Category",
+				"description": "Search Trovo categories and update to the closest matching category.",
+				"fields": [
+					{
+						"key": "category",
+						"label": "Category (name or id)",
+						"type": "text",
+						"required": true,
+						"allowVariables": true
+					}
+				]
+			},
+			{
+				"type": "host_channel",
+				"label": "Host Channel",
+				"description": "Host another Trovo channel using /host command.",
+				"fields": [
+					{
+						"key": "username",
+						"label": "Username",
+						"type": "text",
+						"required": true,
+						"allowVariables": true
+					}
+				]
+			},
+			{
+				"type": "unhost_channel",
+				"label": "Unhost Channel",
+				"description": "Stop hosting using /unhost command.",
+				"fields": []
+			},
+			{
+				"type": "set_title_command",
+				"label": "Set Title (Command)",
+				"description": "Set stream title using /settitle command.",
+				"fields": [
+					{
+						"key": "title",
+						"label": "Title",
+						"type": "text",
+						"required": true,
+						"allowVariables": true
+					}
+				]
+			},
+			{
+				"type": "trigger_alert",
+				"label": "Trigger Alert",
+				"description": "Manually trigger one of the Trovo alerts.",
+				"fields": [
+					{
+						"key": "alertKey",
+						"label": "Alert",
+						"type": "select",
+						"required": true,
+						"defaultValue": "follower",
+						"options": [
+							{ "label": "Stream Live", "value": "streamLive" },
+							{ "label": "Stream Offline", "value": "streamOffline" },
+							{ "label": "First Chatter", "value": "firstChatter" },
+							{ "label": "Entrance", "value": "entrance" },
+							{ "label": "Channel Join", "value": "channelJoin" },
+							{ "label": "Follower", "value": "follower" },
+							{ "label": "Subscriber", "value": "subscriber" },
+							{ "label": "Gift Subscription", "value": "subscriptionGift" },
+							{ "label": "Raid", "value": "raid" },
+							{ "label": "Spell", "value": "spell" }
+						]
+					},
+					{
+						"key": "username",
+						"label": "Username",
+						"type": "text",
+						"allowVariables": true
+					},
+					{
+						"key": "value",
+						"label": "Value",
+						"type": "text",
+						"allowVariables": true
+					}
+				]
+			}
+		],
+		"variableFunctions": [
+			{
+				"key": "uptime",
+				"label": "Trovo Uptime",
+				"description": "Returns current Trovo live uptime as a friendly duration."
+			}
+		],
+		"variables": [
+			{
+				"name": "uptime",
+				"description": "Friendly uptime of the current Trovo live session.",
+				"value": ""
+			},
+			{
+				"name": "live",
+				"description": "Whether Trovo stream is currently live.",
+				"value": false
+			},
+			{
+				"name": "session_chat_count",
+				"description": "Number of chat messages seen in current session.",
+				"value": 0
+			},
+			{
+				"name": "last_follower",
+				"description": "Username of the latest follower event.",
+				"value": ""
+			},
+			{
+				"name": "current_first_chatter",
+				"description": "First chatter username for the current stream session.",
+				"value": ""
+			},
+			{
+				"name": "current_first_chatter_count",
+				"description": "Current first chatter streak count.",
+				"value": 0
+			},
+			{
+				"name": "previous_first_chatter",
+				"description": "First chatter username from previous stream session.",
+				"value": ""
+			},
+			{
+				"name": "previous_first_chatter_count",
+				"description": "Previous first chatter streak count.",
+				"value": 0
+			},
+			{
+				"name": "last_chatter",
+				"description": "Username of the latest chat message author.",
+				"value": ""
+			},
+			{
+				"name": "last_raider",
+				"description": "Username of the latest raider.",
+				"value": ""
+			},
+			{
+				"name": "last_raid_amount",
+				"description": "Viewer count from the latest raid.",
+				"value": 0
+			},
+			{
+				"name": "session_follower_count",
+				"description": "Follower events counted for current session.",
+				"value": 0
+			},
+			{
+				"name": "session_subscribers_count",
+				"description": "Subscriber events counted for current session.",
+				"value": 0
+			},
+			{
+				"name": "session_raiders",
+				"description": "Comma-separated list of raiders for current session.",
+				"value": ""
+			},
+			{
+				"name": "last_subscriber",
+				"description": "Username of the latest subscriber or gift recipient.",
+				"value": ""
+			},
+			{
+				"name": "session_subscribers",
+				"description": "Comma-separated list of subscribers for current session.",
+				"value": ""
+			},
+			{
+				"name": "channel_id",
+				"description": "Resolved Trovo channel ID.",
+				"value": ""
+			},
+			{
+				"name": "username",
+				"description": "Resolved Trovo username.",
+				"value": ""
+			},
+			{
+				"name": "display_name",
+				"description": "Resolved Trovo display name.",
+				"value": ""
+			},
+			{
+				"name": "last_spell",
+				"description": "Name of the latest Trovo spell.",
+				"value": ""
+			},
+			{
+				"name": "last_spell_amount",
+				"description": "Quantity of the latest Trovo spell.",
+				"value": 0
+			},
+			{
+				"name": "last_spell_value",
+				"description": "Value per unit of the latest Trovo spell.",
+				"value": 0
+			},
+			{
+				"name": "last_message",
+				"description": "Text of the latest relayed Trovo chat message.",
+				"value": ""
+			},
+			{
+				"name": "last_message_id",
+				"description": "Message id of the latest relayed Trovo chat message.",
+				"value": ""
+			},
+			{
+				"name": "last_event_at",
+				"description": "ISO timestamp of the latest Trovo event processed.",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Stream Live",
+				"key": "streamLive",
+				"acceptedVariables": ["live", "username", "channel_id", "uptime"],
+				"defaultMessage": "{{username}} is now live on Trovo!"
+			},
+			{
+				"title": "Stream Offline",
+				"key": "streamOffline",
+				"acceptedVariables": ["live", "username", "uptime"],
+				"defaultMessage": "{{username}} has ended the Trovo stream."
+			},
+			{
+				"title": "First Chatter",
+				"key": "firstChatter",
+				"acceptedVariables": [
+					"current_first_chatter",
+					"current_first_chatter_count",
+					"previous_first_chatter",
+					"previous_first_chatter_count",
+					"live"
+				],
+				"defaultMessage": "{{username}} is first chatter!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Entrance",
+				"key": "entrance",
+				"acceptedVariables": ["live", "session_chat_count"],
+				"defaultMessage": "{{username}} entered chat.",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Channel Join",
+				"key": "channelJoin",
+				"acceptedVariables": ["live", "username"],
+				"defaultMessage": "{{username}} joined the channel.",
+				"defaults": {
+					"on": false
+				}
+			},
+			{
+				"title": "Follower",
+				"key": "follower",
+				"acceptedVariables": [
+					"last_follower",
+					"session_follower_count",
+					"username"
+				],
+				"defaultMessage": "New Trovo follower: {{username}}",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Follower count is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Subscriber",
+				"key": "subscriber",
+				"acceptedVariables": [
+					"last_subscriber",
+					"session_subscribers_count",
+					"session_subscribers",
+					"username"
+				],
+				"defaultMessage": "New Trovo subscriber: {{username}}",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Subscriber count is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Gift Subscription",
+				"key": "subscriptionGift",
+				"acceptedVariables": [
+					"last_subscriber",
+					"session_subscribers_count",
+					"session_subscribers",
+					"username"
+				],
+				"defaultMessage": "Gift subscription event by {{username}}",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Gift amount is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Raid",
+				"key": "raid",
+				"acceptedVariables": [
+					"last_raider",
+					"last_raid_amount",
+					"session_raiders",
+					"username"
+				],
+				"defaultMessage": "{{username}} raided with {{value}} viewers!",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Raid amount is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Spell",
+				"key": "spell",
+				"acceptedVariables": [
+					"last_spell",
+					"last_spell_amount",
+					"last_spell_value",
+					"username"
+				],
+				"defaultMessage": "{{username}} cast {{spell}} x{{spell_quantity}}"
+			}
+		]
+	}
+}

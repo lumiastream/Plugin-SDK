@@ -21,6 +21,20 @@ const configArrayFields: Array<{ key: ConfigArrayKey; message: string }> = [
   { key: "alerts", message: "config.alerts must be an array when provided" },
 ];
 
+const pluginModCommandOptions = new Set([
+  "delete",
+  "copy",
+  "translate",
+  "shoutout",
+  "ban",
+  "unban",
+  "timeout",
+  "add-vip",
+  "remove-vip",
+  "add-moderator",
+  "remove-moderator",
+]);
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -68,6 +82,20 @@ function validateCommandBundleEntries(value: unknown): string[] {
   return errors;
 }
 
+function validateModCommandOptions(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return ["config.modcommandOptions must be an array when provided"];
+  }
+
+  const errors: string[] = [];
+  value.forEach((entry, index) => {
+    if (!isNonEmptyString(entry) || !pluginModCommandOptions.has(entry)) {
+      errors.push(`config.modcommandOptions entry at index ${index} is invalid`);
+    }
+  });
+  return errors;
+}
+
 /**
  * Perform lightweight validation on a plugin manifest definition.
  * Returns an array of error strings. An empty array indicates the
@@ -110,6 +138,16 @@ export function validatePluginManifest(manifest: PartialManifest | null | undefi
       if (value !== undefined && !Array.isArray(value)) {
         errors.push(message);
       }
+    }
+
+    if (config.hasChatbot !== undefined && typeof config.hasChatbot !== "boolean") {
+      errors.push("config.hasChatbot must be a boolean when provided");
+    }
+    if (config.chatbot !== undefined) {
+      errors.push("config.chatbot is no longer supported. Use config.hasChatbot (boolean).");
+    }
+    if (config.modcommandOptions !== undefined) {
+      errors.push(...validateModCommandOptions(config.modcommandOptions));
     }
   }
 
