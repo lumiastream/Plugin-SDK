@@ -1,7 +1,7 @@
 {
-	"id": "settings_field_showcase",
-	"name": "Settings Field Showcase",
-	"version": "1.1.0",
+	"id": "settings_showcase",
+	"name": "Settings Showcase",
+	"version": "1.1.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -10,7 +10,7 @@
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "utilities",
-	"icon": "",
+	"icon": "settings_showcase.png",
 	"config": {
 		"settings_tutorial": "settings_tutorial.md",
 		"settings": [

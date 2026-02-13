@@ -5,6 +5,8 @@ import {
   type PluginDisplayChatOptions,
   type PluginAuthValidationResponse,
   type PluginActionPayload,
+  type PluginModCommandOption,
+  type PluginModCommandPayload,
 } from './types';
 
 /**
@@ -38,6 +40,12 @@ export abstract class Plugin {
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async actions(_config: { actions: PluginActionPayload[]; extraSettings?: Record<string, unknown> }): Promise<void> {}
+
+  /**
+   * Handle dashboard/API moderation commands when declared in manifest config.modcommandOptions.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async modCommand(_type: PluginModCommandOption, _value: PluginModCommandPayload): Promise<boolean | void> {}
 
   /**
    * Refresh dynamic action field options in the UI.

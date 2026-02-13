@@ -373,6 +373,53 @@ Notes:
 - `scopes` are provider-specific. When set, they are sent to Lumia's OAuth service as a comma-separated list.
 - Tokens are stored into your plugin settings using the `tokenKeys` mapping and are available via `this.settings` in your plugin.
 
+### Native chatbot support
+
+If your plugin can post chat messages on its own platform, declare chatbot support in the manifest:
+
+```json
+{
+	"config": {
+		"hasChatbot": true
+	}
+}
+```
+
+`config.hasChatbot` is a boolean flag. Set it to `true` to enable plugin-native chatbot routing.
+
+Runtime routing behavior:
+
+1. Lumia calls `chatbot(config)` on your plugin when implemented.
+2. Lumia does not fall back to `actions()` for chatbot routing.
+
+### Native moderation command support
+
+If your plugin supports chat moderation actions in Dashboard Chatbox / API, declare supported commands:
+
+```json
+{
+	"config": {
+		"modcommandOptions": ["delete", "ban", "timeout"]
+	}
+}
+```
+
+Allowed values are:
+
+- `delete`
+- `copy`
+- `translate`
+- `shoutout`
+- `ban`
+- `unban`
+- `timeout`
+- `add-vip`
+- `remove-vip`
+- `add-moderator`
+- `remove-moderator`
+
+When declared, Lumia routes these commands to `modCommand(type, value)` in your plugin runtime.
+
 #### Setting Types
 
 - **`text`** - Single-line text input

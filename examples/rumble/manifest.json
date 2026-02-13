@@ -1,333 +1,303 @@
 {
-  "id": "rumble",
-  "name": "Rumble",
-  "version": "1.0.0",
-  "author": "Lumia Stream",
-  "email": "dev@lumiastream.com",
-  "website": "https://lumiastream.com",
-  "description": "Track Rumble livestream state and engagement with alerts, variables, and chat display.",
-  "license": "MIT",
-  "lumiaVersion": "^9.0.0",
-  "category": "platforms",
-  "keywords": "rumble, livestream, chat, followers, alerts",
-  "icon": "rumble.png",
-  "config": {
-    "settings": [
-      {
-        "key": "apiKey",
-        "label": "API Key",
-        "type": "text",
-        "placeholder": "Enter your Rumble livestream API key",
-        "helperText": "Copy the key parameter from your Rumble livestream API URL",
-        "required": true
-      },
-      {
-        "key": "pollInterval",
-        "label": "Poll Interval (seconds)",
-        "type": "number",
-        "defaultValue": 30,
-        "helperText": "How often to check for stream updates (10-300 seconds)"
-      }
-    ],
-    "settings_tutorial": "---\n### \ud83d\udd11 Get Your Rumble Livestream API URL\n1) Open https://rumble.com/account/livestream-api while logged in.\n2) Copy the full Livestream API URL shown on that page.\n3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).\n---\n### \u2705 Verify Access\nClick **Save** to start syncing data.\n---\n### \u23f1\ufe0f Adjust Polling\nSet a poll interval that balances freshness with API limits (10\u2013300 seconds).\n---",
-    "actions_tutorial": "---\n### Actions\nThis plugin runs automatically on the poll interval and does not expose actions.\n---",
-    "actions": [],
-    "variables": [
-      {
-        "name": "live",
-        "description": "Whether the Rumble stream is currently live",
-        "value": false
-      },
-      {
-        "name": "viewers",
-        "description": "Current number of concurrent viewers watching the stream",
-        "value": 0
-      },
-      {
-        "name": "joined",
-        "description": "Total viewers that have joined the stream session",
-        "value": 0
-      },
-      {
-        "name": "title",
-        "description": "Current stream title",
-        "value": ""
-      },
-      {
-        "name": "thumbnail",
-        "description": "Stream thumbnail URL",
-        "value": ""
-      },
-      {
-        "name": "stream_url",
-        "description": "Public URL to the livestream",
-        "value": ""
-      },
-      {
-        "name": "video_id",
-        "description": "Underlying Rumble video ID",
-        "value": ""
-      },
-      {
-        "name": "reactions",
-        "description": "Current reaction count on the stream",
-        "value": 0
-      },
-      {
-        "name": "followers",
-        "description": "Current follower count of the channel",
-        "value": 0
-      },
-      {
-        "name": "likes",
-        "description": "Thumbs-up reactions on the stream",
-        "value": 0
-      },
-      {
-        "name": "dislikes",
-        "description": "Thumbs-down reactions on the stream",
-        "value": 0
-      },
-      {
-        "name": "subs",
-        "description": "Total paid subscriptions/memberships for the channel",
-        "value": 0
-      },
-      {
-        "name": "sub_gifts",
-        "description": "Gifted subscriptions/memberships received during the stream",
-        "value": 0
-      },
-      {
-        "name": "rants",
-        "description": "Number of Rants received this stream",
-        "value": 0
-      },
-      {
-        "name": "rant_amount",
-        "description": "Total value of Rants received this stream",
-        "value": 0
-      },
-      {
-        "name": "chat_members",
-        "description": "Active chat members in the livestream chat",
-        "value": 0
-      },
-      {
-        "name": "category",
-        "description": "Category assigned to the livestream",
-        "value": ""
-      },
-      {
-        "name": "description",
-        "description": "Short description of the livestream",
-        "value": ""
-      },
-      {
-        "name": "language",
-        "description": "Language reported by Rumble for the stream",
-        "value": ""
-      },
-      {
-        "name": "chat_url",
-        "description": "Direct URL to the livestream chat",
-        "value": ""
-      },
-      {
-        "name": "channel_name",
-        "description": "Rumble channel display name",
-        "value": ""
-      },
-      {
-        "name": "channel_image",
-        "description": "Avatar image URL for the Rumble channel",
-        "value": ""
-      },
-      {
-        "name": "started_at",
-        "description": "Timestamp of when the stream went live (ISO 8601)",
-        "value": ""
-      },
-      {
-        "name": "scheduled_start",
-        "description": "Scheduled start time for the stream (ISO 8601)",
-        "value": ""
-      },
-      {
-        "name": "last_polled",
-        "description": "Timestamp (ISO 8601) of the most recent Rumble API poll",
-        "value": ""
-      }
-    ],
-    "alerts": [
-      {
-        "title": "Stream Started",
-        "key": "streamStarted",
-        "acceptedVariables": [
-          "live",
-          "viewers",
-          "title",
-          "stream_url",
-          "followers",
-          "likes",
-          "dislikes",
-          "subs",
-          "sub_gifts",
-          "rants",
-          "rant_amount"
-        ],
-        "defaultMessage": "{{username}} has started streaming on Rumble!",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Stream Ended",
-        "key": "streamEnded",
-        "acceptedVariables": [
-          "live",
-          "viewers",
-          "title",
-          "followers",
-          "likes",
-          "dislikes",
-          "subs",
-          "sub_gifts",
-          "rants",
-          "rant_amount"
-        ],
-        "defaultMessage": "{{username}} has ended their Rumble stream.",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Follower",
-        "key": "follower",
-        "acceptedVariables": [
-          "followers",
-          "stream_url",
-          "title"
-        ],
-        "defaultMessage": "New followers! Total is now {{followers}}.",
-        "variationConditions": [
-          {
-            "type": "GREATER_NUMBER",
-            "description": "Follow number is greater than.."
-          },
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Rant",
-        "key": "rant",
-        "acceptedVariables": [
-          "rants",
-          "rant_amount",
-          "viewers",
-          "title"
-        ],
-        "defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
-        "variationConditions": [
-          {
-            "type": "GREATER_NUMBER",
-            "description": "Rant number is greater than.."
-          },
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Like",
-        "key": "like",
-        "acceptedVariables": [
-          "likes",
-          "stream_url",
-          "title"
-        ],
-        "defaultMessage": "Another thumbs-up! Likes: {{likes}}",
-        "variationConditions": [
-          {
-            "type": "GREATER_NUMBER",
-            "description": "Like number is greater than.."
-          },
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Dislike",
-        "key": "dislike",
-        "acceptedVariables": [
-          "dislikes",
-          "stream_url",
-          "title"
-        ],
-        "defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
-        "variationConditions": [
-          {
-            "type": "GREATER_NUMBER",
-            "description": "Dislike number is greater than.."
-          },
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Subscriber",
-        "key": "sub",
-        "acceptedVariables": [
-          "subs",
-          "stream_url",
-          "title"
-        ],
-        "defaultMessage": "New subscription! Subs total: {{subs}}",
-        "variationConditions": [
-          {
-            "type": "GREATER_NUMBER",
-            "description": "Sub number is greater than.."
-          },
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Gift Subscription",
-        "key": "subGift",
-        "acceptedVariables": [
-          "sub_gifts",
-          "stream_url",
-          "title"
-        ],
-        "defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
-        "variationConditions": [
-          {
-            "type": "GREATER_NUMBER",
-            "description": "Gift sub number is greater than.."
-          },
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      }
-    ]
-  }
+	"id": "rumble",
+	"name": "Rumble",
+	"version": "1.0.1",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Track Rumble livestream state and engagement with alerts, variables, and chat display.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "platforms",
+	"keywords": "rumble, livestream, chat, followers, alerts",
+	"icon": "rumble.png",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "API Key",
+				"type": "text",
+				"placeholder": "Enter your Rumble livestream API key",
+				"helperText": "Copy the key parameter from your Rumble livestream API URL",
+				"required": true
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 10,
+				"helperText": "How often to check for stream updates (10-300 seconds)"
+			}
+		],
+		"settings_tutorial": "---\n### \ud83d\udd11 Get Your Rumble Livestream API URL\n1) Open https://rumble.com/account/livestream-api while logged in.\n2) Copy the full Livestream API URL shown on that page.\n3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).\n---\n### \u2705 Verify Access\nClick **Save** to start syncing data.\n---\n### \u23f1\ufe0f Adjust Polling\nSet a poll interval that balances freshness with API limits (10\u2013300 seconds).\n---",
+		"actions_tutorial": "---\n### Actions\nThis plugin runs automatically on the poll interval and does not expose actions.\n---",
+		"actions": [],
+		"variables": [
+			{
+				"name": "live",
+				"description": "Whether the Rumble stream is currently live",
+				"value": false
+			},
+			{
+				"name": "viewers",
+				"description": "Current number of concurrent viewers watching the stream",
+				"value": 0
+			},
+			{
+				"name": "joined",
+				"description": "Total viewers that have joined the stream session",
+				"value": 0
+			},
+			{
+				"name": "title",
+				"description": "Current stream title",
+				"value": ""
+			},
+			{
+				"name": "thumbnail",
+				"description": "Stream thumbnail URL",
+				"value": ""
+			},
+			{
+				"name": "stream_url",
+				"description": "Public URL to the livestream",
+				"value": ""
+			},
+			{
+				"name": "video_id",
+				"description": "Underlying Rumble video ID",
+				"value": ""
+			},
+			{
+				"name": "reactions",
+				"description": "Current reaction count on the stream",
+				"value": 0
+			},
+			{
+				"name": "followers",
+				"description": "Current follower count of the channel",
+				"value": 0
+			},
+			{
+				"name": "likes",
+				"description": "Thumbs-up reactions on the stream",
+				"value": 0
+			},
+			{
+				"name": "dislikes",
+				"description": "Thumbs-down reactions on the stream",
+				"value": 0
+			},
+			{
+				"name": "subs",
+				"description": "Total paid subscriptions/memberships for the channel",
+				"value": 0
+			},
+			{
+				"name": "sub_gifts",
+				"description": "Gifted subscriptions/memberships received during the stream",
+				"value": 0
+			},
+			{
+				"name": "rants",
+				"description": "Number of Rants received this stream",
+				"value": 0
+			},
+			{
+				"name": "rant_amount",
+				"description": "Total value of Rants received this stream",
+				"value": 0
+			},
+			{
+				"name": "chat_members",
+				"description": "Active chat members in the livestream chat",
+				"value": 0
+			},
+			{
+				"name": "category",
+				"description": "Category assigned to the livestream",
+				"value": ""
+			},
+			{
+				"name": "description",
+				"description": "Short description of the livestream",
+				"value": ""
+			},
+			{
+				"name": "language",
+				"description": "Language reported by Rumble for the stream",
+				"value": ""
+			},
+			{
+				"name": "chat_url",
+				"description": "Direct URL to the livestream chat",
+				"value": ""
+			},
+			{
+				"name": "channel_name",
+				"description": "Rumble channel display name",
+				"value": ""
+			},
+			{
+				"name": "channel_image",
+				"description": "Avatar image URL for the Rumble channel",
+				"value": ""
+			},
+			{
+				"name": "started_at",
+				"description": "Timestamp of when the stream went live (ISO 8601)",
+				"value": ""
+			},
+			{
+				"name": "scheduled_start",
+				"description": "Scheduled start time for the stream (ISO 8601)",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Stream Started",
+				"key": "streamStarted",
+				"acceptedVariables": [
+					"live",
+					"viewers",
+					"title",
+					"stream_url",
+					"followers",
+					"likes",
+					"dislikes",
+					"subs",
+					"sub_gifts",
+					"rants",
+					"rant_amount"
+				],
+				"defaultMessage": "{{username}} has started streaming on Rumble!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Stream Ended",
+				"key": "streamEnded",
+				"acceptedVariables": [
+					"live",
+					"viewers",
+					"title",
+					"followers",
+					"likes",
+					"dislikes",
+					"subs",
+					"sub_gifts",
+					"rants",
+					"rant_amount"
+				],
+				"defaultMessage": "{{username}} has ended their Rumble stream.",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Follower",
+				"key": "follower",
+				"acceptedVariables": ["followers", "stream_url", "title"],
+				"defaultMessage": "New followers! Total is now {{followers}}.",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Follow number is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Rant",
+				"key": "rant",
+				"acceptedVariables": ["rants", "rant_amount", "viewers", "title"],
+				"defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Rant number is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Like",
+				"key": "like",
+				"acceptedVariables": ["likes", "stream_url", "title"],
+				"defaultMessage": "Another thumbs-up! Likes: {{likes}}",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Like number is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Dislike",
+				"key": "dislike",
+				"acceptedVariables": ["dislikes", "stream_url", "title"],
+				"defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Dislike number is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Subscriber",
+				"key": "sub",
+				"acceptedVariables": ["subs", "stream_url", "title"],
+				"defaultMessage": "New subscription! Subs total: {{subs}}",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Sub number is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Gift Subscription",
+				"key": "subGift",
+				"acceptedVariables": ["sub_gifts", "stream_url", "title"],
+				"defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
+				"variationConditions": [
+					{
+						"type": "GREATER_NUMBER",
+						"description": "Gift sub number is greater than.."
+					},
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			}
+		]
+	}
 }
