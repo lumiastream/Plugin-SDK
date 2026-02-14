@@ -167,6 +167,23 @@ Theme runtime contract:
 
 The `config` object defines your plugin's interactive elements:
 
+### AI Provider Support
+
+If your plugin should appear as an AI provider (like ChatGPT/DeepSeek) in Lumia features that support AI routing, declare:
+
+```json
+{
+	"config": {
+		"hasAI": true
+	}
+}
+```
+
+When `hasAI` is enabled, implement:
+
+- `aiPrompt(config)` to process prompt requests and return text.
+- `aiModels(config?)` to return available model options for dropdowns.
+
 ### Settings
 
 Settings create a configuration UI for users:

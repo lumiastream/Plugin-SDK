@@ -18,6 +18,8 @@ Store any dependencies, initialise locals, and always pass the parameters to the
 - **`onunload()`** – invoked when the plugin is disabled. Clean up timers, close sockets, and release resources.
 - **`onupdate(oldVersion, newVersion)`** – triggered after a version upgrade. Optional.
 - **`onsettingsupdate(settings, previousSettings)`** – called after settings change. Optional.
+- **`aiPrompt(config): Promise<string | object | void> | string | object | void`** – optional AI prompt handler. Enabled by declaring `config.hasAI` in the manifest.
+- **`aiModels(config?): Promise<Array<{ value, name? }> | string[] | { models: [...] } | void>`** – optional AI model list provider used by Lumia AI model pickers.
 - **`chatbot(config): Promise<boolean | void> | boolean | void`** – optional native chatbot handler. Enabled by declaring `config.hasChatbot` in the manifest.
 - **`modCommand(type, value): Promise<boolean | void> | boolean | void`** – optional moderation handler. Enabled by declaring `config.modcommandOptions` in the manifest.
 - **`searchLights(config?): Promise<any>`** – optional discovery hook for lights plugins. Return a list of devices for the auth UI.
@@ -114,6 +116,11 @@ By default, `acquireSharedNoble` uses the host key `bluetooth.runtime.noble.mana
 
 - **`callCommand(name: string, variableValues?: any): Promise<any>`** – execute another Lumia command and optionally pass variable values.
 - **`getAllCommands(params?: { onlyOn?: boolean }): Promise<any>`** – fetch available commands.
+
+### Dynamic UI Options
+
+- **`updateActionFieldOptions({ actionType, fieldKey, options }): Promise<boolean>`** – update action dropdown options at runtime.
+- **`updateSettingsFieldOptions({ fieldKey, options }): Promise<boolean>`** – update settings dropdown options at runtime (used with `dynamicOptions` fields in PluginAuth).
 
 ### Alerts & Chat
 
@@ -225,6 +232,16 @@ For `displayChat`, `userLevels` flags are used when evaluating chat command perm
 Use `skipCommandProcessing` (top-level) to show a message in chat without running command parsing.
 
 `PluginIntegrationConfig` supports `actions_tutorial` (markdown) to display a guide alongside the Actions editor. It also supports `oauth` for Lumia-managed OAuth configuration (see the manifest guide for details).
+
+`PluginIntegrationConfig` also supports `hasAI` for plugin-native AI routing:
+
+```js
+{
+  hasAI: true
+}
+```
+
+When `hasAI` is enabled, Lumia routes prompt requests to your plugin by calling `aiPrompt(config)`, and model list requests by calling `aiModels(config?)`.
 
 `PluginIntegrationConfig` also supports `hasChatbot` for plugin-native chatbot routing:
 
