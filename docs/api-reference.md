@@ -7,7 +7,7 @@ This document describes the public surface of the Lumia Stream Plugin SDK export
 ### Constructor
 
 ```js
-constructor(manifest, context)
+constructor(manifest, context);
 ```
 
 Store any dependencies, initialise locals, and always pass the parameters to the parent constructor.
@@ -245,7 +245,7 @@ Use `skipCommandProcessing` (top-level) to show a message in chat without runnin
 
 ```js
 {
-  hasAI: true
+	hasAI: true;
 }
 ```
 
@@ -255,7 +255,7 @@ When `hasAI` is enabled, Lumia routes prompt requests to your plugin by calling 
 
 ```js
 {
-  hasChatbot: true
+	hasChatbot: true;
 }
 ```
 
@@ -265,7 +265,7 @@ When `hasChatbot` is enabled, Lumia routes chatbot messages for that platform to
 
 ```js
 {
-  modcommandOptions: ["delete", "ban", "timeout"]
+	modcommandOptions: ["delete", "ban", "timeout"];
 }
 ```
 
