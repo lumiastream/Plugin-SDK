@@ -1,0 +1,8 @@
+{
+	"en": {
+		"message": "Stores the most recent message handled by the plugin.",
+		"username": "Stores the most recent username handled by the plugin.",
+		"color": "Tracks the color used by the latest sample alert.",
+		"duration": "Tracks the duration used by the latest sample alert."
+	}
+}

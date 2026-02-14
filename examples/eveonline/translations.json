@@ -1,0 +1,31 @@
+{
+	"en": {
+		"character_id": "Authenticated character ID.",
+		"character_name": "Authenticated character name.",
+		"corporation_id": "Character corporation ID.",
+		"alliance_id": "Character alliance ID (0 if none).",
+		"security_status": "Character security status.",
+		"wallet_balance": "Current wallet balance.",
+		"online": "Whether the character is currently online.",
+		"solar_system_id": "Current solar system ID.",
+		"station_id": "Current station ID (0 if not docked).",
+		"structure_id": "Current structure ID (0 if none).",
+		"ship_name": "Current ship name.",
+		"ship_type_id": "Current ship type ID.",
+		"ship_item_id": "Current ship item ID.",
+		"skillqueue_count": "Number of skills in the queue.",
+		"skillqueue_current_skill_id": "Skill ID currently training.",
+		"skillqueue_current_level": "Training level for the current skill.",
+		"skillqueue_current_end": "Finish time for the current skill (ISO).",
+		"skillqueue_ends_at": "Finish time for the last queued skill (ISO).",
+		"market_orders_active": "Number of active market orders.",
+		"market_orders_buy": "Number of active buy orders.",
+		"market_orders_sell": "Number of active sell orders.",
+		"industry_jobs_active": "Number of active industry jobs.",
+		"industry_jobs_total": "Total industry jobs returned by ESI.",
+		"killmails_recent_count": "Count of recent killmails.",
+		"notifications_count": "Number of notifications returned by ESI.",
+		"last_login": "Last Login",
+		"last_logout": "Last Logout"
+	}
+}

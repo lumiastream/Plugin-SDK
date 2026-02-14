@@ -1,7 +1,7 @@
 {
 	"id": "elevenlabs_tts",
 	"name": "ElevenLabs TTS",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
@@ -22,8 +22,8 @@
 				"required": true
 			}
 		],
-		"settings_tutorial": "---\n### \ud83d\udd10 Get Your ElevenLabs API Key\n1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key. Then copy the Key ID and paste it here.\n---\n### \ud83c\udf9b\ufe0f Voice Tuning (used in Actions)\n- **Stability**: Higher values make speech more consistent/predictable; lower values sound more dynamic.\n- **Similarity Boost**: Higher values keep output closer to the original voice; lower values allow more variation.\n- **Style**: Adds expressiveness/character; higher values can sound more dramatic.\n---",
-		"actions_tutorial": "---\n### \ud83d\udce2 Speak Action\n1) Enter the **Message** you want spoken.\n2) Paste the **Voice ID** you copied from ElevenLabs (find it at https://elevenlabs.io/app/voice-lab).\n3) Choose a **Model ID** (view model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n4) Adjust **Stability**, **Similarity Boost**, and **Style** if desired.\n---\n### \ud83c\udfb5 Stream Music Action\n1) Enter a **Prompt** (or provide a Composition Plan JSON).\n2) Choose the **Model ID** (see music model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n3) Set **Music Length** and **Volume**.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [
 			{
 				"type": "speak",
@@ -62,13 +62,34 @@
 						"defaultValue": "eleven_multilingual_v2",
 						"helperText": "Choose a speech model or type a custom model ID.",
 						"options": [
-							{ "label": "Eleven v3", "value": "eleven_v3" },
-							{ "label": "Multilingual v2", "value": "eleven_multilingual_v2" },
-							{ "label": "Multilingual v1", "value": "eleven_multilingual_v1" },
-							{ "label": "Turbo v2.5", "value": "eleven_turbo_v2_5" },
-							{ "label": "Turbo v2", "value": "eleven_turbo_v2" },
-							{ "label": "Flash v2.5", "value": "eleven_flash_v2_5" },
-							{ "label": "Flash v2", "value": "eleven_flash_v2" }
+							{
+								"label": "Eleven v3",
+								"value": "eleven_v3"
+							},
+							{
+								"label": "Multilingual v2",
+								"value": "eleven_multilingual_v2"
+							},
+							{
+								"label": "Multilingual v1",
+								"value": "eleven_multilingual_v1"
+							},
+							{
+								"label": "Turbo v2.5",
+								"value": "eleven_turbo_v2_5"
+							},
+							{
+								"label": "Turbo v2",
+								"value": "eleven_turbo_v2"
+							},
+							{
+								"label": "Flash v2.5",
+								"value": "eleven_flash_v2_5"
+							},
+							{
+								"label": "Flash v2",
+								"value": "eleven_flash_v2"
+							}
 						]
 					},
 					{
@@ -153,7 +174,12 @@
 						"allowTyping": true,
 						"defaultValue": "music_v1",
 						"helperText": "Choose a music model or type a custom model ID.",
-						"options": [{ "label": "Music v1", "value": "music_v1" }]
+						"options": [
+							{
+								"label": "Music v1",
+								"value": "music_v1"
+							}
+						]
 					},
 					{
 						"key": "forceInstrumental",

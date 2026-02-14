@@ -1,7 +1,7 @@
 {
 	"id": "ollama",
 	"name": "Ollama",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -13,7 +13,7 @@
 	"icon": "ollama.png",
 	"config": {
 		"hasAI": true,
-		"settings_tutorial": "---\n### 1) Install & Run Ollama\n1) Install [Ollama](https://ollama.com).\n2) Start the server: `ollama serve` (defaults to `http://localhost:11434`).\n3) Pull a model you want to use, for example: `ollama pull gpt-oss:20b`.\n---\n### 2) Configure This Plugin\n- **Base URL** should point to your Ollama server (default `http://localhost:11434`).\n- **Default Model** should match a local model name from `ollama list`. If left blank, the plugin will try to auto-detect and use the first available model.\n- **Max Output Length** trims long replies for overlays or chat boxes.\n---\n### 3) Variable Functions\n**ollama_prompt**\nSend prompts using a simple syntax.\n\nExample:\n`{{ollama_prompt=Make a funny quote}}`\n\nUse user input:\n`{{ollama_prompt={{message}}}}`\n\nKeep conversation context with a thread name and optional model override:\n`{{ollama_prompt={{message}}|thread_name|gpt-oss:20b}}`\n\nUse a thread name to continue the conversation, and the last parameter to use a specific model.\n\n**ollama_json**\nReturn JSON-only output:\n`{{ollama_json=Summarize this clip as JSON}}`\n\n**ollama_one_line**\nReturn a single-line response (newlines removed):\n`{{ollama_one_line=Write a short hype line}}`\n\n**ollama_prompt_nostore**\nRun a prompt without storing or using history:\n`{{ollama_prompt_nostore=Give me a quick summary}}`\n\n**ollama_prompt_clear**\nClear a conversation thread:\n`{{ollama_prompt_clear=thread_name}}`\n---",
+		"settings_tutorial": "./settings_tutorial.md",
 		"settings": [
 			{
 				"key": "baseUrl",

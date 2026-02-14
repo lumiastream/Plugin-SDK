@@ -235,9 +235,11 @@ Use `skipCommandProcessing` (top-level) to show a message in chat without runnin
 
 `PluginIntegrationConfig` also supports `translations` for plugin-localized strings:
 
-- key: language code (for example `en`, `es`, `fr`)
-- value: inline translation object or relative `.json` file path
+- shape: either a language-map object or a single relative `.json` file path
+- object keys: language codes (for example `en`, `es`, `fr`)
+- object values: inline translation objects (legacy per-language file paths are also supported)
 - runtime: loaded under your plugin namespace (plugin `id`) when the plugin loads
+- variable/global variable keys: Lumia resolves both `key` and `pluginid_key` forms automatically
 
 `PluginIntegrationConfig` also supports `hasAI` for plugin-native AI routing:
 

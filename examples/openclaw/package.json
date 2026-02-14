@@ -6,6 +6,6 @@
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.3.7"
+    "@lumiastream/plugin": "^0.4.0"
   }
 }

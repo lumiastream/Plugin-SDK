@@ -1,7 +1,7 @@
 {
 	"id": "openclaw",
 	"name": "OpenClaw",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -13,7 +13,7 @@
 	"icon": "openclaw.png",
 	"config": {
 		"hasAI": true,
-		"settings_tutorial": "---\n### 1) Run OpenClaw Gateway\n1) Follow the OpenClaw docs: [docs.openclaw.ai](https://docs.openclaw.ai/).\n2) Enable the OpenAI-compatible HTTP API in your Gateway config.\n3) Start the Gateway (default `http://127.0.0.1:18789`).\n---\n### 2) Configure This Plugin (Minimal)\n- **Base URL** should point to your OpenClaw Gateway.\n- **Gateway Token** is required only if your Gateway auth is enabled.\n- **Known Agent IDs** is a manual comma-separated list (example: `main,research,fast`).\n- **Default Agent ID** uses that manual list for selection.\n- **Model correlation:** the selected agent determines the real provider model inside OpenClaw.\n---\n### 3) Variable Functions\n**openclaw_prompt**\nSend prompts using a simple syntax.\n\nExample:\n`{{openclaw_prompt=Make a funny quote}}`\n\nUse user input:\n`{{openclaw_prompt={{message}}}}`\n\nKeep conversation context with a thread name and optional agent override:\n`{{openclaw_prompt={{message}}|thread_name|main}}`\n\nYou can pass an agent id (`main`) or route (`openclaw:main`) in the third slot.\n\n**openclaw_json**\nReturn JSON-only output:\n`{{openclaw_json=Summarize this clip as JSON}}`\n\n**openclaw_one_line**\nReturn a single-line response (newlines removed):\n`{{openclaw_one_line=Write a short hype line}}`\n\n**openclaw_prompt_nostore**\nRun a prompt without storing or using history:\n`{{openclaw_prompt_nostore=Give me a quick summary}}`\n\n**openclaw_prompt_clear**\nClear a conversation thread:\n`{{openclaw_prompt_clear=thread_name}}`\n---",
+		"settings_tutorial": "./settings_tutorial.md",
 		"settings": [
 			{
 				"key": "baseUrl",

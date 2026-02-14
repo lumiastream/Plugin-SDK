@@ -1,7 +1,7 @@
 {
 	"id": "settings_showcase",
 	"name": "Settings Showcase",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -43,9 +43,18 @@
 				"sectionOrder": 1,
 				"defaultValue": "custom",
 				"options": [
-					{ "label": "Normal", "value": "normal" },
-					{ "label": "Custom", "value": "custom" },
-					{ "label": "Debug", "value": "debug" }
+					{
+						"label": "Normal",
+						"value": "normal"
+					},
+					{
+						"label": "Custom",
+						"value": "custom"
+					},
+					{
+						"label": "Debug",
+						"value": "debug"
+					}
 				],
 				"helperText": "Example of type `select` with `allowTyping: true`."
 			},
@@ -57,12 +66,27 @@
 				"allowTyping": true,
 				"section": "Basics",
 				"sectionOrder": 1,
-				"defaultValue": ["valorant", "overwatch"],
+				"defaultValue": [
+					"valorant",
+					"overwatch"
+				],
 				"options": [
-					{ "label": "Valorant", "value": "valorant" },
-					{ "label": "Rocket League", "value": "rocket_league" },
-					{ "label": "Overwatch", "value": "overwatch" },
-					{ "label": "League of Legends", "value": "league_of_legends" }
+					{
+						"label": "Valorant",
+						"value": "valorant"
+					},
+					{
+						"label": "Rocket League",
+						"value": "rocket_league"
+					},
+					{
+						"label": "Overwatch",
+						"value": "overwatch"
+					},
+					{
+						"label": "League of Legends",
+						"value": "league_of_legends"
+					}
 				],
 				"helperText": "Example of type `select` with `multiple: true` and `allowTyping: true`."
 			},
@@ -208,8 +232,14 @@
 				},
 				"defaultValue": {
 					"rules": [
-						{ "name": "kill", "confidence": 0.9 },
-						{ "name": "goal", "confidence": 0.92 }
+						{
+							"name": "kill",
+							"confidence": 0.9
+						},
+						{
+							"name": "goal",
+							"confidence": 0.92
+						}
 					],
 					"cooldownMs": 1200
 				},
@@ -253,6 +283,7 @@
 				"value": ""
 			}
 		],
-		"alerts": []
+		"alerts": [],
+		"translations": "./translations.json"
 	}
 }

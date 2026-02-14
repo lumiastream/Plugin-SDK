@@ -97,8 +97,19 @@ function validateModCommandOptions(value: unknown): string[] {
 }
 
 function validateTranslations(value: unknown): string[] {
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+      return ["config.translations file path must be a non-empty string"];
+    }
+    if (!normalized.endsWith(".json")) {
+      return ["config.translations file path must reference a .json file"];
+    }
+    return [];
+  }
+
   if (!isPlainObject(value)) {
-    return ["config.translations must be an object when provided"];
+    return ["config.translations must be an object or a .json file path when provided"];
   }
 
   const errors: string[] = [];

@@ -1,7 +1,7 @@
 {
 	"id": "showcase_plugin",
 	"name": "Showcase Plugin",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "",
 	"website": "",
@@ -39,8 +39,8 @@
 				"helperText": "Used when the action does not supply a duration."
 			}
 		],
-		"settings_tutorial": "---\n### Setup\n1) Enter a default message and color.\n2) Adjust the default duration if you want a longer or shorter alert.\n3) Click Save to store the defaults.\n---\n### What this plugin does\n- Stores the message, username, color, and duration in variables.\n- Uses those values when triggering the sample alert.\n---",
-		"actions_tutorial": "---\n### Trigger Sample Alert\nUse this action to fire the sample alert. You can override the message, username, color, and duration per action. The alert uses both dynamic and extraSettings so variations and templates have the same data.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [
 			{
 				"type": "trigger_alert",
@@ -114,12 +114,19 @@
 						"type": "EQUAL_SELECTION",
 						"description": "Matches dynamic.value against the selected color.",
 						"selections": [
-							{ "label": "Blue", "value": "#00c2ff" },
-							{ "label": "Red", "value": "#ff5f5f" }
+							{
+								"label": "Blue",
+								"value": "#00c2ff"
+							},
+							{
+								"label": "Red",
+								"value": "#ff5f5f"
+							}
 						]
 					}
 				]
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }

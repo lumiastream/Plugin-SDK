@@ -1,0 +1,19 @@
+{
+	"en": {
+		"steamid": "SteamID64.",
+		"persona_username": "Username (Steam persona name).",
+		"online_status": "Online status (text).",
+		"profile_url": "Profile URL.",
+		"avatar": "Avatar URL.",
+		"current_game_name": "Current in-game name (if playing).",
+		"current_game_appid": "Current in-game app ID (if playing).",
+		"game_count": "Owned games count.",
+		"current_game_achievement_count": "Total achievements for the current/last played game.",
+		"current_game_achievement_unlocked_count": "Unlocked achievements for the current/last played game.",
+		"requested_game_appid": "App ID for the last requested game.",
+		"requested_game_name": "Name for the last requested game.",
+		"requested_game_achievement_count": "Total achievements for the last requested game.",
+		"requested_game_achievement_unlocked": "Unlocked achievements for the last requested game.",
+		"requested_game_achievements": "JSON payload of achievements for the last requested game."
+	}
+}

@@ -37,6 +37,9 @@ export enum PluginCategory {
 
 export interface PluginVariableDefinition {
 	name: string;
+	/**
+	 * @deprecated Use plugin translations (`config.translations`) for variable display text.
+	 */
 	description?: string;
 	value: string | number | boolean | null;
 }
@@ -301,7 +304,9 @@ export interface PluginOAuthConfig {
 
 export type PluginTranslationDictionary = Record<string, unknown>;
 
-export type PluginTranslations = Record<string, PluginTranslationDictionary | string>;
+export type PluginTranslationLanguageMap = Record<string, PluginTranslationDictionary | string>;
+
+export type PluginTranslations = PluginTranslationLanguageMap | string;
 
 export interface PluginIntegrationConfig {
 	settings?: PluginSetting[];
@@ -316,9 +321,11 @@ export interface PluginIntegrationConfig {
 	/**
 	 * Language resource bundles loaded under the plugin namespace in i18next.
 	 *
-	 * Each language key can be:
-	 * - an inline object with translation keys/values
+	 * Accepts either:
+	 * - a language map object (`{ en: {...}, es: {...} }`)
 	 * - a relative `.json` file path resolved from the plugin root at install/load time
+	 *
+	 * Language-map values can be inline objects or relative `.json` file paths.
 	 */
 	translations?: PluginTranslations;
 	variables?: PluginVariableDefinition[];
