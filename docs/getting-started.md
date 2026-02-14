@@ -314,6 +314,30 @@ For emotes, use `emotesRaw` with the common plugin JSON format:
 `start`/`end` are inclusive character offsets in `message`.
 Use top-level `skipCommandProcessing` to show a message in chat without triggering commands.
 
+If your plugin should appear as an AI provider in Lumia (similar to ChatGPT/DeepSeek), declare AI support in `manifest.json`:
+
+```json
+{
+	"config": {
+		"hasAI": true
+	}
+}
+```
+
+Implement runtime handlers:
+
+```js
+async aiPrompt(config) {
+	// config.message, config.model, config.thread, config.username, ...
+	return "AI response text";
+}
+
+async aiModels() {
+	// Return strings or { value, name } objects
+	return [{ value: "gpt-oss:20b", name: "gpt-oss:20b" }];
+}
+```
+
 If your plugin should appear as a selectable chatbot platform in Lumia commands, declare chatbot support in `manifest.json`:
 
 ```json

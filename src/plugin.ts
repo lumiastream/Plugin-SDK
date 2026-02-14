@@ -5,6 +5,10 @@ import {
   type PluginDisplayChatOptions,
   type PluginAuthValidationResponse,
   type PluginActionPayload,
+  type PluginAIRequestOptions,
+  type PluginAIResponse,
+  type PluginAIModelsRequestOptions,
+  type PluginAIModelOption,
   type PluginModCommandOption,
   type PluginModCommandPayload,
 } from './types';
@@ -42,6 +46,22 @@ export abstract class Plugin {
   async actions(_config: { actions: PluginActionPayload[]; extraSettings?: Record<string, unknown> }): Promise<void> {}
 
   /**
+   * Optional AI prompt handler used when `config.hasAI` is enabled.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async aiPrompt(_config: PluginAIRequestOptions): Promise<string | PluginAIResponse | void> {}
+
+  /**
+   * Optional AI model list handler used when `config.hasAI` is enabled.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async aiModels(
+    _config?: PluginAIModelsRequestOptions,
+  ): Promise<Array<PluginAIModelOption | string> | { models?: Array<PluginAIModelOption | string> } | void> {
+    return [];
+  }
+
+  /**
    * Handle dashboard/API moderation commands when declared in manifest config.modcommandOptions.
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -52,6 +72,12 @@ export abstract class Plugin {
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async refreshActionOptions(_config: { actionType: string; values?: Record<string, any>; action?: any }): Promise<void> {}
+
+  /**
+   * Refresh dynamic settings field options in the PluginAuth UI.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async refreshSettingsOptions(_config: { fieldKey: string; values?: Record<string, any>; settings?: Record<string, any> }): Promise<void> {}
 
   /**
    * Invoked whenever plugin settings are changed.

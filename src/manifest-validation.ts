@@ -143,6 +143,9 @@ export function validatePluginManifest(manifest: PartialManifest | null | undefi
     if (config.hasChatbot !== undefined && typeof config.hasChatbot !== "boolean") {
       errors.push("config.hasChatbot must be a boolean when provided");
     }
+    if (config.hasAI !== undefined && typeof config.hasAI !== "boolean") {
+      errors.push("config.hasAI must be a boolean when provided");
+    }
     if (config.chatbot !== undefined) {
       errors.push("config.chatbot is no longer supported. Use config.hasChatbot (boolean).");
     }

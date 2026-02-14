@@ -5,6 +5,6 @@
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.6"
+		"@lumiastream/plugin": "^0.3.7"
 	}
 }

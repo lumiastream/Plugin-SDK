@@ -315,6 +315,7 @@ export interface PluginIntegrationConfig {
 	variableFunctions?: PluginVariableFunctionDefinition[];
 	lights?: PluginLightsConfig;
 	oauth?: PluginOAuthConfig;
+	hasAI?: boolean;
 	hasChatbot?: boolean;
 	modcommandOptions?: PluginModCommandOption[];
 	[key: string]: any;
@@ -350,6 +351,38 @@ export interface PluginChatbotHandlerOptions {
 	replyParentMessageId?: string;
 	username?: string;
 	extraSettings?: Record<string, any>;
+}
+
+export interface PluginAIRequestOptions {
+	message: string;
+	prompt?: string;
+	thread?: string;
+	model?: string;
+	username?: string;
+	systemMessage?: string;
+	temperature?: number;
+	top_p?: number;
+	max_tokens?: number;
+	keepTrackOfMessages?: boolean;
+	limitMessagesForUser?: boolean;
+	extraSettings?: Record<string, any>;
+}
+
+export interface PluginAIResponse {
+	text?: string;
+	response?: string;
+	message?: string;
+	content?: string;
+	[key: string]: unknown;
+}
+
+export interface PluginAIModelOption {
+	value: string;
+	name?: string;
+}
+
+export interface PluginAIModelsRequestOptions {
+	refresh?: boolean;
 }
 
 export interface PluginManifest {
@@ -566,6 +599,10 @@ export interface ILumiaAPI {
 		fieldKey: string;
 		options: PluginActionFieldOption[];
 	}) => Promise<boolean>;
+	updateSettingsFieldOptions: (params: {
+		fieldKey: string;
+		options: PluginActionFieldOption[];
+	}) => Promise<boolean>;
 	setVariable: (name: string, value: any) => Promise<void>;
 	getVariable: (name: string) => Promise<any>;
 	callCommand: (name: string, variableValues?: any) => Promise<any>;
@@ -661,6 +698,14 @@ export interface PluginRuntime {
 	onload(): Promise<void>;
 	onunload(): Promise<void>;
 	onupdate?(oldVersion: string, newVersion: string): Promise<void>;
+	aiPrompt?(config: PluginAIRequestOptions): Promise<string | PluginAIResponse | void> | string | PluginAIResponse | void;
+	aiModels?(
+		config?: PluginAIModelsRequestOptions,
+	):
+		| Promise<Array<PluginAIModelOption | string> | { models?: Array<PluginAIModelOption | string> } | void>
+		| Array<PluginAIModelOption | string>
+		| { models?: Array<PluginAIModelOption | string> }
+		| void;
 	chatbot?(config: PluginChatbotHandlerOptions): Promise<boolean | void> | boolean | void;
 	modCommand?(type: PluginModCommandOption, value: PluginModCommandPayload): Promise<boolean | void> | boolean | void;
 	actions?(config: {
@@ -674,6 +719,11 @@ export interface PluginRuntime {
 		actionType: string;
 		values?: Record<string, any>;
 		action?: any;
+	}): Promise<void>;
+	refreshSettingsOptions?(config: {
+		fieldKey: string;
+		values?: Record<string, any>;
+		settings?: Record<string, any>;
 	}): Promise<void>;
 	searchLights?(config?: Record<string, any>): Promise<any>;
 	searchThemes?(config?: Record<string, any>): Promise<any>;
