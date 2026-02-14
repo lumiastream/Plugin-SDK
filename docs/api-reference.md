@@ -233,6 +233,12 @@ Use `skipCommandProcessing` (top-level) to show a message in chat without runnin
 
 `PluginIntegrationConfig` supports `actions_tutorial` (markdown) to display a guide alongside the Actions editor. It also supports `oauth` for Lumia-managed OAuth configuration (see the manifest guide for details).
 
+`PluginIntegrationConfig` also supports `translations` for plugin-localized strings:
+
+- key: language code (for example `en`, `es`, `fr`)
+- value: inline translation object or relative `.json` file path
+- runtime: loaded under your plugin namespace (plugin `id`) when the plugin loads
+
 `PluginIntegrationConfig` also supports `hasAI` for plugin-native AI routing:
 
 ```js

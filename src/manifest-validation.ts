@@ -96,6 +96,36 @@ function validateModCommandOptions(value: unknown): string[] {
   return errors;
 }
 
+function validateTranslations(value: unknown): string[] {
+  if (!isPlainObject(value)) {
+    return ["config.translations must be an object when provided"];
+  }
+
+  const errors: string[] = [];
+  Object.entries(value).forEach(([language, translationValue]) => {
+    if (!isNonEmptyString(language)) {
+      errors.push("config.translations language keys must be non-empty strings");
+      return;
+    }
+
+    if (typeof translationValue === "string") {
+      const normalized = translationValue.trim().toLowerCase();
+      if (!normalized) {
+        errors.push(`config.translations.${language} file path must be a non-empty string`);
+      } else if (!normalized.endsWith(".json")) {
+        errors.push(`config.translations.${language} file path must reference a .json file`);
+      }
+      return;
+    }
+
+    if (!isPlainObject(translationValue)) {
+      errors.push(`config.translations.${language} must be an object or a relative .json file path`);
+    }
+  });
+
+  return errors;
+}
+
 /**
  * Perform lightweight validation on a plugin manifest definition.
  * Returns an array of error strings. An empty array indicates the
@@ -151,6 +181,9 @@ export function validatePluginManifest(manifest: PartialManifest | null | undefi
     }
     if (config.modcommandOptions !== undefined) {
       errors.push(...validateModCommandOptions(config.modcommandOptions));
+    }
+    if (config.translations !== undefined) {
+      errors.push(...validateTranslations(config.translations));
     }
   }
 

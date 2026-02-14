@@ -299,6 +299,10 @@ export interface PluginOAuthConfig {
 	tokenKeys?: PluginOAuthTokenKeys;
 }
 
+export type PluginTranslationDictionary = Record<string, unknown>;
+
+export type PluginTranslations = Record<string, PluginTranslationDictionary | string>;
+
 export interface PluginIntegrationConfig {
 	settings?: PluginSetting[];
 	/**
@@ -309,6 +313,14 @@ export interface PluginIntegrationConfig {
 	 * Markdown content or a relative `.md` path resolved at install time.
 	 */
 	actions_tutorial?: string;
+	/**
+	 * Language resource bundles loaded under the plugin namespace in i18next.
+	 *
+	 * Each language key can be:
+	 * - an inline object with translation keys/values
+	 * - a relative `.json` file path resolved from the plugin root at install/load time
+	 */
+	translations?: PluginTranslations;
 	variables?: PluginVariableDefinition[];
 	alerts?: PluginAlertDefinition[];
 	actions?: PluginActionDefinition[];

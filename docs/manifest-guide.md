@@ -17,7 +17,8 @@ The `manifest.json` file is the heart of your Lumia Stream plugin. It defines me
 		"settings": [],
 		"actions": [],
 		"variables": [],
-		"alerts": []
+		"alerts": [],
+		"translations": {}
 	}
 }
 ```
@@ -311,6 +312,38 @@ Tutorials can include local images bundled with the plugin. Reference them with 
 ![API Key](clickup_tutorial_api_key.jpg)
 ![List ID](clickup_tutorial_list_id.jpg)
 ```
+
+### Plugin Translations
+
+Plugins can provide translation bundles under `config.translations`. These bundles are loaded into i18next under the plugin namespace (the plugin `id`) when the plugin loads.
+
+Each language entry supports either:
+
+- an inline object of translation keys/values
+- a relative `.json` file path resolved from the plugin root
+
+```json
+{
+	"id": "clickup",
+	"name": "ClickUp",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"description": "ClickUp integration",
+	"lumiaVersion": "^9.0.0",
+	"category": "apps",
+	"config": {
+		"translations": {
+			"en": "./translations/en.json",
+			"es": "./translations/es.json",
+			"de": {
+				"alerts.task_due_soon.title": "Aufgabe bald fällig"
+			}
+		}
+	}
+}
+```
+
+Use keys from supported Lumia languages (`en`, `es`, `fr`, `ar`, `nl`, `sv`, `de`, `tr`, `zh`, `pt`). Regional tags (for example `en-US`) fall back to their base language when available.
 
 #### Multi-Value Settings
 
@@ -1115,4 +1148,4 @@ The SDK includes manifest validation. Common validation errors:
 
 ## Localization
 
-Currently, manifests support English only. Localization support is planned for future releases.
+Use `config.translations` to provide plugin-localized strings per language. Each language value can be an inline object or a relative `.json` file path.
