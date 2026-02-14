@@ -1,7 +1,7 @@
 {
 	"id": "ntfy",
 	"name": "ntfy",
-	"version": "1.0.1",
+	"version": "1.0.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -96,7 +96,7 @@
 				"helperText": "Optional regex filter applied to title + message (case-insensitive)."
 			}
 		],
-		"settings_tutorial": "---\n1) Enter your ntfy server base URL (hosted or self-hosted).\n2) Add one or more topics (comma-separated).\n3) If your server requires auth, choose **Access Token** (recommended) or **Username + Password**.\n\n### Notes\n- Access tokens and Basic auth are supported for subscriptions.\n- Topics are case-sensitive and should match your ntfy publisher topics.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
 		"variables": [],
 		"alerts": [
 			{
@@ -119,6 +119,7 @@
 			}
 		],
 		"actions": [],
-		"actions_tutorial": "---\n### Actions\nThis plugin runs automatically and does not expose actions.\n---"
+		"actions_tutorial": "./actions_tutorial.md",
+		"translations": "./translations.json"
 	}
 }

@@ -1,7 +1,7 @@
 {
 	"id": "openrgb",
 	"name": "OpenRGB",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -36,8 +36,8 @@
 				"helperText": "Default OpenRGB SDK port is 6742."
 			}
 		],
-		"settings_tutorial": "---\n1) Open **OpenRGB** and enable the **SDK Server**.\n2) Confirm host/port (default `127.0.0.1:6742`).\n3) Save these settings in Lumia and activate the plugin.\n4) Use **Discover OpenRGB Devices** to import devices as selectable lights.\n---\n### Notes\n- On remote hosts, allow incoming TCP to the OpenRGB SDK port.\n- Some devices require a direct/custom mode before color writes. This plugin automatically attempts that.\n---",
-		"actions_tutorial": "---\n### OpenRGB Actions\n- **Load/Save Profile**: Trigger OpenRGB profile commands through the SDK.\n\nLight color/power/brightness are controlled through Lumia light actions and support software fade transitions via the `transition` value.\nStudio Themes now include OpenRGB mode options per discovered device.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"lights": {
 			"search": {
 				"buttonLabel": "Discover OpenRGB Devices",

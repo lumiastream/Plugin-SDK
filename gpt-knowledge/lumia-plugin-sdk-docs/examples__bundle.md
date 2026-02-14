@@ -24,6 +24,16 @@ After scaffolding you can tailor the manifest, code, and README to match your id
 
 ```
 
+## base_plugin/actions_tutorial.md
+
+```
+---
+### Trigger Sample Alert
+Use this action to fire the sample alert. You can override the message, username, color, and duration per action. The alert uses both dynamic and extraSettings so variations and templates have the same data.
+---
+
+```
+
 ## base_plugin/main.js
 
 ```
@@ -125,7 +135,7 @@ module.exports = ShowcasePluginTemplate;
 {
 	"id": "showcase_plugin",
 	"name": "Showcase Plugin",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "",
 	"website": "",
@@ -163,8 +173,8 @@ module.exports = ShowcasePluginTemplate;
 				"helperText": "Used when the action does not supply a duration."
 			}
 		],
-		"settings_tutorial": "---\n### Setup\n1) Enter a default message and color.\n2) Adjust the default duration if you want a longer or shorter alert.\n3) Click Save to store the defaults.\n---\n### What this plugin does\n- Stores the message, username, color, and duration in variables.\n- Uses those values when triggering the sample alert.\n---",
-		"actions_tutorial": "---\n### Trigger Sample Alert\nUse this action to fire the sample alert. You can override the message, username, color, and duration per action. The alert uses both dynamic and extraSettings so variations and templates have the same data.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [
 			{
 				"type": "trigger_alert",
@@ -238,13 +248,20 @@ module.exports = ShowcasePluginTemplate;
 						"type": "EQUAL_SELECTION",
 						"description": "Matches dynamic.value against the selected color.",
 						"selections": [
-							{ "label": "Blue", "value": "#00c2ff" },
-							{ "label": "Red", "value": "#ff5f5f" }
+							{
+								"label": "Blue",
+								"value": "#00c2ff"
+							},
+							{
+								"label": "Red",
+								"value": "#ff5f5f"
+							}
 						]
 					}
 				]
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }
 
@@ -260,9 +277,75 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
 	}
 }
+
+```
+
+## base_plugin/settings_tutorial.md
+
+```
+---
+### Setup
+1) Enter a default message and color.
+2) Adjust the default duration if you want a longer or shorter alert.
+3) Click Save to store the defaults.
+---
+### What this plugin does
+- Stores the message, username, color, and duration in variables.
+- Uses those values when triggering the sample alert.
+---
+
+```
+
+## base_plugin/translations.json
+
+```
+{
+	"en": {
+		"message": "Stores the most recent message handled by the plugin.",
+		"username": "Stores the most recent username handled by the plugin.",
+		"color": "Tracks the color used by the latest sample alert.",
+		"duration": "Tracks the duration used by the latest sample alert."
+	}
+}
+
+```
+
+## divoom_pixoo/actions_tutorial.md
+
+```
+---
+### 🔧 Available Commands
+
+**Basic Control**:
+- Set Brightness - Adjust display brightness (0-100)
+- Set Channel - Switch to clock/visualizer/scene
+- Screen On/Off - Power screen on or off
+- Reset Display - Clear and reset to default
+
+**Display Content**:
+- Send Scrolling Text - Display text messages
+- Clear Screen - Clear all content
+- Display Image - Show image from URL
+- Play GIF - Play animated GIF from URL
+
+**Drawing**:
+- Draw Pixel - Draw individual pixels
+- Draw Rectangle - Draw colored rectangles
+
+**Sound**:
+- Play Buzzer - Play buzzer sound
+
+**Advanced**:
+- Send Raw Command - Send custom API commands
+
+---
+### 💡 Tips
+- Commands are rate-limited to 1 per second (prevents crashes)
+- Connection auto-refreshes every 250 commands
+---
 
 ```
 
@@ -1088,7 +1171,7 @@ module.exports = DivoomPixooPlugin;
 {
 	"id": "divoom_pixoo",
 	"name": "Divoom Pixoo",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -1143,8 +1226,8 @@ module.exports = DivoomPixooPlugin;
 				}
 			}
 		],
-		"settings_tutorial": "---\n### \ud83c\udfa8 Setup Your Divoom Pixoo\n\n1. **Find Your Pixoo's IP Address**:\n   - Use your router's device list\n   - Or use the Divoom app \u2192 Device Settings\n   - Example: `192.168.1.42`\n\n2. **Set Static IP (Recommended)**:\n   - Reserve IP in your router's DHCP settings\n   - Prevents IP from changing\n\n3. **Enter Settings**:\n   - IP Address (required)\n   - Port: 80 (default)\n   - Screen size: 64x64 (or 16x16 for Pixoo 16)\n\n4. **Click Save** to store the settings.\n---",
-		"actions_tutorial": "---\n### \ud83d\udd27 Available Commands\n\n**Basic Control**:\n- Set Brightness - Adjust display brightness (0-100)\n- Set Channel - Switch to clock/visualizer/scene\n- Screen On/Off - Power screen on or off\n- Reset Display - Clear and reset to default\n\n**Display Content**:\n- Send Scrolling Text - Display text messages\n- Clear Screen - Clear all content\n- Display Image - Show image from URL\n- Play GIF - Play animated GIF from URL\n\n**Drawing**:\n- Draw Pixel - Draw individual pixels\n- Draw Rectangle - Draw colored rectangles\n\n**Sound**:\n- Play Buzzer - Play buzzer sound\n\n**Advanced**:\n- Send Raw Command - Send custom API commands\n\n---\n### \ud83d\udca1 Tips\n- Commands are rate-limited to 1 per second (prevents crashes)\n- Connection auto-refreshes every 250 commands\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [
 			{
 				"type": "set_screen_on",
@@ -1374,9 +1457,52 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
 	}
 }
+
+```
+
+## divoom_pixoo/settings_tutorial.md
+
+```
+---
+### 🎨 Setup Your Divoom Pixoo
+
+1. **Find Your Pixoo's IP Address**:
+   - Use your router's device list
+   - Or use the Divoom app → Device Settings
+   - Example: `192.168.1.42`
+
+2. **Set Static IP (Recommended)**:
+   - Reserve IP in your router's DHCP settings
+   - Prevents IP from changing
+
+3. **Enter Settings**:
+   - IP Address (required)
+   - Port: 80 (default)
+   - Screen size: 64x64 (or 16x16 for Pixoo 16)
+
+4. **Click Save** to store the settings.
+---
+
+```
+
+## elevenlabs_tts/actions_tutorial.md
+
+```
+---
+### 📢 Speak Action
+1) Enter the **Message** you want spoken.
+2) Paste the **Voice ID** you copied from ElevenLabs (find it at https://elevenlabs.io/app/voice-lab).
+3) Choose a **Model ID** (view model docs at https://elevenlabs.io/docs/overview/models#models-overview).
+4) Adjust **Stability**, **Similarity Boost**, and **Style** if desired.
+---
+### 🎵 Stream Music Action
+1) Enter a **Prompt** (or provide a Composition Plan JSON).
+2) Choose the **Model ID** (see music model docs at https://elevenlabs.io/docs/overview/models#models-overview).
+3) Set **Music Length** and **Volume**.
+---
 
 ```
 
@@ -1779,7 +1905,7 @@ module.exports = ElevenLabsTTSPlugin;
 {
 	"id": "elevenlabs_tts",
 	"name": "ElevenLabs TTS",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
@@ -1800,8 +1926,8 @@ module.exports = ElevenLabsTTSPlugin;
 				"required": true
 			}
 		],
-		"settings_tutorial": "---\n### \ud83d\udd10 Get Your ElevenLabs API Key\n1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key. Then copy the Key ID and paste it here.\n---\n### \ud83c\udf9b\ufe0f Voice Tuning (used in Actions)\n- **Stability**: Higher values make speech more consistent/predictable; lower values sound more dynamic.\n- **Similarity Boost**: Higher values keep output closer to the original voice; lower values allow more variation.\n- **Style**: Adds expressiveness/character; higher values can sound more dramatic.\n---",
-		"actions_tutorial": "---\n### \ud83d\udce2 Speak Action\n1) Enter the **Message** you want spoken.\n2) Paste the **Voice ID** you copied from ElevenLabs (find it at https://elevenlabs.io/app/voice-lab).\n3) Choose a **Model ID** (view model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n4) Adjust **Stability**, **Similarity Boost**, and **Style** if desired.\n---\n### \ud83c\udfb5 Stream Music Action\n1) Enter a **Prompt** (or provide a Composition Plan JSON).\n2) Choose the **Model ID** (see music model docs at https://elevenlabs.io/docs/overview/models#models-overview).\n3) Set **Music Length** and **Volume**.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [
 			{
 				"type": "speak",
@@ -1840,13 +1966,34 @@ module.exports = ElevenLabsTTSPlugin;
 						"defaultValue": "eleven_multilingual_v2",
 						"helperText": "Choose a speech model or type a custom model ID.",
 						"options": [
-							{ "label": "Eleven v3", "value": "eleven_v3" },
-							{ "label": "Multilingual v2", "value": "eleven_multilingual_v2" },
-							{ "label": "Multilingual v1", "value": "eleven_multilingual_v1" },
-							{ "label": "Turbo v2.5", "value": "eleven_turbo_v2_5" },
-							{ "label": "Turbo v2", "value": "eleven_turbo_v2" },
-							{ "label": "Flash v2.5", "value": "eleven_flash_v2_5" },
-							{ "label": "Flash v2", "value": "eleven_flash_v2" }
+							{
+								"label": "Eleven v3",
+								"value": "eleven_v3"
+							},
+							{
+								"label": "Multilingual v2",
+								"value": "eleven_multilingual_v2"
+							},
+							{
+								"label": "Multilingual v1",
+								"value": "eleven_multilingual_v1"
+							},
+							{
+								"label": "Turbo v2.5",
+								"value": "eleven_turbo_v2_5"
+							},
+							{
+								"label": "Turbo v2",
+								"value": "eleven_turbo_v2"
+							},
+							{
+								"label": "Flash v2.5",
+								"value": "eleven_flash_v2_5"
+							},
+							{
+								"label": "Flash v2",
+								"value": "eleven_flash_v2"
+							}
 						]
 					},
 					{
@@ -1931,7 +2078,12 @@ module.exports = ElevenLabsTTSPlugin;
 						"allowTyping": true,
 						"defaultValue": "music_v1",
 						"helperText": "Choose a music model or type a custom model ID.",
-						"options": [{ "label": "Music v1", "value": "music_v1" }]
+						"options": [
+							{
+								"label": "Music v1",
+								"value": "music_v1"
+							}
+						]
 					},
 					{
 						"key": "forceInstrumental",
@@ -1974,9 +2126,34 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
 	}
 }
+
+```
+
+## elevenlabs_tts/settings_tutorial.md
+
+```
+---
+### 🔐 Get Your ElevenLabs API Key
+1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key. Then copy the Key ID and paste it here.
+---
+### 🎛️ Voice Tuning (used in Actions)
+- **Stability**: Higher values make speech more consistent/predictable; lower values sound more dynamic.
+- **Similarity Boost**: Higher values keep output closer to the original voice; lower values allow more variation.
+- **Style**: Adds expressiveness/character; higher values can sound more dramatic.
+---
+
+```
+
+## eveonline/actions_tutorial.md
+
+```
+---
+### Actions
+This plugin runs automatically and does not expose actions.
+---
 
 ```
 
@@ -3011,305 +3188,306 @@ module.exports = EveOnlinePlugin;
 
 ```
 {
-  "id": "eveonline",
-  "name": "EVE Online",
-  "version": "1.0.0",
-  "author": "Lumia Stream",
-  "email": "dev@lumiastream.com",
-  "website": "https://lumiastream.com",
-  "repository": "",
-  "description": "Pull EVE Online character status, wallet, location, and activity from ESI into Lumia.",
-  "license": "MIT",
-  "lumiaVersion": "^9.0.0",
-  "category": "games",
-  "keywords": "eve online, esi, character, stats, mmo, games",
-  "icon": "eveonline.png",
-  "config": {
-    "oauth": {
-      "buttonLabel": "Authorize EVE Online",
-      "helperText": "Connect your EVE Online character to pull ESI data.",
-      "openInBrowser": true,
-      "scopes": [
-        "esi-characters.read_notifications.v1",
-        "esi-industry.read_character_jobs.v1",
-        "esi-killmails.read_killmails.v1",
-        "esi-location.read_location.v1",
-        "esi-location.read_online.v1",
-        "esi-location.read_ship_type.v1",
-        "esi-markets.read_character_orders.v1",
-        "esi-skills.read_skillqueue.v1",
-        "esi-wallet.read_character_wallet.v1"
-      ],
-      "tokenKeys": {
-        "accessToken": "accessToken",
-        "refreshToken": "refreshToken",
-        "tokenSecret": "tokenSecret"
-      }
-    },
-    "settings": [
-      {
-        "key": "pollInterval",
-        "label": "Poll Interval (seconds)",
-        "type": "number",
-        "defaultValue": 120,
-        "min": 60,
-        "max": 900,
-        "helperText": "How often to refresh ESI data (60-900 seconds)."
-      },
-      {
-        "key": "enableAlerts",
-        "label": "Enable Alerts",
-        "type": "toggle",
-        "defaultValue": true,
-        "helperText": "Trigger Lumia alerts for EVE Online events."
-      },
-      {
-        "key": "walletAlertThreshold",
-        "label": "Wallet Alert Threshold (ISK)",
-        "type": "number",
-        "defaultValue": 1000000,
-        "min": 0,
-        "helperText": "Minimum ISK change to trigger wallet spike/drop alerts."
-      },
-      {
-        "key": "accessToken",
-        "label": "Access Token",
-        "type": "password",
-        "helperText": "Auto-filled after OAuth completes.",
-        "disabled": true,
-        "required": false
-      },
-      {
-        "key": "refreshToken",
-        "label": "Refresh Token",
-        "type": "password",
-        "helperText": "Auto-filled after OAuth completes.",
-        "disabled": true,
-        "required": false
-      }
-    ],
-    "settings_tutorial": "---\n### Authorize This Plugin\n1) Click **Authorize EVE Online** in the OAuth section.\n\n**Note:** EVE SSO authorization is per character. To switch characters, re-authorize.\n---\n---",
-    "actions": [],
-    "variables": [
-      {
-        "name": "character_id",
-        "description": "Authenticated character ID.",
-        "value": 0
-      },
-      {
-        "name": "character_name",
-        "description": "Authenticated character name.",
-        "value": ""
-      },
-      {
-        "name": "corporation_id",
-        "description": "Character corporation ID.",
-        "value": 0
-      },
-      {
-        "name": "alliance_id",
-        "description": "Character alliance ID (0 if none).",
-        "value": 0
-      },
-      {
-        "name": "security_status",
-        "description": "Character security status.",
-        "value": 0
-      },
-      {
-        "name": "wallet_balance",
-        "description": "Current wallet balance.",
-        "value": 0
-      },
-      {
-        "name": "online",
-        "description": "Whether the character is currently online.",
-        "value": false
-      },
-      {
-        "name": "solar_system_id",
-        "description": "Current solar system ID.",
-        "value": 0
-      },
-      {
-        "name": "station_id",
-        "description": "Current station ID (0 if not docked).",
-        "value": 0
-      },
-      {
-        "name": "structure_id",
-        "description": "Current structure ID (0 if none).",
-        "value": 0
-      },
-      {
-        "name": "ship_name",
-        "description": "Current ship name.",
-        "value": ""
-      },
-      {
-        "name": "ship_type_id",
-        "description": "Current ship type ID.",
-        "value": 0
-      },
-      {
-        "name": "ship_item_id",
-        "description": "Current ship item ID.",
-        "value": 0
-      },
-      {
-        "name": "skillqueue_count",
-        "description": "Number of skills in the queue.",
-        "value": 0
-      },
-      {
-        "name": "skillqueue_current_skill_id",
-        "description": "Skill ID currently training.",
-        "value": 0
-      },
-      {
-        "name": "skillqueue_current_level",
-        "description": "Training level for the current skill.",
-        "value": 0
-      },
-      {
-        "name": "skillqueue_current_end",
-        "description": "Finish time for the current skill (ISO).",
-        "value": ""
-      },
-      {
-        "name": "skillqueue_ends_at",
-        "description": "Finish time for the last queued skill (ISO).",
-        "value": ""
-      },
-      {
-        "name": "market_orders_active",
-        "description": "Number of active market orders.",
-        "value": 0
-      },
-      {
-        "name": "market_orders_buy",
-        "description": "Number of active buy orders.",
-        "value": 0
-      },
-      {
-        "name": "market_orders_sell",
-        "description": "Number of active sell orders.",
-        "value": 0
-      },
-      {
-        "name": "industry_jobs_active",
-        "description": "Number of active industry jobs.",
-        "value": 0
-      },
-      {
-        "name": "industry_jobs_total",
-        "description": "Total industry jobs returned by ESI.",
-        "value": 0
-      },
-      {
-        "name": "killmails_recent_count",
-        "description": "Count of recent killmails.",
-        "value": 0
-      },
-      {
-        "name": "notifications_count",
-        "description": "Number of notifications returned by ESI.",
-        "value": 0
-      }
-    ],
-    "alerts": [
-      {
-        "title": "Online Status Changed",
-        "key": "eve_online_status",
-        "acceptedVariables": [
-          "character_name",
-          "online",
-          "last_login",
-          "last_logout"
-        ],
-        "defaultMessage": "{{character_name}} is now {{online}}."
-      },
-      {
-        "title": "Skill Queue Empty",
-        "key": "eve_skillqueue_empty",
-        "acceptedVariables": [
-          "character_name",
-          "skillqueue_count",
-          "skillqueue_current_end"
-        ],
-        "defaultMessage": "{{character_name}}'s skill queue is empty."
-      },
-      {
-        "title": "Wallet Spike",
-        "key": "eve_wallet_spike",
-        "acceptedVariables": [
-          "character_name",
-          "wallet_balance"
-        ],
-        "defaultMessage": "{{character_name}} wallet increased ({{wallet_balance}} ISK)."
-      },
-      {
-        "title": "Wallet Drop",
-        "key": "eve_wallet_drop",
-        "acceptedVariables": [
-          "character_name",
-          "wallet_balance"
-        ],
-        "defaultMessage": "{{character_name}} wallet decreased ({{wallet_balance}} ISK)."
-      },
-      {
-        "title": "New Killmail",
-        "key": "eve_killmail_new",
-        "acceptedVariables": [
-          "character_name",
-          "killmails_recent_count"
-        ],
-        "defaultMessage": "New killmail detected for {{character_name}}."
-      },
-      {
-        "title": "New Notification",
-        "key": "eve_notification_new",
-        "acceptedVariables": [
-          "character_name",
-          "notifications_count"
-        ],
-        "defaultMessage": "New EVE notification for {{character_name}}."
-      },
-      {
-        "title": "Docked",
-        "key": "eve_docked",
-        "acceptedVariables": [
-          "character_name",
-          "station_id",
-          "structure_id",
-          "solar_system_id"
-        ],
-        "defaultMessage": "{{character_name}} docked."
-      },
-      {
-        "title": "Undocked",
-        "key": "eve_undocked",
-        "acceptedVariables": [
-          "character_name",
-          "station_id",
-          "structure_id",
-          "solar_system_id"
-        ],
-        "defaultMessage": "{{character_name}} undocked."
-      },
-      {
-        "title": "Ship Changed",
-        "key": "eve_ship_changed",
-        "acceptedVariables": [
-          "character_name",
-          "ship_type_id",
-          "ship_name"
-        ],
-        "defaultMessage": "{{character_name}} switched ships ({{ship_name}})."
-      }
-    ],
-    "actions_tutorial": "---\n### Actions\nThis plugin runs automatically and does not expose actions.\n---"
-  }
+	"id": "eveonline",
+	"name": "EVE Online",
+	"version": "1.0.2",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Pull EVE Online character status, wallet, location, and activity from ESI into Lumia.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "games",
+	"keywords": "eve online, esi, character, stats, mmo, games",
+	"icon": "eveonline.png",
+	"config": {
+		"oauth": {
+			"buttonLabel": "Authorize EVE Online",
+			"helperText": "Connect your EVE Online character to pull ESI data.",
+			"openInBrowser": true,
+			"scopes": [
+				"esi-characters.read_notifications.v1",
+				"esi-industry.read_character_jobs.v1",
+				"esi-killmails.read_killmails.v1",
+				"esi-location.read_location.v1",
+				"esi-location.read_online.v1",
+				"esi-location.read_ship_type.v1",
+				"esi-markets.read_character_orders.v1",
+				"esi-skills.read_skillqueue.v1",
+				"esi-wallet.read_character_wallet.v1"
+			],
+			"tokenKeys": {
+				"accessToken": "accessToken",
+				"refreshToken": "refreshToken",
+				"tokenSecret": "tokenSecret"
+			}
+		},
+		"settings": [
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 120,
+				"min": 60,
+				"max": 900,
+				"helperText": "How often to refresh ESI data (60-900 seconds)."
+			},
+			{
+				"key": "enableAlerts",
+				"label": "Enable Alerts",
+				"type": "toggle",
+				"defaultValue": true,
+				"helperText": "Trigger Lumia alerts for EVE Online events."
+			},
+			{
+				"key": "walletAlertThreshold",
+				"label": "Wallet Alert Threshold (ISK)",
+				"type": "number",
+				"defaultValue": 1000000,
+				"min": 0,
+				"helperText": "Minimum ISK change to trigger wallet spike/drop alerts."
+			},
+			{
+				"key": "accessToken",
+				"label": "Access Token",
+				"type": "password",
+				"helperText": "Auto-filled after OAuth completes.",
+				"disabled": true,
+				"required": false
+			},
+			{
+				"key": "refreshToken",
+				"label": "Refresh Token",
+				"type": "password",
+				"helperText": "Auto-filled after OAuth completes.",
+				"disabled": true,
+				"required": false
+			}
+		],
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions": [],
+		"variables": [
+			{
+				"name": "character_id",
+				"description": "Authenticated character ID.",
+				"value": 0
+			},
+			{
+				"name": "character_name",
+				"description": "Authenticated character name.",
+				"value": ""
+			},
+			{
+				"name": "corporation_id",
+				"description": "Character corporation ID.",
+				"value": 0
+			},
+			{
+				"name": "alliance_id",
+				"description": "Character alliance ID (0 if none).",
+				"value": 0
+			},
+			{
+				"name": "security_status",
+				"description": "Character security status.",
+				"value": 0
+			},
+			{
+				"name": "wallet_balance",
+				"description": "Current wallet balance.",
+				"value": 0
+			},
+			{
+				"name": "online",
+				"description": "Whether the character is currently online.",
+				"value": false
+			},
+			{
+				"name": "solar_system_id",
+				"description": "Current solar system ID.",
+				"value": 0
+			},
+			{
+				"name": "station_id",
+				"description": "Current station ID (0 if not docked).",
+				"value": 0
+			},
+			{
+				"name": "structure_id",
+				"description": "Current structure ID (0 if none).",
+				"value": 0
+			},
+			{
+				"name": "ship_name",
+				"description": "Current ship name.",
+				"value": ""
+			},
+			{
+				"name": "ship_type_id",
+				"description": "Current ship type ID.",
+				"value": 0
+			},
+			{
+				"name": "ship_item_id",
+				"description": "Current ship item ID.",
+				"value": 0
+			},
+			{
+				"name": "skillqueue_count",
+				"description": "Number of skills in the queue.",
+				"value": 0
+			},
+			{
+				"name": "skillqueue_current_skill_id",
+				"description": "Skill ID currently training.",
+				"value": 0
+			},
+			{
+				"name": "skillqueue_current_level",
+				"description": "Training level for the current skill.",
+				"value": 0
+			},
+			{
+				"name": "skillqueue_current_end",
+				"description": "Finish time for the current skill (ISO).",
+				"value": ""
+			},
+			{
+				"name": "skillqueue_ends_at",
+				"description": "Finish time for the last queued skill (ISO).",
+				"value": ""
+			},
+			{
+				"name": "market_orders_active",
+				"description": "Number of active market orders.",
+				"value": 0
+			},
+			{
+				"name": "market_orders_buy",
+				"description": "Number of active buy orders.",
+				"value": 0
+			},
+			{
+				"name": "market_orders_sell",
+				"description": "Number of active sell orders.",
+				"value": 0
+			},
+			{
+				"name": "industry_jobs_active",
+				"description": "Number of active industry jobs.",
+				"value": 0
+			},
+			{
+				"name": "industry_jobs_total",
+				"description": "Total industry jobs returned by ESI.",
+				"value": 0
+			},
+			{
+				"name": "killmails_recent_count",
+				"description": "Count of recent killmails.",
+				"value": 0
+			},
+			{
+				"name": "notifications_count",
+				"description": "Number of notifications returned by ESI.",
+				"value": 0
+			}
+		],
+		"alerts": [
+			{
+				"title": "Online Status Changed",
+				"key": "eve_online_status",
+				"acceptedVariables": [
+					"character_name",
+					"online",
+					"last_login",
+					"last_logout"
+				],
+				"defaultMessage": "{{character_name}} is now {{online}}."
+			},
+			{
+				"title": "Skill Queue Empty",
+				"key": "eve_skillqueue_empty",
+				"acceptedVariables": [
+					"character_name",
+					"skillqueue_count",
+					"skillqueue_current_end"
+				],
+				"defaultMessage": "{{character_name}}'s skill queue is empty."
+			},
+			{
+				"title": "Wallet Spike",
+				"key": "eve_wallet_spike",
+				"acceptedVariables": [
+					"character_name",
+					"wallet_balance"
+				],
+				"defaultMessage": "{{character_name}} wallet increased ({{wallet_balance}} ISK)."
+			},
+			{
+				"title": "Wallet Drop",
+				"key": "eve_wallet_drop",
+				"acceptedVariables": [
+					"character_name",
+					"wallet_balance"
+				],
+				"defaultMessage": "{{character_name}} wallet decreased ({{wallet_balance}} ISK)."
+			},
+			{
+				"title": "New Killmail",
+				"key": "eve_killmail_new",
+				"acceptedVariables": [
+					"character_name",
+					"killmails_recent_count"
+				],
+				"defaultMessage": "New killmail detected for {{character_name}}."
+			},
+			{
+				"title": "New Notification",
+				"key": "eve_notification_new",
+				"acceptedVariables": [
+					"character_name",
+					"notifications_count"
+				],
+				"defaultMessage": "New EVE notification for {{character_name}}."
+			},
+			{
+				"title": "Docked",
+				"key": "eve_docked",
+				"acceptedVariables": [
+					"character_name",
+					"station_id",
+					"structure_id",
+					"solar_system_id"
+				],
+				"defaultMessage": "{{character_name}} docked."
+			},
+			{
+				"title": "Undocked",
+				"key": "eve_undocked",
+				"acceptedVariables": [
+					"character_name",
+					"station_id",
+					"structure_id",
+					"solar_system_id"
+				],
+				"defaultMessage": "{{character_name}} undocked."
+			},
+			{
+				"title": "Ship Changed",
+				"key": "eve_ship_changed",
+				"acceptedVariables": [
+					"character_name",
+					"ship_type_id",
+					"ship_name"
+				],
+				"defaultMessage": "{{character_name}} switched ships ({{ship_name}})."
+			}
+		],
+		"actions_tutorial": "./actions_tutorial.md",
+		"translations": "./translations.json"
+	}
 }
 
 ```
@@ -3325,9 +3503,69 @@ module.exports = EveOnlinePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
 	}
 }
+
+```
+
+## eveonline/settings_tutorial.md
+
+```
+---
+### Authorize This Plugin
+1) Click **Authorize EVE Online** in the OAuth section.
+
+**Note:** EVE SSO authorization is per character. To switch characters, re-authorize.
+---
+---
+
+```
+
+## eveonline/translations.json
+
+```
+{
+	"en": {
+		"character_id": "Authenticated character ID.",
+		"character_name": "Authenticated character name.",
+		"corporation_id": "Character corporation ID.",
+		"alliance_id": "Character alliance ID (0 if none).",
+		"security_status": "Character security status.",
+		"wallet_balance": "Current wallet balance.",
+		"online": "Whether the character is currently online.",
+		"solar_system_id": "Current solar system ID.",
+		"station_id": "Current station ID (0 if not docked).",
+		"structure_id": "Current structure ID (0 if none).",
+		"ship_name": "Current ship name.",
+		"ship_type_id": "Current ship type ID.",
+		"ship_item_id": "Current ship item ID.",
+		"skillqueue_count": "Number of skills in the queue.",
+		"skillqueue_current_skill_id": "Skill ID currently training.",
+		"skillqueue_current_level": "Training level for the current skill.",
+		"skillqueue_current_end": "Finish time for the current skill (ISO).",
+		"skillqueue_ends_at": "Finish time for the last queued skill (ISO).",
+		"market_orders_active": "Number of active market orders.",
+		"market_orders_buy": "Number of active buy orders.",
+		"market_orders_sell": "Number of active sell orders.",
+		"industry_jobs_active": "Number of active industry jobs.",
+		"industry_jobs_total": "Total industry jobs returned by ESI.",
+		"killmails_recent_count": "Count of recent killmails.",
+		"notifications_count": "Number of notifications returned by ESI.",
+		"last_login": "Last Login",
+		"last_logout": "Last Logout"
+	}
+}
+
+```
+
+## minecraft_server/actions_tutorial.md
+
+```
+---
+### Actions
+This plugin runs on the poll interval and does not expose actions.
+---
 
 ```
 
@@ -4125,197 +4363,199 @@ module.exports = MinecraftServerPlugin;
 
 ```
 {
-  "id": "minecraft_server",
-  "name": "Minecraft Server",
-  "version": "1.0.0",
-  "author": "Lumia Stream",
-  "email": "dev@lumiastream.com",
-  "website": "https://lumiastream.com",
-  "repository": "https://github.com/LumiaStream/minecraft-server-plugin",
-  "description": "Monitor Minecraft Java servers for status and player changes with alerts and variables.",
-  "license": "MIT",
-  "lumiaVersion": "^9.0.0",
-  "category": "games",
-  "keywords": "minecraft, server, java edition, status, players, games",
-  "icon": "minecraft.png",
-  "config": {
-    "settings": [
-      {
-        "key": "serverHost",
-        "label": "Server Address",
-        "type": "text",
-        "placeholder": "play.hypixel.net or 192.168.1.100",
-        "helperText": "Minecraft server hostname or IP address",
-        "required": true
-      },
-      {
-        "key": "serverPort",
-        "label": "Server Port",
-        "type": "number",
-        "defaultValue": 25565,
-        "helperText": "Default Minecraft port is 25565",
-        "validation": {
-          "min": 1,
-          "max": 65535
-        }
-      },
-      {
-        "key": "useQuery",
-        "label": "Enable Query Protocol (Required for player tracking)",
-        "type": "checkbox",
-        "defaultValue": true,
-        "helperText": "Required for player list, join/leave alerts, map, and game type. Set enable-query=true in server.properties."
-      },
-      {
-        "key": "queryPort",
-        "label": "Query Port",
-        "type": "number",
-        "defaultValue": 25565,
-        "helperText": "Must match query.port in server.properties (usually the same as server port)",
-        "validation": {
-          "min": 1,
-          "max": 65535
-        }
-      },
-      {
-        "key": "pollInterval",
-        "label": "Poll Interval (seconds)",
-        "type": "number",
-        "defaultValue": 10,
-        "helperText": "How often to check server status (10-300 seconds)",
-        "validation": {
-          "min": 10,
-          "max": 300
-        }
-      }
-    ],
-    "settings_tutorial": "---\n### \ud83c\udfae Setup Your Minecraft Server Monitoring\n1) Enter your server address (hostname or IP)\n2) Enter server port (default: 25565)\n3) **Enable Query protocol (required for player tracking)**\n   - Set `enable-query=true` in server.properties\n   - Ensure `query.port` matches the Query Port setting\n   - Enables player list, join/leave alerts, map, and game type\n4) Set poll interval (how often to check)\n5) Click **Save** to start monitoring\n### \ud83d\udcca What Gets Tracked\n- Server online/offline status\n- Current player count\n- Maximum players\n- Server version\n- MOTD (Message of the Day)\n- Player list (Query required)\n---",
-    "actions_tutorial": "---\n### Actions\nThis plugin runs on the poll interval and does not expose actions.\n---",
-    "actions": [],
-    "variables": [
-      {
-        "name": "online",
-        "description": "Whether the server is online",
-        "value": false
-      },
-      {
-        "name": "players_online",
-        "description": "Number of players currently online",
-        "value": 0
-      },
-      {
-        "name": "players_max",
-        "description": "Maximum number of players allowed",
-        "value": 0
-      },
-      {
-        "name": "version",
-        "description": "Server version (e.g., 1.21.5)",
-        "value": ""
-      },
-      {
-        "name": "motd",
-        "description": "Server Message of the Day",
-        "value": ""
-      },
-      {
-        "name": "protocol_version",
-        "description": "Protocol version number",
-        "value": 0
-      },
-      {
-        "name": "player_list",
-        "description": "Comma-separated list of player names (Query only)",
-        "value": ""
-      },
-      {
-        "name": "map",
-        "description": "Current world/map name (Query only)",
-        "value": ""
-      },
-      {
-        "name": "game_type",
-        "description": "Game type (Survival, Creative, etc.) (Query only)",
-        "value": ""
-      },
-      {
-        "name": "last_player_joined",
-        "description": "Username of last player who joined",
-        "value": ""
-      },
-      {
-        "name": "last_player_left",
-        "description": "Username of last player who left",
-        "value": ""
-      }
-    ],
-    "alerts": [
-      {
-        "title": "Server Online",
-        "key": "serverOnline",
-        "acceptedVariables": [
-          "online",
-          "version",
-          "motd",
-          "players_max"
-        ],
-        "defaultMessage": "Minecraft server is now online!",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Server Offline",
-        "key": "serverOffline",
-        "acceptedVariables": [],
-        "defaultMessage": "Minecraft server went offline",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Player Joined",
-        "key": "playerJoined",
-        "acceptedVariables": [
-          "username",
-          "last_player_joined",
-          "players_online",
-          "players_max"
-        ],
-        "defaultMessage": "{{last_player_joined}} joined the server! ({{players_online}}/{{players_max}})",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Player Left",
-        "key": "playerLeft",
-        "acceptedVariables": [
-          "username",
-          "last_player_left",
-          "players_online",
-          "players_max"
-        ],
-        "defaultMessage": "{{last_player_left}} left the server ({{players_online}}/{{players_max}})",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      }
-    ]
-  }
+	"id": "minecraft_server",
+	"name": "Minecraft Server",
+	"version": "1.0.2",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "https://github.com/LumiaStream/minecraft-server-plugin",
+	"description": "Monitor Minecraft Java servers for status and player changes with alerts and variables.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "games",
+	"keywords": "minecraft, server, java edition, status, players, games",
+	"icon": "minecraft.png",
+	"config": {
+		"settings": [
+			{
+				"key": "serverHost",
+				"label": "Server Address",
+				"type": "text",
+				"placeholder": "play.hypixel.net or 192.168.1.100",
+				"helperText": "Minecraft server hostname or IP address",
+				"required": true
+			},
+			{
+				"key": "serverPort",
+				"label": "Server Port",
+				"type": "number",
+				"defaultValue": 25565,
+				"helperText": "Default Minecraft port is 25565",
+				"validation": {
+					"min": 1,
+					"max": 65535
+				}
+			},
+			{
+				"key": "useQuery",
+				"label": "Enable Query Protocol (Required for player tracking)",
+				"type": "checkbox",
+				"defaultValue": true,
+				"helperText": "Required for player list, join/leave alerts, map, and game type. Set enable-query=true in server.properties."
+			},
+			{
+				"key": "queryPort",
+				"label": "Query Port",
+				"type": "number",
+				"defaultValue": 25565,
+				"helperText": "Must match query.port in server.properties (usually the same as server port)",
+				"validation": {
+					"min": 1,
+					"max": 65535
+				}
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 10,
+				"helperText": "How often to check server status (10-300 seconds)",
+				"validation": {
+					"min": 10,
+					"max": 300
+				}
+			}
+		],
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
+		"actions": [],
+		"variables": [
+			{
+				"name": "online",
+				"description": "Whether the server is online",
+				"value": false
+			},
+			{
+				"name": "players_online",
+				"description": "Number of players currently online",
+				"value": 0
+			},
+			{
+				"name": "players_max",
+				"description": "Maximum number of players allowed",
+				"value": 0
+			},
+			{
+				"name": "version",
+				"description": "Server version (e.g., 1.21.5)",
+				"value": ""
+			},
+			{
+				"name": "motd",
+				"description": "Server Message of the Day",
+				"value": ""
+			},
+			{
+				"name": "protocol_version",
+				"description": "Protocol version number",
+				"value": 0
+			},
+			{
+				"name": "player_list",
+				"description": "Comma-separated list of player names (Query only)",
+				"value": ""
+			},
+			{
+				"name": "map",
+				"description": "Current world/map name (Query only)",
+				"value": ""
+			},
+			{
+				"name": "game_type",
+				"description": "Game type (Survival, Creative, etc.) (Query only)",
+				"value": ""
+			},
+			{
+				"name": "last_player_joined",
+				"description": "Username of last player who joined",
+				"value": ""
+			},
+			{
+				"name": "last_player_left",
+				"description": "Username of last player who left",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Server Online",
+				"key": "serverOnline",
+				"acceptedVariables": [
+					"online",
+					"version",
+					"motd",
+					"players_max"
+				],
+				"defaultMessage": "Minecraft server is now online!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Server Offline",
+				"key": "serverOffline",
+				"acceptedVariables": [],
+				"defaultMessage": "Minecraft server went offline",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Player Joined",
+				"key": "playerJoined",
+				"acceptedVariables": [
+					"username",
+					"last_player_joined",
+					"players_online",
+					"players_max"
+				],
+				"defaultMessage": "{{last_player_joined}} joined the server! ({{players_online}}/{{players_max}})",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Player Left",
+				"key": "playerLeft",
+				"acceptedVariables": [
+					"username",
+					"last_player_left",
+					"players_online",
+					"players_max"
+				],
+				"defaultMessage": "{{last_player_left}} left the server ({{players_online}}/{{players_max}})",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			}
+		],
+		"translations": "./translations.json"
+	}
 }
+
 ```
 
 ## minecraft_server/package.json
@@ -4329,9 +4569,65 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
 	}
 }
+
+```
+
+## minecraft_server/settings_tutorial.md
+
+```
+---
+### 🎮 Setup Your Minecraft Server Monitoring
+1) Enter your server address (hostname or IP)
+2) Enter server port (default: 25565)
+3) **Enable Query protocol (required for player tracking)**
+   - Set `enable-query=true` in server.properties
+   - Ensure `query.port` matches the Query Port setting
+   - Enables player list, join/leave alerts, map, and game type
+4) Set poll interval (how often to check)
+5) Click **Save** to start monitoring
+### 📊 What Gets Tracked
+- Server online/offline status
+- Current player count
+- Maximum players
+- Server version
+- MOTD (Message of the Day)
+- Player list (Query required)
+---
+
+```
+
+## minecraft_server/translations.json
+
+```
+{
+	"en": {
+		"online": "Whether the server is online",
+		"players_online": "Number of players currently online",
+		"players_max": "Maximum number of players allowed",
+		"version": "Server version (e.g., 1.21.5)",
+		"motd": "Server Message of the Day",
+		"protocol_version": "Protocol version number",
+		"player_list": "Comma-separated list of player names (Query only)",
+		"map": "Current world/map name (Query only)",
+		"game_type": "Game type (Survival, Creative, etc.) (Query only)",
+		"last_player_joined": "Username of last player who joined",
+		"last_player_left": "Username of last player who left",
+		"username": "Username"
+	}
+}
+
+```
+
+## ntfy/actions_tutorial.md
+
+```
+---
+### Actions
+This plugin runs automatically and does not expose actions.
+---
 
 ```
 
@@ -5073,7 +5369,7 @@ module.exports = NtfyPlugin;
 {
 	"id": "ntfy",
 	"name": "ntfy",
-	"version": "1.0.1",
+	"version": "1.0.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -5168,7 +5464,7 @@ module.exports = NtfyPlugin;
 				"helperText": "Optional regex filter applied to title + message (case-insensitive)."
 			}
 		],
-		"settings_tutorial": "---\n1) Enter your ntfy server base URL (hosted or self-hosted).\n2) Add one or more topics (comma-separated).\n3) If your server requires auth, choose **Access Token** (recommended) or **Username + Password**.\n\n### Notes\n- Access tokens and Basic auth are supported for subscriptions.\n- Topics are case-sensitive and should match your ntfy publisher topics.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
 		"variables": [],
 		"alerts": [
 			{
@@ -5191,7 +5487,8 @@ module.exports = NtfyPlugin;
 			}
 		],
 		"actions": [],
-		"actions_tutorial": "---\n### Actions\nThis plugin runs automatically and does not expose actions.\n---"
+		"actions_tutorial": "./actions_tutorial.md",
+		"translations": "./translations.json"
 	}
 }
 
@@ -5208,7 +5505,43 @@ module.exports = NtfyPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
+	}
+}
+
+```
+
+## ntfy/settings_tutorial.md
+
+```
+---
+1) Enter your ntfy server base URL (hosted or self-hosted).
+2) Add one or more topics (comma-separated).
+3) If your server requires auth, choose **Access Token** (recommended) or **Username + Password**.
+
+### Notes
+- Access tokens and Basic auth are supported for subscriptions.
+- Topics are case-sensitive and should match your ntfy publisher topics.
+---
+
+```
+
+## ntfy/translations.json
+
+```
+{
+	"en": {
+		"title": "Title",
+		"message": "Message",
+		"topic": "Topic",
+		"priority": "Priority",
+		"tags": "Tags",
+		"id": "Id",
+		"time": "Time",
+		"click": "Click",
+		"icon": "Icon",
+		"attachment_url": "Attachment Url",
+		"event": "Event"
 	}
 }
 
@@ -5842,7 +6175,7 @@ module.exports = OllamaPlugin;
 {
 	"id": "ollama",
 	"name": "Ollama",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -5854,7 +6187,7 @@ module.exports = OllamaPlugin;
 	"icon": "ollama.png",
 	"config": {
 		"hasAI": true,
-		"settings_tutorial": "---\n### 1) Install & Run Ollama\n1) Install [Ollama](https://ollama.com).\n2) Start the server: `ollama serve` (defaults to `http://localhost:11434`).\n3) Pull a model you want to use, for example: `ollama pull gpt-oss:20b`.\n---\n### 2) Configure This Plugin\n- **Base URL** should point to your Ollama server (default `http://localhost:11434`).\n- **Default Model** should match a local model name from `ollama list`. If left blank, the plugin will try to auto-detect and use the first available model.\n- **Max Output Length** trims long replies for overlays or chat boxes.\n---\n### 3) Variable Functions\n**ollama_prompt**\nSend prompts using a simple syntax.\n\nExample:\n`{{ollama_prompt=Make a funny quote}}`\n\nUse user input:\n`{{ollama_prompt={{message}}}}`\n\nKeep conversation context with a thread name and optional model override:\n`{{ollama_prompt={{message}}|thread_name|gpt-oss:20b}}`\n\nUse a thread name to continue the conversation, and the last parameter to use a specific model.\n\n**ollama_json**\nReturn JSON-only output:\n`{{ollama_json=Summarize this clip as JSON}}`\n\n**ollama_one_line**\nReturn a single-line response (newlines removed):\n`{{ollama_one_line=Write a short hype line}}`\n\n**ollama_prompt_nostore**\nRun a prompt without storing or using history:\n`{{ollama_prompt_nostore=Give me a quick summary}}`\n\n**ollama_prompt_clear**\nClear a conversation thread:\n`{{ollama_prompt_clear=thread_name}}`\n---",
+		"settings_tutorial": "./settings_tutorial.md",
 		"settings": [
 			{
 				"key": "baseUrl",
@@ -6003,9 +6336,57 @@ module.exports = OllamaPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.3.7"
+    "@lumiastream/plugin": "^0.4.0"
   }
 }
+
+```
+
+## ollama/settings_tutorial.md
+
+```
+---
+### 1) Install & Run Ollama
+1) Install [Ollama](https://ollama.com).
+2) Start the server: `ollama serve` (defaults to `http://localhost:11434`).
+3) Pull a model you want to use, for example: `ollama pull gpt-oss:20b`.
+---
+### 2) Configure This Plugin
+- **Base URL** should point to your Ollama server (default `http://localhost:11434`).
+- **Default Model** should match a local model name from `ollama list`. If left blank, the plugin will try to auto-detect and use the first available model.
+- **Max Output Length** trims long replies for overlays or chat boxes.
+---
+### 3) Variable Functions
+**ollama_prompt**
+Send prompts using a simple syntax.
+
+Example:
+`{{ollama_prompt=Make a funny quote}}`
+
+Use user input:
+`{{ollama_prompt={{message}}}}`
+
+Keep conversation context with a thread name and optional model override:
+`{{ollama_prompt={{message}}|thread_name|gpt-oss:20b}}`
+
+Use a thread name to continue the conversation, and the last parameter to use a specific model.
+
+**ollama_json**
+Return JSON-only output:
+`{{ollama_json=Summarize this clip as JSON}}`
+
+**ollama_one_line**
+Return a single-line response (newlines removed):
+`{{ollama_one_line=Write a short hype line}}`
+
+**ollama_prompt_nostore**
+Run a prompt without storing or using history:
+`{{ollama_prompt_nostore=Give me a quick summary}}`
+
+**ollama_prompt_clear**
+Clear a conversation thread:
+`{{ollama_prompt_clear=thread_name}}`
+---
 
 ```
 
@@ -7058,7 +7439,7 @@ module.exports = OpenClawPlugin;
 {
 	"id": "openclaw",
 	"name": "OpenClaw",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -7067,10 +7448,10 @@ module.exports = OpenClawPlugin;
 	"lumiaVersion": "^9.0.0",
 	"category": "apps",
 	"keywords": "openclaw, ai, chat, llm, gateway",
-	"icon": "",
+	"icon": "openclaw.png",
 	"config": {
 		"hasAI": true,
-		"settings_tutorial": "---\n### 1) Run OpenClaw Gateway\n1) Follow the OpenClaw docs: [docs.openclaw.ai](https://docs.openclaw.ai/).\n2) Enable the OpenAI-compatible HTTP API in your Gateway config.\n3) Start the Gateway (default `http://127.0.0.1:18789`).\n---\n### 2) Configure This Plugin (Minimal)\n- **Base URL** should point to your OpenClaw Gateway.\n- **Gateway Token** is required only if your Gateway auth is enabled.\n- **Known Agent IDs** is a manual comma-separated list (example: `main,research,fast`).\n- **Default Agent ID** uses that manual list for selection.\n- **Model correlation:** the selected agent determines the real provider model inside OpenClaw.\n---\n### 3) Variable Functions\n**openclaw_prompt**\nSend prompts using a simple syntax.\n\nExample:\n`{{openclaw_prompt=Make a funny quote}}`\n\nUse user input:\n`{{openclaw_prompt={{message}}}}`\n\nKeep conversation context with a thread name and optional agent override:\n`{{openclaw_prompt={{message}}|thread_name|main}}`\n\nYou can pass an agent id (`main`) or route (`openclaw:main`) in the third slot.\n\n**openclaw_json**\nReturn JSON-only output:\n`{{openclaw_json=Summarize this clip as JSON}}`\n\n**openclaw_one_line**\nReturn a single-line response (newlines removed):\n`{{openclaw_one_line=Write a short hype line}}`\n\n**openclaw_prompt_nostore**\nRun a prompt without storing or using history:\n`{{openclaw_prompt_nostore=Give me a quick summary}}`\n\n**openclaw_prompt_clear**\nClear a conversation thread:\n`{{openclaw_prompt_clear=thread_name}}`\n---",
+		"settings_tutorial": "./settings_tutorial.md",
 		"settings": [
 			{
 				"key": "baseUrl",
@@ -7161,9 +7542,59 @@ module.exports = OpenClawPlugin;
   "main": "main.js",
   "scripts": {},
   "dependencies": {
-    "@lumiastream/plugin": "^0.3.7"
+    "@lumiastream/plugin": "^0.4.0"
   }
 }
+
+```
+
+## openclaw/settings_tutorial.md
+
+```
+---
+### 1) Run OpenClaw Gateway
+1) Follow the OpenClaw docs: [docs.openclaw.ai](https://docs.openclaw.ai/).
+2) Enable the OpenAI-compatible HTTP API in your Gateway config.
+3) Start the Gateway (default `http://127.0.0.1:18789`).
+---
+### 2) Configure This Plugin (Minimal)
+- **Base URL** should point to your OpenClaw Gateway.
+- **Gateway Token** is required only if your Gateway auth is enabled.
+- **Known Agent IDs** is a manual comma-separated list (example: `main,research,fast`).
+- **Default Agent ID** uses that manual list for selection.
+- **Model correlation:** the selected agent determines the real provider model inside OpenClaw.
+---
+### 3) Variable Functions
+**openclaw_prompt**
+Send prompts using a simple syntax.
+
+Example:
+`{{openclaw_prompt=Make a funny quote}}`
+
+Use user input:
+`{{openclaw_prompt={{message}}}}`
+
+Keep conversation context with a thread name and optional agent override:
+`{{openclaw_prompt={{message}}|thread_name|main}}`
+
+You can pass an agent id (`main`) or route (`openclaw:main`) in the third slot.
+
+**openclaw_json**
+Return JSON-only output:
+`{{openclaw_json=Summarize this clip as JSON}}`
+
+**openclaw_one_line**
+Return a single-line response (newlines removed):
+`{{openclaw_one_line=Write a short hype line}}`
+
+**openclaw_prompt_nostore**
+Run a prompt without storing or using history:
+`{{openclaw_prompt_nostore=Give me a quick summary}}`
+
+**openclaw_prompt_clear**
+Clear a conversation thread:
+`{{openclaw_prompt_clear=thread_name}}`
+---
 
 ```
 
@@ -7200,6 +7631,19 @@ Use OpenRGB devices as Lumia Stream lights through the OpenRGB SDK server.
 - Turning power off writes black to all LEDs for targeted devices.
 - If discovery does not return a device, manual add accepts a controller ID.
 - Controller ID is the zero-based index in OpenRGB's Devices list order (first device is `0`, second is `1`, etc.).
+
+```
+
+## openrgb/actions_tutorial.md
+
+```
+---
+### OpenRGB Actions
+- **Load/Save Profile**: Trigger OpenRGB profile commands through the SDK.
+
+Light color/power/brightness are controlled through Lumia light actions and support software fade transitions via the `transition` value.
+Studio Themes now include OpenRGB mode options per discovered device.
+---
 
 ```
 
@@ -9252,7 +9696,7 @@ module.exports = OpenRGBPlugin;
 {
 	"id": "openrgb",
 	"name": "OpenRGB",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -9287,8 +9731,8 @@ module.exports = OpenRGBPlugin;
 				"helperText": "Default OpenRGB SDK port is 6742."
 			}
 		],
-		"settings_tutorial": "---\n1) Open **OpenRGB** and enable the **SDK Server**.\n2) Confirm host/port (default `127.0.0.1:6742`).\n3) Save these settings in Lumia and activate the plugin.\n4) Use **Discover OpenRGB Devices** to import devices as selectable lights.\n---\n### Notes\n- On remote hosts, allow incoming TCP to the OpenRGB SDK port.\n- Some devices require a direct/custom mode before color writes. This plugin automatically attempts that.\n---",
-		"actions_tutorial": "---\n### OpenRGB Actions\n- **Load/Save Profile**: Trigger OpenRGB profile commands through the SDK.\n\nLight color/power/brightness are controlled through Lumia light actions and support software fade transitions via the `transition` value.\nStudio Themes now include OpenRGB mode options per discovered device.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"lights": {
 			"search": {
 				"buttonLabel": "Discover OpenRGB Devices",
@@ -9394,9 +9838,35 @@ module.exports = OpenRGBPlugin;
 	"description": "OpenRGB light integration plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
 	}
 }
+
+```
+
+## openrgb/settings_tutorial.md
+
+```
+---
+1) Open **OpenRGB** and enable the **SDK Server**.
+2) Confirm host/port (default `127.0.0.1:6742`).
+3) Save these settings in Lumia and activate the plugin.
+4) Use **Discover OpenRGB Devices** to import devices as selectable lights.
+---
+### Notes
+- On remote hosts, allow incoming TCP to the OpenRGB SDK port.
+- Some devices require a direct/custom mode before color writes. This plugin automatically attempts that.
+---
+
+```
+
+## rumble/actions_tutorial.md
+
+```
+---
+### Actions
+This plugin runs automatically on the poll interval and does not expose actions.
+---
 
 ```
 
@@ -10729,7 +11199,7 @@ module.exports = RumblePlugin;
 {
 	"id": "rumble",
 	"name": "Rumble",
-	"version": "1.0.1",
+	"version": "1.0.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -10757,8 +11227,8 @@ module.exports = RumblePlugin;
 				"helperText": "How often to check for stream updates (10-300 seconds)"
 			}
 		],
-		"settings_tutorial": "---\n### \ud83d\udd11 Get Your Rumble Livestream API URL\n1) Open https://rumble.com/account/livestream-api while logged in.\n2) Copy the full Livestream API URL shown on that page.\n3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).\n---\n### \u2705 Verify Access\nClick **Save** to start syncing data.\n---\n### \u23f1\ufe0f Adjust Polling\nSet a poll interval that balances freshness with API limits (10\u2013300 seconds).\n---",
-		"actions_tutorial": "---\n### Actions\nThis plugin runs automatically on the poll interval and does not expose actions.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [],
 		"variables": [
 			{
@@ -10933,7 +11403,11 @@ module.exports = RumblePlugin;
 			{
 				"title": "Follower",
 				"key": "follower",
-				"acceptedVariables": ["followers", "stream_url", "title"],
+				"acceptedVariables": [
+					"followers",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "New followers! Total is now {{followers}}.",
 				"variationConditions": [
 					{
@@ -10949,7 +11423,12 @@ module.exports = RumblePlugin;
 			{
 				"title": "Rant",
 				"key": "rant",
-				"acceptedVariables": ["rants", "rant_amount", "viewers", "title"],
+				"acceptedVariables": [
+					"rants",
+					"rant_amount",
+					"viewers",
+					"title"
+				],
 				"defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
 				"variationConditions": [
 					{
@@ -10965,7 +11444,11 @@ module.exports = RumblePlugin;
 			{
 				"title": "Like",
 				"key": "like",
-				"acceptedVariables": ["likes", "stream_url", "title"],
+				"acceptedVariables": [
+					"likes",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "Another thumbs-up! Likes: {{likes}}",
 				"variationConditions": [
 					{
@@ -10981,7 +11464,11 @@ module.exports = RumblePlugin;
 			{
 				"title": "Dislike",
 				"key": "dislike",
-				"acceptedVariables": ["dislikes", "stream_url", "title"],
+				"acceptedVariables": [
+					"dislikes",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
 				"variationConditions": [
 					{
@@ -10997,7 +11484,11 @@ module.exports = RumblePlugin;
 			{
 				"title": "Subscriber",
 				"key": "sub",
-				"acceptedVariables": ["subs", "stream_url", "title"],
+				"acceptedVariables": [
+					"subs",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "New subscription! Subs total: {{subs}}",
 				"variationConditions": [
 					{
@@ -11013,7 +11504,11 @@ module.exports = RumblePlugin;
 			{
 				"title": "Gift Subscription",
 				"key": "subGift",
-				"acceptedVariables": ["sub_gifts", "stream_url", "title"],
+				"acceptedVariables": [
+					"sub_gifts",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
 				"variationConditions": [
 					{
@@ -11026,7 +11521,8 @@ module.exports = RumblePlugin;
 					}
 				]
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }
 
@@ -11043,7 +11539,59 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
+	}
+}
+
+```
+
+## rumble/settings_tutorial.md
+
+```
+---
+### 🔑 Get Your Rumble Livestream API URL
+1) Open https://rumble.com/account/livestream-api while logged in.
+2) Copy the full Livestream API URL shown on that page.
+3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).
+---
+### ✅ Verify Access
+Click **Save** to start syncing data.
+---
+### ⏱️ Adjust Polling
+Set a poll interval that balances freshness with API limits (10–300 seconds).
+---
+
+```
+
+## rumble/translations.json
+
+```
+{
+	"en": {
+		"live": "Whether the Rumble stream is currently live",
+		"viewers": "Current number of concurrent viewers watching the stream",
+		"joined": "Total viewers that have joined the stream session",
+		"title": "Current stream title",
+		"thumbnail": "Stream thumbnail URL",
+		"stream_url": "Public URL to the livestream",
+		"video_id": "Underlying Rumble video ID",
+		"reactions": "Current reaction count on the stream",
+		"followers": "Current follower count of the channel",
+		"likes": "Thumbs-up reactions on the stream",
+		"dislikes": "Thumbs-down reactions on the stream",
+		"subs": "Total paid subscriptions/memberships for the channel",
+		"sub_gifts": "Gifted subscriptions/memberships received during the stream",
+		"rants": "Number of Rants received this stream",
+		"rant_amount": "Total value of Rants received this stream",
+		"chat_members": "Active chat members in the livestream chat",
+		"category": "Category assigned to the livestream",
+		"description": "Short description of the livestream",
+		"language": "Language reported by Rumble for the stream",
+		"chat_url": "Direct URL to the livestream chat",
+		"channel_name": "Rumble channel display name",
+		"channel_image": "Avatar image URL for the Rumble channel",
+		"started_at": "Timestamp of when the stream went live (ISO 8601)",
+		"scheduled_start": "Scheduled start time for the stream (ISO 8601)"
 	}
 }
 
@@ -11315,7 +11863,7 @@ module.exports = SettingsFieldShowcasePlugin;
 {
 	"id": "settings_showcase",
 	"name": "Settings Showcase",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -11357,9 +11905,18 @@ module.exports = SettingsFieldShowcasePlugin;
 				"sectionOrder": 1,
 				"defaultValue": "custom",
 				"options": [
-					{ "label": "Normal", "value": "normal" },
-					{ "label": "Custom", "value": "custom" },
-					{ "label": "Debug", "value": "debug" }
+					{
+						"label": "Normal",
+						"value": "normal"
+					},
+					{
+						"label": "Custom",
+						"value": "custom"
+					},
+					{
+						"label": "Debug",
+						"value": "debug"
+					}
 				],
 				"helperText": "Example of type `select` with `allowTyping: true`."
 			},
@@ -11371,12 +11928,27 @@ module.exports = SettingsFieldShowcasePlugin;
 				"allowTyping": true,
 				"section": "Basics",
 				"sectionOrder": 1,
-				"defaultValue": ["valorant", "overwatch"],
+				"defaultValue": [
+					"valorant",
+					"overwatch"
+				],
 				"options": [
-					{ "label": "Valorant", "value": "valorant" },
-					{ "label": "Rocket League", "value": "rocket_league" },
-					{ "label": "Overwatch", "value": "overwatch" },
-					{ "label": "League of Legends", "value": "league_of_legends" }
+					{
+						"label": "Valorant",
+						"value": "valorant"
+					},
+					{
+						"label": "Rocket League",
+						"value": "rocket_league"
+					},
+					{
+						"label": "Overwatch",
+						"value": "overwatch"
+					},
+					{
+						"label": "League of Legends",
+						"value": "league_of_legends"
+					}
 				],
 				"helperText": "Example of type `select` with `multiple: true` and `allowTyping: true`."
 			},
@@ -11522,8 +12094,14 @@ module.exports = SettingsFieldShowcasePlugin;
 				},
 				"defaultValue": {
 					"rules": [
-						{ "name": "kill", "confidence": 0.9 },
-						{ "name": "goal", "confidence": 0.92 }
+						{
+							"name": "kill",
+							"confidence": 0.9
+						},
+						{
+							"name": "goal",
+							"confidence": 0.92
+						}
 					],
 					"cooldownMs": 1200
 				},
@@ -11567,7 +12145,8 @@ module.exports = SettingsFieldShowcasePlugin;
 				"value": ""
 			}
 		],
-		"alerts": []
+		"alerts": [],
+		"translations": "./translations.json"
 	}
 }
 
@@ -11584,7 +12163,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
 	}
 }
 
@@ -11628,6 +12207,31 @@ When you save settings, the plugin:
 - logs each value
 - shows toast notifications
 - updates `save_count`, `last_saved_at`, and `last_saved_values_json`
+
+```
+
+## settings_showcase/translations.json
+
+```
+{
+	"en": {
+		"save_count": "How many times settings were saved/updated.",
+		"last_saved_at": "Timestamp of the last settings save.",
+		"last_saved_values_json": "JSON snapshot of values saved most recently."
+	}
+}
+
+```
+
+## steam/actions_tutorial.md
+
+```
+---
+---
+### Fetch Game Achievements
+Use **Fetch Achievements For Game** to query a specific game by name or App ID.
+The results are stored in the requested game variables.
+---
 
 ```
 
@@ -12685,7 +13289,7 @@ module.exports = SteamPlugin;
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.2",
+	"version": "1.0.4",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -12728,8 +13332,8 @@ module.exports = SteamPlugin;
 				"helperText": "When enabled, Game Changed alerts also trigger when you stop playing."
 			}
 		],
-		"settings_tutorial": "---\n### Steam Web API Key\n1) Open the [Steam Web API Key page](https://steamcommunity.com/dev/apikey) and sign in.\n2) Enter a domain name (you can use `localhost`).\n3) Accept the terms and click **Register**.\n4) Copy the generated key and paste it into **Steam Web API Key**.\n\n### Steam ID\n1) Open your Steam profile.\n2) Paste **any** of the following into **Steam ID / Vanity Name**:\n   - Your SteamID64 (from account details)\n   - Your vanity profile name\n   - Your full profile URL (example: `https://steamcommunity.com/id/yourname` or `https://steamcommunity.com/profiles/7656119...`)\n\n### Achievements\nAchievement stats are pulled automatically from your **current** game while you are playing.\n---",
-		"actions_tutorial": "---\n---\n### Fetch Game Achievements\nUse **Fetch Achievements For Game** to query a specific game by name or App ID.\nThe results are stored in the requested game variables.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [
 			{
 				"type": "fetch_game",
@@ -12828,7 +13432,10 @@ module.exports = SteamPlugin;
 			{
 				"title": "Online Status Changed",
 				"key": "online_state_changed",
-				"acceptedVariables": ["persona_username", "online_status"],
+				"acceptedVariables": [
+					"persona_username",
+					"online_status"
+				],
 				"defaultMessage": "{{persona_username}} is now {{online_status}}.",
 				"variationConditions": [
 					{
@@ -12887,7 +13494,10 @@ module.exports = SteamPlugin;
 			{
 				"title": "Game Changed",
 				"key": "current_game_changed",
-				"acceptedVariables": ["current_game_name", "current_game_appid"],
+				"acceptedVariables": [
+					"current_game_name",
+					"current_game_appid"
+				],
 				"defaultMessage": "Now playing {{current_game_name}}.",
 				"variationConditions": [
 					{
@@ -12896,7 +13506,8 @@ module.exports = SteamPlugin;
 					}
 				]
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }
 
@@ -12913,9 +13524,73 @@ module.exports = SteamPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
 	}
 }
+
+```
+
+## steam/settings_tutorial.md
+
+```
+---
+### Steam Web API Key
+1) Open the [Steam Web API Key page](https://steamcommunity.com/dev/apikey) and sign in.
+2) Enter a domain name (you can use `localhost`).
+3) Accept the terms and click **Register**.
+4) Copy the generated key and paste it into **Steam Web API Key**.
+
+### Steam ID
+1) Open your Steam profile.
+2) Paste **any** of the following into **Steam ID / Vanity Name**:
+   - Your SteamID64 (from account details)
+   - Your vanity profile name
+   - Your full profile URL (example: `https://steamcommunity.com/id/yourname` or `https://steamcommunity.com/profiles/7656119...`)
+
+### Achievements
+Achievement stats are pulled automatically from your **current** game while you are playing.
+---
+
+```
+
+## steam/translations.json
+
+```
+{
+	"en": {
+		"steamid": "SteamID64.",
+		"persona_username": "Username (Steam persona name).",
+		"online_status": "Online status (text).",
+		"profile_url": "Profile URL.",
+		"avatar": "Avatar URL.",
+		"current_game_name": "Current in-game name (if playing).",
+		"current_game_appid": "Current in-game app ID (if playing).",
+		"game_count": "Owned games count.",
+		"current_game_achievement_count": "Total achievements for the current/last played game.",
+		"current_game_achievement_unlocked_count": "Unlocked achievements for the current/last played game.",
+		"requested_game_appid": "App ID for the last requested game.",
+		"requested_game_name": "Name for the last requested game.",
+		"requested_game_achievement_count": "Total achievements for the last requested game.",
+		"requested_game_achievement_unlocked": "Unlocked achievements for the last requested game.",
+		"requested_game_achievements": "JSON payload of achievements for the last requested game."
+	}
+}
+
+```
+
+## trovo/actions_tutorial.md
+
+```
+---
+### Actions
+- **Send Chat Message**: post a message to Trovo chat.
+- **Update Live Title**: update your Trovo stream title via channel API.
+- **Update Category**: find the closest Trovo category from your text and update it.
+- **Host Channel**: run `/host username` command.
+- **Unhost Channel**: run `/unhost` command.
+- **Set Title (Command)**: run `/settitle title` command.
+- **Trigger Alert**: fire one Trovo alert manually for testing.
+---
 
 ```
 
@@ -16435,7 +17110,7 @@ module.exports = TrovoPlugin;
 {
 	"id": "trovo_live",
 	"name": "Trovo",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -16505,8 +17180,8 @@ module.exports = TrovoPlugin;
 			"add-moderator",
 			"remove-moderator"
 		],
-		"settings_tutorial": "---\n### Setup\n1) Click **Authorize Trovo** in the OAuth section.\n2) Save the plugin; it will fetch your profile and chat token, then connect to Trovo websocket chat.\n\n### Notes\n- Access/refresh tokens are filled automatically by OAuth and refreshed at runtime.\n- Channel ID and username are auto-detected from Trovo API.\n- Entrance and first chatter alerts can be limited to live sessions with the provided toggles.\n---",
-		"actions_tutorial": "---\n### Actions\n- **Send Chat Message**: post a message to Trovo chat.\n- **Update Live Title**: update your Trovo stream title via channel API.\n- **Update Category**: find the closest Trovo category from your text and update it.\n- **Host Channel**: run `/host username` command.\n- **Unhost Channel**: run `/unhost` command.\n- **Set Title (Command)**: run `/settitle title` command.\n- **Trigger Alert**: fire one Trovo alert manually for testing.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [
 			{
 				"type": "send_chat",
@@ -16607,16 +17282,46 @@ module.exports = TrovoPlugin;
 						"required": true,
 						"defaultValue": "follower",
 						"options": [
-							{ "label": "Stream Live", "value": "streamLive" },
-							{ "label": "Stream Offline", "value": "streamOffline" },
-							{ "label": "First Chatter", "value": "firstChatter" },
-							{ "label": "Entrance", "value": "entrance" },
-							{ "label": "Channel Join", "value": "channelJoin" },
-							{ "label": "Follower", "value": "follower" },
-							{ "label": "Subscriber", "value": "subscriber" },
-							{ "label": "Gift Subscription", "value": "subscriptionGift" },
-							{ "label": "Raid", "value": "raid" },
-							{ "label": "Spell", "value": "spell" }
+							{
+								"label": "Stream Live",
+								"value": "streamLive"
+							},
+							{
+								"label": "Stream Offline",
+								"value": "streamOffline"
+							},
+							{
+								"label": "First Chatter",
+								"value": "firstChatter"
+							},
+							{
+								"label": "Entrance",
+								"value": "entrance"
+							},
+							{
+								"label": "Channel Join",
+								"value": "channelJoin"
+							},
+							{
+								"label": "Follower",
+								"value": "follower"
+							},
+							{
+								"label": "Subscriber",
+								"value": "subscriber"
+							},
+							{
+								"label": "Gift Subscription",
+								"value": "subscriptionGift"
+							},
+							{
+								"label": "Raid",
+								"value": "raid"
+							},
+							{
+								"label": "Spell",
+								"value": "spell"
+							}
 						]
 					},
 					{
@@ -16772,13 +17477,22 @@ module.exports = TrovoPlugin;
 			{
 				"title": "Stream Live",
 				"key": "streamLive",
-				"acceptedVariables": ["live", "username", "channel_id", "uptime"],
+				"acceptedVariables": [
+					"live",
+					"username",
+					"channel_id",
+					"uptime"
+				],
 				"defaultMessage": "{{username}} is now live on Trovo!"
 			},
 			{
 				"title": "Stream Offline",
 				"key": "streamOffline",
-				"acceptedVariables": ["live", "username", "uptime"],
+				"acceptedVariables": [
+					"live",
+					"username",
+					"uptime"
+				],
 				"defaultMessage": "{{username}} has ended the Trovo stream."
 			},
 			{
@@ -16802,7 +17516,10 @@ module.exports = TrovoPlugin;
 			{
 				"title": "Entrance",
 				"key": "entrance",
-				"acceptedVariables": ["live", "session_chat_count"],
+				"acceptedVariables": [
+					"live",
+					"session_chat_count"
+				],
 				"defaultMessage": "{{username}} entered chat.",
 				"variationConditions": [
 					{
@@ -16814,7 +17531,10 @@ module.exports = TrovoPlugin;
 			{
 				"title": "Channel Join",
 				"key": "channelJoin",
-				"acceptedVariables": ["live", "username"],
+				"acceptedVariables": [
+					"live",
+					"username"
+				],
 				"defaultMessage": "{{username}} joined the channel.",
 				"defaults": {
 					"on": false
@@ -16914,7 +17634,8 @@ module.exports = TrovoPlugin;
 				],
 				"defaultMessage": "{{username}} cast {{spell}} x{{spell_quantity}}"
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }
 
@@ -16931,8 +17652,59 @@ module.exports = TrovoPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7",
+		"@lumiastream/plugin": "^0.4.0",
 		"ws": "^8.18.3"
+	}
+}
+
+```
+
+## trovo/settings_tutorial.md
+
+```
+---
+### Setup
+1) Click **Authorize Trovo** in the OAuth section.
+2) Save the plugin; it will fetch your profile and chat token, then connect to Trovo websocket chat.
+
+### Notes
+- Access/refresh tokens are filled automatically by OAuth and refreshed at runtime.
+- Channel ID and username are auto-detected from Trovo API.
+- Entrance and first chatter alerts can be limited to live sessions with the provided toggles.
+---
+
+```
+
+## trovo/translations.json
+
+```
+{
+	"en": {
+		"uptime": "Friendly uptime of the current Trovo live session.",
+		"live": "Whether Trovo stream is currently live.",
+		"session_chat_count": "Number of chat messages seen in current session.",
+		"last_follower": "Username of the latest follower event.",
+		"current_first_chatter": "First chatter username for the current stream session.",
+		"current_first_chatter_count": "Current first chatter streak count.",
+		"previous_first_chatter": "First chatter username from previous stream session.",
+		"previous_first_chatter_count": "Previous first chatter streak count.",
+		"last_chatter": "Username of the latest chat message author.",
+		"last_raider": "Username of the latest raider.",
+		"last_raid_amount": "Viewer count from the latest raid.",
+		"session_follower_count": "Follower events counted for current session.",
+		"session_subscribers_count": "Subscriber events counted for current session.",
+		"session_raiders": "Comma-separated list of raiders for current session.",
+		"last_subscriber": "Username of the latest subscriber or gift recipient.",
+		"session_subscribers": "Comma-separated list of subscribers for current session.",
+		"channel_id": "Resolved Trovo channel ID.",
+		"username": "Resolved Trovo username.",
+		"display_name": "Resolved Trovo display name.",
+		"last_spell": "Name of the latest Trovo spell.",
+		"last_spell_amount": "Quantity of the latest Trovo spell.",
+		"last_spell_value": "Value per unit of the latest Trovo spell.",
+		"last_message": "Text of the latest relayed Trovo chat message.",
+		"last_message_id": "Message id of the latest relayed Trovo chat message.",
+		"last_event_at": "ISO timestamp of the latest Trovo event processed."
 	}
 }
 
@@ -16995,7 +17767,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 {
 	"id": "typescript_plugin_example",
 	"name": "TypeScript Plugin Example",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "Lumia Stream",
 	"email": "",
 	"website": "",
@@ -17067,10 +17839,14 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 			{
 				"title": "TypeScript Sample Alert",
 				"key": "ts_sample_alert",
-				"acceptedVariables": ["last_username", "last_message"],
+				"acceptedVariables": [
+					"last_username",
+					"last_message"
+				],
 				"defaultMessage": "{{last_username}}: {{last_message}}"
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }
 
@@ -17092,7 +17868,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.3.7"
+		"@lumiastream/plugin": "^0.4.0"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
@@ -17256,6 +18032,19 @@ class TypeScriptPluginExample extends Plugin {
 }
 
 export = TypeScriptPluginExample;
+
+```
+
+## typescript_plugin/translations.json
+
+```
+{
+	"en": {
+		"last_username": "Most recent username used by the action.",
+		"last_message": "Most recent message used by the action.",
+		"last_heartbeat": "ISO timestamp from the plugin heartbeat loop."
+	}
+}
 
 ```
 

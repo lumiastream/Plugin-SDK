@@ -1,7 +1,7 @@
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.2",
+	"version": "1.0.4",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -44,8 +44,8 @@
 				"helperText": "When enabled, Game Changed alerts also trigger when you stop playing."
 			}
 		],
-		"settings_tutorial": "---\n### Steam Web API Key\n1) Open the [Steam Web API Key page](https://steamcommunity.com/dev/apikey) and sign in.\n2) Enter a domain name (you can use `localhost`).\n3) Accept the terms and click **Register**.\n4) Copy the generated key and paste it into **Steam Web API Key**.\n\n### Steam ID\n1) Open your Steam profile.\n2) Paste **any** of the following into **Steam ID / Vanity Name**:\n   - Your SteamID64 (from account details)\n   - Your vanity profile name\n   - Your full profile URL (example: `https://steamcommunity.com/id/yourname` or `https://steamcommunity.com/profiles/7656119...`)\n\n### Achievements\nAchievement stats are pulled automatically from your **current** game while you are playing.\n---",
-		"actions_tutorial": "---\n---\n### Fetch Game Achievements\nUse **Fetch Achievements For Game** to query a specific game by name or App ID.\nThe results are stored in the requested game variables.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [
 			{
 				"type": "fetch_game",
@@ -144,7 +144,10 @@
 			{
 				"title": "Online Status Changed",
 				"key": "online_state_changed",
-				"acceptedVariables": ["persona_username", "online_status"],
+				"acceptedVariables": [
+					"persona_username",
+					"online_status"
+				],
 				"defaultMessage": "{{persona_username}} is now {{online_status}}.",
 				"variationConditions": [
 					{
@@ -203,7 +206,10 @@
 			{
 				"title": "Game Changed",
 				"key": "current_game_changed",
-				"acceptedVariables": ["current_game_name", "current_game_appid"],
+				"acceptedVariables": [
+					"current_game_name",
+					"current_game_appid"
+				],
 				"defaultMessage": "Now playing {{current_game_name}}.",
 				"variationConditions": [
 					{
@@ -212,6 +218,7 @@
 					}
 				]
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }

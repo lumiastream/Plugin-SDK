@@ -1,7 +1,7 @@
 {
 	"id": "typescript_plugin_example",
 	"name": "TypeScript Plugin Example",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "Lumia Stream",
 	"email": "",
 	"website": "",
@@ -73,9 +73,13 @@
 			{
 				"title": "TypeScript Sample Alert",
 				"key": "ts_sample_alert",
-				"acceptedVariables": ["last_username", "last_message"],
+				"acceptedVariables": [
+					"last_username",
+					"last_message"
+				],
 				"defaultMessage": "{{last_username}}: {{last_message}}"
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }

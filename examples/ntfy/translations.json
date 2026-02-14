@@ -1,0 +1,15 @@
+{
+	"en": {
+		"title": "Title",
+		"message": "Message",
+		"topic": "Topic",
+		"priority": "Priority",
+		"tags": "Tags",
+		"id": "Id",
+		"time": "Time",
+		"click": "Click",
+		"icon": "Icon",
+		"attachment_url": "Attachment Url",
+		"event": "Event"
+	}
+}

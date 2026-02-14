@@ -1,0 +1,92 @@
+{
+	"id": "openclaw",
+	"name": "OpenClaw",
+	"version": "1.0.1",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Send prompts to an OpenClaw Gateway and use responses in Lumia templates via {{openclaw_prompt}} and related helpers.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "apps",
+	"keywords": "openclaw, ai, chat, llm, gateway",
+	"icon": "openclaw.png",
+	"config": {
+		"hasAI": true,
+		"settings_tutorial": "./settings_tutorial.md",
+		"settings": [
+			{
+				"key": "baseUrl",
+				"label": "Base URL",
+				"type": "text",
+				"defaultValue": "http://127.0.0.1:18789",
+				"required": true,
+				"helperText": "Your OpenClaw Gateway URL.",
+				"refreshOnChange": true
+			},
+			{
+				"key": "authToken",
+				"label": "Gateway Token",
+				"type": "password",
+				"helperText": "Optional. Required when Gateway auth is enabled.",
+				"refreshOnChange": true
+			},
+			{
+				"key": "defaultAgentId",
+				"label": "Default Agent ID",
+				"type": "select",
+				"defaultValue": "",
+				"allowTyping": true,
+				"dynamicOptions": true,
+				"refreshOnChange": true,
+				"placeholder": "Auto",
+				"options": [
+					{
+						"label": "Auto",
+						"value": ""
+					}
+				],
+				"required": false,
+				"helperText": "Agent id used to build request route (openclaw:<agent>) and x-openclaw-agent-id."
+			},
+			{
+				"key": "knownAgentIds",
+				"label": "Known Agent IDs",
+				"type": "text",
+				"defaultValue": "",
+				"helperText": "Comma-separated agent IDs for the dropdown (example: main,research,fast).",
+				"refreshOnChange": true
+			}
+		],
+		"actions": [],
+		"variableFunctions": [
+			{
+				"key": "openclaw_prompt",
+				"label": "OpenClaw Prompt",
+				"description": "Use {{openclaw_prompt=message|thread|agent}} to return a response from OpenClaw."
+			},
+			{
+				"key": "openclaw_json",
+				"label": "OpenClaw JSON",
+				"description": "Use {{openclaw_json=message|thread|agent}} to return JSON-only output."
+			},
+			{
+				"key": "openclaw_one_line",
+				"label": "OpenClaw One Line",
+				"description": "Use {{openclaw_one_line=message|thread|agent}} to return a single-line response."
+			},
+			{
+				"key": "openclaw_prompt_nostore",
+				"label": "OpenClaw Prompt (No Store)",
+				"description": "Use {{openclaw_prompt_nostore=message|thread|agent}} to run without history."
+			},
+			{
+				"key": "openclaw_prompt_clear",
+				"label": "OpenClaw Clear Thread",
+				"description": "Use {{openclaw_prompt_clear=thread_name}} to clear a conversation thread."
+			}
+		],
+		"variables": [],
+		"alerts": []
+	}
+}

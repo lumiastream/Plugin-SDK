@@ -1,192 +1,193 @@
 {
-  "id": "minecraft_server",
-  "name": "Minecraft Server",
-  "version": "1.0.0",
-  "author": "Lumia Stream",
-  "email": "dev@lumiastream.com",
-  "website": "https://lumiastream.com",
-  "repository": "https://github.com/LumiaStream/minecraft-server-plugin",
-  "description": "Monitor Minecraft Java servers for status and player changes with alerts and variables.",
-  "license": "MIT",
-  "lumiaVersion": "^9.0.0",
-  "category": "games",
-  "keywords": "minecraft, server, java edition, status, players, games",
-  "icon": "minecraft.png",
-  "config": {
-    "settings": [
-      {
-        "key": "serverHost",
-        "label": "Server Address",
-        "type": "text",
-        "placeholder": "play.hypixel.net or 192.168.1.100",
-        "helperText": "Minecraft server hostname or IP address",
-        "required": true
-      },
-      {
-        "key": "serverPort",
-        "label": "Server Port",
-        "type": "number",
-        "defaultValue": 25565,
-        "helperText": "Default Minecraft port is 25565",
-        "validation": {
-          "min": 1,
-          "max": 65535
-        }
-      },
-      {
-        "key": "useQuery",
-        "label": "Enable Query Protocol (Required for player tracking)",
-        "type": "checkbox",
-        "defaultValue": true,
-        "helperText": "Required for player list, join/leave alerts, map, and game type. Set enable-query=true in server.properties."
-      },
-      {
-        "key": "queryPort",
-        "label": "Query Port",
-        "type": "number",
-        "defaultValue": 25565,
-        "helperText": "Must match query.port in server.properties (usually the same as server port)",
-        "validation": {
-          "min": 1,
-          "max": 65535
-        }
-      },
-      {
-        "key": "pollInterval",
-        "label": "Poll Interval (seconds)",
-        "type": "number",
-        "defaultValue": 10,
-        "helperText": "How often to check server status (10-300 seconds)",
-        "validation": {
-          "min": 10,
-          "max": 300
-        }
-      }
-    ],
-    "settings_tutorial": "---\n### \ud83c\udfae Setup Your Minecraft Server Monitoring\n1) Enter your server address (hostname or IP)\n2) Enter server port (default: 25565)\n3) **Enable Query protocol (required for player tracking)**\n   - Set `enable-query=true` in server.properties\n   - Ensure `query.port` matches the Query Port setting\n   - Enables player list, join/leave alerts, map, and game type\n4) Set poll interval (how often to check)\n5) Click **Save** to start monitoring\n### \ud83d\udcca What Gets Tracked\n- Server online/offline status\n- Current player count\n- Maximum players\n- Server version\n- MOTD (Message of the Day)\n- Player list (Query required)\n---",
-    "actions_tutorial": "---\n### Actions\nThis plugin runs on the poll interval and does not expose actions.\n---",
-    "actions": [],
-    "variables": [
-      {
-        "name": "online",
-        "description": "Whether the server is online",
-        "value": false
-      },
-      {
-        "name": "players_online",
-        "description": "Number of players currently online",
-        "value": 0
-      },
-      {
-        "name": "players_max",
-        "description": "Maximum number of players allowed",
-        "value": 0
-      },
-      {
-        "name": "version",
-        "description": "Server version (e.g., 1.21.5)",
-        "value": ""
-      },
-      {
-        "name": "motd",
-        "description": "Server Message of the Day",
-        "value": ""
-      },
-      {
-        "name": "protocol_version",
-        "description": "Protocol version number",
-        "value": 0
-      },
-      {
-        "name": "player_list",
-        "description": "Comma-separated list of player names (Query only)",
-        "value": ""
-      },
-      {
-        "name": "map",
-        "description": "Current world/map name (Query only)",
-        "value": ""
-      },
-      {
-        "name": "game_type",
-        "description": "Game type (Survival, Creative, etc.) (Query only)",
-        "value": ""
-      },
-      {
-        "name": "last_player_joined",
-        "description": "Username of last player who joined",
-        "value": ""
-      },
-      {
-        "name": "last_player_left",
-        "description": "Username of last player who left",
-        "value": ""
-      }
-    ],
-    "alerts": [
-      {
-        "title": "Server Online",
-        "key": "serverOnline",
-        "acceptedVariables": [
-          "online",
-          "version",
-          "motd",
-          "players_max"
-        ],
-        "defaultMessage": "Minecraft server is now online!",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Server Offline",
-        "key": "serverOffline",
-        "acceptedVariables": [],
-        "defaultMessage": "Minecraft server went offline",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Player Joined",
-        "key": "playerJoined",
-        "acceptedVariables": [
-          "username",
-          "last_player_joined",
-          "players_online",
-          "players_max"
-        ],
-        "defaultMessage": "{{last_player_joined}} joined the server! ({{players_online}}/{{players_max}})",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      },
-      {
-        "title": "Player Left",
-        "key": "playerLeft",
-        "acceptedVariables": [
-          "username",
-          "last_player_left",
-          "players_online",
-          "players_max"
-        ],
-        "defaultMessage": "{{last_player_left}} left the server ({{players_online}}/{{players_max}})",
-        "variationConditions": [
-          {
-            "type": "RANDOM",
-            "description": "Trigger this variation based on a percent chance."
-          }
-        ]
-      }
-    ]
-  }
+	"id": "minecraft_server",
+	"name": "Minecraft Server",
+	"version": "1.0.2",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "https://github.com/LumiaStream/minecraft-server-plugin",
+	"description": "Monitor Minecraft Java servers for status and player changes with alerts and variables.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "games",
+	"keywords": "minecraft, server, java edition, status, players, games",
+	"icon": "minecraft.png",
+	"config": {
+		"settings": [
+			{
+				"key": "serverHost",
+				"label": "Server Address",
+				"type": "text",
+				"placeholder": "play.hypixel.net or 192.168.1.100",
+				"helperText": "Minecraft server hostname or IP address",
+				"required": true
+			},
+			{
+				"key": "serverPort",
+				"label": "Server Port",
+				"type": "number",
+				"defaultValue": 25565,
+				"helperText": "Default Minecraft port is 25565",
+				"validation": {
+					"min": 1,
+					"max": 65535
+				}
+			},
+			{
+				"key": "useQuery",
+				"label": "Enable Query Protocol (Required for player tracking)",
+				"type": "checkbox",
+				"defaultValue": true,
+				"helperText": "Required for player list, join/leave alerts, map, and game type. Set enable-query=true in server.properties."
+			},
+			{
+				"key": "queryPort",
+				"label": "Query Port",
+				"type": "number",
+				"defaultValue": 25565,
+				"helperText": "Must match query.port in server.properties (usually the same as server port)",
+				"validation": {
+					"min": 1,
+					"max": 65535
+				}
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 10,
+				"helperText": "How often to check server status (10-300 seconds)",
+				"validation": {
+					"min": 10,
+					"max": 300
+				}
+			}
+		],
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
+		"actions": [],
+		"variables": [
+			{
+				"name": "online",
+				"description": "Whether the server is online",
+				"value": false
+			},
+			{
+				"name": "players_online",
+				"description": "Number of players currently online",
+				"value": 0
+			},
+			{
+				"name": "players_max",
+				"description": "Maximum number of players allowed",
+				"value": 0
+			},
+			{
+				"name": "version",
+				"description": "Server version (e.g., 1.21.5)",
+				"value": ""
+			},
+			{
+				"name": "motd",
+				"description": "Server Message of the Day",
+				"value": ""
+			},
+			{
+				"name": "protocol_version",
+				"description": "Protocol version number",
+				"value": 0
+			},
+			{
+				"name": "player_list",
+				"description": "Comma-separated list of player names (Query only)",
+				"value": ""
+			},
+			{
+				"name": "map",
+				"description": "Current world/map name (Query only)",
+				"value": ""
+			},
+			{
+				"name": "game_type",
+				"description": "Game type (Survival, Creative, etc.) (Query only)",
+				"value": ""
+			},
+			{
+				"name": "last_player_joined",
+				"description": "Username of last player who joined",
+				"value": ""
+			},
+			{
+				"name": "last_player_left",
+				"description": "Username of last player who left",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Server Online",
+				"key": "serverOnline",
+				"acceptedVariables": [
+					"online",
+					"version",
+					"motd",
+					"players_max"
+				],
+				"defaultMessage": "Minecraft server is now online!",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Server Offline",
+				"key": "serverOffline",
+				"acceptedVariables": [],
+				"defaultMessage": "Minecraft server went offline",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Player Joined",
+				"key": "playerJoined",
+				"acceptedVariables": [
+					"username",
+					"last_player_joined",
+					"players_online",
+					"players_max"
+				],
+				"defaultMessage": "{{last_player_joined}} joined the server! ({{players_online}}/{{players_max}})",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			},
+			{
+				"title": "Player Left",
+				"key": "playerLeft",
+				"acceptedVariables": [
+					"username",
+					"last_player_left",
+					"players_online",
+					"players_max"
+				],
+				"defaultMessage": "{{last_player_left}} left the server ({{players_online}}/{{players_max}})",
+				"variationConditions": [
+					{
+						"type": "RANDOM",
+						"description": "Trigger this variation based on a percent chance."
+					}
+				]
+			}
+		],
+		"translations": "./translations.json"
+	}
 }

@@ -1,7 +1,7 @@
 {
 	"id": "trovo_live",
 	"name": "Trovo",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -71,8 +71,8 @@
 			"add-moderator",
 			"remove-moderator"
 		],
-		"settings_tutorial": "---\n### Setup\n1) Click **Authorize Trovo** in the OAuth section.\n2) Save the plugin; it will fetch your profile and chat token, then connect to Trovo websocket chat.\n\n### Notes\n- Access/refresh tokens are filled automatically by OAuth and refreshed at runtime.\n- Channel ID and username are auto-detected from Trovo API.\n- Entrance and first chatter alerts can be limited to live sessions with the provided toggles.\n---",
-		"actions_tutorial": "---\n### Actions\n- **Send Chat Message**: post a message to Trovo chat.\n- **Update Live Title**: update your Trovo stream title via channel API.\n- **Update Category**: find the closest Trovo category from your text and update it.\n- **Host Channel**: run `/host username` command.\n- **Unhost Channel**: run `/unhost` command.\n- **Set Title (Command)**: run `/settitle title` command.\n- **Trigger Alert**: fire one Trovo alert manually for testing.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [
 			{
 				"type": "send_chat",
@@ -173,16 +173,46 @@
 						"required": true,
 						"defaultValue": "follower",
 						"options": [
-							{ "label": "Stream Live", "value": "streamLive" },
-							{ "label": "Stream Offline", "value": "streamOffline" },
-							{ "label": "First Chatter", "value": "firstChatter" },
-							{ "label": "Entrance", "value": "entrance" },
-							{ "label": "Channel Join", "value": "channelJoin" },
-							{ "label": "Follower", "value": "follower" },
-							{ "label": "Subscriber", "value": "subscriber" },
-							{ "label": "Gift Subscription", "value": "subscriptionGift" },
-							{ "label": "Raid", "value": "raid" },
-							{ "label": "Spell", "value": "spell" }
+							{
+								"label": "Stream Live",
+								"value": "streamLive"
+							},
+							{
+								"label": "Stream Offline",
+								"value": "streamOffline"
+							},
+							{
+								"label": "First Chatter",
+								"value": "firstChatter"
+							},
+							{
+								"label": "Entrance",
+								"value": "entrance"
+							},
+							{
+								"label": "Channel Join",
+								"value": "channelJoin"
+							},
+							{
+								"label": "Follower",
+								"value": "follower"
+							},
+							{
+								"label": "Subscriber",
+								"value": "subscriber"
+							},
+							{
+								"label": "Gift Subscription",
+								"value": "subscriptionGift"
+							},
+							{
+								"label": "Raid",
+								"value": "raid"
+							},
+							{
+								"label": "Spell",
+								"value": "spell"
+							}
 						]
 					},
 					{
@@ -338,13 +368,22 @@
 			{
 				"title": "Stream Live",
 				"key": "streamLive",
-				"acceptedVariables": ["live", "username", "channel_id", "uptime"],
+				"acceptedVariables": [
+					"live",
+					"username",
+					"channel_id",
+					"uptime"
+				],
 				"defaultMessage": "{{username}} is now live on Trovo!"
 			},
 			{
 				"title": "Stream Offline",
 				"key": "streamOffline",
-				"acceptedVariables": ["live", "username", "uptime"],
+				"acceptedVariables": [
+					"live",
+					"username",
+					"uptime"
+				],
 				"defaultMessage": "{{username}} has ended the Trovo stream."
 			},
 			{
@@ -368,7 +407,10 @@
 			{
 				"title": "Entrance",
 				"key": "entrance",
-				"acceptedVariables": ["live", "session_chat_count"],
+				"acceptedVariables": [
+					"live",
+					"session_chat_count"
+				],
 				"defaultMessage": "{{username}} entered chat.",
 				"variationConditions": [
 					{
@@ -380,7 +422,10 @@
 			{
 				"title": "Channel Join",
 				"key": "channelJoin",
-				"acceptedVariables": ["live", "username"],
+				"acceptedVariables": [
+					"live",
+					"username"
+				],
 				"defaultMessage": "{{username}} joined the channel.",
 				"defaults": {
 					"on": false
@@ -480,6 +525,7 @@
 				],
 				"defaultMessage": "{{username}} cast {{spell}} x{{spell_quantity}}"
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }

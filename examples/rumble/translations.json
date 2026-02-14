@@ -1,0 +1,28 @@
+{
+	"en": {
+		"live": "Whether the Rumble stream is currently live",
+		"viewers": "Current number of concurrent viewers watching the stream",
+		"joined": "Total viewers that have joined the stream session",
+		"title": "Current stream title",
+		"thumbnail": "Stream thumbnail URL",
+		"stream_url": "Public URL to the livestream",
+		"video_id": "Underlying Rumble video ID",
+		"reactions": "Current reaction count on the stream",
+		"followers": "Current follower count of the channel",
+		"likes": "Thumbs-up reactions on the stream",
+		"dislikes": "Thumbs-down reactions on the stream",
+		"subs": "Total paid subscriptions/memberships for the channel",
+		"sub_gifts": "Gifted subscriptions/memberships received during the stream",
+		"rants": "Number of Rants received this stream",
+		"rant_amount": "Total value of Rants received this stream",
+		"chat_members": "Active chat members in the livestream chat",
+		"category": "Category assigned to the livestream",
+		"description": "Short description of the livestream",
+		"language": "Language reported by Rumble for the stream",
+		"chat_url": "Direct URL to the livestream chat",
+		"channel_name": "Rumble channel display name",
+		"channel_image": "Avatar image URL for the Rumble channel",
+		"started_at": "Timestamp of when the stream went live (ISO 8601)",
+		"scheduled_start": "Scheduled start time for the stream (ISO 8601)"
+	}
+}
