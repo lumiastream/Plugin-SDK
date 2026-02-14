@@ -14,13 +14,15 @@ class OllamaPlugin extends Plugin {
 		this._messagesByThread = {};
 		this._messagesByUser = {};
 		this._lastConnectionState = null;
-		this._modelCache = { list: [], fetchedAt: 0 };
+		this._modelCache = { list: [], fetchedAt: 0, baseUrl: "" };
 		this._modelFetchPromise = null;
+		this._modelFetchBaseUrl = "";
 	}
 
 	async onload() {
 		await this._updateConnectionState(false);
 		void this._refreshModelCache();
+		void this.refreshSettingsOptions({ fieldKey: "defaultModel" });
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
@@ -30,11 +32,66 @@ class OllamaPlugin extends Plugin {
 		if (baseChanged || modelChanged) {
 			await this._validateConnection({ silent: true });
 			void this._refreshModelCache({ force: true, silent: true });
+			void this.refreshSettingsOptions({ fieldKey: "defaultModel" });
 		}
 	}
 
 	async validateAuth() {
 		return this._validateConnection({ silent: true });
+	}
+
+	async aiPrompt(config = {}) {
+		const message = this._trim(
+			config?.message ?? config?.prompt ?? config?.text ?? "",
+		);
+		if (!message) {
+			return "";
+		}
+
+		return await this._handleChat({ ...config, message });
+	}
+
+	async aiModels({ refresh = false, settings } = {}) {
+		const models = await this._refreshModelCache({
+			force: Boolean(refresh),
+			silent: true,
+			settings,
+			persistDefaultModel: false,
+		});
+		return models.map((model) => ({ value: model, name: model }));
+	}
+
+	async refreshSettingsOptions({ fieldKey, values, settings } = {}) {
+		if (fieldKey && fieldKey !== "defaultModel" && fieldKey !== "baseUrl") {
+			return;
+		}
+
+		if (typeof this.lumia?.updateSettingsFieldOptions !== "function") {
+			return;
+		}
+
+		const previewSettings =
+			values && typeof values === "object"
+				? values
+				: settings && typeof settings === "object"
+					? settings
+					: this.settings;
+		const models = await this.aiModels({
+			refresh: true,
+			settings: previewSettings,
+		});
+		const options = [
+			{ label: "Auto (first available)", value: "" },
+			...models.map((model) => ({
+				label: model?.name || model?.value,
+				value: model?.value || "",
+			})),
+		];
+
+		await this.lumia.updateSettingsFieldOptions({
+			fieldKey: "defaultModel",
+			options,
+		});
 	}
 
 	async variableFunction({ key, value, raw, allVariables } = {}) {
@@ -181,6 +238,9 @@ class OllamaPlugin extends Plugin {
 		} catch (error) {
 			const messageText = this._errorMessage(error);
 			await this._updateConnectionState(false);
+			if (typeof this.lumia?.log === "function") {
+				await this.lumia.log(`[Ollama] Chat request failed: ${messageText}`);
+			}
 			return "";
 		}
 
@@ -193,6 +253,9 @@ class OllamaPlugin extends Plugin {
 			responseText = responseTransform(responseText);
 		}
 		responseText = this._applyMaxOutput(responseText);
+		if (!responseText && typeof this.lumia?.log === "function") {
+			await this.lumia.log("[Ollama] Chat request returned an empty response.");
+		}
 
 		if (historyKey && storeHistory) {
 			const nextHistory = this._trimHistory(
@@ -255,6 +318,7 @@ class OllamaPlugin extends Plugin {
 	_requestTimeoutMs(settings = this.settings) {
 		const raw = Number(settings?.requestTimeoutMs);
 		const value = Number.isFinite(raw) ? raw : DEFAULTS.requestTimeoutMs;
+		if (value <= 0) return 0;
 		return Math.min(Math.max(value, 1000), 300000);
 	}
 
@@ -368,40 +432,57 @@ class OllamaPlugin extends Plugin {
 		return value.slice(0, maxChars);
 	}
 
-	async _refreshModelCache({ force = false, silent = false } = {}) {
+	async _refreshModelCache({
+		force = false,
+		silent = false,
+		settings = this.settings,
+		persistDefaultModel = true,
+	} = {}) {
 		const now = Date.now();
+		const baseUrl = this._baseUrl(settings);
 		if (
 			!force &&
 			this._modelCache.list.length > 0 &&
+			this._modelCache.baseUrl === baseUrl &&
 			now - this._modelCache.fetchedAt < DEFAULTS.modelCacheTtlMs
 		) {
 			return this._modelCache.list;
 		}
 
-		if (this._modelFetchPromise) {
+		if (this._modelFetchPromise && this._modelFetchBaseUrl === baseUrl) {
 			try {
 				return await this._modelFetchPromise;
 			} catch (error) {
-				return this._modelCache.list;
+				return this._modelCache.baseUrl === baseUrl
+					? this._modelCache.list
+					: [];
 			}
 		}
 
+		this._modelFetchBaseUrl = baseUrl;
 		this._modelFetchPromise = (async () => {
-			const response = await this._fetchJson(this._url("/api/tags"), {
-				method: "GET",
-			});
+			const response = await this._fetchJson(
+				this._url("/api/tags", settings),
+				{
+					method: "GET",
+				},
+				settings,
+			);
 			const models = Array.isArray(response?.models)
 				? response.models
 						.map((model) => this._trim(model?.name))
 						.filter(Boolean)
 				: [];
-			this._modelCache = { list: models, fetchedAt: now };
-			if (!this._defaultModel() && models.length > 0) {
+			this._modelCache = { list: models, fetchedAt: now, baseUrl };
+			if (persistDefaultModel && !this._defaultModel(settings) && models.length > 0) {
 				this.updateSettings({ defaultModel: models[0] });
 			}
 			return models;
 		})().finally(() => {
-			this._modelFetchPromise = null;
+			if (this._modelFetchBaseUrl === baseUrl) {
+				this._modelFetchPromise = null;
+				this._modelFetchBaseUrl = "";
+			}
 		});
 
 		try {
@@ -410,7 +491,7 @@ class OllamaPlugin extends Plugin {
 			if (!silent) {
 				await this._updateConnectionState(false);
 			}
-			return this._modelCache.list;
+			return this._modelCache.baseUrl === baseUrl ? this._modelCache.list : [];
 		}
 	}
 
@@ -480,20 +561,27 @@ class OllamaPlugin extends Plugin {
 		return String(error ?? "Unknown error");
 	}
 
-	_url(path) {
-		const base = new URL(this._baseUrl());
+	_url(path, settings = this.settings) {
+		const base = new URL(this._baseUrl(settings));
 		const basePath = base.pathname.replace(/\/+$/, "");
 		base.pathname = `${basePath}${path}`;
 		return base.toString();
 	}
 
-	async _fetchJson(url, options = {}) {
-		const timeoutMs = this._requestTimeoutMs();
-		const timeoutPromise = new Promise((_, reject) => {
-			setTimeout(() => reject(new Error("Request timed out")), timeoutMs);
-		});
-
-		const response = await Promise.race([fetch(url, options), timeoutPromise]);
+	async _fetchJson(url, options = {}, settings = this.settings) {
+		const timeoutMs = this._requestTimeoutMs(settings);
+		const response =
+			timeoutMs === 0
+				? await fetch(url, options)
+				: await Promise.race([
+						fetch(url, options),
+						new Promise((_, reject) => {
+							setTimeout(
+								() => reject(new Error("Request timed out")),
+								timeoutMs,
+							);
+						}),
+					]);
 
 		if (!response || !response.ok) {
 			const text = response ? await response.text() : "";
