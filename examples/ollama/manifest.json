@@ -14,6 +14,7 @@
 	"config": {
 		"hasAI": true,
 		"settings_tutorial": "./settings_tutorial.md",
+		"translations": "./translations.json",
 		"settings": [
 			{
 				"key": "baseUrl",
@@ -22,7 +23,10 @@
 				"defaultValue": "http://localhost:11434",
 				"required": true,
 				"helperText": "Your Ollama server URL.",
-				"refreshOnChange": true
+				"refreshOnChange": true,
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "defaultModel",
@@ -39,14 +43,24 @@
 					}
 				],
 				"required": false,
-				"helperText": "Loaded from Ollama /api/tags. Leave blank for auto-detect or type a custom model."
+				"helperText": "Loaded from Ollama /api/tags. Leave blank for auto-detect or type a custom model.",
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "defaultSystemMessage",
 				"label": "Default System Message",
 				"type": "textarea",
 				"rows": 3,
-				"helperText": "Optional system message used when none is provided in the action."
+				"helperText": "Optional system message used when none is provided in the action.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": {
+					"key": "advanced_tuning",
+					"label": "Advanced Tuning",
+					"helperText": "Optional controls for sampling, memory, and output behavior."
+				}
 			},
 			{
 				"key": "defaultTemperature",
@@ -55,7 +69,10 @@
 				"min": 0,
 				"max": 2,
 				"step": 0.1,
-				"helperText": "Optional. Higher is more creative."
+				"helperText": "Optional. Higher is more creative.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "defaultTopP",
@@ -64,7 +81,10 @@
 				"min": 0,
 				"max": 1,
 				"step": 0.05,
-				"helperText": "Optional nucleus sampling value."
+				"helperText": "Optional nucleus sampling value.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "defaultMaxTokens",
@@ -72,30 +92,42 @@
 				"type": "number",
 				"min": 1,
 				"max": 8192,
-				"helperText": "Optional. Maps to Ollama num_predict."
+				"helperText": "Optional. Maps to Ollama num_predict.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "keepAlive",
 				"label": "Keep Alive",
 				"type": "text",
 				"placeholder": "5m",
-				"helperText": "How long to keep the model loaded (example: `5m`, `0`). Optional."
+				"helperText": "How long to keep the model loaded (example: `5m`, `0`). Optional.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "requestTimeoutMs",
 				"label": "Request Timeout (ms)",
 				"type": "number",
-				"defaultValue": 60000,
+				"defaultValue": 0,
 				"min": 0,
 				"max": 300000,
-				"helperText": "How long to wait for a response. Set to 0 to disable timeout."
+				"helperText": "How long to wait for a response. Set to 0 to disable timeout.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "rememberMessages",
 				"label": "Remember Messages",
 				"type": "toggle",
 				"defaultValue": true,
-				"helperText": "Store history per thread or username."
+				"helperText": "Store history per thread or username.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "maxHistoryMessages",
@@ -104,7 +136,10 @@
 				"defaultValue": 12,
 				"min": 0,
 				"max": 100,
-				"helperText": "How many recent messages to keep per thread/user."
+				"helperText": "How many recent messages to keep per thread/user.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "maxOutputChars",
@@ -113,7 +148,10 @@
 				"defaultValue": 0,
 				"min": 0,
 				"max": 100000,
-				"helperText": "Trim responses to this length (0 = no limit)."
+				"helperText": "Trim responses to this length (0 = no limit).",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			}
 		],
 		"actions": [],

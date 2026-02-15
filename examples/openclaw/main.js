@@ -17,6 +17,7 @@ class OpenClawPlugin extends Plugin {
 		this._messagesByUser = {};
 		this._lastConnectionState = null;
 		this._modelCache = { list: [], fetchedAt: 0, baseUrl: "" };
+		this._lastErrorToast = { message: "", at: 0 };
 	}
 
 	async onload() {
@@ -98,18 +99,19 @@ class OpenClawPlugin extends Plugin {
 			return;
 		}
 
-		const previewSettings =
-			values && typeof values === "object"
-				? values
-				: settings && typeof settings === "object"
-					? settings
-					: this.settings;
+		const previewSettings = {
+			...(this.settings && typeof this.settings === "object" ? this.settings : {}),
+			...(settings && typeof settings === "object" ? settings : {}),
+			...(values && typeof values === "object" ? values : {}),
+		};
 		const agentIds = await this._refreshModelCache({
 			force: true,
 			settings: previewSettings,
 		});
 		const fallbackAgent = this._normalizeAgentId(
-			this._defaultAgentId(previewSettings),
+			values?.defaultAgentId ??
+				settings?.defaultAgentId ??
+				this._defaultAgentId(previewSettings),
 			"",
 		);
 		const uniqueAgents = Array.from(
@@ -278,8 +280,17 @@ class OpenClawPlugin extends Plugin {
 			});
 			await this._updateConnectionState(true);
 		} catch (error) {
+			const userMessage = this._userErrorMessage(error, "OpenClaw");
+			const rawMessage = this._errorMessage(error);
 			await this._updateConnectionState(false);
-			await this._logError("Chat request failed", error);
+			await this._reportApiError({
+				userMessage,
+				rawMessage,
+				error,
+			});
+			if (format === "json") {
+				return this._jsonErrorResponse(userMessage);
+			}
 			return "";
 		}
 
@@ -714,14 +725,56 @@ class OpenClawPlugin extends Plugin {
 	}
 
 	_toJsonString(text) {
-		if (!text) return "";
-		const trimmed = String(text).trim();
-		try {
-			const parsed = JSON.parse(trimmed);
+		const parsed = this._parseJsonCandidate(text);
+		if (parsed !== null) {
 			return JSON.stringify(parsed);
-		} catch (error) {
-			return trimmed;
 		}
+		const trimmed = this._trim(text);
+		if (!trimmed) {
+			return "{}";
+		}
+		return JSON.stringify({
+			error: "Invalid JSON response from OpenClaw.",
+			raw: this._truncateForLog(trimmed, 300),
+		});
+	}
+
+	_jsonErrorResponse(message) {
+		return JSON.stringify({
+			error: this._trim(message) || "OpenClaw request failed.",
+		});
+	}
+
+	_parseJsonCandidate(sourceText) {
+		const source = this._trim(sourceText);
+		if (!source) return null;
+
+		const candidates = [source];
+		const fenced = source.match(/```(?:json)?\s*([\s\S]*?)```/i);
+		if (fenced?.[1]) {
+			candidates.unshift(fenced[1].trim());
+		}
+
+		const firstBrace = source.indexOf("{");
+		const lastBrace = source.lastIndexOf("}");
+		if (firstBrace !== -1 && lastBrace > firstBrace) {
+			candidates.push(source.slice(firstBrace, lastBrace + 1));
+		}
+
+		const firstBracket = source.indexOf("[");
+		const lastBracket = source.lastIndexOf("]");
+		if (firstBracket !== -1 && lastBracket > firstBracket) {
+			candidates.push(source.slice(firstBracket, lastBracket + 1));
+		}
+
+		for (const candidate of candidates) {
+			try {
+				return JSON.parse(candidate);
+			} catch (error) {
+			}
+		}
+
+		return null;
 	}
 
 	_extractResponseText(response = {}) {
@@ -871,6 +924,90 @@ class OpenClawPlugin extends Plugin {
 		return String(error ?? "Unknown error");
 	}
 
+	_userErrorMessage(error, provider = "AI") {
+		const { status, responseText, message } = this._errorContext(error);
+		const apiMessage = this._errorBodyMessage(responseText);
+		const retryHint = this._retryHint(responseText);
+
+		if (status === 401 || status === 403) {
+			return `${provider} API authentication failed. Check your API key and permissions.`;
+		}
+		if (status === 429) {
+			return `${provider} API rate limit or quota exceeded. Check your plan/billing and try again.${retryHint}`;
+		}
+		if (status !== null && status >= 500) {
+			return `${provider} API is temporarily unavailable. Please try again in a moment.`;
+		}
+		if (apiMessage) {
+			return `${provider} API error: ${apiMessage}`;
+		}
+		return `${provider} request failed. ${this._truncateForLog(message, 180) || "Please check plugin settings and try again."}`;
+	}
+
+	_errorContext(error) {
+		const message = this._errorMessage(error);
+		const parsedStatus = Number(error?.status);
+		let status = Number.isFinite(parsedStatus) ? parsedStatus : null;
+		let responseText =
+			typeof error?.responseText === "string" ? error.responseText.trim() : "";
+
+		const match = message.match(/^Request failed \(([^)]+)\):\s*([\s\S]*)$/);
+		if (match) {
+			if (status === null && /^\d+$/.test(match[1])) {
+				status = Number(match[1]);
+			}
+			if (!responseText) {
+				responseText = match[2].trim();
+			}
+		}
+
+		return { status, responseText, message };
+	}
+
+	_errorBodyMessage(responseText) {
+		const text = this._trim(responseText);
+		if (!text) return "";
+		const parsed = this._safeParseJson(text);
+		if (parsed) {
+			const fromNested =
+				this._trim(parsed?.error?.message) ||
+				this._trim(parsed?.error) ||
+				this._trim(parsed?.message) ||
+				this._trim(parsed?.details);
+			if (fromNested) return this._truncateForLog(fromNested, 220);
+		}
+		return this._truncateForLog(text, 220);
+	}
+
+	_retryHint(responseText) {
+		const parsed = this._safeParseJson(responseText);
+		const retryAfter =
+			this._trim(parsed?.retry_after) ||
+			this._trim(parsed?.retryAfter) ||
+			this._trim(parsed?.error?.retry_after) ||
+			this._trim(parsed?.error?.retryAfter);
+		if (retryAfter) {
+			return ` Retry in about ${retryAfter}.`;
+		}
+
+		const text = this._trim(responseText);
+		const retryMatch = text.match(/retry (?:after|in)\s+([0-9]+(?:\.[0-9]+)?s?)/i);
+		if (retryMatch?.[1]) {
+			return ` Retry in about ${retryMatch[1]}.`;
+		}
+		return "";
+	}
+
+	_safeParseJson(text) {
+		const value = this._trim(text);
+		if (!value) return null;
+		try {
+			return JSON.parse(value);
+		} catch (error) {
+			return null;
+		}
+	}
+
 	_truncateForLog(text, max = 300) {
 		const value = String(text ?? "").replace(/\s+/g, " ").trim();
 		if (value.length <= max) return value;
@@ -908,6 +1045,44 @@ class OpenClawPlugin extends Plugin {
 		const suffix = this._formatErrorDetails(error);
 		const full = suffix ? `${message} | ${suffix}` : message;
 		await this._log(full);
+	}
+
+	async _reportApiError({ userMessage, rawMessage, error } = {}) {
+		await this._logError("Chat request failed", error);
+
+		const compactUser = this._truncateForLog(userMessage, 220);
+		const compactRaw = this._truncateForLog(rawMessage, 260);
+
+		if (typeof this.lumia?.log === "function") {
+			try {
+				const message = compactRaw
+					? `[OpenClaw] ${compactUser} | ${compactRaw}`
+					: `[OpenClaw] ${compactUser}`;
+				await this.lumia.log({ message, level: "error" });
+			} catch (logError) {
+				try {
+					await this.lumia.log(`[OpenClaw] ${compactUser}`);
+				} catch (innerError) {
+				}
+			}
+		}
+
+		if (typeof this.lumia?.showToast === "function") {
+			const now = Date.now();
+			const sameMessage =
+				this._lastErrorToast.message === compactUser &&
+				now - this._lastErrorToast.at < 5000;
+			if (!sameMessage) {
+				this._lastErrorToast = { message: compactUser, at: now };
+				try {
+					await this.lumia.showToast({
+						message: compactUser,
+						time: 4500,
+					});
+				} catch (toastError) {
+				}
+			}
+		}
 	}
 
 	_url(path, settings = this.settings) {

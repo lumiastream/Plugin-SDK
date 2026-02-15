@@ -14,6 +14,7 @@
 	"config": {
 		"hasAI": true,
 		"settings_tutorial": "./settings_tutorial.md",
+		"translations": "./translations.json",
 		"settings": [
 			{
 				"key": "baseUrl",
@@ -22,14 +23,20 @@
 				"defaultValue": "http://127.0.0.1:18789",
 				"required": true,
 				"helperText": "Your OpenClaw Gateway URL.",
-				"refreshOnChange": true
+				"refreshOnChange": true,
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "authToken",
 				"label": "Gateway Token",
 				"type": "password",
 				"helperText": "Optional. Required when Gateway auth is enabled.",
-				"refreshOnChange": true
+				"refreshOnChange": true,
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "defaultAgentId",
@@ -47,7 +54,10 @@
 					}
 				],
 				"required": false,
-				"helperText": "Agent id used to build request route (openclaw:<agent>) and x-openclaw-agent-id."
+				"helperText": "Agent id used to build request route (openclaw:<agent>) and x-openclaw-agent-id.",
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "knownAgentIds",
@@ -55,7 +65,10 @@
 				"type": "text",
 				"defaultValue": "",
 				"helperText": "Comma-separated agent IDs for the dropdown (example: main,research,fast).",
-				"refreshOnChange": true
+				"refreshOnChange": true,
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			}
 		],
 		"actions": [],
