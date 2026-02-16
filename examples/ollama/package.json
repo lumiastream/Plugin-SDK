@@ -1,11 +1,11 @@
 {
-  "name": "lumia-ollama",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Lumia Stream plugin that sends prompts to Ollama and exposes the response in variables and alerts.",
-  "main": "main.js",
-  "scripts": {},
-  "dependencies": {
-    "@lumiastream/plugin": "^0.4.0"
-  }
+	"name": "lumia-ollama",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that sends prompts to Ollama and exposes the response in variables and alerts.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.0"
+	}
 }

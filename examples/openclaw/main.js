@@ -28,7 +28,8 @@ class OpenClawPlugin extends Plugin {
 
 	async onsettingsupdate(settings, previous = {}) {
 		const baseChanged = this._baseUrl(settings) !== this._baseUrl(previous);
-		const tokenChanged = this._authToken(settings) !== this._authToken(previous);
+		const tokenChanged =
+			this._authToken(settings) !== this._authToken(previous);
 		const agentChanged =
 			this._defaultAgentId(settings) !== this._defaultAgentId(previous);
 		const knownAgentsChanged =
@@ -77,7 +78,9 @@ class OpenClawPlugin extends Plugin {
 			this._defaultAgentId(settings || this.settings),
 			"",
 		);
-		const agents = Array.from(new Set([defaultAgent, ...fetchedAgents].filter(Boolean)));
+		const agents = Array.from(
+			new Set([defaultAgent, ...fetchedAgents].filter(Boolean)),
+		);
 		const routes = agents.map((agentId) =>
 			this._toAgentRoute(agentId, defaultAgent || "main"),
 		);
@@ -100,7 +103,9 @@ class OpenClawPlugin extends Plugin {
 		}
 
 		const previewSettings = {
-			...(this.settings && typeof this.settings === "object" ? this.settings : {}),
+			...(this.settings && typeof this.settings === "object"
+				? this.settings
+				: {}),
 			...(settings && typeof settings === "object" ? settings : {}),
 			...(values && typeof values === "object" ? values : {}),
 		};
@@ -138,11 +143,7 @@ class OpenClawPlugin extends Plugin {
 		if (!key) return "";
 
 		const input =
-			typeof value === "string"
-				? value
-				: typeof raw === "string"
-					? raw
-					: "";
+			typeof value === "string" ? value : typeof raw === "string" ? raw : "";
 		if (!input.trim()) {
 			return "";
 		}
@@ -235,10 +236,7 @@ class OpenClawPlugin extends Plugin {
 			this._defaultTemperature(),
 		);
 		const topP = this._number(data?.top_p, this._defaultTopP());
-		const maxTokens = this._number(
-			data?.max_tokens,
-			this._defaultMaxTokens(),
-		);
+		const maxTokens = this._number(data?.max_tokens, this._defaultMaxTokens());
 
 		const thread = this._trim(data?.thread);
 		const username = this._trim(data?.username);
@@ -250,7 +248,7 @@ class OpenClawPlugin extends Plugin {
 						thread,
 						username,
 						rememberMessages,
-				  })
+					})
 				: null;
 		const history = historyKey ? this._getHistory(historyKey) : [];
 
@@ -648,7 +646,7 @@ class OpenClawPlugin extends Plugin {
 						topP,
 						maxTokens,
 						sessionUser,
-				  })
+					})
 				: this._buildChatCompletionsBody({
 						model,
 						messages,
@@ -657,7 +655,7 @@ class OpenClawPlugin extends Plugin {
 						maxTokens,
 						format,
 						sessionUser,
-				  });
+					});
 
 		if (path === "/v1/responses" && format === "json") {
 			await this._logInfo(
@@ -770,8 +768,7 @@ class OpenClawPlugin extends Plugin {
 		for (const candidate of candidates) {
 			try {
 				return JSON.parse(candidate);
-			} catch (error) {
-			}
+			} catch (error) {}
 		}
 
 		return null;
@@ -838,10 +835,7 @@ class OpenClawPlugin extends Plugin {
 		return value.slice(0, maxChars);
 	}
 
-	async _refreshModelCache({
-		force = false,
-		settings = this.settings,
-	} = {}) {
+	async _refreshModelCache({ force = false, settings = this.settings } = {}) {
 		const now = Date.now();
 		const baseUrl = this._baseUrl(settings);
 		if (
@@ -884,7 +878,7 @@ class OpenClawPlugin extends Plugin {
 			? messages.map((msg) => ({
 					role: msg?.role,
 					content: msg?.content,
-			  }))
+				}))
 			: [];
 	}
 
@@ -991,7 +985,9 @@ class OpenClawPlugin extends Plugin {
 		}
 
 		const text = this._trim(responseText);
-		const retryMatch = text.match(/retry (?:after|in)\s+([0-9]+(?:\.[0-9]+)?s?)/i);
+		const retryMatch = text.match(
+			/retry (?:after|in)\s+([0-9]+(?:\.[0-9]+)?s?)/i,
+		);
 		if (retryMatch?.[1]) {
 			return ` Retry in about ${retryMatch[1]}.`;
 		}
@@ -1009,7 +1005,9 @@ class OpenClawPlugin extends Plugin {
 	}
 
 	_truncateForLog(text, max = 300) {
-		const value = String(text ?? "").replace(/\s+/g, " ").trim();
+		const value = String(text ?? "")
+			.replace(/\s+/g, " ")
+			.trim();
 		if (value.length <= max) return value;
 		return `${value.slice(0, max)}...`;
 	}
@@ -1020,7 +1018,8 @@ class OpenClawPlugin extends Plugin {
 		if (error?.status) details.push(`status=${error.status}`);
 		if (error?.method) details.push(`method=${error.method}`);
 		if (error?.url) details.push(`url=${error.url}`);
-		if (error?.message) details.push(`error=${this._truncateForLog(error.message)}`);
+		if (error?.message)
+			details.push(`error=${this._truncateForLog(error.message)}`);
 		if (error?.responseText) {
 			details.push(`body=${this._truncateForLog(error.responseText)}`);
 		}
@@ -1033,8 +1032,7 @@ class OpenClawPlugin extends Plugin {
 		}
 		try {
 			await this.lumia.log(`[OpenClaw] ${message}`);
-		} catch (error) {
-		}
+		} catch (error) {}
 	}
 
 	async _logInfo(message) {
@@ -1062,8 +1060,7 @@ class OpenClawPlugin extends Plugin {
 			} catch (logError) {
 				try {
 					await this.lumia.log(`[OpenClaw] ${compactUser}`);
-				} catch (innerError) {
-				}
+				} catch (innerError) {}
 			}
 		}
 
@@ -1079,8 +1076,7 @@ class OpenClawPlugin extends Plugin {
 						message: compactUser,
 						time: 4500,
 					});
-				} catch (toastError) {
-				}
+				} catch (toastError) {}
 			}
 		}
 	}
@@ -1148,7 +1144,9 @@ class OpenClawPlugin extends Plugin {
 		}
 
 		this._lastConnectionState = state;
-		await this._logInfo(`Connection state changed: ${state ? "connected" : "disconnected"}`);
+		await this._logInfo(
+			`Connection state changed: ${state ? "connected" : "disconnected"}`,
+		);
 
 		if (typeof this.lumia.updateConnection === "function") {
 			try {

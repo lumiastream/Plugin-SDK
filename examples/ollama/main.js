@@ -72,7 +72,9 @@ class OllamaPlugin extends Plugin {
 		}
 
 		const previewSettings = {
-			...(this.settings && typeof this.settings === "object" ? this.settings : {}),
+			...(this.settings && typeof this.settings === "object"
+				? this.settings
+				: {}),
 			...(settings && typeof settings === "object" ? settings : {}),
 			...(values && typeof values === "object" ? values : {}),
 		};
@@ -86,10 +88,12 @@ class OllamaPlugin extends Plugin {
 				this._defaultModel(previewSettings),
 		);
 		const modelValues = Array.from(
-			new Set([
-				selectedModel,
-				...models.map((model) => this._trim(model?.value)),
-			].filter(Boolean)),
+			new Set(
+				[
+					selectedModel,
+					...models.map((model) => this._trim(model?.value)),
+				].filter(Boolean),
+			),
 		);
 		const options = [
 			{ label: "Auto (first available)", value: "" },
@@ -109,11 +113,7 @@ class OllamaPlugin extends Plugin {
 		if (!key) return "";
 
 		const input =
-			typeof value === "string"
-				? value
-				: typeof raw === "string"
-					? raw
-					: "";
+			typeof value === "string" ? value : typeof raw === "string" ? raw : "";
 		if (!input.trim()) {
 			return "";
 		}
@@ -194,10 +194,7 @@ class OllamaPlugin extends Plugin {
 			this._defaultTemperature(),
 		);
 		const topP = this._number(data?.top_p, this._defaultTopP());
-		const maxTokens = this._number(
-			data?.max_tokens,
-			this._defaultMaxTokens(),
-		);
+		const maxTokens = this._number(data?.max_tokens, this._defaultMaxTokens());
 		const keepAlive = this._keepAlive(data);
 
 		const thread = this._trim(data?.thread);
@@ -210,7 +207,7 @@ class OllamaPlugin extends Plugin {
 						thread,
 						username,
 						rememberMessages,
-				  })
+					})
 				: null;
 		const history = historyKey ? this._getHistory(historyKey) : [];
 
@@ -475,8 +472,7 @@ class OllamaPlugin extends Plugin {
 		for (const candidate of candidates) {
 			try {
 				return JSON.parse(candidate);
-			} catch (error) {
-			}
+			} catch (error) {}
 		}
 
 		return null;
@@ -532,7 +528,11 @@ class OllamaPlugin extends Plugin {
 						.filter(Boolean)
 				: [];
 			this._modelCache = { list: models, fetchedAt: now, baseUrl };
-			if (persistDefaultModel && !this._defaultModel(settings) && models.length > 0) {
+			if (
+				persistDefaultModel &&
+				!this._defaultModel(settings) &&
+				models.length > 0
+			) {
 				this.updateSettings({ defaultModel: models[0] });
 			}
 			return models;
@@ -579,7 +579,7 @@ class OllamaPlugin extends Plugin {
 			? messages.map((msg) => ({
 					role: msg?.role,
 					content: msg?.content,
-			  }))
+				}))
 			: [];
 	}
 
@@ -686,7 +686,9 @@ class OllamaPlugin extends Plugin {
 		}
 
 		const text = this._trim(responseText);
-		const retryMatch = text.match(/retry (?:after|in)\s+([0-9]+(?:\.[0-9]+)?s?)/i);
+		const retryMatch = text.match(
+			/retry (?:after|in)\s+([0-9]+(?:\.[0-9]+)?s?)/i,
+		);
 		if (retryMatch?.[1]) {
 			return ` Retry in about ${retryMatch[1]}.`;
 		}
@@ -704,7 +706,9 @@ class OllamaPlugin extends Plugin {
 	}
 
 	_truncateText(text, max = 240) {
-		const value = String(text ?? "").replace(/\s+/g, " ").trim();
+		const value = String(text ?? "")
+			.replace(/\s+/g, " ")
+			.trim();
 		if (!value) return "";
 		if (value.length <= max) return value;
 		return `${value.slice(0, max)}...`;
@@ -723,8 +727,7 @@ class OllamaPlugin extends Plugin {
 			} catch (error) {
 				try {
 					await this.lumia.log(`[Ollama] ${compactUser}`);
-				} catch (innerError) {
-				}
+				} catch (innerError) {}
 			}
 		}
 
@@ -740,8 +743,7 @@ class OllamaPlugin extends Plugin {
 						message: compactUser,
 						time: 4500,
 					});
-				} catch (error) {
-				}
+				} catch (error) {}
 			}
 		}
 	}
