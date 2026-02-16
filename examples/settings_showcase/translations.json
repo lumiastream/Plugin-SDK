@@ -1,0 +1,7 @@
+{
+	"en": {
+		"save_count": "How many times settings were saved/updated.",
+		"last_saved_at": "Timestamp of the last settings save.",
+		"last_saved_values_json": "JSON snapshot of values saved most recently."
+	}
+}

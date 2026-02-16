@@ -1,0 +1,16 @@
+{
+	"en": {
+		"online": "Whether the server is online",
+		"players_online": "Number of players currently online",
+		"players_max": "Maximum number of players allowed",
+		"version": "Server version (e.g., 1.21.5)",
+		"motd": "Server Message of the Day",
+		"protocol_version": "Protocol version number",
+		"player_list": "Comma-separated list of player names (Query only)",
+		"map": "Current world/map name (Query only)",
+		"game_type": "Game type (Survival, Creative, etc.) (Query only)",
+		"last_player_joined": "Username of last player who joined",
+		"last_player_left": "Username of last player who left",
+		"username": "Username"
+	}
+}

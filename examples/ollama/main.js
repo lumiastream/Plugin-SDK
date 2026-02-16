@@ -17,6 +17,7 @@ class OllamaPlugin extends Plugin {
 		this._modelCache = { list: [], fetchedAt: 0, baseUrl: "" };
 		this._modelFetchPromise = null;
 		this._modelFetchBaseUrl = "";
+		this._lastErrorToast = { message: "", at: 0 };
 	}
 
 	async onload() {
@@ -70,21 +71,35 @@ class OllamaPlugin extends Plugin {
 			return;
 		}
 
-		const previewSettings =
-			values && typeof values === "object"
-				? values
-				: settings && typeof settings === "object"
-					? settings
-					: this.settings;
+		const previewSettings = {
+			...(this.settings && typeof this.settings === "object"
+				? this.settings
+				: {}),
+			...(settings && typeof settings === "object" ? settings : {}),
+			...(values && typeof values === "object" ? values : {}),
+		};
 		const models = await this.aiModels({
 			refresh: true,
 			settings: previewSettings,
 		});
+		const selectedModel = this._trim(
+			values?.defaultModel ??
+				settings?.defaultModel ??
+				this._defaultModel(previewSettings),
+		);
+		const modelValues = Array.from(
+			new Set(
+				[
+					selectedModel,
+					...models.map((model) => this._trim(model?.value)),
+				].filter(Boolean),
+			),
+		);
 		const options = [
 			{ label: "Auto (first available)", value: "" },
-			...models.map((model) => ({
-				label: model?.name || model?.value,
-				value: model?.value || "",
+			...modelValues.map((value) => ({
+				label: value,
+				value,
 			})),
 		];
 
@@ -98,11 +113,7 @@ class OllamaPlugin extends Plugin {
 		if (!key) return "";
 
 		const input =
-			typeof value === "string"
-				? value
-				: typeof raw === "string"
-					? raw
-					: "";
+			typeof value === "string" ? value : typeof raw === "string" ? raw : "";
 		if (!input.trim()) {
 			return "";
 		}
@@ -183,10 +194,7 @@ class OllamaPlugin extends Plugin {
 			this._defaultTemperature(),
 		);
 		const topP = this._number(data?.top_p, this._defaultTopP());
-		const maxTokens = this._number(
-			data?.max_tokens,
-			this._defaultMaxTokens(),
-		);
+		const maxTokens = this._number(data?.max_tokens, this._defaultMaxTokens());
 		const keepAlive = this._keepAlive(data);
 
 		const thread = this._trim(data?.thread);
@@ -199,7 +207,7 @@ class OllamaPlugin extends Plugin {
 						thread,
 						username,
 						rememberMessages,
-				  })
+					})
 				: null;
 		const history = historyKey ? this._getHistory(historyKey) : [];
 
@@ -237,9 +245,14 @@ class OllamaPlugin extends Plugin {
 			await this._updateConnectionState(true);
 		} catch (error) {
 			const messageText = this._errorMessage(error);
+			const userMessage = this._userErrorMessage(error, "Ollama");
 			await this._updateConnectionState(false);
-			if (typeof this.lumia?.log === "function") {
-				await this.lumia.log(`[Ollama] Chat request failed: ${messageText}`);
+			await this._reportApiError({
+				userMessage,
+				rawMessage: messageText,
+			});
+			if (format === "json") {
+				return this._jsonErrorResponse(userMessage);
 			}
 			return "";
 		}
@@ -414,14 +427,55 @@ class OllamaPlugin extends Plugin {
 	}
 
 	_toJsonString(text) {
-		if (!text) return "";
-		const trimmed = String(text).trim();
-		try {
-			const parsed = JSON.parse(trimmed);
+		const parsed = this._parseJsonCandidate(text);
+		if (parsed !== null) {
 			return JSON.stringify(parsed);
-		} catch (error) {
-			return trimmed;
 		}
+		const trimmed = this._trim(text);
+		if (!trimmed) {
+			return "{}";
+		}
+		return JSON.stringify({
+			error: "Invalid JSON response from Ollama.",
+			raw: this._truncateText(trimmed, 300),
+		});
+	}
+
+	_jsonErrorResponse(message) {
+		return JSON.stringify({
+			error: this._trim(message) || "Ollama request failed.",
+		});
+	}
+
+	_parseJsonCandidate(sourceText) {
+		const source = this._trim(sourceText);
+		if (!source) return null;
+
+		const candidates = [source];
+		const fenced = source.match(/```(?:json)?\s*([\s\S]*?)```/i);
+		if (fenced?.[1]) {
+			candidates.unshift(fenced[1].trim());
+		}
+
+		const firstBrace = source.indexOf("{");
+		const lastBrace = source.lastIndexOf("}");
+		if (firstBrace !== -1 && lastBrace > firstBrace) {
+			candidates.push(source.slice(firstBrace, lastBrace + 1));
+		}
+
+		const firstBracket = source.indexOf("[");
+		const lastBracket = source.lastIndexOf("]");
+		if (firstBracket !== -1 && lastBracket > firstBracket) {
+			candidates.push(source.slice(firstBracket, lastBracket + 1));
+		}
+
+		for (const candidate of candidates) {
+			try {
+				return JSON.parse(candidate);
+			} catch (error) {}
+		}
+
+		return null;
 	}
 
 	_applyMaxOutput(text) {
@@ -474,7 +528,11 @@ class OllamaPlugin extends Plugin {
 						.filter(Boolean)
 				: [];
 			this._modelCache = { list: models, fetchedAt: now, baseUrl };
-			if (persistDefaultModel && !this._defaultModel(settings) && models.length > 0) {
+			if (
+				persistDefaultModel &&
+				!this._defaultModel(settings) &&
+				models.length > 0
+			) {
 				this.updateSettings({ defaultModel: models[0] });
 			}
 			return models;
@@ -521,7 +579,7 @@ class OllamaPlugin extends Plugin {
 			? messages.map((msg) => ({
 					role: msg?.role,
 					content: msg?.content,
-			  }))
+				}))
 			: [];
 	}
 
@@ -561,6 +619,135 @@ class OllamaPlugin extends Plugin {
 		return String(error ?? "Unknown error");
 	}
 
+	_userErrorMessage(error, provider = "AI") {
+		const { status, responseText, message } = this._errorContext(error);
+		const apiMessage = this._errorBodyMessage(responseText);
+		const retryHint = this._retryHint(responseText);
+
+		if (status === 401 || status === 403) {
+			return `${provider} API authentication failed. Check your API key and permissions.`;
+		}
+		if (status === 429) {
+			return `${provider} API rate limit or quota exceeded. Check your plan/billing and try again.${retryHint}`;
+		}
+		if (status !== null && status >= 500) {
+			return `${provider} API is temporarily unavailable. Please try again in a moment.`;
+		}
+		if (apiMessage) {
+			return `${provider} API error: ${apiMessage}`;
+		}
+		return `${provider} request failed. ${this._truncateText(message, 180) || "Please check plugin settings and try again."}`;
+	}
+
+	_errorContext(error) {
+		const message = this._errorMessage(error);
+		const parsedStatus = Number(error?.status);
+		let status = Number.isFinite(parsedStatus) ? parsedStatus : null;
+		let responseText =
+			typeof error?.responseText === "string" ? error.responseText.trim() : "";
+
+		const match = message.match(/^Request failed \(([^)]+)\):\s*([\s\S]*)$/);
+		if (match) {
+			if (status === null && /^\d+$/.test(match[1])) {
+				status = Number(match[1]);
+			}
+			if (!responseText) {
+				responseText = match[2].trim();
+			}
+		}
+
+		return { status, responseText, message };
+	}
+
+	_errorBodyMessage(responseText) {
+		const text = this._trim(responseText);
+		if (!text) return "";
+		const parsed = this._safeParseJson(text);
+		if (parsed) {
+			const fromNested =
+				this._trim(parsed?.error?.message) ||
+				this._trim(parsed?.error) ||
+				this._trim(parsed?.message) ||
+				this._trim(parsed?.details);
+			if (fromNested) return this._truncateText(fromNested, 220);
+		}
+		return this._truncateText(text, 220);
+	}
+
+	_retryHint(responseText) {
+		const parsed = this._safeParseJson(responseText);
+		const retryAfter =
+			this._trim(parsed?.retry_after) ||
+			this._trim(parsed?.retryAfter) ||
+			this._trim(parsed?.error?.retry_after) ||
+			this._trim(parsed?.error?.retryAfter);
+		if (retryAfter) {
+			return ` Retry in about ${retryAfter}.`;
+		}
+
+		const text = this._trim(responseText);
+		const retryMatch = text.match(
+			/retry (?:after|in)\s+([0-9]+(?:\.[0-9]+)?s?)/i,
+		);
+		if (retryMatch?.[1]) {
+			return ` Retry in about ${retryMatch[1]}.`;
+		}
+		return "";
+	}
+
+	_safeParseJson(text) {
+		const value = this._trim(text);
+		if (!value) return null;
+		try {
+			return JSON.parse(value);
+		} catch (error) {
+			return null;
+		}
+	}
+
+	_truncateText(text, max = 240) {
+		const value = String(text ?? "")
+			.replace(/\s+/g, " ")
+			.trim();
+		if (!value) return "";
+		if (value.length <= max) return value;
+		return `${value.slice(0, max)}...`;
+	}
+
+	async _reportApiError({ userMessage, rawMessage } = {}) {
+		const compactUser = this._truncateText(userMessage, 220);
+		const compactRaw = this._truncateText(rawMessage, 260);
+
+		if (typeof this.lumia?.log === "function") {
+			try {
+				const message = compactRaw
+					? `[Ollama] ${compactUser} | ${compactRaw}`
+					: `[Ollama] ${compactUser}`;
+				await this.lumia.log({ message, level: "error" });
+			} catch (error) {
+				try {
+					await this.lumia.log(`[Ollama] ${compactUser}`);
+				} catch (innerError) {}
+			}
+		}
+
+		if (typeof this.lumia?.showToast === "function") {
+			const now = Date.now();
+			const sameMessage =
+				this._lastErrorToast.message === compactUser &&
+				now - this._lastErrorToast.at < 5000;
+			if (!sameMessage) {
+				this._lastErrorToast = { message: compactUser, at: now };
+				try {
+					await this.lumia.showToast({
+						message: compactUser,
+						time: 4500,
+					});
+				} catch (error) {}
+			}
+		}
+	}
+
 	_url(path, settings = this.settings) {
 		const base = new URL(this._baseUrl(settings));
 		const basePath = base.pathname.replace(/\/+$/, "");
@@ -570,6 +757,7 @@ class OllamaPlugin extends Plugin {
 
 	async _fetchJson(url, options = {}, settings = this.settings) {
 		const timeoutMs = this._requestTimeoutMs(settings);
+		const method = this._trim(options?.method || "GET") || "GET";
 		const response =
 			timeoutMs === 0
 				? await fetch(url, options)
@@ -585,9 +773,14 @@ class OllamaPlugin extends Plugin {
 
 		if (!response || !response.ok) {
 			const text = response ? await response.text() : "";
-			throw new Error(
+			const error = new Error(
 				`Request failed (${response?.status ?? "unknown"}): ${text || response?.statusText || "No response"}`,
 			);
+			error.status = response?.status;
+			error.url = url;
+			error.method = method;
+			error.responseText = text;
+			throw error;
 		}
 
 		return await response.json();

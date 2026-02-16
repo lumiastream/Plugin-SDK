@@ -1,0 +1,7 @@
+{
+	"en": {
+		"last_username": "Most recent username used by the action.",
+		"last_message": "Most recent message used by the action.",
+		"last_heartbeat": "ISO timestamp from the plugin heartbeat loop."
+	}
+}

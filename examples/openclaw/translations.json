@@ -1,0 +1,25 @@
+{
+	"en": {
+		"connection": "Connection",
+		"Connection": "Connection",
+		"Base URL": "Base URL",
+		"Your OpenClaw Gateway URL.": "Your OpenClaw Gateway URL.",
+		"Gateway Token": "Gateway Token",
+		"Optional. Required when Gateway auth is enabled.": "Optional. Required when Gateway auth is enabled.",
+		"Default Agent ID": "Default Agent ID",
+		"Auto": "Auto",
+		"Agent id used to build request route (openclaw:<agent>) and x-openclaw-agent-id.": "Agent id used to build request route (openclaw:<agent>) and x-openclaw-agent-id.",
+		"Known Agent IDs": "Known Agent IDs",
+		"Comma-separated agent IDs for the dropdown (example: main,research,fast).": "Comma-separated agent IDs for the dropdown (example: main,research,fast).",
+		"OpenClaw Prompt": "OpenClaw Prompt",
+		"Use {{openclaw_prompt=message|thread|agent}} to return a response from OpenClaw.": "Use {{openclaw_prompt=message|thread|agent}} to return a response from OpenClaw.",
+		"OpenClaw JSON": "OpenClaw JSON",
+		"Use {{openclaw_json=message|thread|agent}} to return JSON-only output.": "Use {{openclaw_json=message|thread|agent}} to return JSON-only output.",
+		"OpenClaw One Line": "OpenClaw One Line",
+		"Use {{openclaw_one_line=message|thread|agent}} to return a single-line response.": "Use {{openclaw_one_line=message|thread|agent}} to return a single-line response.",
+		"OpenClaw Prompt (No Store)": "OpenClaw Prompt (No Store)",
+		"Use {{openclaw_prompt_nostore=message|thread|agent}} to run without history.": "Use {{openclaw_prompt_nostore=message|thread|agent}} to run without history.",
+		"OpenClaw Clear Thread": "OpenClaw Clear Thread",
+		"Use {{openclaw_prompt_clear=thread_name}} to clear a conversation thread.": "Use {{openclaw_prompt_clear=thread_name}} to clear a conversation thread."
+	}
+}

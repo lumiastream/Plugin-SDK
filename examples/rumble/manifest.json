@@ -1,7 +1,7 @@
 {
 	"id": "rumble",
 	"name": "Rumble",
-	"version": "1.0.1",
+	"version": "1.0.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -29,8 +29,8 @@
 				"helperText": "How often to check for stream updates (10-300 seconds)"
 			}
 		],
-		"settings_tutorial": "---\n### \ud83d\udd11 Get Your Rumble Livestream API URL\n1) Open https://rumble.com/account/livestream-api while logged in.\n2) Copy the full Livestream API URL shown on that page.\n3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).\n---\n### \u2705 Verify Access\nClick **Save** to start syncing data.\n---\n### \u23f1\ufe0f Adjust Polling\nSet a poll interval that balances freshness with API limits (10\u2013300 seconds).\n---",
-		"actions_tutorial": "---\n### Actions\nThis plugin runs automatically on the poll interval and does not expose actions.\n---",
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
 		"actions": [],
 		"variables": [
 			{
@@ -205,7 +205,11 @@
 			{
 				"title": "Follower",
 				"key": "follower",
-				"acceptedVariables": ["followers", "stream_url", "title"],
+				"acceptedVariables": [
+					"followers",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "New followers! Total is now {{followers}}.",
 				"variationConditions": [
 					{
@@ -221,7 +225,12 @@
 			{
 				"title": "Rant",
 				"key": "rant",
-				"acceptedVariables": ["rants", "rant_amount", "viewers", "title"],
+				"acceptedVariables": [
+					"rants",
+					"rant_amount",
+					"viewers",
+					"title"
+				],
 				"defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
 				"variationConditions": [
 					{
@@ -237,7 +246,11 @@
 			{
 				"title": "Like",
 				"key": "like",
-				"acceptedVariables": ["likes", "stream_url", "title"],
+				"acceptedVariables": [
+					"likes",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "Another thumbs-up! Likes: {{likes}}",
 				"variationConditions": [
 					{
@@ -253,7 +266,11 @@
 			{
 				"title": "Dislike",
 				"key": "dislike",
-				"acceptedVariables": ["dislikes", "stream_url", "title"],
+				"acceptedVariables": [
+					"dislikes",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
 				"variationConditions": [
 					{
@@ -269,7 +286,11 @@
 			{
 				"title": "Subscriber",
 				"key": "sub",
-				"acceptedVariables": ["subs", "stream_url", "title"],
+				"acceptedVariables": [
+					"subs",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "New subscription! Subs total: {{subs}}",
 				"variationConditions": [
 					{
@@ -285,7 +306,11 @@
 			{
 				"title": "Gift Subscription",
 				"key": "subGift",
-				"acceptedVariables": ["sub_gifts", "stream_url", "title"],
+				"acceptedVariables": [
+					"sub_gifts",
+					"stream_url",
+					"title"
+				],
 				"defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
 				"variationConditions": [
 					{
@@ -298,6 +323,7 @@
 					}
 				]
 			}
-		]
+		],
+		"translations": "./translations.json"
 	}
 }

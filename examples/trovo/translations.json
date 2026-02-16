@@ -1,0 +1,29 @@
+{
+	"en": {
+		"uptime": "Friendly uptime of the current Trovo live session.",
+		"live": "Whether Trovo stream is currently live.",
+		"session_chat_count": "Number of chat messages seen in current session.",
+		"last_follower": "Username of the latest follower event.",
+		"current_first_chatter": "First chatter username for the current stream session.",
+		"current_first_chatter_count": "Current first chatter streak count.",
+		"previous_first_chatter": "First chatter username from previous stream session.",
+		"previous_first_chatter_count": "Previous first chatter streak count.",
+		"last_chatter": "Username of the latest chat message author.",
+		"last_raider": "Username of the latest raider.",
+		"last_raid_amount": "Viewer count from the latest raid.",
+		"session_follower_count": "Follower events counted for current session.",
+		"session_subscribers_count": "Subscriber events counted for current session.",
+		"session_raiders": "Comma-separated list of raiders for current session.",
+		"last_subscriber": "Username of the latest subscriber or gift recipient.",
+		"session_subscribers": "Comma-separated list of subscribers for current session.",
+		"channel_id": "Resolved Trovo channel ID.",
+		"username": "Resolved Trovo username.",
+		"display_name": "Resolved Trovo display name.",
+		"last_spell": "Name of the latest Trovo spell.",
+		"last_spell_amount": "Quantity of the latest Trovo spell.",
+		"last_spell_value": "Value per unit of the latest Trovo spell.",
+		"last_message": "Text of the latest relayed Trovo chat message.",
+		"last_message_id": "Message id of the latest relayed Trovo chat message.",
+		"last_event_at": "ISO timestamp of the latest Trovo event processed."
+	}
+}
