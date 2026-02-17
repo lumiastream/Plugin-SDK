@@ -1,0 +1,171 @@
+{
+  "id": "system_monitor",
+  "name": "System Monitor",
+  "version": "1.0.0",
+  "author": "Lumia Stream",
+  "email": "",
+  "website": "",
+  "repository": "",
+  "description": "Monitor CPU, RAM, and GPU usage with variables and alerts.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "utilities",
+  "main": "main.js",
+  "icon": "system_monitor.png",
+  "keywords": "system, cpu, ram, gpu, alerts",
+  "config": {
+    "settings": [
+      {
+        "key": "pollIntervalSec",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 30,
+        "min": 10,
+        "max": 120,
+        "helperText": "How often to sample CPU/RAM/GPU usage."
+      },
+      {
+        "key": "cpuWarn",
+        "label": "CPU Warning Threshold (%)",
+        "type": "number",
+        "defaultValue": 70,
+        "min": 1,
+        "max": 99
+      },
+      {
+        "key": "cpuCritical",
+        "label": "CPU Critical Threshold (%)",
+        "type": "number",
+        "defaultValue": 90,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "key": "ramWarn",
+        "label": "RAM Warning Threshold (%)",
+        "type": "number",
+        "defaultValue": 70,
+        "min": 1,
+        "max": 99
+      },
+      {
+        "key": "ramCritical",
+        "label": "RAM Critical Threshold (%)",
+        "type": "number",
+        "defaultValue": 90,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "key": "gpuWarn",
+        "label": "GPU Warning Threshold (%)",
+        "type": "number",
+        "defaultValue": 70,
+        "min": 1,
+        "max": 99
+      },
+      {
+        "key": "gpuCritical",
+        "label": "GPU Critical Threshold (%)",
+        "type": "number",
+        "defaultValue": 90,
+        "min": 1,
+        "max": 100
+      }
+    ],
+    "variables": [
+      {
+        "name": "cpu_usage",
+        "value": 0
+      },
+      {
+        "name": "cpu_bucket",
+        "value": "normal"
+      },
+      {
+        "name": "ram_usage",
+        "value": 0
+      },
+      {
+        "name": "ram_bucket",
+        "value": "normal"
+      },
+      {
+        "name": "ram_used_mb",
+        "value": 0
+      },
+      {
+        "name": "ram_total_mb",
+        "value": 0
+      },
+      {
+        "name": "gpu_available",
+        "value": false
+      },
+      {
+        "name": "gpu_usage",
+        "value": 0
+      },
+      {
+        "name": "gpu_bucket",
+        "value": "normal"
+      }
+    ],
+    "translations": "./translations.json",
+    "alerts": [
+      {
+        "title": "CPU Usage Alert",
+        "key": "cpu_alert",
+        "acceptedVariables": ["cpu_usage", "cpu_bucket"],
+        "defaultMessage": "CPU at {{cpu_usage}}% ({{cpu_bucket}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "Bucket type",
+            "selections": [
+              { "label": "Warning", "value": "warning" },
+              { "label": "Critical", "value": "critical" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "RAM Usage Alert",
+        "key": "ram_alert",
+        "acceptedVariables": [
+          "ram_usage",
+          "ram_bucket",
+          "ram_used_mb",
+          "ram_total_mb"
+        ],
+        "defaultMessage": "RAM at {{ram_usage}}% ({{ram_bucket}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "Bucket type",
+            "selections": [
+              { "label": "Warning", "value": "warning" },
+              { "label": "Critical", "value": "critical" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "GPU Usage Alert",
+        "key": "gpu_alert",
+        "acceptedVariables": ["gpu_usage", "gpu_bucket"],
+        "defaultMessage": "GPU at {{gpu_usage}}% ({{gpu_bucket}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "Bucket type",
+            "selections": [
+              { "label": "Warning", "value": "warning" },
+              { "label": "Critical", "value": "critical" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
