@@ -141,6 +141,16 @@ export abstract class Plugin {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async searchPlugs(_query?: Record<string, any>): Promise<any> {
+    return [];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async addPlug(_data: Record<string, any>): Promise<any> {
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async onLightChange(_config: {
     brand: string;
     lights: any[];
@@ -148,6 +158,16 @@ export abstract class Plugin {
     power?: boolean;
     brightness?: number;
     transition?: number;
+    rawConfig?: any;
+  }): Promise<void> {
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onPlugChange(_config: {
+    brand: string;
+    devices: any[];
+    state?: boolean;
     rawConfig?: any;
   }): Promise<void> {
     return;
