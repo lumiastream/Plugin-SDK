@@ -1,0 +1,11 @@
+{
+	"name": "lumia-system-monitor-plugin",
+	"version": "1.0.0",
+	"description": "System monitor plugin for CPU/RAM/GPU usage with alerts.",
+	"main": "main.js",
+	"author": "Lumia Stream",
+	"license": "MIT",
+	"dependencies": {
+		"systeminformation": "^5.23.6"
+	}
+}

@@ -1,0 +1,15 @@
+{
+  "en": {
+    "variables": {
+      "cpu_usage": "Current CPU usage percent.",
+      "cpu_bucket": "Current CPU bucket: normal, warning, critical.",
+      "ram_usage": "Current RAM usage percent.",
+      "ram_bucket": "Current RAM bucket: normal, warning, critical.",
+      "ram_used_mb": "Current RAM used (MB).",
+      "ram_total_mb": "Total RAM (MB).",
+      "gpu_available": "Whether GPU usage is available.",
+      "gpu_usage": "Current GPU usage percent (if available).",
+      "gpu_bucket": "Current GPU bucket: normal, warning, critical."
+    }
+  }
+}
