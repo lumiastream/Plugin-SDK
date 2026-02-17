@@ -1,0 +1,19 @@
+{
+	"en": {
+		"fajr": "Fajr time for the current location.",
+		"sunrise": "Shuruq (sunrise) time for the current location.",
+		"dhuhr": "Dhuhr time for the current location.",
+		"asr": "Asr time for the current location.",
+		"maghrib": "Maghrib time for the current location.",
+		"isha": "Isha time for the current location.",
+		"hijri_date": "Hijri date for the current location.",
+		"hijri_month": "Hijri month name.",
+		"hijri_day": "Hijri day of month.",
+		"location": "Resolved location label.",
+		"next_prayer": "Next prayer name.",
+		"next_prayer_time": "Next prayer time.",
+		"prayer_times": "Prayer times (comma-separated key=value).",
+		"mawakit_prayer_times": "Prayer times (comma-separated key=value).",
+		"mawakit_hijri_date": "Hijri date for the specified location."
+	}
+}

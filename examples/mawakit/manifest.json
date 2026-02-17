@@ -1,0 +1,547 @@
+{
+  "id": "mawakit",
+  "name": "Mawakit",
+  "version": "1.0.1",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "description": "Prayer time alerts, Hijri date variables, and Ramadan reminders based on your location.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "utilities",
+  "keywords": "prayer, islam, adhan, hijri, ramadan, alerts",
+  "icon": "mawakit.png",
+  "changelog": "1.0.0: Prayer time alerts for Fajr, Shuruq, Dhuhr, Asr, Maghrib, Isha. Hijri date variables and function variable support. Ramadan-near alerts based on Hijri date. Location via city/country or coordinates with optional system location fallback. Per-prayer time offsets. Juristic method (Shafi/Maliki/Hanafi) support.",
+  "config": {
+    "settings": [
+      {
+        "key": "locationMode",
+        "label": "Location Mode",
+        "type": "select",
+        "defaultValue": "manual",
+        "options": [
+          { "label": "Manual", "value": "manual" },
+          { "label": "System (if available)", "value": "system" }
+        ],
+        "section": "Location",
+        "helperText": "System mode uses the host location only if the runtime provides it. Otherwise Mawakit falls back to manual settings."
+      },
+      {
+        "key": "locationType",
+        "label": "Location Type",
+        "type": "select",
+        "defaultValue": "city",
+        "options": [
+          { "label": "City + Country", "value": "city" },
+          { "label": "Latitude + Longitude", "value": "coordinates" }
+        ],
+        "section": "Location"
+      },
+      {
+        "key": "city",
+        "label": "City",
+        "type": "text",
+        "placeholder": "Casablanca",
+        "section": "Location",
+        "visibleIf": { "key": "locationType", "equals": "city" }
+      },
+      {
+        "key": "country",
+        "label": "Country",
+        "type": "text",
+        "placeholder": "Morocco",
+        "section": "Location",
+        "visibleIf": { "key": "locationType", "equals": "city" }
+      },
+      {
+        "key": "latitude",
+        "label": "Latitude",
+        "type": "number",
+        "min": -90,
+        "max": 90,
+        "section": "Location",
+        "visibleIf": { "key": "locationType", "equals": "coordinates" }
+      },
+      {
+        "key": "longitude",
+        "label": "Longitude",
+        "type": "number",
+        "min": -180,
+        "max": 180,
+        "section": "Location",
+        "visibleIf": { "key": "locationType", "equals": "coordinates" }
+      },
+      {
+        "key": "timezoneOffsetMinutes",
+        "label": "Timezone Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -720,
+        "max": 840,
+        "section": "Location",
+        "helperText": "Adjust timings if your system timezone differs from the selected location."
+      },
+      {
+        "key": "calculationMethod",
+        "label": "Calculation Method ID",
+        "type": "number",
+        "defaultValue": 2,
+        "min": 0,
+        "max": 20,
+        "section": "Calculation",
+        "helperText": "Uses Aladhan method IDs. Keep the default if you are unsure."
+      },
+      {
+        "key": "juristicMethod",
+        "label": "Juristic Method (Asr)",
+        "type": "select",
+        "defaultValue": "shafi",
+        "options": [
+          { "label": "Shafi", "value": "shafi" },
+          { "label": "Maliki", "value": "maliki" },
+          { "label": "Hanafi", "value": "hanafi" }
+        ],
+        "section": "Calculation",
+        "helperText": "Shafi and Maliki share the same Asr calculation in most APIs."
+      },
+      {
+        "key": "pollIntervalMinutes",
+        "label": "Refresh Interval (minutes)",
+        "type": "number",
+        "defaultValue": 60,
+        "min": 15,
+        "max": 720,
+        "section": "Schedule",
+        "helperText": "How often Mawakit refreshes prayer times from the API."
+      },
+      {
+        "key": "alertMinutesBefore",
+        "label": "Alert Minutes Before Prayer",
+        "type": "number",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 30,
+        "section": "Alerts",
+        "helperText": "Fire the alert this many minutes before the prayer time (0 = at exact time). E.g. 10 = alert when 10 min before Asr."
+      },
+      {
+        "key": "enableRamadanAlert",
+        "label": "Alert When Ramadan Is Near",
+        "type": "toggle",
+        "defaultValue": true,
+        "section": "Alerts"
+      },
+      {
+        "key": "ramadanAlertDays",
+        "label": "Ramadan Alert Days Before",
+        "type": "number",
+        "defaultValue": 10,
+        "min": 1,
+        "max": 30,
+        "section": "Alerts",
+        "visibleIf": { "key": "enableRamadanAlert", "equals": true }
+      },
+      {
+        "key": "offsetFajr",
+        "label": "Fajr Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetSunrise",
+        "label": "Shuruq Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetDhuhr",
+        "label": "Dhuhr Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetAsr",
+        "label": "Asr Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetMaghrib",
+        "label": "Maghrib Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetIsha",
+        "label": "Isha Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      }
+    ],
+    "settings_tutorial": "./settings_tutorial.md",
+    "actions": [],
+    "variableFunctions": [
+      {
+        "key": "mawakit_prayer_times",
+        "label": "Mawakit Prayer Times",
+        "description": "Use {{mawakit_prayer_times=city|country}}, {{mawakit_prayer_times=|country}}, {{mawakit_prayer_times=lat,lon}}, or {{mawakit_prayer_times}} (uses settings) to return prayer times. Falls back to selected country."
+      },
+      {
+        "key": "mawakit_hijri_date",
+        "label": "Mawakit Hijri Date",
+        "description": "Use {{mawakit_hijri_date=city|country}}, {{mawakit_hijri_date=|country}}, {{mawakit_hijri_date=lat,lon}}, or {{mawakit_hijri_date}} (uses settings) to return Hijri date."
+      }
+    ],
+    "variables": [
+      {
+        "name": "fajr",
+        "value": ""
+      },
+      {
+        "name": "sunrise",
+        "value": ""
+      },
+      {
+        "name": "dhuhr",
+        "value": ""
+      },
+      {
+        "name": "asr",
+        "value": ""
+      },
+      {
+        "name": "maghrib",
+        "value": ""
+      },
+      {
+        "name": "isha",
+        "value": ""
+      },
+      {
+        "name": "hijri_date",
+        "value": ""
+      },
+      {
+        "name": "hijri_month",
+        "value": ""
+      },
+      {
+        "name": "hijri_day",
+        "value": ""
+      },
+      {
+        "name": "location",
+        "value": ""
+      },
+      {
+        "name": "next_prayer",
+        "value": ""
+      },
+      {
+        "name": "next_prayer_time",
+        "value": ""
+      },
+      {
+        "name": "prayer_times",
+        "value": ""
+      }
+    ],
+    "alerts": [
+      {
+        "title": "Fajr",
+        "key": "mawakit_fajr",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Fajr at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Fajr at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Fajr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Fajr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Fajr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Fajr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Shuruq",
+        "key": "mawakit_shuruq",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Shuruq at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Shuruq at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Shuruq in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Shuruq in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Shuruq in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Shuruq in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Dhuhr",
+        "key": "mawakit_dhuhr",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Dhuhr at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Dhuhr at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Dhuhr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Dhuhr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Dhuhr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Dhuhr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Asr",
+        "key": "mawakit_asr",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Asr at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Asr at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Asr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Asr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Asr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Asr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Maghrib",
+        "key": "mawakit_maghrib",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Maghrib at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Maghrib at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Maghrib in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Maghrib in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Maghrib in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Maghrib in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Isha",
+        "key": "mawakit_isha",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Isha at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Isha at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Isha in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Isha in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Isha in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Isha in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Ramadan Soon",
+        "key": "mawakit_ramadan_soon",
+        "acceptedVariables": ["days_remaining", "hijri_date", "location"],
+        "defaultMessage": "Ramadan is near: {{days_remaining}} days remaining ({{hijri_date}})"
+      }
+    ],
+    "translations": "./translations.json"
+  }
+}
