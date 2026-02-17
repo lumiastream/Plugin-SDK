@@ -333,6 +333,7 @@ export interface PluginIntegrationConfig {
 	actions?: PluginActionDefinition[];
 	variableFunctions?: PluginVariableFunctionDefinition[];
 	lights?: PluginLightsConfig;
+	plugs?: PluginPlugsConfig;
 	oauth?: PluginOAuthConfig;
 	hasAI?: boolean;
 	hasChatbot?: boolean;
@@ -747,6 +748,8 @@ export interface PluginRuntime {
 	searchLights?(config?: Record<string, any>): Promise<any>;
 	searchThemes?(config?: Record<string, any>): Promise<any>;
 	addLight?(config: Record<string, any>): Promise<any>;
+	searchPlugs?(config?: Record<string, any>): Promise<any>;
+	addPlug?(config: Record<string, any>): Promise<any>;
 	onLightChange?(config: {
 		brand: string;
 		lights: PluginLight[];
@@ -754,6 +757,12 @@ export interface PluginRuntime {
 		power?: boolean;
 		brightness?: number;
 		transition?: number;
+		rawConfig?: any;
+	}): Promise<void>;
+	onPlugChange?(config: {
+		brand: string;
+		devices: any[];
+		state?: boolean;
 		rawConfig?: any;
 	}): Promise<void>;
 	settings: Record<string, any>;
@@ -853,6 +862,31 @@ export interface PluginLightsConfig {
 	search?: PluginLightSearchConfig;
 	manualAdd?: PluginLightManualAddConfig;
 	displayFields?: PluginLightDisplayField[];
+	emptyStateText?: string;
+}
+
+export interface PluginPlugDisplayField {
+	key: string;
+	label: string;
+	fallback?: string;
+}
+
+export interface PluginPlugSearchConfig {
+	label?: string;
+	helperText?: string;
+	buttonLabel?: string;
+}
+
+export interface PluginPlugManualAddConfig {
+	fields: PluginFormField[];
+	buttonLabel?: string;
+	helperText?: string;
+}
+
+export interface PluginPlugsConfig {
+	search?: PluginPlugSearchConfig;
+	manualAdd?: PluginPlugManualAddConfig;
+	displayFields?: PluginPlugDisplayField[];
 	emptyStateText?: string;
 }
 
