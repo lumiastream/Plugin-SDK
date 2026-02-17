@@ -1,0 +1,10 @@
+{
+	"name": "lumia-mawakit",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Prayer time alerts, Hijri date variables, and Ramadan reminders.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.0"
+	}
+}
