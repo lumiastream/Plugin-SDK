@@ -1,0 +1,10 @@
+{
+	"name": "lumia-chat-summarizer",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that summarizes chat and highlights users by category.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.0"
+	}
+}

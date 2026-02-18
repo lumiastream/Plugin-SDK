@@ -1,0 +1,183 @@
+{
+  "id": "chat_summarizer",
+  "name": "Chat Summarizer",
+  "version": "1.0.0",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "description": "Summarizes chat on an interval and highlights users by category.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "apps",
+  "keywords": "chat, summary, moderation, analytics",
+  "icon": "chat_summarizer.png",
+  "changelog": "",
+  "bundle": {
+    "commands": [
+      "bundle/chatmatch/chat-summary_chatmatch.lumia",
+      "bundle/commands/summarize_command.lumia"
+    ]
+  },
+  "config": {
+    "settings": [
+      {
+        "key": "summaryTemplate",
+        "label": "Summary Template",
+        "type": "textarea",
+        "defaultValue": "Chat Summary (last {interval} min): {totalMessages} messages from {uniqueUsers} users. Top chatters: {topChatters}. Categories: {categories}.",
+        "helperText": "Template placeholders: {interval}, {totalMessages}, {uniqueUsers}, {topChatters}, {categories}.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "intervalMinutes",
+        "label": "Summary Interval (minutes)",
+        "type": "number",
+        "defaultValue": 5,
+        "min": 1,
+        "max": 60,
+        "helperText": "How often to summarize chat.",
+        "refreshOnChange": true,
+        "section": "Connection",
+        "sectionOrder": 1,
+        "group": "connection"
+      },
+      {
+        "key": "summaryUsername",
+        "label": "Summary Username",
+        "type": "text",
+        "defaultValue": "Chat Summary",
+        "helperText": "Shown as the username in Lumia chat.",
+        "section": "Connection",
+        "sectionOrder": 1,
+        "group": "connection"
+      },
+      {
+        "key": "categories",
+        "label": "Categories",
+        "type": "select",
+        "multiple": true,
+        "allowTyping": true,
+        "defaultValue": ["feedback", "questions", "hype"],
+        "options": [
+          { "label": "Feedback", "value": "feedback" },
+          { "label": "Questions", "value": "questions" },
+          { "label": "Hype", "value": "hype" }
+        ],
+        "helperText": "Select categories to include in the summary.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "categoryRules",
+        "label": "Category Keywords (optional)",
+        "type": "textarea",
+        "defaultValue": "feedback: feedback, suggest, idea, maybe, should, could, recommend, wish, feature\nquestions: ?, how, why, what, when, where, help, anyone, can i, could i\nhype: hype, pog, poggers, gg, lets go, let's go, lfg, fire, 🔥, wow",
+        "helperText": "One category per line: category: keyword1, keyword2. Overrides defaults for listed categories. Example: feedback: suggest, idea, should",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "minMessages",
+        "label": "Minimum Messages to Summarize",
+        "type": "number",
+        "defaultValue": 5,
+        "min": 1,
+        "max": 1000,
+        "helperText": "Skip summary if fewer messages are collected in the interval.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "maxUsersPerCategory",
+        "label": "Max Users Per Category",
+        "type": "number",
+        "defaultValue": 10,
+        "min": 1,
+        "max": 50,
+        "helperText": "Limits how many usernames are listed per category.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "maxSummaryLength",
+        "label": "Max Summary Length",
+        "type": "number",
+        "defaultValue": 350,
+        "min": 100,
+        "max": 2000,
+        "helperText": "Trim summary text to this length.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "maxBufferedMessages",
+        "label": "Max Buffered Messages",
+        "type": "number",
+        "defaultValue": 1000,
+        "min": 0,
+        "max": 10000,
+        "helperText": "Buffer size limit to avoid unbounded memory growth. Use 0 for unlimited.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      }
+    ],
+    "variables": [
+      {
+        "name": "summary_buckets",
+        "description": "Readable string: {N}min ago, totalMessages, topChatters, and per-bucket (user:\"msg\") for buckets with messages.",
+        "value": ""
+      }
+    ],
+    "settings_tutorial": "./settings_tutorial.md",
+    "actions": [
+      {
+        "type": "ingest_chat",
+        "label": "Ingest Chat Message",
+        "description": "Add a chat message to the summarizer buffer (use in automations).",
+        "fields": [
+          {
+            "key": "username",
+            "label": "Username",
+            "type": "text",
+            "allowVariables": true,
+            "defaultValue": "{{username}}"
+          },
+          {
+            "key": "message",
+            "label": "Message",
+            "type": "text",
+            "allowVariables": true,
+            "defaultValue": "{{message}}"
+          },
+          {
+            "key": "platform",
+            "label": "Platform",
+            "type": "text",
+            "allowVariables": true,
+            "defaultValue": "{{site}}"
+          },
+          {
+            "key": "userId",
+            "label": "User ID",
+            "type": "text",
+            "allowVariables": true,
+            "defaultValue": "{{user_id}}"
+          }
+        ]
+      },
+      {
+        "type": "summarize_now",
+        "label": "Summarize Now",
+        "description": "Force a summary immediately, even if minimum message count is not met.",
+        "fields": []
+      },
+      {
+        "type": "clear_buffer",
+        "label": "Clear Buffer",
+        "description": "Clear all buffered chat messages.",
+        "fields": []
+      }
+    ]
+  }
+}
