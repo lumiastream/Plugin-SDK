@@ -1,0 +1,467 @@
+{
+  "id": "telegram",
+  "name": "Telegram",
+  "version": "1.0.4",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "description": "Send Telegram messages and trigger Lumia alerts from incoming Telegram chats.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "platforms",
+  "keywords": "telegram, chat, alerts, bot, mtproto",
+  "main": "main.js",
+  "icon": "telegram.png",
+  "config": {
+    "settings": [
+      {
+        "key": "authMode",
+        "label": "Auth Mode",
+        "type": "select",
+        "defaultValue": "bot",
+        "options": [
+          {
+            "label": "Bot (BotFather token)",
+            "value": "bot"
+          },
+          {
+            "label": "User (MTProto session)",
+            "value": "user"
+          }
+        ],
+        "section": "Connection",
+        "sectionOrder": 1
+      },
+      {
+        "key": "autoConnect",
+        "label": "Auto Connect",
+        "type": "toggle",
+        "defaultValue": true,
+        "section": "Connection",
+        "sectionOrder": 1
+      },
+      {
+        "key": "botToken",
+        "label": "Bot Token",
+        "type": "password",
+        "placeholder": "123456:ABC...",
+        "helperText": "Create a bot via @BotFather and paste its token here.",
+        "required": true,
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "bot"
+        },
+        "section": "Bot Mode",
+        "sectionOrder": 2
+      },
+      {
+        "key": "botDefaultChatId",
+        "label": "Default Chat ID",
+        "type": "text",
+        "placeholder": "-1001234567890",
+        "helperText": "Used when actions don't specify a chat id.",
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "bot"
+        },
+        "section": "Bot Mode",
+        "sectionOrder": 2
+      },
+      {
+        "key": "botAllowedChats",
+        "label": "Allowed Chat IDs",
+        "type": "textarea",
+        "rows": 3,
+        "placeholder": "-1001234567890\n@mychannel",
+        "helperText": "Optional allow-list for incoming messages (one per line).",
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "bot"
+        },
+        "section": "Bot Mode",
+        "sectionOrder": 2
+      },
+      {
+        "key": "botIncludePrivate",
+        "label": "Include Private Chats",
+        "type": "toggle",
+        "defaultValue": true,
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "bot"
+        },
+        "section": "Bot Mode",
+        "sectionOrder": 2
+      },
+      {
+        "key": "botIncludeGroups",
+        "label": "Include Groups",
+        "type": "toggle",
+        "defaultValue": true,
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "bot"
+        },
+        "section": "Bot Mode",
+        "sectionOrder": 2
+      },
+      {
+        "key": "botIncludeChannels",
+        "label": "Include Channels",
+        "type": "toggle",
+        "defaultValue": false,
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "bot"
+        },
+        "section": "Bot Mode",
+        "sectionOrder": 2
+      },
+      {
+        "key": "botIgnoreBots",
+        "label": "Ignore Bot Messages",
+        "type": "toggle",
+        "defaultValue": true,
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "bot"
+        },
+        "section": "Bot Mode",
+        "sectionOrder": 2
+      },
+      {
+        "key": "botPollInterval",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 2,
+        "min": 1,
+        "max": 60,
+        "helperText": "Delay between long-poll requests.",
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "bot"
+        },
+        "section": "Bot Mode",
+        "sectionOrder": 2
+      },
+      {
+        "key": "botLongPollTimeout",
+        "label": "Long Poll Timeout (seconds)",
+        "type": "number",
+        "defaultValue": 20,
+        "min": 1,
+        "max": 50,
+        "helperText": "Telegram server wait time per request.",
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "bot"
+        },
+        "section": "Bot Mode",
+        "sectionOrder": 2
+      },
+      {
+        "key": "userApiId",
+        "label": "API ID",
+        "type": "password",
+        "placeholder": "123456",
+        "helperText": "Create an app at my.telegram.org to obtain this value.",
+        "required": true,
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "User Mode",
+        "sectionOrder": 3
+      },
+      {
+        "key": "userApiHash",
+        "label": "API Hash",
+        "type": "password",
+        "placeholder": "0123456789abcdef",
+        "helperText": "Create an app at my.telegram.org to obtain this value.",
+        "required": true,
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "User Mode",
+        "sectionOrder": 3
+      },
+      {
+        "key": "userSessionString",
+        "label": "Session String",
+        "type": "textarea",
+        "rows": 3,
+        "placeholder": "Paste a saved session string",
+        "helperText": "Recommended: generate a session string and paste it here to avoid repeated logins.",
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "User Mode",
+        "sectionOrder": 3
+      },
+      {
+        "key": "userPhoneNumber",
+        "label": "Phone Number",
+        "type": "text",
+        "placeholder": "+15551234567",
+        "helperText": "Optional: used if session string is empty (login flow will request a code).",
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "User Mode",
+        "sectionOrder": 3
+      },
+      {
+        "key": "userLoginCode",
+        "label": "Login Code",
+        "type": "password",
+        "placeholder": "12345",
+        "helperText": "Paste the code you receive from Telegram if prompted.",
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "User Mode",
+        "sectionOrder": 3
+      },
+      {
+        "key": "userPassword",
+        "label": "Two-Factor Password",
+        "type": "password",
+        "placeholder": "Telegram 2FA password",
+        "helperText": "Only required if your account has a Telegram password enabled.",
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "User Mode",
+        "sectionOrder": 3
+      },
+      {
+        "key": "userDefaultChatId",
+        "label": "Default Chat ID",
+        "type": "text",
+        "placeholder": "@mygroup",
+        "helperText": "Used when actions don't specify a chat id.",
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "User Mode",
+        "sectionOrder": 3
+      },
+      {
+        "key": "filterRegex",
+        "label": "Message Regex Filter",
+        "type": "text",
+        "placeholder": "error|alert",
+        "helperText": "Optional regex applied to incoming messages (case-insensitive).",
+        "section": "Filters",
+        "sectionOrder": 4
+      },
+      {
+        "key": "ignoreServiceMessages",
+        "label": "Ignore Service Messages",
+        "type": "toggle",
+        "defaultValue": true,
+        "section": "Filters",
+        "sectionOrder": 4
+      }
+    ],
+    "settings_tutorial": "./settings_tutorial.md",
+    "actions_tutorial": "./actions_tutorial.md",
+    "translations": "./translations.json",
+    "actions": [
+      {
+        "type": "send_message",
+        "label": "Send Message",
+        "description": "Send a Telegram message.",
+        "refreshOnChange": true,
+        "fields": [
+          {
+            "key": "chatId",
+            "label": "Chat",
+            "type": "select",
+            "allowVariables": true,
+            "allowTyping": true,
+            "dynamicOptions": true,
+            "placeholder": "Pick a chat or type @username / chat id",
+            "helperText": "List is populated from recent chats or user-mode dialog fetch."
+          },
+          {
+            "key": "message",
+            "label": "Message",
+            "type": "textarea",
+            "required": true,
+            "allowVariables": true
+          },
+          {
+            "key": "parseMode",
+            "label": "Parse Mode",
+            "type": "select",
+            "defaultValue": "none",
+            "options": [
+              { "label": "None", "value": "none" },
+              { "label": "MarkdownV2", "value": "MarkdownV2" },
+              { "label": "HTML", "value": "HTML" }
+            ]
+          },
+          {
+            "key": "disableNotification",
+            "label": "Silent Notification",
+            "type": "checkbox",
+            "defaultValue": false
+          },
+          {
+            "key": "replyToMessageId",
+            "label": "Reply To Message ID",
+            "type": "text",
+            "allowVariables": true
+          }
+        ]
+      },
+      {
+        "type": "reset_session",
+        "label": "Reset Session Counters",
+        "description": "Reset chat counters and first chatter tracking.",
+        "fields": []
+      },
+      {
+        "type": "refresh_member_count",
+        "label": "Refresh Member Count",
+        "description": "Fetch and update the Telegram member count for a chat.",
+        "fields": [
+          {
+            "key": "chatId",
+            "label": "Chat ID / @username",
+            "type": "text",
+            "allowVariables": true
+          }
+        ]
+      },
+      {
+        "type": "connect",
+        "label": "Connect",
+        "description": "Manually connect to Telegram using current settings.",
+        "fields": []
+      },
+      {
+        "type": "disconnect",
+        "label": "Disconnect",
+        "description": "Manually disconnect from Telegram.",
+        "fields": []
+      }
+    ],
+    "variableFunctions": [
+      {
+        "key": "uptime",
+        "label": "Telegram Uptime",
+        "description": "Returns how long the current Telegram session has been connected."
+      }
+    ],
+    "variables": [
+      {
+        "name": "uptime",
+        "value": ""
+      },
+      {
+        "name": "chat_title",
+        "value": ""
+      },
+      {
+        "name": "chat_id",
+        "value": ""
+      },
+      {
+        "name": "chat_type",
+        "value": ""
+      },
+      {
+        "name": "session_chat_count",
+        "value": 0
+      },
+      {
+        "name": "current_first_chatter",
+        "value": ""
+      },
+      {
+        "name": "current_first_chatter_count",
+        "value": 0
+      },
+      {
+        "name": "previous_first_chatter",
+        "value": ""
+      },
+      {
+        "name": "previous_first_chatter_count",
+        "value": 0
+      },
+      {
+        "name": "last_chatter",
+        "value": ""
+      },
+      {
+        "name": "last_user_id",
+        "value": ""
+      },
+      {
+        "name": "last_message",
+        "value": ""
+      },
+      {
+        "name": "last_message_id",
+        "value": ""
+      },
+      {
+        "name": "last_message_at",
+        "value": ""
+      },
+      {
+        "name": "member_count",
+        "value": 0
+      }
+    ],
+    "alerts": [
+      {
+        "title": "Telegram Message",
+        "key": "message",
+        "acceptedVariables": [
+          "chat_title",
+          "chat_id",
+          "chat_type",
+          "last_chatter",
+          "last_user_id",
+          "last_message",
+          "last_message_id",
+          "last_message_at",
+          "session_chat_count"
+        ],
+        "defaultMessage": "{{last_chatter}}: {{last_message}}"
+      },
+      {
+        "title": "Telegram Entrance",
+        "key": "entrance",
+        "acceptedVariables": [
+          "last_chatter",
+          "chat_title",
+          "session_chat_count"
+        ],
+        "defaultMessage": "{{last_chatter}} entered Telegram chat."
+      },
+      {
+        "title": "Telegram First Chatter",
+        "key": "firstChatter",
+        "acceptedVariables": [
+          "current_first_chatter",
+          "current_first_chatter_count",
+          "previous_first_chatter",
+          "previous_first_chatter_count"
+        ],
+        "defaultMessage": "{{current_first_chatter}} is first chatter!"
+      }
+    ]
+  }
+}
