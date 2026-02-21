@@ -2,14 +2,8 @@
   "en": {
     "variables": {
       "uptime": "Friendly uptime of the current Telegram session.",
-      "chat_title": "Title or name of the latest chat.",
       "chat_id": "Chat ID of the latest message.",
       "chat_type": "Chat type of the latest message (private, group, supergroup, channel).",
-      "session_chat_count": "Number of chat messages seen in the current session.",
-      "current_first_chatter": "First chatter username for the current session.",
-      "current_first_chatter_count": "Current first chatter streak count.",
-      "previous_first_chatter": "First chatter username from previous session.",
-      "previous_first_chatter_count": "Previous first chatter streak count.",
       "last_chatter": "Username of the latest chat message author.",
       "last_user_id": "User ID of the latest chat message author.",
       "last_message": "Text of the latest Telegram message.",

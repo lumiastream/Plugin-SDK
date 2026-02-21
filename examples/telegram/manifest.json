@@ -1,7 +1,7 @@
 {
   "id": "telegram",
   "name": "Telegram",
-  "version": "1.0.4",
+  "version": "1.0.0",
   "author": "Lumia Stream",
   "email": "dev@lumiastream.com",
   "website": "https://lumiastream.com",
@@ -21,22 +21,18 @@
         "defaultValue": "bot",
         "options": [
           {
-            "label": "Bot (BotFather token)",
+            "label": "Bot (BotFather token) - Recommended",
             "value": "bot"
           },
           {
-            "label": "User (MTProto session)",
+            "label": "Lumia App (managed credentials)",
+            "value": "lumia"
+          },
+          {
+            "label": "Your App (API ID + hash)",
             "value": "user"
           }
         ],
-        "section": "Connection",
-        "sectionOrder": 1
-      },
-      {
-        "key": "autoConnect",
-        "label": "Auto Connect",
-        "type": "toggle",
-        "defaultValue": true,
         "section": "Connection",
         "sectionOrder": 1
       },
@@ -51,8 +47,72 @@
           "key": "authMode",
           "equals": "bot"
         },
-        "section": "Bot Mode",
-        "sectionOrder": 2
+        "section": "Connection",
+        "sectionOrder": 1
+      },
+      {
+        "key": "userApiId",
+        "label": "API ID",
+        "type": "password",
+        "placeholder": "123456",
+        "helperText": "Create an app at my.telegram.org to obtain this value.",
+        "required": true,
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "Connection",
+        "sectionOrder": 1
+      },
+      {
+        "key": "userApiHash",
+        "label": "API Hash",
+        "type": "password",
+        "placeholder": "0123456789abcdef",
+        "helperText": "Create an app at my.telegram.org to obtain this value.",
+        "required": true,
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "Connection",
+        "sectionOrder": 1
+      },
+      {
+        "key": "lumiaPhoneNumber",
+        "label": "Phone Number",
+        "type": "text",
+        "placeholder": "+15551234567",
+        "helperText": "Use your Telegram phone number (Lumia App mode uses managed API credentials). Click Verify to request a login code.",
+        "endAdornment": {
+          "type": "button",
+          "label": "Verify",
+          "actionKey": "verifyLogin"
+        },
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "lumia"
+        },
+        "section": "Connection",
+        "sectionOrder": 1
+      },
+      {
+        "key": "userPhoneNumber",
+        "label": "Phone Number",
+        "type": "text",
+        "placeholder": "+15551234567",
+        "helperText": "Used if session string is empty. Click Verify to request a login code.",
+        "endAdornment": {
+          "type": "button",
+          "label": "Verify",
+          "actionKey": "verifyLogin"
+        },
+        "visibleIf": {
+          "key": "authMode",
+          "equals": "user"
+        },
+        "section": "Connection",
+        "sectionOrder": 1
       },
       {
         "key": "botDefaultChatId",
@@ -160,84 +220,17 @@
         "sectionOrder": 2
       },
       {
-        "key": "userApiId",
-        "label": "API ID",
-        "type": "password",
-        "placeholder": "123456",
-        "helperText": "Create an app at my.telegram.org to obtain this value.",
-        "required": true,
-        "visibleIf": {
-          "key": "authMode",
-          "equals": "user"
-        },
-        "section": "User Mode",
-        "sectionOrder": 3
-      },
-      {
-        "key": "userApiHash",
-        "label": "API Hash",
-        "type": "password",
-        "placeholder": "0123456789abcdef",
-        "helperText": "Create an app at my.telegram.org to obtain this value.",
-        "required": true,
-        "visibleIf": {
-          "key": "authMode",
-          "equals": "user"
-        },
-        "section": "User Mode",
-        "sectionOrder": 3
-      },
-      {
         "key": "userSessionString",
         "label": "Session String",
         "type": "textarea",
         "rows": 3,
         "placeholder": "Paste a saved session string",
-        "helperText": "Recommended: generate a session string and paste it here to avoid repeated logins.",
+        "helperText": "Optional: a saved session string lets you skip SMS codes on future logins. Generate it once, then paste it here.",
         "visibleIf": {
           "key": "authMode",
           "equals": "user"
         },
-        "section": "User Mode",
-        "sectionOrder": 3
-      },
-      {
-        "key": "userPhoneNumber",
-        "label": "Phone Number",
-        "type": "text",
-        "placeholder": "+15551234567",
-        "helperText": "Optional: used if session string is empty (login flow will request a code).",
-        "visibleIf": {
-          "key": "authMode",
-          "equals": "user"
-        },
-        "section": "User Mode",
-        "sectionOrder": 3
-      },
-      {
-        "key": "userLoginCode",
-        "label": "Login Code",
-        "type": "password",
-        "placeholder": "12345",
-        "helperText": "Paste the code you receive from Telegram if prompted.",
-        "visibleIf": {
-          "key": "authMode",
-          "equals": "user"
-        },
-        "section": "User Mode",
-        "sectionOrder": 3
-      },
-      {
-        "key": "userPassword",
-        "label": "Two-Factor Password",
-        "type": "password",
-        "placeholder": "Telegram 2FA password",
-        "helperText": "Only required if your account has a Telegram password enabled.",
-        "visibleIf": {
-          "key": "authMode",
-          "equals": "user"
-        },
-        "section": "User Mode",
+        "section": "Connection",
         "sectionOrder": 3
       },
       {
@@ -248,7 +241,7 @@
         "helperText": "Used when actions don't specify a chat id.",
         "visibleIf": {
           "key": "authMode",
-          "equals": "user"
+          "equals": ["user", "lumia"]
         },
         "section": "User Mode",
         "sectionOrder": 3
@@ -322,55 +315,9 @@
             "allowVariables": true
           }
         ]
-      },
-      {
-        "type": "reset_session",
-        "label": "Reset Session Counters",
-        "description": "Reset chat counters and first chatter tracking.",
-        "fields": []
-      },
-      {
-        "type": "refresh_member_count",
-        "label": "Refresh Member Count",
-        "description": "Fetch and update the Telegram member count for a chat.",
-        "fields": [
-          {
-            "key": "chatId",
-            "label": "Chat ID / @username",
-            "type": "text",
-            "allowVariables": true
-          }
-        ]
-      },
-      {
-        "type": "connect",
-        "label": "Connect",
-        "description": "Manually connect to Telegram using current settings.",
-        "fields": []
-      },
-      {
-        "type": "disconnect",
-        "label": "Disconnect",
-        "description": "Manually disconnect from Telegram.",
-        "fields": []
-      }
-    ],
-    "variableFunctions": [
-      {
-        "key": "uptime",
-        "label": "Telegram Uptime",
-        "description": "Returns how long the current Telegram session has been connected."
       }
     ],
     "variables": [
-      {
-        "name": "uptime",
-        "value": ""
-      },
-      {
-        "name": "chat_title",
-        "value": ""
-      },
       {
         "name": "chat_id",
         "value": ""
@@ -378,26 +325,6 @@
       {
         "name": "chat_type",
         "value": ""
-      },
-      {
-        "name": "session_chat_count",
-        "value": 0
-      },
-      {
-        "name": "current_first_chatter",
-        "value": ""
-      },
-      {
-        "name": "current_first_chatter_count",
-        "value": 0
-      },
-      {
-        "name": "previous_first_chatter",
-        "value": ""
-      },
-      {
-        "name": "previous_first_chatter_count",
-        "value": 0
       },
       {
         "name": "last_chatter",
@@ -429,38 +356,15 @@
         "title": "Telegram Message",
         "key": "message",
         "acceptedVariables": [
-          "chat_title",
           "chat_id",
           "chat_type",
           "last_chatter",
           "last_user_id",
           "last_message",
           "last_message_id",
-          "last_message_at",
-          "session_chat_count"
+          "last_message_at"
         ],
         "defaultMessage": "{{last_chatter}}: {{last_message}}"
-      },
-      {
-        "title": "Telegram Entrance",
-        "key": "entrance",
-        "acceptedVariables": [
-          "last_chatter",
-          "chat_title",
-          "session_chat_count"
-        ],
-        "defaultMessage": "{{last_chatter}} entered Telegram chat."
-      },
-      {
-        "title": "Telegram First Chatter",
-        "key": "firstChatter",
-        "acceptedVariables": [
-          "current_first_chatter",
-          "current_first_chatter_count",
-          "previous_first_chatter",
-          "previous_first_chatter_count"
-        ],
-        "defaultMessage": "{{current_first_chatter}} is first chatter!"
       }
     ]
   }
