@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.2"
 	}
 }
 
@@ -310,6 +310,677 @@ module.exports = ShowcasePluginTemplate;
 		"duration": "Tracks the duration used by the latest sample alert."
 	}
 }
+
+```
+
+## chat_summarizer/README.md
+
+```
+# Chat Summarizer (Lumia Stream)
+
+Summarizes recent chat messages on a timer and posts the summary back into the Lumia chat message box. It also highlights users by category.
+
+## How it works
+
+- Use a Lumia automation (or dashboard chat trigger) to call **Ingest Chat Message** for each incoming chat message.
+- The plugin buffers messages and posts a summary every N minutes.
+- Categories and limits are configured in the plugin settings.
+
+## Suggested Lumia automation
+
+Trigger: **On Chat Message**
+Action: **Chat Summarizer → Ingest Chat Message**
+
+Fields:
+- Username: `{{username}}`
+- Message: `{{message}}`
+- Platform: `{{site}}`
+- User ID: `{{user_id}}`
+
+## Actions
+
+- **Ingest Chat Message**: Adds one message to the buffer.
+- **Summarize Now**: Forces a summary immediately.
+- **Clear Buffer**: Clears all buffered messages.
+
+## Settings
+
+- **Summary Interval (minutes)**: How often to summarize.
+- **Summary Template**: Control the message format with placeholders like `{interval}` and `{topChatters}`.
+- **Categories**: Which categories to include (defaults: feedback, questions, hype).
+- **Category Keywords**: Optional per-category keyword overrides.
+- **Minimum Messages to Summarize**: Skip summaries when chat is quiet.
+- **Max Users Per Category**: Limits list length.
+- **Max Summary Length**: Trims long summaries.
+- **Max Buffered Messages**: Prevents unbounded memory growth (use 0 for unlimited).
+
+## Variables
+
+- `summary_buckets`: Readable string like `5min ago, totalMessages: 8, topChatters: user1, user2; feedback: (user1:"msg"), (user2:"msg")`. Only buckets with messages are shown.
+
+```
+
+## chat_summarizer/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const DEFAULT_RULES = {
+	feedback: [
+		"feedback",
+		"suggest",
+		"idea",
+		"maybe",
+		"should",
+		"could",
+		"recommend",
+		"wish",
+		"feature",
+	],
+	questions: ["?", "how", "why", "what", "when", "where", "help", "anyone", "can i", "could i"],
+	hype: ["hype", "pog", "poggers", "gg", "lets go", "let's go", "lfg", "fire", "🔥", "wow"],
+};
+
+function normalizeText(value) {
+	return String(value || "")
+		.trim()
+		.toLowerCase();
+}
+
+function parseCategoryRules(input) {
+	const rules = new Map();
+	if (!input || typeof input !== "string") return rules;
+	const lines = input.split(/\r?\n/);
+	for (const raw of lines) {
+		const line = raw.trim();
+		if (!line) continue;
+		const sepIndex = line.indexOf(":");
+		if (sepIndex === -1) continue;
+		const category = normalizeText(line.slice(0, sepIndex));
+		const keywords = line
+			.slice(sepIndex + 1)
+			.split(",")
+			.map((entry) => normalizeText(entry))
+			.filter(Boolean);
+		if (category && keywords.length) {
+			rules.set(category, keywords);
+		}
+	}
+	return rules;
+}
+
+function buildRules(settingsCategories, customRules) {
+	const selected = Array.isArray(settingsCategories) ? settingsCategories : [];
+	const ruleMap = new Map();
+	for (const raw of selected) {
+		const key = normalizeText(raw);
+		if (!key) continue;
+		if (customRules.has(key)) {
+			ruleMap.set(key, customRules.get(key));
+			continue;
+		}
+		if (DEFAULT_RULES[key]) {
+			ruleMap.set(key, DEFAULT_RULES[key]);
+		}
+	}
+	return ruleMap;
+}
+
+function truncateText(text, maxLength) {
+	if (!maxLength || text.length <= maxLength) return text;
+	if (maxLength <= 3) return text.slice(0, maxLength);
+	return `${text.slice(0, maxLength - 1)}…`;
+}
+
+function renderTemplate(template, data) {
+	if (!template || typeof template !== "string") return "";
+	return template.replace(/\{(\w+)\}/g, (match, key) => {
+		const value = data[key];
+		if (value === undefined || value === null) return match;
+		return String(value);
+	});
+}
+
+function formatBucketsAsString(buckets) {
+	const intervalMinutes = buckets.intervalMinutes ?? 0;
+	const totalMessages = buckets.totalMessages ?? 0;
+	const topChatters = buckets.topChatters || "None";
+
+	const parts = [
+		`${intervalMinutes}min ago`,
+		`totalMessages: ${totalMessages}`,
+		`topChatters: ${topChatters}`,
+	];
+
+	const formatBucketMessages = (items) =>
+		items
+			.map((m) => {
+				const user = m.displayname || m.username || "?";
+				const msg = String(m.message || "").replace(/"/g, "'");
+				return `(${user}:"${msg}")`;
+			})
+			.join(", ");
+
+	for (const [key, items] of Object.entries(buckets.buckets || {})) {
+		if (!Array.isArray(items) || !items.length) continue;
+		const label = key.charAt(0).toUpperCase() + key.slice(1);
+		parts.push(`${label}: ${formatBucketMessages(items)}`);
+	}
+
+	if (Array.isArray(buckets.other) && buckets.other.length) {
+		parts.push(`Other: ${formatBucketMessages(buckets.other)}`);
+	}
+
+	return parts.join(", ");
+}
+
+module.exports = class ChatSummarizer extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._timer = null;
+		this._buffer = [];
+	}
+
+	async onload() {
+		this._schedule();
+		await this.lumia.updateConnection(true);
+		await this._logInfo("Chat Summarizer loaded.");
+		await this._toast("Chat Summarizer connected.");
+	}
+
+	async onunload() {
+		this._clearTimer();
+		this._buffer = [];
+		await this.lumia.updateConnection(false);
+		await this._logInfo("Chat Summarizer unloaded.");
+	}
+
+	async onsettingsupdate() {
+		this._clearTimer();
+		this._schedule();
+		await this._logInfo("Settings updated. Summary timer restarted.");
+	}
+
+	async actions(config) {
+		for (const action of config.actions ?? []) {
+			switch (action.type) {
+				case "ingest_chat":
+					this._ingestChat(action.value || {});
+					break;
+				case "summarize_now":
+					await this._summarizeAndPost(true);
+					break;
+				case "clear_buffer":
+					this._buffer = [];
+					await this._logInfo("Buffer cleared via action.");
+					break;
+				default:
+					break;
+			}
+		}
+	}
+
+	_ingestChat(payload) {
+		const username = normalizeText(payload.username);
+		const message = String(payload.message || "").trim();
+		if (!username || !message) return;
+
+		this._buffer.push({
+			username,
+			displayname: payload.username || username,
+			message,
+			platform: payload.platform ? String(payload.platform) : "",
+			userId: payload.userId ? String(payload.userId) : "",
+			timestamp: Date.now(),
+		});
+
+		const maxBuffered = this._numberSetting("maxBufferedMessages", 1000, 0, 10000);
+		if (maxBuffered > 0 && this._buffer.length > maxBuffered) {
+			this._buffer.splice(0, this._buffer.length - maxBuffered);
+		}
+	}
+
+	_schedule() {
+		const intervalMinutes = this._numberSetting("intervalMinutes", 5, 1, 60);
+		this._timer = setInterval(() => {
+			this._summarizeAndPost(false);
+		}, intervalMinutes * 60 * 1000);
+	}
+
+	_clearTimer() {
+		if (this._timer) {
+			clearInterval(this._timer);
+			this._timer = null;
+		}
+	}
+
+	async _summarizeAndPost(force) {
+		const minMessages = this._numberSetting("minMessages", 5, 1, 1000);
+		if (!force && this._buffer.length < minMessages) {
+			await this._logDebug(
+				`Summary skipped. ${this._buffer.length} messages buffered (min ${minMessages}).`,
+			);
+			return;
+		}
+
+		const snapshot = this._buffer.slice();
+		this._buffer = [];
+		if (!snapshot.length) return;
+
+		const summaryResult = this._buildSummary(snapshot);
+		const summaryUsername =
+			String(this.settings.summaryUsername || "Chat Summary").trim() || "Chat Summary";
+
+		this.displayChat({
+			username: summaryUsername,
+			displayname: summaryUsername,
+			message: summaryResult.text,
+			skipCommandProcessing: true,
+			userLevels: { isSelf: true },
+		});
+		await this.lumia.setVariable("summary_buckets", formatBucketsAsString(summaryResult.buckets));
+		await this._logInfo(`Summary posted (${snapshot.length} messages).`);
+		await this._toast("Chat summary posted.");
+	}
+
+	_buildSummary(messages) {
+		const intervalMinutes = this._numberSetting("intervalMinutes", 5, 1, 60);
+		const totalMessages = messages.length;
+		const userMap = new Map();
+		for (const item of messages) {
+			const key = item.username;
+			const entry = userMap.get(key) || {
+				displayname: item.displayname || key,
+				count: 0,
+				messages: [],
+			};
+			entry.count += 1;
+			entry.messages.push(item.message);
+			userMap.set(key, entry);
+		}
+
+		const uniqueUsers = userMap.size;
+		const topChatters = Array.from(userMap.values())
+			.sort((a, b) => b.count - a.count)
+			.slice(0, 5)
+			.map((entry) => `${entry.displayname}(${entry.count})`)
+			.join(", ");
+
+		const categories = Array.isArray(this.settings.categories)
+			? this.settings.categories
+			: ["feedback", "questions", "hype"];
+		const customRules = parseCategoryRules(this.settings.categoryRules);
+		const ruleMap = buildRules(categories, customRules);
+
+		const categoryUsers = new Map();
+		const categoryBuckets = new Map();
+		for (const raw of categories) {
+			const key = normalizeText(raw);
+			if (!key) continue;
+			categoryUsers.set(key, new Set());
+			categoryBuckets.set(key, []);
+		}
+		const otherUsers = new Set();
+		const otherBucket = [];
+
+		for (const [username, entry] of userMap.entries()) {
+			const text = normalizeText(entry.messages.join(" "));
+			let matched = false;
+			for (const [category, keywords] of ruleMap.entries()) {
+				for (const keyword of keywords) {
+					if (!keyword) continue;
+					if (keyword === "?" ? text.includes("?") : text.includes(keyword)) {
+						categoryUsers.get(category)?.add(entry.displayname || username);
+						matched = true;
+						break;
+					}
+				}
+			}
+			if (!matched) {
+				otherUsers.add(entry.displayname || username);
+			}
+		}
+
+		for (const item of messages) {
+			const messageText = normalizeText(item.message);
+			const matchedCategories = [];
+			for (const [category, keywords] of ruleMap.entries()) {
+				for (const keyword of keywords) {
+					if (!keyword) continue;
+					if (keyword === "?" ? messageText.includes("?") : messageText.includes(keyword)) {
+						matchedCategories.push(category);
+						break;
+					}
+				}
+			}
+
+			const payload = {
+				username: item.username,
+				displayname: item.displayname,
+				message: item.message,
+				timestamp: item.timestamp,
+				platform: item.platform,
+				userId: item.userId,
+			};
+
+			if (!matchedCategories.length) {
+				otherBucket.push(payload);
+				continue;
+			}
+
+			for (const category of matchedCategories) {
+				categoryBuckets.get(category)?.push(payload);
+			}
+		}
+
+		const maxUsersPerCategory = this._numberSetting("maxUsersPerCategory", 10, 1, 50);
+		const categoryLines = [];
+		for (const [category, users] of categoryUsers.entries()) {
+			const label = category.charAt(0).toUpperCase() + category.slice(1);
+			const list = Array.from(users);
+			const display = this._limitNames(list, maxUsersPerCategory);
+			if (display) categoryLines.push(`${label}: ${display}`);
+		}
+		if (otherUsers.size) {
+			const display = this._limitNames(Array.from(otherUsers), maxUsersPerCategory);
+			if (display) categoryLines.push(`Other: ${display}`);
+		}
+
+		const summaryTemplate = String(this.settings.summaryTemplate || "").trim();
+		const templateData = {
+			interval: intervalMinutes,
+			totalMessages,
+			uniqueUsers,
+			topChatters: topChatters || "None",
+			categories: categoryLines.length ? categoryLines.join(" | ") : "None",
+		};
+
+		const templateResult = summaryTemplate ? renderTemplate(summaryTemplate, templateData) : "";
+		const lines = templateResult
+			? [templateResult]
+			: [
+					`Chat Summary (last ${intervalMinutes} min): ${totalMessages} messages from ${uniqueUsers} users.`,
+					`Top chatters: ${topChatters || "None"}.`,
+					`Categories: ${categoryLines.length ? categoryLines.join(" | ") : "None"}.`,
+				];
+
+		const maxSummaryLength = this._numberSetting("maxSummaryLength", 350, 100, 2000);
+		const summaryText = truncateText(lines.join(" "), maxSummaryLength);
+		const buckets = {
+			intervalMinutes,
+			totalMessages,
+			uniqueUsers,
+			topChatters: topChatters || "",
+			categories: categoryLines,
+			buckets: Object.fromEntries(categoryBuckets),
+			other: otherBucket,
+		};
+		return { text: summaryText, buckets };
+	}
+
+	_limitNames(list, maxCount) {
+		if (!list.length) return "";
+		if (list.length <= maxCount) return list.join(", ");
+		const head = list.slice(0, maxCount).join(", ");
+		return `${head} (+${list.length - maxCount})`;
+	}
+
+	_numberSetting(key, fallback, min, max) {
+		const raw = this.settings?.[key];
+		const num = Number(raw);
+		if (!Number.isFinite(num)) return fallback;
+		if (min !== undefined && num < min) return min;
+		if (max !== undefined && num > max) return max;
+		return num;
+	}
+
+	async _logInfo(message) {
+		if (this.lumia?.log) {
+			await this.lumia.log({ message, level: "info" });
+		}
+	}
+
+	async _logDebug(message) {
+		if (this.lumia?.log) {
+			await this.lumia.log({ message, level: "debug" });
+		}
+	}
+
+	async _toast(message) {
+		if (this.lumia?.showToast) {
+			await this.lumia.showToast({ message, time: 3000 });
+		}
+	}
+};
+
+```
+
+## chat_summarizer/manifest.json
+
+```
+{
+  "id": "chat_summarizer",
+  "name": "Chat Summarizer",
+  "version": "1.0.0",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "description": "Summarizes chat on an interval and highlights users by category.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "apps",
+  "keywords": "chat, summary, moderation, analytics",
+  "icon": "chat_summarizer.png",
+  "changelog": "",
+  "bundle": {
+    "commands": [
+      "bundle/chatmatch/chat-summary_chatmatch.lumia",
+      "bundle/commands/summarize_command.lumia"
+    ]
+  },
+  "config": {
+    "settings": [
+      {
+        "key": "summaryTemplate",
+        "label": "Summary Template",
+        "type": "textarea",
+        "defaultValue": "Chat Summary (last {interval} min): {totalMessages} messages from {uniqueUsers} users. Top chatters: {topChatters}. Categories: {categories}.",
+        "helperText": "Template placeholders: {interval}, {totalMessages}, {uniqueUsers}, {topChatters}, {categories}.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "intervalMinutes",
+        "label": "Summary Interval (minutes)",
+        "type": "number",
+        "defaultValue": 5,
+        "min": 1,
+        "max": 60,
+        "helperText": "How often to summarize chat.",
+        "refreshOnChange": true,
+        "section": "Connection",
+        "sectionOrder": 1,
+        "group": "connection"
+      },
+      {
+        "key": "summaryUsername",
+        "label": "Summary Username",
+        "type": "text",
+        "defaultValue": "Chat Summary",
+        "helperText": "Shown as the username in Lumia chat.",
+        "section": "Connection",
+        "sectionOrder": 1,
+        "group": "connection"
+      },
+      {
+        "key": "categories",
+        "label": "Categories",
+        "type": "select",
+        "multiple": true,
+        "allowTyping": true,
+        "defaultValue": ["feedback", "questions", "hype"],
+        "options": [
+          { "label": "Feedback", "value": "feedback" },
+          { "label": "Questions", "value": "questions" },
+          { "label": "Hype", "value": "hype" }
+        ],
+        "helperText": "Select categories to include in the summary.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "categoryRules",
+        "label": "Category Keywords (optional)",
+        "type": "textarea",
+        "defaultValue": "feedback: feedback, suggest, idea, maybe, should, could, recommend, wish, feature\nquestions: ?, how, why, what, when, where, help, anyone, can i, could i\nhype: hype, pog, poggers, gg, lets go, let's go, lfg, fire, 🔥, wow",
+        "helperText": "One category per line: category: keyword1, keyword2. Overrides defaults for listed categories. Example: feedback: suggest, idea, should",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "minMessages",
+        "label": "Minimum Messages to Summarize",
+        "type": "number",
+        "defaultValue": 5,
+        "min": 1,
+        "max": 1000,
+        "helperText": "Skip summary if fewer messages are collected in the interval.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "maxUsersPerCategory",
+        "label": "Max Users Per Category",
+        "type": "number",
+        "defaultValue": 10,
+        "min": 1,
+        "max": 50,
+        "helperText": "Limits how many usernames are listed per category.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "maxSummaryLength",
+        "label": "Max Summary Length",
+        "type": "number",
+        "defaultValue": 350,
+        "min": 100,
+        "max": 2000,
+        "helperText": "Trim summary text to this length.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      },
+      {
+        "key": "maxBufferedMessages",
+        "label": "Max Buffered Messages",
+        "type": "number",
+        "defaultValue": 1000,
+        "min": 0,
+        "max": 10000,
+        "helperText": "Buffer size limit to avoid unbounded memory growth. Use 0 for unlimited.",
+        "section": "Summarizer",
+        "sectionOrder": 2
+      }
+    ],
+    "variables": [
+      {
+        "name": "summary_buckets",
+        "description": "Readable string: {N}min ago, totalMessages, topChatters, and per-bucket (user:\"msg\") for buckets with messages.",
+        "value": ""
+      }
+    ],
+    "settings_tutorial": "./settings_tutorial.md",
+    "actions": [
+      {
+        "type": "ingest_chat",
+        "label": "Ingest Chat Message",
+        "description": "Add a chat message to the summarizer buffer (use in automations).",
+        "fields": [
+          {
+            "key": "username",
+            "label": "Username",
+            "type": "text",
+            "allowVariables": true,
+            "defaultValue": "{{username}}"
+          },
+          {
+            "key": "message",
+            "label": "Message",
+            "type": "text",
+            "allowVariables": true,
+            "defaultValue": "{{message}}"
+          },
+          {
+            "key": "platform",
+            "label": "Platform",
+            "type": "text",
+            "allowVariables": true,
+            "defaultValue": "{{site}}"
+          },
+          {
+            "key": "userId",
+            "label": "User ID",
+            "type": "text",
+            "allowVariables": true,
+            "defaultValue": "{{user_id}}"
+          }
+        ]
+      },
+      {
+        "type": "summarize_now",
+        "label": "Summarize Now",
+        "description": "Force a summary immediately, even if minimum message count is not met.",
+        "fields": []
+      },
+      {
+        "type": "clear_buffer",
+        "label": "Clear Buffer",
+        "description": "Clear all buffered chat messages.",
+        "fields": []
+      }
+    ]
+  }
+}
+
+```
+
+## chat_summarizer/package.json
+
+```
+{
+	"name": "lumia-chat-summarizer",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that summarizes chat and highlights users by category.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.0"
+	}
+}
+
+```
+
+## chat_summarizer/settings_tutorial.md
+
+```
+# Chat Summarizer Setup
+
+## Lumia Commands
+
+There are **2 commands** that will be downloaded to use with Chat Summarizer:
+
+1. **chatmatch** — Helps fill the buckets by ingesting chat messages into the summarizer.
+2. **chatcommand** — Contains the `{{chat_summarizer_summary_buckets}}` variable where you'll see the detailed summary of the chat.
+
+## Using with AI Chat
+
+You can use `{{chat_summarizer_summary_buckets}}` as a starting point for your AI chat and display something different. For example:
+
+```
+{{ai_prompt={{chat_summarizer_summary_buckets}}}}
+```
+
+This passes the summary buckets into your AI prompt so it can analyze the chat and respond based on the categorized messages.
 
 ```
 
@@ -1457,7 +2128,7 @@ module.exports = DivoomPixooPlugin;
 	"description": "Control Divoom Pixoo WIFI devices from Lumia Stream actions.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.1"
 	}
 }
 
@@ -2126,7 +2797,7 @@ module.exports = ElevenLabsTTSPlugin;
 	"description": "ElevenLabs TTS plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.1"
 	}
 }
 
@@ -3503,7 +4174,7 @@ module.exports = EveOnlinePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.1"
 	}
 }
 
@@ -3554,6 +4225,1493 @@ module.exports = EveOnlinePlugin;
 		"notifications_count": "Number of notifications returned by ESI.",
 		"last_login": "Last Login",
 		"last_logout": "Last Logout"
+	}
+}
+
+```
+
+## mawakit/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+/** Alert keys defined in manifest.json; used when triggering prayer/ramadan alerts. */
+const ALERT_KEYS = {
+  fajr: "mawakit_fajr",
+  sunrise: "mawakit_shuruq",
+  dhuhr: "mawakit_dhuhr",
+  asr: "mawakit_asr",
+  maghrib: "mawakit_maghrib",
+  isha: "mawakit_isha",
+  ramadan: "mawakit_ramadan_soon",
+};
+
+/** Prayer order and their corresponding alert/offset setting keys. Sunrise is displayed as Shuruq. */
+const PRAYER_ORDER = [
+  { key: "Fajr", alert: ALERT_KEYS.fajr, offsetKey: "offsetFajr" },
+  { key: "Sunrise", alert: ALERT_KEYS.sunrise, offsetKey: "offsetSunrise" },
+  { key: "Dhuhr", alert: ALERT_KEYS.dhuhr, offsetKey: "offsetDhuhr" },
+  { key: "Asr", alert: ALERT_KEYS.asr, offsetKey: "offsetAsr" },
+  { key: "Maghrib", alert: ALERT_KEYS.maghrib, offsetKey: "offsetMaghrib" },
+  { key: "Isha", alert: ALERT_KEYS.isha, offsetKey: "offsetIsha" },
+];
+
+const VARIABLE_KEYS = {
+  fajr: "fajr",
+  sunrise: "sunrise",
+  dhuhr: "dhuhr",
+  asr: "asr",
+  maghrib: "maghrib",
+  isha: "isha",
+  hijriDate: "hijri_date",
+  hijriMonth: "hijri_month",
+  hijriDay: "hijri_day",
+  location: "location",
+  nextPrayer: "next_prayer",
+  nextPrayerTime: "next_prayer_time",
+  prayerTimes: "prayer_times",
+};
+
+/** Cache timings for 10 minutes to avoid hitting the Aladhan API too frequently. */
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+/** Default city when only country is set (Aladhan API requires city+country). */
+const DEFAULT_CITY_BY_COUNTRY = {
+  Morocco: "Casablanca",
+  "Saudi Arabia": "Mecca",
+  Egypt: "Cairo",
+  Turkey: "Istanbul",
+  Indonesia: "Jakarta",
+  Pakistan: "Karachi",
+  Malaysia: "Kuala Lumpur",
+  Algeria: "Algiers",
+  "United Arab Emirates": "Dubai",
+  Nigeria: "Lagos",
+  Tunisia: "Tunis",
+  Jordan: "Amman",
+  Lebanon: "Beirut",
+  Syria: "Damascus",
+  Iraq: "Baghdad",
+  Iran: "Tehran",
+  Afghanistan: "Kabul",
+  Bangladesh: "Dhaka",
+  Yemen: "Sana'a",
+  Libya: "Tripoli",
+  Palestine: "Ramallah",
+  Kuwait: "Kuwait City",
+  Qatar: "Doha",
+  Bahrain: "Manama",
+  Oman: "Muscat",
+  Sudan: "Khartoum",
+  Somalia: "Mogadishu",
+  Mauritania: "Nouakchott",
+  Senegal: "Dakar",
+  Mali: "Bamako",
+  Niger: "Niamey",
+  "Burkina Faso": "Ouagadougou",
+  Gambia: "Banjul",
+  Guinea: "Conakry",
+};
+
+class MawakitPlugin extends Plugin {
+  constructor(manifest, context) {
+    super(manifest, context);
+    this._pollTimer = null;
+    this._midnightTimer = null;
+    this._ramadanTimer = null;
+    this._bootstrapTimer = null;
+    this._prayerTimers = new Map();
+    this._cache = new Map();
+    this._state = {
+      timings: null,
+      hijri: null,
+      meta: null,
+      location: null,
+      locationLabel: "",
+    };
+    this._lastRamadanAlertDate = null;
+    this._lastToast = null;
+  }
+
+  async onload() {
+    this._ensureStart({ reason: "load" });
+  }
+
+  async onunload() {
+    this._clearTimers();
+  }
+
+  async onsettingsupdate(settings, previous = {}) {
+    this._ensureStart({ reason: "settings-update", previous });
+  }
+
+  async variableFunction(config) {
+    const key = config?.key;
+    const args = Array.isArray(config?.args) ? config.args : [];
+    const raw = typeof config?.value === "string" ? config.value : "";
+
+    if (key !== "mawakit_prayer_times" && key !== "mawakit_hijri_date") {
+      return "";
+    }
+
+    // Resolve location: variable args (city|country or lat,lon) → settings → cached state
+    const location =
+      this._resolveLocationFromArgs(args, raw) ||
+      this._resolveLocationWithCountryFallback(this.settings) ||
+      this._state.location;
+
+    if (!location) {
+      // mawakit_prayer_times must never return empty - use last known or placeholder
+      if (key === "mawakit_prayer_times" && this._state.locationLabel) {
+        return (
+          this._buildPrayerTimesString() ||
+          `Location=${this._state.locationLabel}`
+        );
+      }
+      return key === "mawakit_hijri_date"
+        ? ""
+        : "Set location in Mawakit settings";
+    }
+
+    const timings = await this._fetchTimingsCached({ location });
+    if (!timings) {
+      if (key === "mawakit_prayer_times") {
+        const fallback = this._buildPrayerTimesString();
+        if (fallback) return fallback;
+        return `Location=${location?.city || location?.latitude || "Unknown"}`;
+      }
+      return "";
+    }
+
+    if (key === "mawakit_hijri_date") {
+      return timings.hijri?.date ?? "";
+    }
+
+    const parts = [
+      `Fajr=${timings.timings?.Fajr ?? ""}`,
+      `Sunrise=${timings.timings?.Sunrise ?? ""}`,
+      `Dhuhr=${timings.timings?.Dhuhr ?? ""}`,
+      `Asr=${timings.timings?.Asr ?? ""}`,
+      `Maghrib=${timings.timings?.Maghrib ?? ""}`,
+      `Isha=${timings.timings?.Isha ?? ""}`,
+      `Hijri=${timings.hijri?.date ?? ""}`,
+      `Location=${timings.locationLabel ?? ""}`,
+    ];
+
+    return parts.join(", ");
+  }
+
+  async _start({ reason } = {}) {
+    this._clearTimers();
+    await this._refreshTimings({ reason });
+    this._schedulePolling();
+    this._scheduleMidnightRefresh();
+    this._schedulePrayerAlerts();
+    this._scheduleRamadanCheck();
+  }
+
+  _clearTimers() {
+    if (this._pollTimer) {
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
+    }
+    if (this._midnightTimer) {
+      clearTimeout(this._midnightTimer);
+      this._midnightTimer = null;
+    }
+    if (this._ramadanTimer) {
+      clearInterval(this._ramadanTimer);
+      this._ramadanTimer = null;
+    }
+    for (const timer of this._prayerTimers.values()) {
+      clearTimeout(timer);
+    }
+    this._prayerTimers.clear();
+    if (this._bootstrapTimer) {
+      clearTimeout(this._bootstrapTimer);
+      this._bootstrapTimer = null;
+    }
+  }
+
+  /**
+   * Start the plugin when Lumia is ready. If context.lumia isn't available yet (e.g. during init),
+   * retry after 500ms until it is.
+   */
+  _ensureStart({ reason, previous } = {}) {
+    if (this._hasLumia()) {
+      void this._start({ reason, previous });
+      return;
+    }
+    if (this._bootstrapTimer) {
+      return;
+    }
+    this._bootstrapTimer = setTimeout(() => {
+      this._bootstrapTimer = null;
+      this._ensureStart({ reason, previous });
+    }, 500);
+  }
+
+  _schedulePolling() {
+    const intervalMinutes = this._coerceNumber(
+      this.settings?.pollIntervalMinutes,
+      60,
+    );
+    if (intervalMinutes <= 0) {
+      return;
+    }
+    this._pollTimer = setInterval(
+      () => {
+        void this._refreshTimings({ reason: "poll" });
+      },
+      intervalMinutes * 60 * 1000,
+    );
+  }
+
+  /**
+   * Refresh timings at 00:05 local time so a new day's prayer schedule is loaded.
+   * Schedules itself again after each run to run every night.
+   */
+  _scheduleMidnightRefresh() {
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(0, 5, 0, 0);
+    if (next <= now) {
+      next.setDate(next.getDate() + 1);
+    }
+    this._midnightTimer = setTimeout(() => {
+      void this._refreshTimings({ reason: "midnight" }).then(() => {
+        this._schedulePrayerAlerts();
+        this._scheduleMidnightRefresh();
+      });
+    }, next.getTime() - now.getTime());
+  }
+
+  _schedulePrayerAlerts() {
+    for (const timer of this._prayerTimers.values()) {
+      clearTimeout(timer);
+    }
+    this._prayerTimers.clear();
+
+    if (!this._state.timings) {
+      return;
+    }
+
+    const now = new Date();
+    const timezoneOffsetMinutes = this._coerceNumber(
+      this.settings?.timezoneOffsetMinutes,
+      0,
+    );
+    const alertMinutesBefore = this._coerceNumber(
+      this.settings?.alertMinutesBefore,
+      0,
+    );
+
+    for (const prayer of PRAYER_ORDER) {
+      const time = this._state.timings?.[prayer.key];
+      if (!time) {
+        continue;
+      }
+      const offsetMinutes = this._coerceNumber(
+        this.settings?.[prayer.offsetKey],
+        0,
+      );
+      let target = this._buildTimeToday(
+        time,
+        timezoneOffsetMinutes + offsetMinutes,
+      );
+      if (!target || target <= now) {
+        continue;
+      }
+      if (alertMinutesBefore > 0) {
+        target = new Date(target.getTime() - alertMinutesBefore * 60 * 1000);
+        if (target <= now) {
+          continue;
+        }
+      }
+      const delay = target.getTime() - now.getTime();
+      const timer = setTimeout(() => {
+        void this._emitPrayerAlert(prayer.key, time, alertMinutesBefore);
+        void this._refreshNextPrayer();
+      }, delay);
+      this._prayerTimers.set(prayer.key, timer);
+    }
+
+    void this._refreshNextPrayer();
+  }
+
+  _scheduleRamadanCheck() {
+    if (this.settings?.enableRamadanAlert === false) {
+      return;
+    }
+    this._ramadanTimer = setInterval(
+      () => {
+        void this._maybeRamadanAlert();
+      },
+      6 * 60 * 60 * 1000,
+    );
+    void this._maybeRamadanAlert();
+  }
+
+  async _refreshTimings({ reason } = {}) {
+    const location = this._resolveLocationWithCountryFallback(this.settings);
+    if (!location) {
+      if (reason !== "poll") {
+        await this._toastOnce(
+          "Set a location in Mawakit settings to enable prayer time alerts.",
+        );
+      }
+      return;
+    }
+
+    const data = await this._fetchTimingsCached({ location });
+    if (!data) {
+      return;
+    }
+
+    this._state.timings = data.timings || null;
+    this._state.hijri = data.hijri || null;
+    this._state.meta = data.meta || null;
+    this._state.location = location;
+    this._state.locationLabel = data.locationLabel || "";
+    await this._applyVariables();
+  }
+
+  async _applyVariables() {
+    if (!this._hasLumia()) {
+      return;
+    }
+
+    const timings = this._state.timings || {};
+    const vars = {
+      [VARIABLE_KEYS.fajr]: this._applyOffsetToTime(
+        timings.Fajr,
+        this.settings?.offsetFajr,
+      ),
+      [VARIABLE_KEYS.sunrise]: this._applyOffsetToTime(
+        timings.Sunrise,
+        this.settings?.offsetSunrise,
+      ),
+      [VARIABLE_KEYS.dhuhr]: this._applyOffsetToTime(
+        timings.Dhuhr,
+        this.settings?.offsetDhuhr,
+      ),
+      [VARIABLE_KEYS.asr]: this._applyOffsetToTime(
+        timings.Asr,
+        this.settings?.offsetAsr,
+      ),
+      [VARIABLE_KEYS.maghrib]: this._applyOffsetToTime(
+        timings.Maghrib,
+        this.settings?.offsetMaghrib,
+      ),
+      [VARIABLE_KEYS.isha]: this._applyOffsetToTime(
+        timings.Isha,
+        this.settings?.offsetIsha,
+      ),
+      [VARIABLE_KEYS.location]: this._state.locationLabel || "",
+      [VARIABLE_KEYS.hijriDate]: (this._state.hijri || {}).date || "",
+      [VARIABLE_KEYS.hijriMonth]:
+        this._state.hijri?.month?.en || this._state.hijri?.month?.ar || "",
+      [VARIABLE_KEYS.hijriDay]: (this._state.hijri || {}).day || "",
+      [VARIABLE_KEYS.prayerTimes]: this._buildPrayerTimesString(),
+    };
+
+    for (const [key, value] of Object.entries(vars)) {
+      await this._setVariable(key, value);
+    }
+
+    await this._refreshNextPrayer();
+  }
+
+  async _refreshNextPrayer() {
+    if (!this._state.timings) {
+      return;
+    }
+    const now = new Date();
+    const timezoneOffsetMinutes = this._coerceNumber(
+      this.settings?.timezoneOffsetMinutes,
+      0,
+    );
+    let nextName = "";
+    let nextTime = "";
+
+    for (const prayer of PRAYER_ORDER) {
+      const raw = this._state.timings?.[prayer.key];
+      if (!raw) {
+        continue;
+      }
+      const offsetMinutes = this._coerceNumber(
+        this.settings?.[prayer.offsetKey],
+        0,
+      );
+      const target = this._buildTimeToday(
+        raw,
+        timezoneOffsetMinutes + offsetMinutes,
+      );
+      if (target && target > now) {
+        nextName = prayer.key === "Sunrise" ? "Shuruq" : prayer.key;
+        nextTime = this._formatTime(target);
+        break;
+      }
+    }
+
+    if (!nextName) {
+      const firstPrayer = PRAYER_ORDER[0];
+      const raw = this._state.timings?.[firstPrayer.key];
+      if (raw) {
+        const offsetMinutes = this._coerceNumber(
+          this.settings?.[firstPrayer.offsetKey],
+          0,
+        );
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const target = this._buildTimeOnDate(
+          tomorrow,
+          raw,
+          timezoneOffsetMinutes + offsetMinutes,
+        );
+        if (target) {
+          nextName = firstPrayer.key;
+          nextTime = this._formatTime(target);
+        }
+      }
+    }
+
+    await this._setVariable(VARIABLE_KEYS.nextPrayer, nextName);
+    await this._setVariable(VARIABLE_KEYS.nextPrayerTime, nextTime);
+  }
+
+  async _emitPrayerAlert(prayerKey, time, alertMinutesBefore = 0) {
+    const prayer = PRAYER_ORDER.find((entry) => entry.key === prayerKey);
+    if (!prayer) {
+      return;
+    }
+
+    const hijriDate = this._state.hijri?.date || "";
+    const location = this._state.locationLabel || "";
+    const displayName = prayer.key === "Sunrise" ? "Shuruq" : prayer.key;
+    const adjustedTime = this._applyOffsetToTime(
+      time,
+      this.settings?.[prayer.offsetKey],
+    );
+
+    // Maps to manifest variationConditions so Lumia can show the correct alert message
+    const whenValue =
+      alertMinutesBefore >= 20
+        ? "20_before"
+        : alertMinutesBefore >= 15
+          ? "15_before"
+          : alertMinutesBefore >= 10
+            ? "10_before"
+            : alertMinutesBefore >= 5
+              ? "5_before"
+              : "at_time";
+
+    try {
+      if (!this._hasLumia()) {
+        return;
+      }
+      await this.context.lumia.triggerAlert({
+        alert: prayer.alert,
+        dynamic: { name: "value", value: whenValue },
+        extraSettings: {
+          prayer: displayName,
+          time: adjustedTime,
+          hijri_date: hijriDate,
+          location,
+          minutes_before: alertMinutesBefore,
+        },
+      });
+    } catch (error) {
+      if (this.context?.lumia?.log) {
+        await this.context.lumia.log(
+          `[Mawakit] Failed to trigger ${displayName} alert: ${error?.message ?? String(error)}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Fire Ramadan alert when we're in Hijri month 8 (Ramadan) and within N days of the end.
+   * monthNumber 8 = Ramadan; day 1–30 is the day of the month.
+   */
+  async _maybeRamadanAlert() {
+    if (this.settings?.enableRamadanAlert === false) {
+      return;
+    }
+    const hijri = this._state.hijri;
+    if (!hijri) {
+      return;
+    }
+    const monthNumber = this._coerceNumber(hijri?.month?.number, 0);
+    const day = this._coerceNumber(hijri?.day, 0);
+    if (monthNumber !== 8 || day <= 0) {
+      return;
+    }
+    const daysRemaining = Math.max(0, 30 - day);
+    const threshold = this._coerceNumber(this.settings?.ramadanAlertDays, 10);
+    if (daysRemaining > threshold) {
+      return;
+    }
+    const todayKey = new Date().toISOString().slice(0, 10);
+    if (this._lastRamadanAlertDate === todayKey) {
+      return;
+    }
+    this._lastRamadanAlertDate = todayKey;
+    try {
+      if (!this._hasLumia()) {
+        return;
+      }
+      await this.context.lumia.triggerAlert({
+        alert: ALERT_KEYS.ramadan,
+        extraSettings: {
+          days_remaining: daysRemaining,
+          hijri_date: hijri?.date || "",
+          location: this._state.locationLabel || "",
+        },
+      });
+    } catch (error) {
+      if (this.context?.lumia?.log) {
+        await this.context.lumia.log(
+          `[Mawakit] Failed to trigger Ramadan alert: ${error?.message ?? String(error)}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Resolves location from settings: system location (if enabled), coordinates, or city+country.
+   * When only country is set, uses DEFAULT_CITY_BY_COUNTRY so the Aladhan API gets a valid city.
+   */
+  _resolveLocationWithCountryFallback(settings = {}) {
+    if (settings?.locationMode === "system") {
+      const location = this._resolveSystemLocation();
+      if (location) {
+        return location;
+      }
+    }
+
+    const type = settings?.locationType || "city";
+    if (type === "coordinates") {
+      const lat = this._coerceNumber(settings?.latitude, null);
+      const lon = this._coerceNumber(settings?.longitude, null);
+      if (typeof lat === "number" && typeof lon === "number") {
+        return { type: "coordinates", latitude: lat, longitude: lon };
+      }
+      return null;
+    }
+
+    let city = this._coerceString(settings?.city, "").trim();
+    const country = this._coerceString(settings?.country, "").trim();
+    if (country && !city) {
+      city = DEFAULT_CITY_BY_COUNTRY[country] || country;
+    }
+    if (city && country) {
+      return { type: "city", city, country };
+    }
+    return null;
+  }
+
+  _resolveSystemLocation() {
+    if (typeof this.lumia?.getLocation !== "function") {
+      return null;
+    }
+    try {
+      const data = this.lumia.getLocation();
+      if (!data) {
+        return null;
+      }
+      const latitude = this._coerceNumber(data.latitude, null);
+      const longitude = this._coerceNumber(data.longitude, null);
+      if (typeof latitude === "number" && typeof longitude === "number") {
+        return { type: "coordinates", latitude, longitude };
+      }
+      if (data.city && data.country) {
+        return { type: "city", city: data.city, country: data.country };
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Parse location from variable function input: "city|country", "|country", or "lat,lon".
+   */
+  _resolveLocationFromArgs(args, raw) {
+    if (!raw && args.length === 0) {
+      return null;
+    }
+    const input = raw || args.join("|");
+    const [first = "", second = ""] = input.split("|").map((s) => s.trim());
+    if (first.includes(",")) {
+      const [latRaw, lonRaw] = first.split(",");
+      const lat = this._coerceNumber(latRaw, null);
+      const lon = this._coerceNumber(lonRaw, null);
+      if (typeof lat === "number" && typeof lon === "number") {
+        return { type: "coordinates", latitude: lat, longitude: lon };
+      }
+      return null;
+    }
+    let city = first;
+    const country = second;
+    if (country && !city) {
+      city = DEFAULT_CITY_BY_COUNTRY[country] || country;
+    }
+    if (city && country) {
+      return { type: "city", city, country };
+    }
+    return null;
+  }
+
+  async _fetchTimingsCached({ location }) {
+    const cacheKey = JSON.stringify({
+      location,
+      method: this._methodId(),
+      school: this._schoolId(),
+    });
+    const cached = this._cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return cached.data;
+    }
+    const data = await this._fetchTimings({ location });
+    if (data) {
+      this._cache.set(cacheKey, { timestamp: Date.now(), data });
+    }
+    return data;
+  }
+
+  async _fetchTimings({ location }) {
+    const method = this._methodId();
+    const school = this._schoolId();
+    const date = this._formatApiDate(new Date());
+    let url = "";
+    if (location.type === "coordinates") {
+      url = `https://api.aladhan.com/v1/timings/${date}?latitude=${encodeURIComponent(
+        location.latitude,
+      )}&longitude=${encodeURIComponent(location.longitude)}&method=${method}&school=${school}`;
+    } else {
+      url = `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(
+        location.city,
+      )}&country=${encodeURIComponent(location.country)}&method=${method}&school=${school}`;
+    }
+
+    let json;
+    try {
+      json = await this._fetchJson(url);
+    } catch (error) {
+      if (this._hasLumia()) {
+        await this.context.lumia.log(
+          `[Mawakit] Failed to fetch prayer times: ${error?.message ?? String(error)}`,
+        );
+      }
+      return null;
+    }
+
+    const data = json?.data;
+    if (!data?.timings) {
+      return null;
+    }
+
+    const timings = data.timings || {};
+    const hijri = data.date?.hijri || null;
+    const meta = data.meta || null;
+    const locationLabel = this._formatLocationLabel(location, meta);
+
+    return { timings, hijri, meta, locationLabel };
+  }
+
+  async _fetchJson(url) {
+    if (typeof fetch !== "function") {
+      throw new Error("fetch is not available in this runtime");
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return await response.json();
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  _formatLocationLabel(location, meta) {
+    if (location.type === "city") {
+      return `${location.city}, ${location.country}`;
+    }
+    if (meta?.timezone) {
+      return `${location.latitude}, ${location.longitude} (${meta.timezone})`;
+    }
+    return `${location.latitude}, ${location.longitude}`;
+  }
+
+  /** Aladhan API expects date as DD-MM-YYYY. */
+  _formatApiDate(date) {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  _buildTimeOnDate(baseDate, time, offsetMinutes) {
+    const normalized = this._normalizeTime(time);
+    if (!normalized) {
+      return null;
+    }
+    const [hours, minutes] = normalized
+      .split(":")
+      .map((value) => Number(value));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return null;
+    }
+    const target = new Date(baseDate);
+    target.setHours(hours, minutes, 0, 0);
+    if (offsetMinutes) {
+      target.setMinutes(target.getMinutes() + offsetMinutes);
+    }
+    return target;
+  }
+
+  _buildTimeToday(time, offsetMinutes) {
+    return this._buildTimeOnDate(new Date(), time, offsetMinutes);
+  }
+
+  /** Extract HH:MM from API time strings (e.g. "05:30 (GMT+1)" → "05:30"). */
+  _normalizeTime(time) {
+    if (typeof time !== "string") {
+      return "";
+    }
+    return time.split(" ")[0].trim();
+  }
+
+  _formatTime(date) {
+    return date.toTimeString().slice(0, 5);
+  }
+
+  _applyOffsetToTime(time, offsetMinutes) {
+    const normalized = this._normalizeTime(time);
+    if (!normalized) {
+      return "";
+    }
+    const [hours, minutes] = normalized
+      .split(":")
+      .map((value) => Number(value));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return normalized;
+    }
+    const target = new Date();
+    target.setHours(hours, minutes, 0, 0);
+    const offset = this._coerceNumber(offsetMinutes, 0);
+    if (offset) {
+      target.setMinutes(target.getMinutes() + offset);
+    }
+    return this._formatTime(target);
+  }
+
+  _buildPrayerTimesString() {
+    if (!this._state.timings) {
+      return "";
+    }
+    const timings = this._state.timings;
+    const parts = [
+      `Fajr=${this._applyOffsetToTime(timings.Fajr, this.settings?.offsetFajr)}`,
+      `Sunrise=${this._applyOffsetToTime(timings.Sunrise, this.settings?.offsetSunrise)}`,
+      `Dhuhr=${this._applyOffsetToTime(timings.Dhuhr, this.settings?.offsetDhuhr)}`,
+      `Asr=${this._applyOffsetToTime(timings.Asr, this.settings?.offsetAsr)}`,
+      `Maghrib=${this._applyOffsetToTime(timings.Maghrib, this.settings?.offsetMaghrib)}`,
+      `Isha=${this._applyOffsetToTime(timings.Isha, this.settings?.offsetIsha)}`,
+    ];
+    if (this._state.hijri?.date) {
+      parts.push(`Hijri=${this._state.hijri.date}`);
+    }
+    if (this._state.locationLabel) {
+      parts.push(`Location=${this._state.locationLabel}`);
+    }
+    return parts.join(", ");
+  }
+
+  async _setVariable(key, value) {
+    const lumia = this.context?.lumia;
+    if (!lumia) {
+      return;
+    }
+    const alias = this._prefixedKey(key);
+    await lumia.setVariable(key, value);
+    if (alias && alias !== key) {
+      await lumia.setVariable(alias, value);
+    }
+  }
+
+  /** Plugin-scoped variable alias (e.g. mawakit_fajr) so variables don't clash with other plugins. */
+  _prefixedKey(key) {
+    const id = this.manifest?.id || "";
+    if (!id) {
+      return "";
+    }
+    return `${id}_${key}`;
+  }
+
+  /** Aladhan calculation method ID (default 2 = Muslim World League). */
+  _methodId() {
+    return this._coerceNumber(this.settings?.calculationMethod, 2);
+  }
+
+  /** Asr juristic method: Hanafi uses shadow factor 2; Shafi/Maliki use 1. */
+  _schoolId() {
+    const method = this._coerceString(this.settings?.juristicMethod, "shafi");
+    return method === "hanafi" ? 1 : 0;
+  }
+
+  _coerceNumber(value, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  _coerceString(value, fallback) {
+    return typeof value === "string" ? value : fallback;
+  }
+
+  async _toastOnce(message) {
+    if (this._lastToast === message) {
+      return;
+    }
+    this._lastToast = message;
+    if (
+      this._hasLumia() &&
+      typeof this.context.lumia?.showToast === "function"
+    ) {
+      await this.context.lumia.showToast({ message });
+    }
+  }
+
+  _hasLumia() {
+    return Boolean(this.context && this.context.lumia);
+  }
+}
+
+module.exports = MawakitPlugin;
+
+```
+
+## mawakit/manifest.json
+
+```
+{
+  "id": "mawakit",
+  "name": "Mawakit",
+  "version": "1.0.1",
+  "author": "Lumia Stream",
+  "email": "dev@lumiastream.com",
+  "website": "https://lumiastream.com",
+  "description": "Prayer time alerts, Hijri date variables, and Ramadan reminders based on your location.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "utilities",
+  "keywords": "prayer, islam, adhan, hijri, ramadan, alerts",
+  "icon": "mawakit.png",
+  "changelog": "1.0.0: Prayer time alerts for Fajr, Shuruq, Dhuhr, Asr, Maghrib, Isha. Hijri date variables and function variable support. Ramadan-near alerts based on Hijri date. Location via city/country or coordinates with optional system location fallback. Per-prayer time offsets. Juristic method (Shafi/Maliki/Hanafi) support.",
+  "config": {
+    "settings": [
+      {
+        "key": "locationMode",
+        "label": "Location Mode",
+        "type": "select",
+        "defaultValue": "manual",
+        "options": [
+          { "label": "Manual", "value": "manual" },
+          { "label": "System (if available)", "value": "system" }
+        ],
+        "section": "Location",
+        "helperText": "System mode uses the host location only if the runtime provides it. Otherwise Mawakit falls back to manual settings."
+      },
+      {
+        "key": "locationType",
+        "label": "Location Type",
+        "type": "select",
+        "defaultValue": "city",
+        "options": [
+          { "label": "City + Country", "value": "city" },
+          { "label": "Latitude + Longitude", "value": "coordinates" }
+        ],
+        "section": "Location"
+      },
+      {
+        "key": "city",
+        "label": "City",
+        "type": "text",
+        "placeholder": "Casablanca",
+        "section": "Location",
+        "visibleIf": { "key": "locationType", "equals": "city" }
+      },
+      {
+        "key": "country",
+        "label": "Country",
+        "type": "text",
+        "placeholder": "Morocco",
+        "section": "Location",
+        "visibleIf": { "key": "locationType", "equals": "city" }
+      },
+      {
+        "key": "latitude",
+        "label": "Latitude",
+        "type": "number",
+        "min": -90,
+        "max": 90,
+        "section": "Location",
+        "visibleIf": { "key": "locationType", "equals": "coordinates" }
+      },
+      {
+        "key": "longitude",
+        "label": "Longitude",
+        "type": "number",
+        "min": -180,
+        "max": 180,
+        "section": "Location",
+        "visibleIf": { "key": "locationType", "equals": "coordinates" }
+      },
+      {
+        "key": "timezoneOffsetMinutes",
+        "label": "Timezone Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -720,
+        "max": 840,
+        "section": "Location",
+        "helperText": "Adjust timings if your system timezone differs from the selected location."
+      },
+      {
+        "key": "calculationMethod",
+        "label": "Calculation Method ID",
+        "type": "number",
+        "defaultValue": 2,
+        "min": 0,
+        "max": 20,
+        "section": "Calculation",
+        "helperText": "Uses Aladhan method IDs. Keep the default if you are unsure."
+      },
+      {
+        "key": "juristicMethod",
+        "label": "Juristic Method (Asr)",
+        "type": "select",
+        "defaultValue": "shafi",
+        "options": [
+          { "label": "Shafi", "value": "shafi" },
+          { "label": "Maliki", "value": "maliki" },
+          { "label": "Hanafi", "value": "hanafi" }
+        ],
+        "section": "Calculation",
+        "helperText": "Shafi and Maliki share the same Asr calculation in most APIs."
+      },
+      {
+        "key": "pollIntervalMinutes",
+        "label": "Refresh Interval (minutes)",
+        "type": "number",
+        "defaultValue": 60,
+        "min": 15,
+        "max": 720,
+        "section": "Schedule",
+        "helperText": "How often Mawakit refreshes prayer times from the API."
+      },
+      {
+        "key": "alertMinutesBefore",
+        "label": "Alert Minutes Before Prayer",
+        "type": "number",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 30,
+        "section": "Alerts",
+        "helperText": "Fire the alert this many minutes before the prayer time (0 = at exact time). E.g. 10 = alert when 10 min before Asr."
+      },
+      {
+        "key": "enableRamadanAlert",
+        "label": "Alert When Ramadan Is Near",
+        "type": "toggle",
+        "defaultValue": true,
+        "section": "Alerts"
+      },
+      {
+        "key": "ramadanAlertDays",
+        "label": "Ramadan Alert Days Before",
+        "type": "number",
+        "defaultValue": 10,
+        "min": 1,
+        "max": 30,
+        "section": "Alerts",
+        "visibleIf": { "key": "enableRamadanAlert", "equals": true }
+      },
+      {
+        "key": "offsetFajr",
+        "label": "Fajr Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetSunrise",
+        "label": "Shuruq Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetDhuhr",
+        "label": "Dhuhr Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetAsr",
+        "label": "Asr Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetMaghrib",
+        "label": "Maghrib Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      },
+      {
+        "key": "offsetIsha",
+        "label": "Isha Offset (minutes)",
+        "type": "number",
+        "defaultValue": 0,
+        "min": -60,
+        "max": 60,
+        "section": "Offsets"
+      }
+    ],
+    "settings_tutorial": "./settings_tutorial.md",
+    "actions": [],
+    "variableFunctions": [
+      {
+        "key": "mawakit_prayer_times",
+        "label": "Mawakit Prayer Times",
+        "description": "Use {{mawakit_prayer_times=city|country}}, {{mawakit_prayer_times=|country}}, {{mawakit_prayer_times=lat,lon}}, or {{mawakit_prayer_times}} (uses settings) to return prayer times. Falls back to selected country."
+      },
+      {
+        "key": "mawakit_hijri_date",
+        "label": "Mawakit Hijri Date",
+        "description": "Use {{mawakit_hijri_date=city|country}}, {{mawakit_hijri_date=|country}}, {{mawakit_hijri_date=lat,lon}}, or {{mawakit_hijri_date}} (uses settings) to return Hijri date."
+      }
+    ],
+    "variables": [
+      {
+        "name": "fajr",
+        "value": ""
+      },
+      {
+        "name": "sunrise",
+        "value": ""
+      },
+      {
+        "name": "dhuhr",
+        "value": ""
+      },
+      {
+        "name": "asr",
+        "value": ""
+      },
+      {
+        "name": "maghrib",
+        "value": ""
+      },
+      {
+        "name": "isha",
+        "value": ""
+      },
+      {
+        "name": "hijri_date",
+        "value": ""
+      },
+      {
+        "name": "hijri_month",
+        "value": ""
+      },
+      {
+        "name": "hijri_day",
+        "value": ""
+      },
+      {
+        "name": "location",
+        "value": ""
+      },
+      {
+        "name": "next_prayer",
+        "value": ""
+      },
+      {
+        "name": "next_prayer_time",
+        "value": ""
+      },
+      {
+        "name": "prayer_times",
+        "value": ""
+      }
+    ],
+    "alerts": [
+      {
+        "title": "Fajr",
+        "key": "mawakit_fajr",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Fajr at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Fajr at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Fajr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Fajr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Fajr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Fajr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Shuruq",
+        "key": "mawakit_shuruq",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Shuruq at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Shuruq at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Shuruq in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Shuruq in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Shuruq in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Shuruq in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Dhuhr",
+        "key": "mawakit_dhuhr",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Dhuhr at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Dhuhr at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Dhuhr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Dhuhr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Dhuhr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Dhuhr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Asr",
+        "key": "mawakit_asr",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Asr at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Asr at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Asr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Asr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Asr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Asr in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Maghrib",
+        "key": "mawakit_maghrib",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Maghrib at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Maghrib at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Maghrib in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Maghrib in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Maghrib in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Maghrib in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Isha",
+        "key": "mawakit_isha",
+        "acceptedVariables": [
+          "prayer",
+          "time",
+          "hijri_date",
+          "location",
+          "minutes_before"
+        ],
+        "defaultMessage": "Isha at {{time}} ({{hijri_date}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "When to alert",
+            "selections": [
+              {
+                "label": "At exact time",
+                "value": "at_time",
+                "message": "Isha at {{time}} ({{hijri_date}})"
+              },
+              {
+                "label": "5 min before",
+                "value": "5_before",
+                "message": "Isha in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "10 min before",
+                "value": "10_before",
+                "message": "Isha in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "15 min before",
+                "value": "15_before",
+                "message": "Isha in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              },
+              {
+                "label": "20 min before",
+                "value": "20_before",
+                "message": "Isha in {{minutes_before}} minutes! ({{time}}) - {{hijri_date}}"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Ramadan Soon",
+        "key": "mawakit_ramadan_soon",
+        "acceptedVariables": ["days_remaining", "hijri_date", "location"],
+        "defaultMessage": "Ramadan is near: {{days_remaining}} days remaining ({{hijri_date}})"
+      }
+    ],
+    "translations": "./translations.json"
+  }
+}
+
+```
+
+## mawakit/package.json
+
+```
+{
+	"name": "lumia-mawakit",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Prayer time alerts, Hijri date variables, and Ramadan reminders.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.0"
+	}
+}
+
+```
+
+## mawakit/settings_tutorial.md
+
+```
+### Mawakit Setup
+
+1. Choose `Location Mode` and set either `City + Country` or `Latitude + Longitude`.
+2. Pick the `Calculation Method ID` and `Juristic Method` that match your region.
+3. Adjust prayer offsets if needed.
+4. Save settings and enable Mawakit. Alerts fire at each prayer and shuruq.
+
+Notes:
+- If `Location Mode` is set to System, Mawakit will use system location only when the runtime provides it.
+- If your system timezone differs from the chosen location, set `Timezone Offset (minutes)` to correct scheduling.
+- Ramadan alerts use the Hijri date from the prayer time API and will trigger once per day when within the configured window.
+
+Variable functions:
+- `{{mawakit_prayer_times=city|country}}` or `{{mawakit_prayer_times=lat,lon}}` (returns comma-separated `key=value` pairs)
+- `{{mawakit_prayer_times=}}` uses your current Mawakit location settings
+- `{{mawakit_hijri_date=city|country}}` or `{{mawakit_hijri_date=lat,lon}}`
+
+Built-in variables:
+- `{{fajr}}`, `{{sunrise}}`, `{{dhuhr}}`, `{{asr}}`, `{{maghrib}}`, `{{isha}}`
+- `{{hijri_date}}`, `{{hijri_month}}`, `{{hijri_day}}`
+- `{{next_prayer}}`, `{{next_prayer_time}}`
+- `{{prayer_times}}`
+
+```
+
+## mawakit/translations.json
+
+```
+{
+	"en": {
+		"fajr": "Fajr time for the current location.",
+		"sunrise": "Shuruq (sunrise) time for the current location.",
+		"dhuhr": "Dhuhr time for the current location.",
+		"asr": "Asr time for the current location.",
+		"maghrib": "Maghrib time for the current location.",
+		"isha": "Isha time for the current location.",
+		"hijri_date": "Hijri date for the current location.",
+		"hijri_month": "Hijri month name.",
+		"hijri_day": "Hijri day of month.",
+		"location": "Resolved location label.",
+		"next_prayer": "Next prayer name.",
+		"next_prayer_time": "Next prayer time.",
+		"prayer_times": "Prayer times (comma-separated key=value).",
+		"mawakit_prayer_times": "Prayer times (comma-separated key=value).",
+		"mawakit_hijri_date": "Hijri date for the specified location."
 	}
 }
 
@@ -4569,7 +6727,7 @@ module.exports = MinecraftServerPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.1"
 	}
 }
 
@@ -5505,7 +7663,7 @@ module.exports = NtfyPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.1"
 	}
 }
 
@@ -5569,6 +7727,7 @@ class OllamaPlugin extends Plugin {
 		this._modelCache = { list: [], fetchedAt: 0, baseUrl: "" };
 		this._modelFetchPromise = null;
 		this._modelFetchBaseUrl = "";
+		this._lastErrorToast = { message: "", at: 0 };
 	}
 
 	async onload() {
@@ -5622,21 +7781,35 @@ class OllamaPlugin extends Plugin {
 			return;
 		}
 
-		const previewSettings =
-			values && typeof values === "object"
-				? values
-				: settings && typeof settings === "object"
-					? settings
-					: this.settings;
+		const previewSettings = {
+			...(this.settings && typeof this.settings === "object"
+				? this.settings
+				: {}),
+			...(settings && typeof settings === "object" ? settings : {}),
+			...(values && typeof values === "object" ? values : {}),
+		};
 		const models = await this.aiModels({
 			refresh: true,
 			settings: previewSettings,
 		});
+		const selectedModel = this._trim(
+			values?.defaultModel ??
+				settings?.defaultModel ??
+				this._defaultModel(previewSettings),
+		);
+		const modelValues = Array.from(
+			new Set(
+				[
+					selectedModel,
+					...models.map((model) => this._trim(model?.value)),
+				].filter(Boolean),
+			),
+		);
 		const options = [
 			{ label: "Auto (first available)", value: "" },
-			...models.map((model) => ({
-				label: model?.name || model?.value,
-				value: model?.value || "",
+			...modelValues.map((value) => ({
+				label: value,
+				value,
 			})),
 		];
 
@@ -5650,11 +7823,7 @@ class OllamaPlugin extends Plugin {
 		if (!key) return "";
 
 		const input =
-			typeof value === "string"
-				? value
-				: typeof raw === "string"
-					? raw
-					: "";
+			typeof value === "string" ? value : typeof raw === "string" ? raw : "";
 		if (!input.trim()) {
 			return "";
 		}
@@ -5735,10 +7904,7 @@ class OllamaPlugin extends Plugin {
 			this._defaultTemperature(),
 		);
 		const topP = this._number(data?.top_p, this._defaultTopP());
-		const maxTokens = this._number(
-			data?.max_tokens,
-			this._defaultMaxTokens(),
-		);
+		const maxTokens = this._number(data?.max_tokens, this._defaultMaxTokens());
 		const keepAlive = this._keepAlive(data);
 
 		const thread = this._trim(data?.thread);
@@ -5751,7 +7917,7 @@ class OllamaPlugin extends Plugin {
 						thread,
 						username,
 						rememberMessages,
-				  })
+					})
 				: null;
 		const history = historyKey ? this._getHistory(historyKey) : [];
 
@@ -5789,9 +7955,14 @@ class OllamaPlugin extends Plugin {
 			await this._updateConnectionState(true);
 		} catch (error) {
 			const messageText = this._errorMessage(error);
+			const userMessage = this._userErrorMessage(error, "Ollama");
 			await this._updateConnectionState(false);
-			if (typeof this.lumia?.log === "function") {
-				await this.lumia.log(`[Ollama] Chat request failed: ${messageText}`);
+			await this._reportApiError({
+				userMessage,
+				rawMessage: messageText,
+			});
+			if (format === "json") {
+				return this._jsonErrorResponse(userMessage);
 			}
 			return "";
 		}
@@ -5966,14 +8137,55 @@ class OllamaPlugin extends Plugin {
 	}
 
 	_toJsonString(text) {
-		if (!text) return "";
-		const trimmed = String(text).trim();
-		try {
-			const parsed = JSON.parse(trimmed);
+		const parsed = this._parseJsonCandidate(text);
+		if (parsed !== null) {
 			return JSON.stringify(parsed);
-		} catch (error) {
-			return trimmed;
 		}
+		const trimmed = this._trim(text);
+		if (!trimmed) {
+			return "{}";
+		}
+		return JSON.stringify({
+			error: "Invalid JSON response from Ollama.",
+			raw: this._truncateText(trimmed, 300),
+		});
+	}
+
+	_jsonErrorResponse(message) {
+		return JSON.stringify({
+			error: this._trim(message) || "Ollama request failed.",
+		});
+	}
+
+	_parseJsonCandidate(sourceText) {
+		const source = this._trim(sourceText);
+		if (!source) return null;
+
+		const candidates = [source];
+		const fenced = source.match(/```(?:json)?\s*([\s\S]*?)```/i);
+		if (fenced?.[1]) {
+			candidates.unshift(fenced[1].trim());
+		}
+
+		const firstBrace = source.indexOf("{");
+		const lastBrace = source.lastIndexOf("}");
+		if (firstBrace !== -1 && lastBrace > firstBrace) {
+			candidates.push(source.slice(firstBrace, lastBrace + 1));
+		}
+
+		const firstBracket = source.indexOf("[");
+		const lastBracket = source.lastIndexOf("]");
+		if (firstBracket !== -1 && lastBracket > firstBracket) {
+			candidates.push(source.slice(firstBracket, lastBracket + 1));
+		}
+
+		for (const candidate of candidates) {
+			try {
+				return JSON.parse(candidate);
+			} catch (error) {}
+		}
+
+		return null;
 	}
 
 	_applyMaxOutput(text) {
@@ -6026,7 +8238,11 @@ class OllamaPlugin extends Plugin {
 						.filter(Boolean)
 				: [];
 			this._modelCache = { list: models, fetchedAt: now, baseUrl };
-			if (persistDefaultModel && !this._defaultModel(settings) && models.length > 0) {
+			if (
+				persistDefaultModel &&
+				!this._defaultModel(settings) &&
+				models.length > 0
+			) {
 				this.updateSettings({ defaultModel: models[0] });
 			}
 			return models;
@@ -6073,7 +8289,7 @@ class OllamaPlugin extends Plugin {
 			? messages.map((msg) => ({
 					role: msg?.role,
 					content: msg?.content,
-			  }))
+				}))
 			: [];
 	}
 
@@ -6113,6 +8329,135 @@ class OllamaPlugin extends Plugin {
 		return String(error ?? "Unknown error");
 	}
 
+	_userErrorMessage(error, provider = "AI") {
+		const { status, responseText, message } = this._errorContext(error);
+		const apiMessage = this._errorBodyMessage(responseText);
+		const retryHint = this._retryHint(responseText);
+
+		if (status === 401 || status === 403) {
+			return `${provider} API authentication failed. Check your API key and permissions.`;
+		}
+		if (status === 429) {
+			return `${provider} API rate limit or quota exceeded. Check your plan/billing and try again.${retryHint}`;
+		}
+		if (status !== null && status >= 500) {
+			return `${provider} API is temporarily unavailable. Please try again in a moment.`;
+		}
+		if (apiMessage) {
+			return `${provider} API error: ${apiMessage}`;
+		}
+		return `${provider} request failed. ${this._truncateText(message, 180) || "Please check plugin settings and try again."}`;
+	}
+
+	_errorContext(error) {
+		const message = this._errorMessage(error);
+		const parsedStatus = Number(error?.status);
+		let status = Number.isFinite(parsedStatus) ? parsedStatus : null;
+		let responseText =
+			typeof error?.responseText === "string" ? error.responseText.trim() : "";
+
+		const match = message.match(/^Request failed \(([^)]+)\):\s*([\s\S]*)$/);
+		if (match) {
+			if (status === null && /^\d+$/.test(match[1])) {
+				status = Number(match[1]);
+			}
+			if (!responseText) {
+				responseText = match[2].trim();
+			}
+		}
+
+		return { status, responseText, message };
+	}
+
+	_errorBodyMessage(responseText) {
+		const text = this._trim(responseText);
+		if (!text) return "";
+		const parsed = this._safeParseJson(text);
+		if (parsed) {
+			const fromNested =
+				this._trim(parsed?.error?.message) ||
+				this._trim(parsed?.error) ||
+				this._trim(parsed?.message) ||
+				this._trim(parsed?.details);
+			if (fromNested) return this._truncateText(fromNested, 220);
+		}
+		return this._truncateText(text, 220);
+	}
+
+	_retryHint(responseText) {
+		const parsed = this._safeParseJson(responseText);
+		const retryAfter =
+			this._trim(parsed?.retry_after) ||
+			this._trim(parsed?.retryAfter) ||
+			this._trim(parsed?.error?.retry_after) ||
+			this._trim(parsed?.error?.retryAfter);
+		if (retryAfter) {
+			return ` Retry in about ${retryAfter}.`;
+		}
+
+		const text = this._trim(responseText);
+		const retryMatch = text.match(
+			/retry (?:after|in)\s+([0-9]+(?:\.[0-9]+)?s?)/i,
+		);
+		if (retryMatch?.[1]) {
+			return ` Retry in about ${retryMatch[1]}.`;
+		}
+		return "";
+	}
+
+	_safeParseJson(text) {
+		const value = this._trim(text);
+		if (!value) return null;
+		try {
+			return JSON.parse(value);
+		} catch (error) {
+			return null;
+		}
+	}
+
+	_truncateText(text, max = 240) {
+		const value = String(text ?? "")
+			.replace(/\s+/g, " ")
+			.trim();
+		if (!value) return "";
+		if (value.length <= max) return value;
+		return `${value.slice(0, max)}...`;
+	}
+
+	async _reportApiError({ userMessage, rawMessage } = {}) {
+		const compactUser = this._truncateText(userMessage, 220);
+		const compactRaw = this._truncateText(rawMessage, 260);
+
+		if (typeof this.lumia?.log === "function") {
+			try {
+				const message = compactRaw
+					? `[Ollama] ${compactUser} | ${compactRaw}`
+					: `[Ollama] ${compactUser}`;
+				await this.lumia.log({ message, level: "error" });
+			} catch (error) {
+				try {
+					await this.lumia.log(`[Ollama] ${compactUser}`);
+				} catch (innerError) {}
+			}
+		}
+
+		if (typeof this.lumia?.showToast === "function") {
+			const now = Date.now();
+			const sameMessage =
+				this._lastErrorToast.message === compactUser &&
+				now - this._lastErrorToast.at < 5000;
+			if (!sameMessage) {
+				this._lastErrorToast = { message: compactUser, at: now };
+				try {
+					await this.lumia.showToast({
+						message: compactUser,
+						time: 4500,
+					});
+				} catch (error) {}
+			}
+		}
+	}
+
 	_url(path, settings = this.settings) {
 		const base = new URL(this._baseUrl(settings));
 		const basePath = base.pathname.replace(/\/+$/, "");
@@ -6122,6 +8467,7 @@ class OllamaPlugin extends Plugin {
 
 	async _fetchJson(url, options = {}, settings = this.settings) {
 		const timeoutMs = this._requestTimeoutMs(settings);
+		const method = this._trim(options?.method || "GET") || "GET";
 		const response =
 			timeoutMs === 0
 				? await fetch(url, options)
@@ -6137,9 +8483,14 @@ class OllamaPlugin extends Plugin {
 
 		if (!response || !response.ok) {
 			const text = response ? await response.text() : "";
-			throw new Error(
+			const error = new Error(
 				`Request failed (${response?.status ?? "unknown"}): ${text || response?.statusText || "No response"}`,
 			);
+			error.status = response?.status;
+			error.url = url;
+			error.method = method;
+			error.responseText = text;
+			throw error;
 		}
 
 		return await response.json();
@@ -6188,6 +8539,7 @@ module.exports = OllamaPlugin;
 	"config": {
 		"hasAI": true,
 		"settings_tutorial": "./settings_tutorial.md",
+		"translations": "./translations.json",
 		"settings": [
 			{
 				"key": "baseUrl",
@@ -6196,7 +8548,10 @@ module.exports = OllamaPlugin;
 				"defaultValue": "http://localhost:11434",
 				"required": true,
 				"helperText": "Your Ollama server URL.",
-				"refreshOnChange": true
+				"refreshOnChange": true,
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "defaultModel",
@@ -6213,14 +8568,24 @@ module.exports = OllamaPlugin;
 					}
 				],
 				"required": false,
-				"helperText": "Loaded from Ollama /api/tags. Leave blank for auto-detect or type a custom model."
+				"helperText": "Loaded from Ollama /api/tags. Leave blank for auto-detect or type a custom model.",
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "defaultSystemMessage",
 				"label": "Default System Message",
 				"type": "textarea",
 				"rows": 3,
-				"helperText": "Optional system message used when none is provided in the action."
+				"helperText": "Optional system message used when none is provided in the action.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": {
+					"key": "advanced_tuning",
+					"label": "Advanced Tuning",
+					"helperText": "Optional controls for sampling, memory, and output behavior."
+				}
 			},
 			{
 				"key": "defaultTemperature",
@@ -6229,7 +8594,10 @@ module.exports = OllamaPlugin;
 				"min": 0,
 				"max": 2,
 				"step": 0.1,
-				"helperText": "Optional. Higher is more creative."
+				"helperText": "Optional. Higher is more creative.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "defaultTopP",
@@ -6238,7 +8606,10 @@ module.exports = OllamaPlugin;
 				"min": 0,
 				"max": 1,
 				"step": 0.05,
-				"helperText": "Optional nucleus sampling value."
+				"helperText": "Optional nucleus sampling value.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "defaultMaxTokens",
@@ -6246,30 +8617,42 @@ module.exports = OllamaPlugin;
 				"type": "number",
 				"min": 1,
 				"max": 8192,
-				"helperText": "Optional. Maps to Ollama num_predict."
+				"helperText": "Optional. Maps to Ollama num_predict.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "keepAlive",
 				"label": "Keep Alive",
 				"type": "text",
 				"placeholder": "5m",
-				"helperText": "How long to keep the model loaded (example: `5m`, `0`). Optional."
+				"helperText": "How long to keep the model loaded (example: `5m`, `0`). Optional.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "requestTimeoutMs",
 				"label": "Request Timeout (ms)",
 				"type": "number",
-				"defaultValue": 60000,
+				"defaultValue": 0,
 				"min": 0,
 				"max": 300000,
-				"helperText": "How long to wait for a response. Set to 0 to disable timeout."
+				"helperText": "How long to wait for a response. Set to 0 to disable timeout.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "rememberMessages",
 				"label": "Remember Messages",
 				"type": "toggle",
 				"defaultValue": true,
-				"helperText": "Store history per thread or username."
+				"helperText": "Store history per thread or username.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "maxHistoryMessages",
@@ -6278,7 +8661,10 @@ module.exports = OllamaPlugin;
 				"defaultValue": 12,
 				"min": 0,
 				"max": 100,
-				"helperText": "How many recent messages to keep per thread/user."
+				"helperText": "How many recent messages to keep per thread/user.",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			},
 			{
 				"key": "maxOutputChars",
@@ -6287,7 +8673,10 @@ module.exports = OllamaPlugin;
 				"defaultValue": 0,
 				"min": 0,
 				"max": 100000,
-				"helperText": "Trim responses to this length (0 = no limit)."
+				"helperText": "Trim responses to this length (0 = no limit).",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_tuning"
 			}
 		],
 		"actions": [],
@@ -6329,15 +8718,15 @@ module.exports = OllamaPlugin;
 
 ```
 {
-  "name": "lumia-ollama",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Lumia Stream plugin that sends prompts to Ollama and exposes the response in variables and alerts.",
-  "main": "main.js",
-  "scripts": {},
-  "dependencies": {
-    "@lumiastream/plugin": "^0.4.0"
-  }
+	"name": "lumia-ollama",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that sends prompts to Ollama and exposes the response in variables and alerts.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.1"
+	}
 }
 
 ```
@@ -6387,6 +8776,54 @@ Run a prompt without storing or using history:
 Clear a conversation thread:
 `{{ollama_prompt_clear=thread_name}}`
 ---
+
+```
+
+## ollama/translations.json
+
+```
+{
+	"en": {
+		"connection": "Connection",
+		"Connection": "Connection",
+		"Advanced": "Advanced",
+		"Advanced Tuning": "Advanced Tuning",
+		"Base URL": "Base URL",
+		"Your Ollama server URL.": "Your Ollama server URL.",
+		"Default Model": "Default Model",
+		"Auto (first available)": "Auto (first available)",
+		"Loaded from Ollama /api/tags. Leave blank for auto-detect or type a custom model.": "Loaded from Ollama /api/tags. Leave blank for auto-detect or type a custom model.",
+		"Default System Message": "Default System Message",
+		"Optional system message used when none is provided in the action.": "Optional system message used when none is provided in the action.",
+		"Optional controls for sampling, memory, and output behavior.": "Optional controls for sampling, memory, and output behavior.",
+		"Default Temperature": "Default Temperature",
+		"Optional. Higher is more creative.": "Optional. Higher is more creative.",
+		"Default Top P": "Default Top P",
+		"Optional nucleus sampling value.": "Optional nucleus sampling value.",
+		"Default Max Tokens": "Default Max Tokens",
+		"Optional. Maps to Ollama num_predict.": "Optional. Maps to Ollama num_predict.",
+		"Keep Alive": "Keep Alive",
+		"How long to keep the model loaded (example: `5m`, `0`). Optional.": "How long to keep the model loaded (example: `5m`, `0`). Optional.",
+		"Request Timeout (ms)": "Request Timeout (ms)",
+		"How long to wait for a response. Set to 0 to disable timeout.": "How long to wait for a response. Set to 0 to disable timeout.",
+		"Remember Messages": "Remember Messages",
+		"Store history per thread or username.": "Store history per thread or username.",
+		"Max History Messages": "Max History Messages",
+		"How many recent messages to keep per thread/user.": "How many recent messages to keep per thread/user.",
+		"Max Output Length (chars)": "Max Output Length (chars)",
+		"Trim responses to this length (0 = no limit).": "Trim responses to this length (0 = no limit).",
+		"Ollama Prompt": "Ollama Prompt",
+		"Use {{ollama_prompt=message|thread|model}} to return a response from Ollama.": "Use {{ollama_prompt=message|thread|model}} to return a response from Ollama.",
+		"Ollama JSON": "Ollama JSON",
+		"Use {{ollama_json=message|thread|model}} to return JSON-only output.": "Use {{ollama_json=message|thread|model}} to return JSON-only output.",
+		"Ollama One Line": "Ollama One Line",
+		"Use {{ollama_one_line=message|thread|model}} to return a single-line response.": "Use {{ollama_one_line=message|thread|model}} to return a single-line response.",
+		"Ollama Prompt (No Store)": "Ollama Prompt (No Store)",
+		"Use {{ollama_prompt_nostore=message|thread|model}} to run without history.": "Use {{ollama_prompt_nostore=message|thread|model}} to run without history.",
+		"Ollama Clear Thread": "Ollama Clear Thread",
+		"Use {{ollama_prompt_clear=thread_name}} to clear a conversation thread.": "Use {{ollama_prompt_clear=thread_name}} to clear a conversation thread."
+	}
+}
 
 ```
 
@@ -6461,6 +8898,7 @@ class OpenClawPlugin extends Plugin {
 		this._messagesByUser = {};
 		this._lastConnectionState = null;
 		this._modelCache = { list: [], fetchedAt: 0, baseUrl: "" };
+		this._lastErrorToast = { message: "", at: 0 };
 	}
 
 	async onload() {
@@ -6471,7 +8909,8 @@ class OpenClawPlugin extends Plugin {
 
 	async onsettingsupdate(settings, previous = {}) {
 		const baseChanged = this._baseUrl(settings) !== this._baseUrl(previous);
-		const tokenChanged = this._authToken(settings) !== this._authToken(previous);
+		const tokenChanged =
+			this._authToken(settings) !== this._authToken(previous);
 		const agentChanged =
 			this._defaultAgentId(settings) !== this._defaultAgentId(previous);
 		const knownAgentsChanged =
@@ -6520,7 +8959,9 @@ class OpenClawPlugin extends Plugin {
 			this._defaultAgentId(settings || this.settings),
 			"",
 		);
-		const agents = Array.from(new Set([defaultAgent, ...fetchedAgents].filter(Boolean)));
+		const agents = Array.from(
+			new Set([defaultAgent, ...fetchedAgents].filter(Boolean)),
+		);
 		const routes = agents.map((agentId) =>
 			this._toAgentRoute(agentId, defaultAgent || "main"),
 		);
@@ -6542,18 +8983,21 @@ class OpenClawPlugin extends Plugin {
 			return;
 		}
 
-		const previewSettings =
-			values && typeof values === "object"
-				? values
-				: settings && typeof settings === "object"
-					? settings
-					: this.settings;
+		const previewSettings = {
+			...(this.settings && typeof this.settings === "object"
+				? this.settings
+				: {}),
+			...(settings && typeof settings === "object" ? settings : {}),
+			...(values && typeof values === "object" ? values : {}),
+		};
 		const agentIds = await this._refreshModelCache({
 			force: true,
 			settings: previewSettings,
 		});
 		const fallbackAgent = this._normalizeAgentId(
-			this._defaultAgentId(previewSettings),
+			values?.defaultAgentId ??
+				settings?.defaultAgentId ??
+				this._defaultAgentId(previewSettings),
 			"",
 		);
 		const uniqueAgents = Array.from(
@@ -6580,11 +9024,7 @@ class OpenClawPlugin extends Plugin {
 		if (!key) return "";
 
 		const input =
-			typeof value === "string"
-				? value
-				: typeof raw === "string"
-					? raw
-					: "";
+			typeof value === "string" ? value : typeof raw === "string" ? raw : "";
 		if (!input.trim()) {
 			return "";
 		}
@@ -6677,10 +9117,7 @@ class OpenClawPlugin extends Plugin {
 			this._defaultTemperature(),
 		);
 		const topP = this._number(data?.top_p, this._defaultTopP());
-		const maxTokens = this._number(
-			data?.max_tokens,
-			this._defaultMaxTokens(),
-		);
+		const maxTokens = this._number(data?.max_tokens, this._defaultMaxTokens());
 
 		const thread = this._trim(data?.thread);
 		const username = this._trim(data?.username);
@@ -6692,7 +9129,7 @@ class OpenClawPlugin extends Plugin {
 						thread,
 						username,
 						rememberMessages,
-				  })
+					})
 				: null;
 		const history = historyKey ? this._getHistory(historyKey) : [];
 
@@ -6722,8 +9159,17 @@ class OpenClawPlugin extends Plugin {
 			});
 			await this._updateConnectionState(true);
 		} catch (error) {
+			const userMessage = this._userErrorMessage(error, "OpenClaw");
+			const rawMessage = this._errorMessage(error);
 			await this._updateConnectionState(false);
-			await this._logError("Chat request failed", error);
+			await this._reportApiError({
+				userMessage,
+				rawMessage,
+				error,
+			});
+			if (format === "json") {
+				return this._jsonErrorResponse(userMessage);
+			}
 			return "";
 		}
 
@@ -7081,7 +9527,7 @@ class OpenClawPlugin extends Plugin {
 						topP,
 						maxTokens,
 						sessionUser,
-				  })
+					})
 				: this._buildChatCompletionsBody({
 						model,
 						messages,
@@ -7090,7 +9536,7 @@ class OpenClawPlugin extends Plugin {
 						maxTokens,
 						format,
 						sessionUser,
-				  });
+					});
 
 		if (path === "/v1/responses" && format === "json") {
 			await this._logInfo(
@@ -7158,14 +9604,55 @@ class OpenClawPlugin extends Plugin {
 	}
 
 	_toJsonString(text) {
-		if (!text) return "";
-		const trimmed = String(text).trim();
-		try {
-			const parsed = JSON.parse(trimmed);
+		const parsed = this._parseJsonCandidate(text);
+		if (parsed !== null) {
 			return JSON.stringify(parsed);
-		} catch (error) {
-			return trimmed;
 		}
+		const trimmed = this._trim(text);
+		if (!trimmed) {
+			return "{}";
+		}
+		return JSON.stringify({
+			error: "Invalid JSON response from OpenClaw.",
+			raw: this._truncateForLog(trimmed, 300),
+		});
+	}
+
+	_jsonErrorResponse(message) {
+		return JSON.stringify({
+			error: this._trim(message) || "OpenClaw request failed.",
+		});
+	}
+
+	_parseJsonCandidate(sourceText) {
+		const source = this._trim(sourceText);
+		if (!source) return null;
+
+		const candidates = [source];
+		const fenced = source.match(/```(?:json)?\s*([\s\S]*?)```/i);
+		if (fenced?.[1]) {
+			candidates.unshift(fenced[1].trim());
+		}
+
+		const firstBrace = source.indexOf("{");
+		const lastBrace = source.lastIndexOf("}");
+		if (firstBrace !== -1 && lastBrace > firstBrace) {
+			candidates.push(source.slice(firstBrace, lastBrace + 1));
+		}
+
+		const firstBracket = source.indexOf("[");
+		const lastBracket = source.lastIndexOf("]");
+		if (firstBracket !== -1 && lastBracket > firstBracket) {
+			candidates.push(source.slice(firstBracket, lastBracket + 1));
+		}
+
+		for (const candidate of candidates) {
+			try {
+				return JSON.parse(candidate);
+			} catch (error) {}
+		}
+
+		return null;
 	}
 
 	_extractResponseText(response = {}) {
@@ -7229,10 +9716,7 @@ class OpenClawPlugin extends Plugin {
 		return value.slice(0, maxChars);
 	}
 
-	async _refreshModelCache({
-		force = false,
-		settings = this.settings,
-	} = {}) {
+	async _refreshModelCache({ force = false, settings = this.settings } = {}) {
 		const now = Date.now();
 		const baseUrl = this._baseUrl(settings);
 		if (
@@ -7275,7 +9759,7 @@ class OpenClawPlugin extends Plugin {
 			? messages.map((msg) => ({
 					role: msg?.role,
 					content: msg?.content,
-			  }))
+				}))
 			: [];
 	}
 
@@ -7315,8 +9799,96 @@ class OpenClawPlugin extends Plugin {
 		return String(error ?? "Unknown error");
 	}
 
+	_userErrorMessage(error, provider = "AI") {
+		const { status, responseText, message } = this._errorContext(error);
+		const apiMessage = this._errorBodyMessage(responseText);
+		const retryHint = this._retryHint(responseText);
+
+		if (status === 401 || status === 403) {
+			return `${provider} API authentication failed. Check your API key and permissions.`;
+		}
+		if (status === 429) {
+			return `${provider} API rate limit or quota exceeded. Check your plan/billing and try again.${retryHint}`;
+		}
+		if (status !== null && status >= 500) {
+			return `${provider} API is temporarily unavailable. Please try again in a moment.`;
+		}
+		if (apiMessage) {
+			return `${provider} API error: ${apiMessage}`;
+		}
+		return `${provider} request failed. ${this._truncateForLog(message, 180) || "Please check plugin settings and try again."}`;
+	}
+
+	_errorContext(error) {
+		const message = this._errorMessage(error);
+		const parsedStatus = Number(error?.status);
+		let status = Number.isFinite(parsedStatus) ? parsedStatus : null;
+		let responseText =
+			typeof error?.responseText === "string" ? error.responseText.trim() : "";
+
+		const match = message.match(/^Request failed \(([^)]+)\):\s*([\s\S]*)$/);
+		if (match) {
+			if (status === null && /^\d+$/.test(match[1])) {
+				status = Number(match[1]);
+			}
+			if (!responseText) {
+				responseText = match[2].trim();
+			}
+		}
+
+		return { status, responseText, message };
+	}
+
+	_errorBodyMessage(responseText) {
+		const text = this._trim(responseText);
+		if (!text) return "";
+		const parsed = this._safeParseJson(text);
+		if (parsed) {
+			const fromNested =
+				this._trim(parsed?.error?.message) ||
+				this._trim(parsed?.error) ||
+				this._trim(parsed?.message) ||
+				this._trim(parsed?.details);
+			if (fromNested) return this._truncateForLog(fromNested, 220);
+		}
+		return this._truncateForLog(text, 220);
+	}
+
+	_retryHint(responseText) {
+		const parsed = this._safeParseJson(responseText);
+		const retryAfter =
+			this._trim(parsed?.retry_after) ||
+			this._trim(parsed?.retryAfter) ||
+			this._trim(parsed?.error?.retry_after) ||
+			this._trim(parsed?.error?.retryAfter);
+		if (retryAfter) {
+			return ` Retry in about ${retryAfter}.`;
+		}
+
+		const text = this._trim(responseText);
+		const retryMatch = text.match(
+			/retry (?:after|in)\s+([0-9]+(?:\.[0-9]+)?s?)/i,
+		);
+		if (retryMatch?.[1]) {
+			return ` Retry in about ${retryMatch[1]}.`;
+		}
+		return "";
+	}
+
+	_safeParseJson(text) {
+		const value = this._trim(text);
+		if (!value) return null;
+		try {
+			return JSON.parse(value);
+		} catch (error) {
+			return null;
+		}
+	}
+
 	_truncateForLog(text, max = 300) {
-		const value = String(text ?? "").replace(/\s+/g, " ").trim();
+		const value = String(text ?? "")
+			.replace(/\s+/g, " ")
+			.trim();
 		if (value.length <= max) return value;
 		return `${value.slice(0, max)}...`;
 	}
@@ -7327,7 +9899,8 @@ class OpenClawPlugin extends Plugin {
 		if (error?.status) details.push(`status=${error.status}`);
 		if (error?.method) details.push(`method=${error.method}`);
 		if (error?.url) details.push(`url=${error.url}`);
-		if (error?.message) details.push(`error=${this._truncateForLog(error.message)}`);
+		if (error?.message)
+			details.push(`error=${this._truncateForLog(error.message)}`);
 		if (error?.responseText) {
 			details.push(`body=${this._truncateForLog(error.responseText)}`);
 		}
@@ -7340,8 +9913,7 @@ class OpenClawPlugin extends Plugin {
 		}
 		try {
 			await this.lumia.log(`[OpenClaw] ${message}`);
-		} catch (error) {
-		}
+		} catch (error) {}
 	}
 
 	async _logInfo(message) {
@@ -7352,6 +9924,42 @@ class OpenClawPlugin extends Plugin {
 		const suffix = this._formatErrorDetails(error);
 		const full = suffix ? `${message} | ${suffix}` : message;
 		await this._log(full);
+	}
+
+	async _reportApiError({ userMessage, rawMessage, error } = {}) {
+		await this._logError("Chat request failed", error);
+
+		const compactUser = this._truncateForLog(userMessage, 220);
+		const compactRaw = this._truncateForLog(rawMessage, 260);
+
+		if (typeof this.lumia?.log === "function") {
+			try {
+				const message = compactRaw
+					? `[OpenClaw] ${compactUser} | ${compactRaw}`
+					: `[OpenClaw] ${compactUser}`;
+				await this.lumia.log({ message, level: "error" });
+			} catch (logError) {
+				try {
+					await this.lumia.log(`[OpenClaw] ${compactUser}`);
+				} catch (innerError) {}
+			}
+		}
+
+		if (typeof this.lumia?.showToast === "function") {
+			const now = Date.now();
+			const sameMessage =
+				this._lastErrorToast.message === compactUser &&
+				now - this._lastErrorToast.at < 5000;
+			if (!sameMessage) {
+				this._lastErrorToast = { message: compactUser, at: now };
+				try {
+					await this.lumia.showToast({
+						message: compactUser,
+						time: 4500,
+					});
+				} catch (toastError) {}
+			}
+		}
 	}
 
 	_url(path, settings = this.settings) {
@@ -7417,7 +10025,9 @@ class OpenClawPlugin extends Plugin {
 		}
 
 		this._lastConnectionState = state;
-		await this._logInfo(`Connection state changed: ${state ? "connected" : "disconnected"}`);
+		await this._logInfo(
+			`Connection state changed: ${state ? "connected" : "disconnected"}`,
+		);
 
 		if (typeof this.lumia.updateConnection === "function") {
 			try {
@@ -7452,6 +10062,7 @@ module.exports = OpenClawPlugin;
 	"config": {
 		"hasAI": true,
 		"settings_tutorial": "./settings_tutorial.md",
+		"translations": "./translations.json",
 		"settings": [
 			{
 				"key": "baseUrl",
@@ -7460,14 +10071,20 @@ module.exports = OpenClawPlugin;
 				"defaultValue": "http://127.0.0.1:18789",
 				"required": true,
 				"helperText": "Your OpenClaw Gateway URL.",
-				"refreshOnChange": true
+				"refreshOnChange": true,
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "authToken",
 				"label": "Gateway Token",
 				"type": "password",
 				"helperText": "Optional. Required when Gateway auth is enabled.",
-				"refreshOnChange": true
+				"refreshOnChange": true,
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "defaultAgentId",
@@ -7485,7 +10102,10 @@ module.exports = OpenClawPlugin;
 					}
 				],
 				"required": false,
-				"helperText": "Agent id used to build request route (openclaw:<agent>) and x-openclaw-agent-id."
+				"helperText": "Agent id used to build request route (openclaw:<agent>) and x-openclaw-agent-id.",
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			},
 			{
 				"key": "knownAgentIds",
@@ -7493,7 +10113,10 @@ module.exports = OpenClawPlugin;
 				"type": "text",
 				"defaultValue": "",
 				"helperText": "Comma-separated agent IDs for the dropdown (example: main,research,fast).",
-				"refreshOnChange": true
+				"refreshOnChange": true,
+				"section": "Connection",
+				"sectionOrder": 1,
+				"group": "connection"
 			}
 		],
 		"actions": [],
@@ -7535,15 +10158,15 @@ module.exports = OpenClawPlugin;
 
 ```
 {
-  "name": "lumia-openclaw",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Lumia Stream plugin that sends prompts to an OpenClaw Gateway and exposes the response in variables and alerts.",
-  "main": "main.js",
-  "scripts": {},
-  "dependencies": {
-    "@lumiastream/plugin": "^0.4.0"
-  }
+	"name": "lumia-openclaw",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin that sends prompts to an OpenClaw Gateway and exposes the response in variables and alerts.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.1"
+	}
 }
 
 ```
@@ -7595,6 +10218,37 @@ Run a prompt without storing or using history:
 Clear a conversation thread:
 `{{openclaw_prompt_clear=thread_name}}`
 ---
+
+```
+
+## openclaw/translations.json
+
+```
+{
+	"en": {
+		"connection": "Connection",
+		"Connection": "Connection",
+		"Base URL": "Base URL",
+		"Your OpenClaw Gateway URL.": "Your OpenClaw Gateway URL.",
+		"Gateway Token": "Gateway Token",
+		"Optional. Required when Gateway auth is enabled.": "Optional. Required when Gateway auth is enabled.",
+		"Default Agent ID": "Default Agent ID",
+		"Auto": "Auto",
+		"Agent id used to build request route (openclaw:<agent>) and x-openclaw-agent-id.": "Agent id used to build request route (openclaw:<agent>) and x-openclaw-agent-id.",
+		"Known Agent IDs": "Known Agent IDs",
+		"Comma-separated agent IDs for the dropdown (example: main,research,fast).": "Comma-separated agent IDs for the dropdown (example: main,research,fast).",
+		"OpenClaw Prompt": "OpenClaw Prompt",
+		"Use {{openclaw_prompt=message|thread|agent}} to return a response from OpenClaw.": "Use {{openclaw_prompt=message|thread|agent}} to return a response from OpenClaw.",
+		"OpenClaw JSON": "OpenClaw JSON",
+		"Use {{openclaw_json=message|thread|agent}} to return JSON-only output.": "Use {{openclaw_json=message|thread|agent}} to return JSON-only output.",
+		"OpenClaw One Line": "OpenClaw One Line",
+		"Use {{openclaw_one_line=message|thread|agent}} to return a single-line response.": "Use {{openclaw_one_line=message|thread|agent}} to return a single-line response.",
+		"OpenClaw Prompt (No Store)": "OpenClaw Prompt (No Store)",
+		"Use {{openclaw_prompt_nostore=message|thread|agent}} to run without history.": "Use {{openclaw_prompt_nostore=message|thread|agent}} to run without history.",
+		"OpenClaw Clear Thread": "OpenClaw Clear Thread",
+		"Use {{openclaw_prompt_clear=thread_name}} to clear a conversation thread.": "Use {{openclaw_prompt_clear=thread_name}} to clear a conversation thread."
+	}
+}
 
 ```
 
@@ -9838,7 +12492,7 @@ module.exports = OpenRGBPlugin;
 	"description": "OpenRGB light integration plugin for Lumia Stream.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.1"
 	}
 }
 
@@ -11539,7 +14193,7 @@ module.exports = RumblePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.1"
 	}
 }
 
@@ -12163,7 +14817,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.2"
 	}
 }
 
@@ -12220,6 +14874,1226 @@ When you save settings, the plugin:
 		"last_saved_values_json": "JSON snapshot of values saved most recently."
 	}
 }
+
+```
+
+## sound_match_trigger/README.md
+
+```
+# Sound Match Trigger Example
+
+This plugin lets users upload a reference sound and trigger a Lumia alert when live audio matches it.
+
+## Requirements
+
+- FFmpeg installed and reachable by `ffmpeg` (or provide a full path in settings).
+- A short reference audio clip (distinctive clips produce better matching).
+
+## Recommended workflow
+
+1. Run **List Capture Devices** and copy a device name/index if needed.
+2. Set **Reference Audio File**.
+3. Start with threshold `0.82` and cooldown `3000 ms`.
+4. Enable **Log Similarity Scores** briefly while tuning.
+
+## Notes
+
+- Windows is the primary target:
+  - mic/input uses `dshow`
+  - output/loopback uses `wasapi`
+- macOS/Linux are supported with FFmpeg backends (`avfoundation` / `pulse`) but may require device-specific setup.
+
+```
+
+## sound_match_trigger/actions_tutorial.md
+
+```
+### Start Detection
+Starts live listening with current settings.
+
+### Stop Detection
+Stops the FFmpeg capture process and analysis loop.
+
+### List Capture Devices
+Prints available capture devices to plugin logs for your current platform.
+
+### Test Alert
+Fires the `sound_detected` alert immediately using a test score.
+
+```
+
+## sound_match_trigger/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+const { spawn } = require("child_process");
+const fs = require("fs/promises");
+const path = require("path");
+
+const SAMPLE_RATE = 16000;
+const MIN_REFERENCE_SECONDS = 0.3;
+const DEFAULTS = {
+	ffmpegPath: "ffmpeg",
+	captureMode: "microphone",
+	inputDevice: "",
+	threshold: 0.82,
+	cooldownMs: 3000,
+	detectionIntervalMs: 700,
+	maxReferenceSeconds: 6,
+	autoStart: true,
+	autoRestart: true,
+	restartDelayMs: 2000,
+	logSimilarity: false,
+};
+
+const FEATURE_BANDS_HZ = [90, 150, 240, 360, 520, 740, 1040, 1450, 2000, 2750, 3600, 4700, 6200];
+const VARIABLE_NAMES = {
+	status: "detector_status",
+	lastSimilarity: "last_similarity",
+	lastMatchScore: "last_match_score",
+	lastMatchTime: "last_match_time",
+	referenceFile: "reference_file",
+	captureDevice: "capture_device",
+};
+
+function clamp(value, min, max) {
+	return Math.max(min, Math.min(max, value));
+}
+
+function toNumber(value, fallback) {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return parsed;
+		}
+	}
+	return fallback;
+}
+
+function toBoolean(value, fallback) {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (["true", "1", "yes", "on"].includes(normalized)) return true;
+		if (["false", "0", "no", "off"].includes(normalized)) return false;
+	}
+	return fallback;
+}
+
+function toString(value, fallback = "") {
+	if (typeof value !== "string") {
+		return fallback;
+	}
+	const trimmed = value.trim();
+	return trimmed.length ? trimmed : fallback;
+}
+
+function normalizeVector(values) {
+	let norm = 0;
+	for (let i = 0; i < values.length; i += 1) {
+		const v = values[i];
+		norm += v * v;
+	}
+	norm = Math.sqrt(norm) || 1;
+	const output = new Array(values.length);
+	for (let i = 0; i < values.length; i += 1) {
+		output[i] = values[i] / norm;
+	}
+	return output;
+}
+
+function cosineSimilarity(a, b) {
+	if (!Array.isArray(a) || !Array.isArray(b) || a.length === 0 || a.length !== b.length) {
+		return 0;
+	}
+	let dot = 0;
+	for (let i = 0; i < a.length; i += 1) {
+		dot += a[i] * b[i];
+	}
+	return clamp(dot, 0, 1);
+}
+
+function trimSilence(samples) {
+	if (!(samples instanceof Float32Array) || samples.length === 0) {
+		return samples;
+	}
+	let maxAbs = 0;
+	for (let i = 0; i < samples.length; i += 1) {
+		const abs = Math.abs(samples[i]);
+		if (abs > maxAbs) maxAbs = abs;
+	}
+	const threshold = Math.max(0.008, maxAbs * 0.08);
+	let start = 0;
+	let end = samples.length - 1;
+	while (start < samples.length && Math.abs(samples[start]) < threshold) {
+		start += 1;
+	}
+	while (end > start && Math.abs(samples[end]) < threshold) {
+		end -= 1;
+	}
+	return samples.slice(start, end + 1);
+}
+
+function downsampleAverages(values, targetLength) {
+	if (!Array.isArray(values) || values.length === 0 || targetLength <= 0) {
+		return [];
+	}
+	if (values.length <= targetLength) {
+		return values.slice();
+	}
+	const output = [];
+	const stride = values.length / targetLength;
+	for (let i = 0; i < targetLength; i += 1) {
+		const start = Math.floor(i * stride);
+		const end = Math.max(start + 1, Math.floor((i + 1) * stride));
+		let sum = 0;
+		for (let j = start; j < end && j < values.length; j += 1) {
+			sum += values[j];
+		}
+		output.push(sum / (end - start));
+	}
+	return output;
+}
+
+function buildEnvelope(samples, parts = 48) {
+	if (!(samples instanceof Float32Array) || samples.length === 0) {
+		return [];
+	}
+	const output = [];
+	const stride = samples.length / parts;
+	for (let i = 0; i < parts; i += 1) {
+		const start = Math.floor(i * stride);
+		const end = Math.max(start + 1, Math.floor((i + 1) * stride));
+		let sum = 0;
+		for (let j = start; j < end && j < samples.length; j += 1) {
+			sum += Math.abs(samples[j]);
+		}
+		output.push(sum / (end - start));
+	}
+	return output;
+}
+
+function buildEnvelopeDeltas(envelope, targetLength = 24) {
+	if (!Array.isArray(envelope) || envelope.length < 2) {
+		return [];
+	}
+	const deltas = [];
+	for (let i = 1; i < envelope.length; i += 1) {
+		deltas.push(Math.abs(envelope[i] - envelope[i - 1]));
+	}
+	return downsampleAverages(deltas, targetLength);
+}
+
+function goertzelPower(samples, offset, frameSize, coeff) {
+	let s0 = 0;
+	let s1 = 0;
+	let s2 = 0;
+	for (let i = 0; i < frameSize; i += 1) {
+		s0 = samples[offset + i] + coeff * s1 - s2;
+		s2 = s1;
+		s1 = s0;
+	}
+	return s1 * s1 + s2 * s2 - coeff * s1 * s2;
+}
+
+function buildSpectralProfile(samples) {
+	if (!(samples instanceof Float32Array) || samples.length < 1024) {
+		return FEATURE_BANDS_HZ.map(() => 0);
+	}
+	const frameSize = 1024;
+	const hop = 512;
+	const coeffs = FEATURE_BANDS_HZ.map((freq) => 2 * Math.cos((2 * Math.PI * freq) / SAMPLE_RATE));
+	const sums = FEATURE_BANDS_HZ.map(() => 0);
+	let frameCount = 0;
+
+	for (let offset = 0; offset + frameSize <= samples.length; offset += hop) {
+		frameCount += 1;
+		for (let i = 0; i < coeffs.length; i += 1) {
+			const power = goertzelPower(samples, offset, frameSize, coeffs[i]);
+			sums[i] += Math.log1p(Math.max(power, 0));
+		}
+	}
+
+	if (frameCount === 0) return FEATURE_BANDS_HZ.map(() => 0);
+	return sums.map((sum) => sum / frameCount);
+}
+
+function buildFeatureVector(rawSamples) {
+	if (!(rawSamples instanceof Float32Array) || rawSamples.length === 0) {
+		return [];
+	}
+	let rms = 0;
+	for (let i = 0; i < rawSamples.length; i += 1) {
+		rms += rawSamples[i] * rawSamples[i];
+	}
+	rms = Math.sqrt(rms / rawSamples.length) || 1;
+	const normalizedSamples = new Float32Array(rawSamples.length);
+	for (let i = 0; i < rawSamples.length; i += 1) {
+		normalizedSamples[i] = clamp(rawSamples[i] / rms, -1, 1);
+	}
+
+	const envelope = buildEnvelope(normalizedSamples, 48);
+	const envelopeSummary = downsampleAverages(envelope, 24);
+	const envelopeDeltas = buildEnvelopeDeltas(envelope, 24);
+	const spectral = buildSpectralProfile(normalizedSamples);
+	return normalizeVector(spectral.concat(envelopeSummary, envelopeDeltas));
+}
+
+function decodeS16LEChunk(buffer) {
+	const count = Math.floor(buffer.length / 2);
+	const output = new Float32Array(count);
+	for (let i = 0; i < count; i += 1) {
+		output[i] = buffer.readInt16LE(i * 2) / 32768;
+	}
+	return output;
+}
+
+function mergeBuffers(buffers) {
+	if (!Array.isArray(buffers) || buffers.length === 0) return Buffer.alloc(0);
+	if (buffers.length === 1) return buffers[0];
+	return Buffer.concat(buffers);
+}
+
+class CircularFloatBuffer {
+	constructor(capacity) {
+		this.capacity = Math.max(1, Math.floor(capacity));
+		this.data = new Float32Array(this.capacity);
+		this.size = 0;
+		this.writeIndex = 0;
+	}
+
+	push(samples) {
+		for (let i = 0; i < samples.length; i += 1) {
+			this.data[this.writeIndex] = samples[i];
+			this.writeIndex = (this.writeIndex + 1) % this.capacity;
+			if (this.size < this.capacity) {
+				this.size += 1;
+			}
+		}
+	}
+
+	getLatest(count) {
+		if (this.size === 0 || count <= 0) return new Float32Array(0);
+		const length = Math.min(count, this.size);
+		const output = new Float32Array(length);
+		let start = this.writeIndex - length;
+		if (start < 0) start += this.capacity;
+		for (let i = 0; i < length; i += 1) {
+			output[i] = this.data[(start + i) % this.capacity];
+		}
+		return output;
+	}
+}
+
+class SoundMatchTriggerPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._runtime = {
+			running: false,
+			startPromise: null,
+			stopPromise: null,
+			ffmpegProcess: null,
+			buffer: null,
+			leftoverBytes: Buffer.alloc(0),
+			analysisTimer: null,
+			analysisInProgress: false,
+			lastTriggerAt: 0,
+			lastSimilarityAt: 0,
+			lastLoggedSimilarityAt: 0,
+			restartTimer: null,
+			stopRequested: false,
+			settings: null,
+			referenceFeature: [],
+			referenceSampleCount: 0,
+			referenceFileLabel: "",
+			stderrTail: [],
+		};
+	}
+
+	async onload() {
+		await this._setVariableSafe(VARIABLE_NAMES.status, "stopped");
+		const settings = this._getSettingsSnapshot();
+		if (settings.autoStart && settings.referenceAudioFile) {
+			await this.startDetection("auto-start");
+		}
+	}
+
+	async onunload() {
+		await this.stopDetection("plugin unload");
+	}
+
+	async onsettingsupdate(settings, previousSettings = {}) {
+		const next = this._getSettingsSnapshot(settings);
+		const previous = this._getSettingsSnapshot(previousSettings);
+		const affectDetection =
+			next.referenceAudioFile !== previous.referenceAudioFile ||
+			next.ffmpegPath !== previous.ffmpegPath ||
+			next.captureMode !== previous.captureMode ||
+			next.inputDevice !== previous.inputDevice ||
+			next.maxReferenceSeconds !== previous.maxReferenceSeconds ||
+			next.detectionIntervalMs !== previous.detectionIntervalMs;
+
+		if (this._runtime.running && !next.autoStart) {
+			await this.stopDetection("auto-start disabled");
+			return;
+		}
+
+		if (this._runtime.running && affectDetection) {
+			await this._restartDetection("capture settings changed");
+			return;
+		}
+
+		if (!this._runtime.running && next.autoStart && next.referenceAudioFile) {
+			await this.startDetection("settings update auto-start");
+		}
+	}
+
+	async actions(config) {
+		for (const action of config.actions || []) {
+			const value = action?.value || {};
+			switch (action?.type) {
+				case "start_detection":
+					await this.startDetection("action");
+					break;
+				case "stop_detection":
+					await this.stopDetection("action");
+					break;
+				case "list_devices":
+					await this._listCaptureDevices(value?.mode);
+					break;
+				case "test_alert":
+					await this._triggerMatchAlert(
+						clamp(toNumber(value?.score, 0.95), 0, 1),
+						new Date().toISOString(),
+					);
+					break;
+				default:
+					break;
+			}
+		}
+	}
+
+	async startDetection(reason = "manual") {
+		if (this._runtime.running) {
+			await this._log(`Detector already running (${reason}).`);
+			return true;
+		}
+		if (this._runtime.startPromise) {
+			return this._runtime.startPromise;
+		}
+		this._runtime.startPromise = this._startInternal(reason)
+			.catch(async (error) => {
+				await this._setVariableSafe(VARIABLE_NAMES.status, "error");
+				await this._log(`Failed to start detector: ${this._errorMessage(error)}`, "error");
+				return false;
+			})
+			.finally(() => {
+				this._runtime.startPromise = null;
+			});
+		return this._runtime.startPromise;
+	}
+
+	async stopDetection(reason = "manual") {
+		if (!this._runtime.running && !this._runtime.ffmpegProcess) {
+			await this._setVariableSafe(VARIABLE_NAMES.status, "stopped");
+			return true;
+		}
+		if (this._runtime.stopPromise) {
+			return this._runtime.stopPromise;
+		}
+		this._runtime.stopPromise = this._stopInternal(reason).finally(() => {
+			this._runtime.stopPromise = null;
+		});
+		return this._runtime.stopPromise;
+	}
+
+	async _restartDetection(reason) {
+		await this.stopDetection(`restart: ${reason}`);
+		await this.startDetection(reason);
+	}
+
+	_getSettingsSnapshot(raw = this.settings || {}) {
+		const captureMode = toString(raw.captureMode, DEFAULTS.captureMode).toLowerCase() === "system"
+			? "system"
+			: "microphone";
+		return {
+			referenceAudioFile: toString(raw.referenceAudioFile),
+			ffmpegPath: toString(raw.ffmpegPath, DEFAULTS.ffmpegPath),
+			captureMode,
+			inputDevice: toString(raw.inputDevice),
+			threshold: clamp(toNumber(raw.threshold, DEFAULTS.threshold), 0.4, 0.99),
+			cooldownMs: Math.floor(clamp(toNumber(raw.cooldownMs, DEFAULTS.cooldownMs), 500, 60000)),
+			detectionIntervalMs: Math.floor(
+				clamp(toNumber(raw.detectionIntervalMs, DEFAULTS.detectionIntervalMs), 200, 5000),
+			),
+			maxReferenceSeconds: clamp(
+				toNumber(raw.maxReferenceSeconds, DEFAULTS.maxReferenceSeconds),
+				1,
+				30,
+			),
+			autoStart: toBoolean(raw.autoStart, DEFAULTS.autoStart),
+			autoRestart: toBoolean(raw.autoRestart, DEFAULTS.autoRestart),
+			restartDelayMs: Math.floor(
+				clamp(toNumber(raw.restartDelayMs, DEFAULTS.restartDelayMs), 500, 30000),
+			),
+			logSimilarity: toBoolean(raw.logSimilarity, DEFAULTS.logSimilarity),
+		};
+	}
+
+	async _startInternal(reason) {
+		const settings = this._getSettingsSnapshot();
+		if (!settings.referenceAudioFile) {
+			await this._log("Reference audio file is required before starting detection.", "warn");
+			await this._setVariableSafe(VARIABLE_NAMES.status, "stopped");
+			return false;
+		}
+
+		const reference = await this._loadReferenceProfile(settings);
+		const capture = this._buildCaptureConfig(settings);
+		const bufferCapacity = Math.max(reference.sampleCount * 2, SAMPLE_RATE * 20);
+
+		this._runtime.running = true;
+		this._runtime.stopRequested = false;
+		this._runtime.settings = settings;
+		this._runtime.buffer = new CircularFloatBuffer(bufferCapacity);
+		this._runtime.leftoverBytes = Buffer.alloc(0);
+		this._runtime.analysisInProgress = false;
+		this._runtime.lastTriggerAt = 0;
+		this._runtime.lastSimilarityAt = 0;
+		this._runtime.lastLoggedSimilarityAt = 0;
+		this._runtime.referenceFeature = reference.feature;
+		this._runtime.referenceSampleCount = reference.sampleCount;
+		this._runtime.referenceFileLabel = reference.fileLabel;
+		this._runtime.stderrTail = [];
+
+		if (this._runtime.restartTimer) {
+			clearTimeout(this._runtime.restartTimer);
+			this._runtime.restartTimer = null;
+		}
+
+		const proc = spawn(settings.ffmpegPath, capture.args, {
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+		this._runtime.ffmpegProcess = proc;
+
+		proc.stdout.on("data", (chunk) => {
+			this._onAudioChunk(chunk);
+		});
+
+		proc.stderr.on("data", (chunk) => {
+			const text = String(chunk || "").trim();
+			if (!text) return;
+			this._runtime.stderrTail.push(text);
+			if (this._runtime.stderrTail.length > 20) {
+				this._runtime.stderrTail.shift();
+			}
+		});
+
+		proc.on("error", async (error) => {
+			await this._log(`Capture process error: ${this._errorMessage(error)}`, "error");
+		});
+
+		proc.on("exit", (code, signal) => {
+			this._onCaptureExit(code, signal).catch(() => {});
+		});
+
+		this._runtime.analysisTimer = setInterval(() => {
+			if (this._runtime.analysisInProgress || !this._runtime.running) return;
+			this._runtime.analysisInProgress = true;
+			this._analyzeLatestWindow()
+				.catch(async (error) => {
+					await this._log(`Analysis error: ${this._errorMessage(error)}`, "error");
+				})
+				.finally(() => {
+					this._runtime.analysisInProgress = false;
+				});
+		}, settings.detectionIntervalMs);
+
+		await this._setVariableSafe(VARIABLE_NAMES.status, "running");
+		await this._setVariableSafe(VARIABLE_NAMES.referenceFile, reference.fileLabel);
+		await this._setVariableSafe(VARIABLE_NAMES.captureDevice, capture.label);
+		await this._setVariableSafe(VARIABLE_NAMES.lastSimilarity, 0);
+		await this._log(
+			`Detector started (${reason}). Reference=${reference.fileLabel} (${reference.durationSeconds.toFixed(
+				2,
+			)}s), mode=${settings.captureMode}, device=${capture.label}`,
+		);
+		return true;
+	}
+
+	async _stopInternal(reason) {
+		this._runtime.stopRequested = true;
+
+		if (this._runtime.restartTimer) {
+			clearTimeout(this._runtime.restartTimer);
+			this._runtime.restartTimer = null;
+		}
+		if (this._runtime.analysisTimer) {
+			clearInterval(this._runtime.analysisTimer);
+			this._runtime.analysisTimer = null;
+		}
+
+		const proc = this._runtime.ffmpegProcess;
+		this._runtime.ffmpegProcess = null;
+		if (proc) {
+			proc.removeAllListeners("exit");
+			try {
+				proc.kill("SIGTERM");
+			} catch (_error) {}
+			await new Promise((resolve) => setTimeout(resolve, 120));
+			if (!proc.killed) {
+				try {
+					proc.kill("SIGKILL");
+				} catch (_error) {}
+			}
+		}
+
+		this._runtime.running = false;
+		this._runtime.buffer = null;
+		this._runtime.leftoverBytes = Buffer.alloc(0);
+		this._runtime.referenceFeature = [];
+		this._runtime.referenceSampleCount = 0;
+		this._runtime.referenceFileLabel = "";
+		this._runtime.settings = null;
+		await this._setVariableSafe(VARIABLE_NAMES.status, "stopped");
+		await this._log(`Detector stopped (${reason}).`);
+		return true;
+	}
+
+	_onAudioChunk(chunk) {
+		if (!this._runtime.running || !this._runtime.buffer) {
+			return;
+		}
+		const combined = this._runtime.leftoverBytes.length
+			? Buffer.concat([this._runtime.leftoverBytes, chunk])
+			: chunk;
+		const usableBytes = combined.length - (combined.length % 2);
+		if (usableBytes <= 0) {
+			this._runtime.leftoverBytes = combined;
+			return;
+		}
+		this._runtime.leftoverBytes = combined.slice(usableBytes);
+		const pcm = decodeS16LEChunk(combined.subarray(0, usableBytes));
+		this._runtime.buffer.push(pcm);
+	}
+
+	async _analyzeLatestWindow() {
+		const runtime = this._runtime;
+		if (!runtime.running || !runtime.buffer || runtime.referenceSampleCount <= 0) {
+			return;
+		}
+		const samples = runtime.buffer.getLatest(runtime.referenceSampleCount);
+		if (samples.length < runtime.referenceSampleCount) {
+			return;
+		}
+		const feature = buildFeatureVector(samples);
+		const similarity = cosineSimilarity(runtime.referenceFeature, feature);
+		const now = Date.now();
+
+		if (now - runtime.lastSimilarityAt > 1000) {
+			runtime.lastSimilarityAt = now;
+			await this._setVariableSafe(VARIABLE_NAMES.lastSimilarity, Number(similarity.toFixed(4)));
+		}
+
+		if (runtime.settings?.logSimilarity && now - runtime.lastLoggedSimilarityAt > 1000) {
+			runtime.lastLoggedSimilarityAt = now;
+			await this._log(`Similarity=${similarity.toFixed(4)} threshold=${runtime.settings.threshold}`);
+		}
+
+		if (similarity < runtime.settings.threshold) {
+			return;
+		}
+		if (now - runtime.lastTriggerAt < runtime.settings.cooldownMs) {
+			return;
+		}
+
+		runtime.lastTriggerAt = now;
+		await this._triggerMatchAlert(similarity, new Date(now).toISOString());
+	}
+
+	async _triggerMatchAlert(similarity, timestampIso) {
+		const runtime = this._runtime;
+		const score = Number(similarity.toFixed(4));
+		const referenceFile = runtime.referenceFileLabel || path.basename(this._getSettingsSnapshot().referenceAudioFile || "");
+		const captureDevice = this._captureLabel(runtime.settings || this._getSettingsSnapshot());
+
+		await this._setVariableSafe(VARIABLE_NAMES.lastMatchScore, score);
+		await this._setVariableSafe(VARIABLE_NAMES.lastMatchTime, timestampIso);
+		await this._setVariableSafe(VARIABLE_NAMES.referenceFile, referenceFile);
+		await this._setVariableSafe(VARIABLE_NAMES.captureDevice, captureDevice);
+
+		try {
+			await this.lumia.triggerAlert({
+				alert: "sound_detected",
+				extraSettings: {
+					last_match_score: score,
+					last_match_time: timestampIso,
+					reference_file: referenceFile,
+					capture_device: captureDevice,
+				},
+				showInEventList: true,
+			});
+		} catch (error) {
+			await this._log(`Failed to trigger alert: ${this._errorMessage(error)}`, "error");
+			return;
+		}
+
+		await this._log(`Sound matched: score=${score} reference=${referenceFile} device=${captureDevice}`);
+	}
+
+	async _onCaptureExit(code, signal) {
+		if (!this._runtime.running) {
+			return;
+		}
+		const settings = this._runtime.settings || this._getSettingsSnapshot();
+		const stderrSummary = this._runtime.stderrTail.slice(-5).join(" | ");
+
+		this._runtime.running = false;
+		this._runtime.ffmpegProcess = null;
+		if (this._runtime.analysisTimer) {
+			clearInterval(this._runtime.analysisTimer);
+			this._runtime.analysisTimer = null;
+		}
+
+		if (this._runtime.stopRequested) {
+			await this._setVariableSafe(VARIABLE_NAMES.status, "stopped");
+			return;
+		}
+
+		await this._log(
+			`Capture exited (code=${code ?? "null"}, signal=${signal ?? "null"}). ${stderrSummary}`,
+			"warn",
+		);
+
+		if (!settings.autoRestart) {
+			await this._setVariableSafe(VARIABLE_NAMES.status, "error");
+			return;
+		}
+
+		await this._setVariableSafe(VARIABLE_NAMES.status, "restarting");
+		this._runtime.restartTimer = setTimeout(() => {
+			this.startDetection("auto-restart after capture exit").catch(() => {});
+		}, settings.restartDelayMs);
+	}
+
+	async _loadReferenceProfile(settings) {
+		const filePath = settings.referenceAudioFile;
+		await fs.access(filePath);
+
+		const decodeArgs = [
+			"-hide_banner",
+			"-loglevel",
+			"error",
+			"-i",
+			filePath,
+			"-t",
+			String(settings.maxReferenceSeconds),
+			"-ac",
+			"1",
+			"-ar",
+			String(SAMPLE_RATE),
+			"-f",
+			"s16le",
+			"pipe:1",
+		];
+		const result = await this._runCommand(settings.ffmpegPath, decodeArgs, 30000);
+		if (result.code !== 0 || !result.stdout.length) {
+			throw new Error(
+				`Unable to decode reference file. Verify FFmpeg path and file format. ${result.stderr || ""}`.trim(),
+			);
+		}
+
+		let samples = decodeS16LEChunk(result.stdout);
+		samples = trimSilence(samples);
+
+		const minSamples = Math.floor(MIN_REFERENCE_SECONDS * SAMPLE_RATE);
+		if (samples.length < minSamples) {
+			throw new Error(
+				`Reference audio is too short after trimming silence. Minimum is ${MIN_REFERENCE_SECONDS} seconds.`,
+			);
+		}
+
+		const feature = buildFeatureVector(samples);
+		if (!feature.length) {
+			throw new Error("Reference audio feature extraction failed.");
+		}
+
+		return {
+			feature,
+			sampleCount: samples.length,
+			durationSeconds: samples.length / SAMPLE_RATE,
+			fileLabel: path.basename(filePath),
+		};
+	}
+
+	_buildCaptureConfig(settings) {
+		const platform = process.platform;
+		const mode = settings.captureMode;
+		const ffmpegArgs = ["-hide_banner", "-loglevel", "error"];
+
+		if (platform === "win32") {
+			if (mode === "system") {
+				const input = settings.inputDevice || "default";
+				ffmpegArgs.push("-f", "wasapi", "-i", input);
+			} else {
+				const source = settings.inputDevice
+					? settings.inputDevice.startsWith("audio=")
+						? settings.inputDevice
+						: `audio=${settings.inputDevice}`
+					: "audio=default";
+				ffmpegArgs.push("-f", "dshow", "-i", source);
+			}
+		} else if (platform === "darwin") {
+			const input = settings.inputDevice || "0";
+			const source = input.includes(":") ? input : `:${input}`;
+			ffmpegArgs.push("-f", "avfoundation", "-i", source);
+		} else if (platform === "linux") {
+			const source = settings.inputDevice || "default";
+			ffmpegArgs.push("-f", "pulse", "-i", source);
+		} else {
+			const source = settings.inputDevice || "default";
+			ffmpegArgs.push("-f", "pulse", "-i", source);
+		}
+
+		ffmpegArgs.push("-ac", "1", "-ar", String(SAMPLE_RATE), "-f", "s16le", "pipe:1");
+		return {
+			args: ffmpegArgs,
+			label: this._captureLabel(settings),
+		};
+	}
+
+	_captureLabel(settings) {
+		const mode = settings?.captureMode === "system" ? "system" : "microphone";
+		const device = settings?.inputDevice || "default";
+		return `${mode}:${device}`;
+	}
+
+	async _listCaptureDevices(modeInput = "auto") {
+		const settings = this._getSettingsSnapshot();
+		const mode = modeInput && modeInput !== "auto" ? modeInput : settings.captureMode;
+		const ffmpegPath = settings.ffmpegPath;
+		const platform = process.platform;
+		let outputLines = [];
+
+		if (platform === "win32") {
+			if (mode === "system") {
+				const result = await this._runCommand(
+					ffmpegPath,
+					["-hide_banner", "-list_devices", "true", "-f", "wasapi", "-i", "dummy"],
+					15000,
+				);
+				outputLines = this._parseQuotedDeviceLines(result.stderr);
+			} else {
+				const result = await this._runCommand(
+					ffmpegPath,
+					["-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
+					15000,
+				);
+				outputLines = this._parseQuotedDeviceLines(result.stderr);
+			}
+		} else if (platform === "darwin") {
+			const result = await this._runCommand(
+				ffmpegPath,
+				["-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""],
+				15000,
+			);
+			outputLines = result.stderr
+				.split(/\r?\n/)
+				.map((line) => line.trim())
+				.filter((line) => /\[\d+\]/.test(line));
+		} else if (platform === "linux") {
+			const pactlResult = await this._runCommand("pactl", ["list", "short", "sources"], 10000);
+			if (pactlResult.code === 0 && pactlResult.stdout.length) {
+				outputLines = pactlResult.stdout
+					.toString()
+					.split(/\r?\n/)
+					.map((line) => line.trim())
+					.filter(Boolean);
+			} else {
+				const ffmpegResult = await this._runCommand(
+					ffmpegPath,
+					["-hide_banner", "-sources", "pulse"],
+					15000,
+				);
+				outputLines = ffmpegResult.stderr
+					.split(/\r?\n/)
+					.map((line) => line.trim())
+					.filter(Boolean);
+			}
+		}
+
+		if (!outputLines.length) {
+			await this._log("No capture devices found or FFmpeg/PulseAudio is unavailable.", "warn");
+			await this._toast("No devices listed. Check plugin logs.");
+			return;
+		}
+
+		await this._log(`Available ${mode} devices:\n${outputLines.join("\n")}`);
+		await this._toast(`Found ${outputLines.length} devices. See logs.`);
+	}
+
+	_parseQuotedDeviceLines(text) {
+		const lines = String(text || "")
+			.split(/\r?\n/)
+			.map((line) => line.trim())
+			.filter(Boolean);
+		const matches = [];
+		for (const line of lines) {
+			const quoted = line.match(/"([^"]+)"/g);
+			if (!quoted || !quoted.length) continue;
+			for (const item of quoted) {
+				const value = item.replace(/"/g, "");
+				if (value && !matches.includes(value)) {
+					matches.push(value);
+				}
+			}
+		}
+		return matches;
+	}
+
+	async _runCommand(command, args, timeoutMs = 10000) {
+		return new Promise((resolve) => {
+			const proc = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+			const stdoutChunks = [];
+			const stderrChunks = [];
+			let timedOut = false;
+			const timer = setTimeout(() => {
+				timedOut = true;
+				try {
+					proc.kill("SIGKILL");
+				} catch (_error) {}
+			}, timeoutMs);
+
+			proc.stdout.on("data", (chunk) => stdoutChunks.push(chunk));
+			proc.stderr.on("data", (chunk) => stderrChunks.push(chunk));
+			proc.on("error", (error) => {
+				clearTimeout(timer);
+				resolve({
+					code: -1,
+					stdout: mergeBuffers(stdoutChunks),
+					stderr: String(mergeBuffers(stderrChunks) || ""),
+					error,
+					timedOut,
+				});
+			});
+			proc.on("close", (code) => {
+				clearTimeout(timer);
+				resolve({
+					code,
+					stdout: mergeBuffers(stdoutChunks),
+					stderr: String(mergeBuffers(stderrChunks) || ""),
+					timedOut,
+				});
+			});
+		});
+	}
+
+	async _setVariableSafe(name, value) {
+		try {
+			await this.lumia.setVariable(name, value);
+		} catch (_error) {}
+	}
+
+	async _toast(message) {
+		try {
+			await this.lumia.showToast({ message, time: 3500 });
+		} catch (_error) {}
+	}
+
+	async _log(message, level = "info") {
+		try {
+			await this.lumia.log({ message: `[SoundMatch] ${message}`, level });
+		} catch (_error) {}
+	}
+
+	_errorMessage(error) {
+		if (error instanceof Error) return error.message;
+		return String(error);
+	}
+}
+
+module.exports = SoundMatchTriggerPlugin;
+
+```
+
+## sound_match_trigger/manifest.json
+
+```
+{
+	"id": "sound_match_trigger",
+	"name": "Sound Match Trigger",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "",
+	"repository": "",
+	"description": "Upload a reference sound, listen to live audio, and trigger Lumia alerts when that sound is detected.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "audio",
+	"keywords": "audio, sound detection, trigger, microphone, wasapi, ffmpeg",
+	"icon": "",
+	"config": {
+		"settings": [
+			{
+				"key": "referenceAudioFile",
+				"label": "Reference Audio File",
+				"type": "file",
+				"required": true,
+				"helperText": "The sound to detect (wav/mp3/etc)."
+			},
+			{
+				"key": "ffmpegPath",
+				"label": "FFmpeg Path",
+				"type": "text",
+				"defaultValue": "ffmpeg",
+				"helperText": "Binary path or command name. Install FFmpeg if detection fails to start."
+			},
+			{
+				"key": "captureMode",
+				"label": "Capture Mode",
+				"type": "select",
+				"defaultValue": "microphone",
+				"options": [
+					{
+						"label": "Microphone/Input Device",
+						"value": "microphone"
+					},
+					{
+						"label": "System Output/Loopback",
+						"value": "system"
+					}
+				],
+				"helperText": "Windows: microphone uses dshow, system uses WASAPI loopback."
+			},
+			{
+				"key": "inputDevice",
+				"label": "Input Device",
+				"type": "text",
+				"defaultValue": "",
+				"helperText": "Optional device name/index. Leave empty for platform default."
+			},
+			{
+				"key": "threshold",
+				"label": "Detection Threshold (0-1)",
+				"type": "number",
+				"defaultValue": 0.82,
+				"min": 0.4,
+				"max": 0.99,
+				"helperText": "Higher values reduce false positives but may miss quieter matches."
+			},
+			{
+				"key": "cooldownMs",
+				"label": "Cooldown (ms)",
+				"type": "number",
+				"defaultValue": 3000,
+				"min": 500,
+				"max": 60000,
+				"helperText": "Minimum time between alerts after a match."
+			},
+			{
+				"key": "detectionIntervalMs",
+				"label": "Analyze Interval (ms)",
+				"type": "number",
+				"defaultValue": 700,
+				"min": 200,
+				"max": 5000,
+				"helperText": "How often live audio is analyzed."
+			},
+			{
+				"key": "maxReferenceSeconds",
+				"label": "Max Reference Length (seconds)",
+				"type": "number",
+				"defaultValue": 6,
+				"min": 1,
+				"max": 30,
+				"helperText": "Only the first part of the file is used for matching."
+			},
+			{
+				"key": "autoStart",
+				"label": "Start Detector Automatically",
+				"type": "switch",
+				"defaultValue": true
+			},
+			{
+				"key": "autoRestart",
+				"label": "Auto Restart On Capture Exit",
+				"type": "checkbox",
+				"defaultValue": true
+			},
+			{
+				"key": "restartDelayMs",
+				"label": "Restart Delay (ms)",
+				"type": "number",
+				"defaultValue": 2000,
+				"min": 500,
+				"max": 30000
+			},
+			{
+				"key": "logSimilarity",
+				"label": "Log Similarity Scores",
+				"type": "switch",
+				"defaultValue": false,
+				"helperText": "Useful for threshold tuning."
+			}
+		],
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
+		"actions": [
+			{
+				"type": "start_detection",
+				"label": "Start Detection",
+				"description": "Start live audio listening and sound matching.",
+				"fields": []
+			},
+			{
+				"type": "stop_detection",
+				"label": "Stop Detection",
+				"description": "Stop live audio listening.",
+				"fields": []
+			},
+			{
+				"type": "list_devices",
+				"label": "List Capture Devices",
+				"description": "Log available capture devices for the current OS.",
+				"fields": [
+					{
+						"key": "mode",
+						"label": "Mode",
+						"type": "select",
+						"defaultValue": "auto",
+						"options": [
+							{
+								"label": "Use Current Setting",
+								"value": "auto"
+							},
+							{
+								"label": "Microphone/Input",
+								"value": "microphone"
+							},
+							{
+								"label": "System Output",
+								"value": "system"
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "test_alert",
+				"label": "Test Alert",
+				"description": "Fire a sample match alert without listening.",
+				"fields": [
+					{
+						"key": "score",
+						"label": "Test Score",
+						"type": "number",
+						"defaultValue": 0.95,
+						"min": 0,
+						"max": 1
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "detector_status",
+				"description": "Current detector status: stopped, running, restarting, or error.",
+				"value": "stopped"
+			},
+			{
+				"name": "last_similarity",
+				"description": "Most recent similarity score (0-1).",
+				"value": 0
+			},
+			{
+				"name": "last_match_score",
+				"description": "Similarity score from the last triggered match.",
+				"value": 0
+			},
+			{
+				"name": "last_match_time",
+				"description": "ISO timestamp of the last triggered match.",
+				"value": ""
+			},
+			{
+				"name": "reference_file",
+				"description": "File name of the active reference audio sample.",
+				"value": ""
+			},
+			{
+				"name": "capture_device",
+				"description": "Capture device currently used by FFmpeg.",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Sound Detected",
+				"key": "sound_detected",
+				"acceptedVariables": [
+					"last_match_score",
+					"last_match_time",
+					"reference_file",
+					"capture_device"
+				],
+				"defaultMessage": "Matched {{reference_file}} (score {{last_match_score}}) on {{capture_device}}."
+			}
+		]
+	}
+}
+
+```
+
+## sound_match_trigger/package.json
+
+```
+{
+	"name": "lumia-sound-match-trigger",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Detect a user-provided sound in live audio and trigger Lumia alerts.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.2"
+	}
+}
+
+```
+
+## sound_match_trigger/settings_tutorial.md
+
+```
+### Quick Start
+- Install FFmpeg and make sure `ffmpeg` is available on PATH (or set a full path in **FFmpeg Path**).
+- Choose **Reference Audio File** with the exact sound you want to detect.
+- Pick **Capture Mode**:
+  - **Microphone/Input Device**: live mic/input capture
+  - **System Output/Loopback**: desktop/output capture (Windows WASAPI loopback)
+- Optional: set **Input Device** if default is wrong.
+
+### Tuning
+- **Detection Threshold**:
+  - Start around `0.82`
+  - Raise threshold to reduce false positives
+  - Lower threshold if real matches are missed
+- **Cooldown** controls how often alerts can fire.
+- **Analyze Interval** controls responsiveness vs CPU usage.
+- **Max Reference Length** keeps matching fast; short, distinctive clips work best.
+
+### Platform Notes
+- Windows:
+  - Microphone mode uses FFmpeg `dshow`
+  - System mode uses FFmpeg `wasapi`
+- macOS:
+  - Uses FFmpeg `avfoundation` (audio index in `Input Device`)
+- Linux:
+  - Uses FFmpeg `pulse` (source name in `Input Device`)
 
 ```
 
@@ -13524,7 +17398,7 @@ module.exports = SteamPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.1"
 	}
 }
 
@@ -13574,6 +17448,543 @@ Achievement stats are pulled automatically from your **current** game while you 
 		"requested_game_achievement_unlocked": "Unlocked achievements for the last requested game.",
 		"requested_game_achievements": "JSON payload of achievements for the last requested game."
 	}
+}
+
+```
+
+## system_monitor/README.md
+
+```
+# System Monitor Plugin
+
+Monitors CPU, RAM, and GPU usage (when available) and exposes variables and alerts.
+
+## Variables
+- `cpu_usage`, `cpu_bucket`
+- `ram_usage`, `ram_bucket`, `ram_used_mb`, `ram_total_mb`
+- `gpu_available`, `gpu_usage`, `gpu_bucket`
+
+## Alerts
+- `cpu_alert` (warning/critical variations)
+- `ram_alert` (warning/critical variations)
+- `gpu_alert` (warning/critical variations)
+
+Alerts only fire when entering a new bucket (normal -> warning -> critical).
+
+## Notes
+- GPU usage depends on OS and driver support. If not available, `gpu_available` is false and no GPU alert fires.
+
+```
+
+## system_monitor/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+const os = require("os");
+
+function safeRequireSystemInformation() {
+	try {
+		return require("systeminformation");
+	} catch (error) {
+		return null;
+	}
+}
+
+const DEFAULTS = {
+	pollIntervalSec: 2,
+	cpuWarn: 70,
+	cpuCritical: 90,
+	ramWarn: 70,
+	ramCritical: 90,
+	gpuWarn: 70,
+	gpuCritical: 90,
+};
+
+const VARIABLES = {
+	cpuUsage: "cpu_usage",
+	cpuBucket: "cpu_bucket",
+	ramUsage: "ram_usage",
+	ramBucket: "ram_bucket",
+	ramUsedMb: "ram_used_mb",
+	ramTotalMb: "ram_total_mb",
+	gpuAvailable: "gpu_available",
+	gpuUsage: "gpu_usage",
+	gpuBucket: "gpu_bucket",
+};
+
+const ALERTS = {
+	cpu: "cpu_alert",
+	ram: "ram_alert",
+	gpu: "gpu_alert",
+};
+
+class SystemMonitorPlugin extends Plugin {
+	async onload() {
+		this._si = safeRequireSystemInformation();
+		if (!this._si) {
+			await this.lumia.log(
+				"[System Monitor] systeminformation not installed. CPU/RAM will use basic OS stats and GPU will be disabled. Run `npm install` in the plugin folder for full support."
+			);
+		}
+
+		this._interval = null;
+		this._lastBuckets = {
+			cpu: "normal",
+			ram: "normal",
+			gpu: "normal",
+		};
+		this._lastCpuSample = this._readCpuTimes();
+		await this._startPolling();
+	}
+
+	async onsettingsupdate(settings, previous = {}) {
+		const next = this._normalizeSettings(settings);
+		const prev = this._normalizeSettings(previous);
+
+		if (next.pollIntervalSec !== prev.pollIntervalSec) {
+			await this._startPolling();
+		}
+	}
+
+	onunload() {
+		this._stopPolling();
+	}
+
+	_normalizeSettings(settings = this.settings) {
+		return {
+			pollIntervalSec: this._number(settings?.pollIntervalSec, DEFAULTS.pollIntervalSec),
+			cpuWarn: this._number(settings?.cpuWarn, DEFAULTS.cpuWarn),
+			cpuCritical: this._number(settings?.cpuCritical, DEFAULTS.cpuCritical),
+			ramWarn: this._number(settings?.ramWarn, DEFAULTS.ramWarn),
+			ramCritical: this._number(settings?.ramCritical, DEFAULTS.ramCritical),
+			gpuWarn: this._number(settings?.gpuWarn, DEFAULTS.gpuWarn),
+			gpuCritical: this._number(settings?.gpuCritical, DEFAULTS.gpuCritical),
+		};
+	}
+
+	_number(value, fallback) {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : fallback;
+	}
+
+	_stopPolling() {
+		if (this._interval) {
+			clearInterval(this._interval);
+			this._interval = null;
+		}
+	}
+
+	async _startPolling() {
+		this._stopPolling();
+		const { pollIntervalSec } = this._normalizeSettings();
+		const intervalMs = Math.max(1, pollIntervalSec) * 1000;
+
+		await this._pollOnce();
+		this._interval = setInterval(() => {
+			this._pollOnce().catch((error) => {
+				this.lumia.log(
+					`[System Monitor] Poll failed: ${error?.message ?? String(error)}`
+				);
+			});
+		}, intervalMs);
+	}
+
+	async _pollOnce() {
+		const settings = this._normalizeSettings();
+		const { cpuUsage, memUsed, memTotal, gpuInfo } = await this._readMetrics();
+		const ramUsage =
+			memTotal > 0
+				? this._roundPercent((memUsed / memTotal) * 100)
+				: 0;
+
+		await Promise.all([
+			this.lumia.setVariable(VARIABLES.cpuUsage, cpuUsage),
+			this.lumia.setVariable(VARIABLES.ramUsage, ramUsage),
+			this.lumia.setVariable(VARIABLES.ramUsedMb, this._toMb(memUsed)),
+			this.lumia.setVariable(VARIABLES.ramTotalMb, this._toMb(memTotal)),
+			this.lumia.setVariable(VARIABLES.gpuAvailable, gpuInfo.available),
+			this.lumia.setVariable(VARIABLES.gpuUsage, gpuInfo.usage),
+		]);
+
+		const cpuBucket = this._bucket(cpuUsage, settings.cpuWarn, settings.cpuCritical);
+		const ramBucket = this._bucket(ramUsage, settings.ramWarn, settings.ramCritical);
+		const gpuBucket = gpuInfo.available
+			? this._bucket(gpuInfo.usage, settings.gpuWarn, settings.gpuCritical)
+			: "normal";
+
+		await Promise.all([
+			this.lumia.setVariable(VARIABLES.cpuBucket, cpuBucket),
+			this.lumia.setVariable(VARIABLES.ramBucket, ramBucket),
+			this.lumia.setVariable(VARIABLES.gpuBucket, gpuBucket),
+		]);
+
+		await this._maybeAlert({
+			metric: "cpu",
+			bucket: cpuBucket,
+			usage: cpuUsage,
+			variables: { cpu_usage: cpuUsage, cpu_bucket: cpuBucket },
+		});
+
+		await this._maybeAlert({
+			metric: "ram",
+			bucket: ramBucket,
+			usage: ramUsage,
+			variables: {
+				ram_usage: ramUsage,
+				ram_bucket: ramBucket,
+				ram_used_mb: this._toMb(memUsed),
+				ram_total_mb: this._toMb(memTotal),
+			},
+		});
+
+		if (gpuInfo.available) {
+			await this._maybeAlert({
+				metric: "gpu",
+				bucket: gpuBucket,
+				usage: gpuInfo.usage,
+				variables: { gpu_usage: gpuInfo.usage, gpu_bucket: gpuBucket },
+			});
+		}
+	}
+
+	async _readMetrics() {
+		if (this._si) {
+			const [load, mem, graphics] = await Promise.all([
+				this._si.currentLoad(),
+				this._si.mem(),
+				this._si.graphics().catch(() => ({ controllers: [] })),
+			]);
+
+			const cpuUsage = this._roundPercent(load?.currentLoad);
+			const memUsed = this._number(mem?.used ?? mem?.active, 0);
+			const memTotal = this._number(mem?.total, 0);
+			const gpuInfo = this._resolveGpuUsage(graphics);
+
+			return { cpuUsage, memUsed, memTotal, gpuInfo };
+		}
+
+		const cpuUsage = this._readCpuUsageFallback();
+		const memTotal = os.totalmem();
+		const memFree = os.freemem();
+		const memUsed = Math.max(0, memTotal - memFree);
+
+		return {
+			cpuUsage: this._roundPercent(cpuUsage),
+			memUsed,
+			memTotal,
+			gpuInfo: { available: false, usage: 0 },
+		};
+	}
+
+	_readCpuTimes() {
+		const cpus = os.cpus();
+		let idle = 0;
+		let total = 0;
+
+		for (const cpu of cpus) {
+			const times = cpu.times || {};
+			idle += times.idle ?? 0;
+			total +=
+				(times.user ?? 0) +
+				(times.nice ?? 0) +
+				(times.sys ?? 0) +
+				(times.irq ?? 0) +
+				(times.idle ?? 0);
+		}
+
+		return { idle, total };
+	}
+
+	_readCpuUsageFallback() {
+		const prev = this._lastCpuSample || this._readCpuTimes();
+		const next = this._readCpuTimes();
+		this._lastCpuSample = next;
+
+		const idle = next.idle - prev.idle;
+		const total = next.total - prev.total;
+		if (total <= 0) return 0;
+
+		return (1 - idle / total) * 100;
+	}
+
+	_roundPercent(value) {
+		const number = this._number(value, 0);
+		return Math.max(0, Math.min(100, Number(number.toFixed(1))));
+	}
+
+	_toMb(value) {
+		return Number((this._number(value, 0) / 1024 / 1024).toFixed(0));
+	}
+
+	_bucket(value, warn, critical) {
+		if (value >= critical) return "critical";
+		if (value >= warn) return "warning";
+		return "normal";
+	}
+
+	_resolveGpuUsage(graphics) {
+		const controllers = Array.isArray(graphics?.controllers)
+			? graphics.controllers
+			: [];
+
+		const values = controllers
+			.map((controller) => {
+				const candidate =
+					controller?.utilizationGpu ??
+					controller?.utilizationGPU ??
+					controller?.utilization ??
+					controller?.utilization_gpu ??
+					controller?.gpuUtilization ??
+					controller?.gpu_utilization;
+				return this._number(candidate, NaN);
+			})
+			.filter((value) => Number.isFinite(value));
+
+		if (!values.length) {
+			return { available: false, usage: 0 };
+		}
+
+		const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+		return { available: true, usage: this._roundPercent(avg) };
+	}
+
+	async _maybeAlert({ metric, bucket, usage, variables }) {
+		const last = this._lastBuckets[metric] ?? "normal";
+		this._lastBuckets[metric] = bucket;
+
+		if (bucket === last || bucket === "normal") {
+			return;
+		}
+
+		const alertKey = ALERTS[metric];
+		if (!alertKey) return;
+
+		await this.lumia.triggerAlert({
+			alert: alertKey,
+			dynamic: {
+				name: "value",
+				value: bucket,
+			},
+			extraSettings: variables,
+		});
+	}
+}
+
+module.exports = SystemMonitorPlugin;
+
+```
+
+## system_monitor/manifest.json
+
+```
+{
+  "id": "system_monitor",
+  "name": "System Monitor",
+  "version": "1.0.0",
+  "author": "Lumia Stream",
+  "email": "",
+  "website": "",
+  "repository": "",
+  "description": "Monitor CPU, RAM, and GPU usage with variables and alerts.",
+  "license": "MIT",
+  "lumiaVersion": "^9.0.0",
+  "category": "utilities",
+  "main": "main.js",
+  "icon": "system_monitor.png",
+  "keywords": "system, cpu, ram, gpu, alerts",
+  "config": {
+    "settings": [
+      {
+        "key": "pollIntervalSec",
+        "label": "Poll Interval (seconds)",
+        "type": "number",
+        "defaultValue": 30,
+        "min": 10,
+        "max": 120,
+        "helperText": "How often to sample CPU/RAM/GPU usage."
+      },
+      {
+        "key": "cpuWarn",
+        "label": "CPU Warning Threshold (%)",
+        "type": "number",
+        "defaultValue": 70,
+        "min": 1,
+        "max": 99
+      },
+      {
+        "key": "cpuCritical",
+        "label": "CPU Critical Threshold (%)",
+        "type": "number",
+        "defaultValue": 90,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "key": "ramWarn",
+        "label": "RAM Warning Threshold (%)",
+        "type": "number",
+        "defaultValue": 70,
+        "min": 1,
+        "max": 99
+      },
+      {
+        "key": "ramCritical",
+        "label": "RAM Critical Threshold (%)",
+        "type": "number",
+        "defaultValue": 90,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "key": "gpuWarn",
+        "label": "GPU Warning Threshold (%)",
+        "type": "number",
+        "defaultValue": 70,
+        "min": 1,
+        "max": 99
+      },
+      {
+        "key": "gpuCritical",
+        "label": "GPU Critical Threshold (%)",
+        "type": "number",
+        "defaultValue": 90,
+        "min": 1,
+        "max": 100
+      }
+    ],
+    "variables": [
+      {
+        "name": "cpu_usage",
+        "value": 0
+      },
+      {
+        "name": "cpu_bucket",
+        "value": "normal"
+      },
+      {
+        "name": "ram_usage",
+        "value": 0
+      },
+      {
+        "name": "ram_bucket",
+        "value": "normal"
+      },
+      {
+        "name": "ram_used_mb",
+        "value": 0
+      },
+      {
+        "name": "ram_total_mb",
+        "value": 0
+      },
+      {
+        "name": "gpu_available",
+        "value": false
+      },
+      {
+        "name": "gpu_usage",
+        "value": 0
+      },
+      {
+        "name": "gpu_bucket",
+        "value": "normal"
+      }
+    ],
+    "translations": "./translations.json",
+    "alerts": [
+      {
+        "title": "CPU Usage Alert",
+        "key": "cpu_alert",
+        "acceptedVariables": ["cpu_usage", "cpu_bucket"],
+        "defaultMessage": "CPU at {{cpu_usage}}% ({{cpu_bucket}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "Bucket type",
+            "selections": [
+              { "label": "Warning", "value": "warning" },
+              { "label": "Critical", "value": "critical" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "RAM Usage Alert",
+        "key": "ram_alert",
+        "acceptedVariables": [
+          "ram_usage",
+          "ram_bucket",
+          "ram_used_mb",
+          "ram_total_mb"
+        ],
+        "defaultMessage": "RAM at {{ram_usage}}% ({{ram_bucket}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "Bucket type",
+            "selections": [
+              { "label": "Warning", "value": "warning" },
+              { "label": "Critical", "value": "critical" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "GPU Usage Alert",
+        "key": "gpu_alert",
+        "acceptedVariables": ["gpu_usage", "gpu_bucket"],
+        "defaultMessage": "GPU at {{gpu_usage}}% ({{gpu_bucket}})",
+        "variationConditions": [
+          {
+            "type": "EQUAL_SELECTION",
+            "description": "Bucket type",
+            "selections": [
+              { "label": "Warning", "value": "warning" },
+              { "label": "Critical", "value": "critical" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+```
+
+## system_monitor/package.json
+
+```
+{
+	"name": "lumia-system-monitor-plugin",
+	"version": "1.0.0",
+	"description": "System monitor plugin for CPU/RAM/GPU usage with alerts.",
+	"main": "main.js",
+	"author": "Lumia Stream",
+	"license": "MIT",
+	"dependencies": {
+		"systeminformation": "^5.23.6"
+	}
+}
+
+```
+
+## system_monitor/translations.json
+
+```
+{
+  "en": {
+    "variables": {
+      "cpu_usage": "Current CPU usage percent.",
+      "cpu_bucket": "Current CPU bucket: normal, warning, critical.",
+      "ram_usage": "Current RAM usage percent.",
+      "ram_bucket": "Current RAM bucket: normal, warning, critical.",
+      "ram_used_mb": "Current RAM used (MB).",
+      "ram_total_mb": "Total RAM (MB).",
+      "gpu_available": "Whether GPU usage is available.",
+      "gpu_usage": "Current GPU usage percent (if available).",
+      "gpu_bucket": "Current GPU bucket: normal, warning, critical."
+    }
+  }
 }
 
 ```
@@ -17652,7 +22063,7 @@ module.exports = TrovoPlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0",
+		"@lumiastream/plugin": "^0.4.1",
 		"ws": "^8.18.3"
 	}
 }
@@ -17868,7 +22279,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.2"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
