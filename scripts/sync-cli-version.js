@@ -92,44 +92,15 @@ if (fs.existsSync(cliLockPath)) {
 	console.log('CLI package-lock.json not found, skipping');
 }
 
-function getExamplePackageJsonPaths(rootDir) {
-	if (!fs.existsSync(rootDir)) {
-		return [];
-	}
-
-	const stack = [rootDir];
-	const packagePaths = [];
-
-	while (stack.length) {
-		const currentDir = stack.pop();
-		const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-
-		for (const entry of entries) {
-			const fullPath = path.join(currentDir, entry.name);
-
-			if (entry.isDirectory()) {
-				if (entry.name === 'node_modules') {
-					continue;
-				}
-
-				stack.push(fullPath);
-				continue;
-			}
-
-			if (entry.isFile() && entry.name === 'package.json') {
-				packagePaths.push(fullPath);
-			}
-		}
-	}
-
-	return packagePaths;
-}
+const targetExampleDirs = ['base_plugin', 'settings_showcase', 'typescript_plugin'];
 
 const exampleRoots = [...new Set([cliExamplesPath, repoExamplesPath])].filter((exampleRoot) =>
 	fs.existsSync(exampleRoot)
 );
 const examplePackageJsonPaths = exampleRoots.flatMap((exampleRoot) =>
-	getExamplePackageJsonPaths(exampleRoot)
+	targetExampleDirs
+		.map((exampleDir) => path.join(exampleRoot, exampleDir, 'package.json'))
+		.filter((examplePackagePath) => fs.existsSync(examplePackagePath))
 );
 let examplesUpdated = 0;
 
