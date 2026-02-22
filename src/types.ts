@@ -211,10 +211,6 @@ export interface PluginSetting {
 	 */
 	valueKey?: string;
 	/**
-	 * named_map only: key used for mapped variation value in serialized payload (default: "variationValue").
-	 */
-	variationKey?: string;
-	/**
 	 * named_map only: label/placeholder/default for each row value input.
 	 */
 	valueLabel?: string;
@@ -224,27 +220,6 @@ export interface PluginSetting {
 	 * named_map only: override value input config for each row.
 	 */
 	valueField?: PluginNamedMapValueFieldConfig;
-	/**
-	 * named_map only: include variation mapping column (default: true).
-	 */
-	mapToVariation?: boolean;
-	/**
-	 * named_map only: when true, updates variation value from name while variation is blank or unchanged.
-	 */
-	autoFillVariationFromName?: boolean;
-	/**
-	 * named_map only: variation input configuration.
-	 */
-	variationLabel?: string;
-	variationPlaceholder?: string;
-	allowVariationTyping?: boolean;
-	variationOptions?: PluginNamedMapOption[];
-	/**
-	 * named_map only: when not "manual", variation options can be hydrated from alert variationConditions.
-	 */
-	variationSource?: "manifest" | "manual";
-	variationAlertKey?: string;
-	variationConditionType?: string;
 	allowDuplicateNames?: boolean;
 	/**
 	 * named_map only: output serialization shape.
@@ -938,20 +913,10 @@ export interface PluginFormField {
 	valueType?: PluginNamedMapValueType;
 	nameKey?: string;
 	valueKey?: string;
-	variationKey?: string;
 	valueLabel?: string;
 	valuePlaceholder?: string;
 	valueDefault?: unknown;
 	valueField?: PluginNamedMapValueFieldConfig;
-	mapToVariation?: boolean;
-	autoFillVariationFromName?: boolean;
-	variationLabel?: string;
-	variationPlaceholder?: string;
-	allowVariationTyping?: boolean;
-	variationOptions?: PluginNamedMapOption[];
-	variationSource?: "manifest" | "manual";
-	variationAlertKey?: string;
-	variationConditionType?: string;
 	allowDuplicateNames?: boolean;
 	outputMode?: PluginNamedMapOutputMode;
 	objectValueMode?: PluginNamedMapObjectValueMode;

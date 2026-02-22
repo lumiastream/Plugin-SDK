@@ -584,7 +584,7 @@ Settings can also include **`disabled`** (boolean) to render a read-only field i
 
 #### Named Map (`named_map`)
 
-Use `named_map` when users should define multiple named entries, each with a typed value and optional alert-variation mapping.
+Use `named_map` when users should define multiple named entries, each with a typed value.
 
 ```json
 {
@@ -592,9 +592,6 @@ Use `named_map` when users should define multiple named entries, each with a typ
 	"label": "Named Sounds",
 	"type": "named_map",
 	"valueType": "file",
-	"mapToVariation": true,
-	"variationAlertKey": "sound_match",
-	"variationConditionType": "EQUAL_SELECTION",
 	"outputMode": "array"
 }
 ```
@@ -603,11 +600,7 @@ Common `named_map` options:
 
 - `valueType`: row value type (`text`, `number`, `select`, `checkbox`/`switch`/`toggle`, `file`, `json`)
 - `valueField`: optional row editor config (placeholder, options, rows, etc.)
-- `mapToVariation`: show/hide variation mapping column (defaults to `true`)
-- `variationOptions`: static variation options
-- `variationSource`: `manifest` (default, uses alert `variationConditions`) or `manual`
-- `variationAlertKey` / `variationConditionType`: choose alert/condition for variation suggestions
-- `nameKey` / `valueKey` / `variationKey`: customize serialized keys
+- `nameKey` / `valueKey`: customize serialized keys
 - `outputMode`: `array` (default) or `object`/`map`
 - `objectValueMode`: for object output, choose `object` (default), `value`, or `path`
 

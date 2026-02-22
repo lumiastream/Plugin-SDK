@@ -14877,10 +14877,10 @@ When you save settings, the plugin:
 
 ```
 
-## sound_match_trigger/README.md
+## sound_trigger_alert/README.md
 
 ```
-# Sound Match Trigger Example
+# Sound Trigger Alert Example
 
 This plugin lets users upload a reference sound and trigger a Lumia alert when live audio matches it.
 
@@ -14892,7 +14892,7 @@ This plugin lets users upload a reference sound and trigger a Lumia alert when l
 ## Recommended workflow
 
 1. Run **List Capture Devices** and copy a device name/index if needed.
-2. Set **Reference Audio File**.
+2. Configure **Reference Audio Map** with one or more named sounds.
 3. Start with threshold `0.82` and cooldown `3000 ms`.
 4. Enable **Log Similarity Scores** briefly while tuning.
 
@@ -14905,7 +14905,7 @@ This plugin lets users upload a reference sound and trigger a Lumia alert when l
 
 ```
 
-## sound_match_trigger/actions_tutorial.md
+## sound_trigger_alert/actions_tutorial.md
 
 ```
 ### Start Detection
@@ -14922,7 +14922,7 @@ Fires the `sound_detected` alert immediately using a test score.
 
 ```
 
-## sound_match_trigger/main.js
+## sound_trigger_alert/main.js
 
 ```
 const { Plugin } = require("@lumiastream/plugin");
@@ -14932,6 +14932,11 @@ const path = require("path");
 
 const SAMPLE_RATE = 16000;
 const MIN_REFERENCE_SECONDS = 0.3;
+const MIN_ANALYSIS_SECONDS = 0.12;
+const MIN_ANALYSIS_RMS = 0.0045;
+const MIN_ANALYSIS_PEAK = 0.015;
+const MIN_TRIGGER_RMS = 0.018;
+const MIN_TRIGGER_PEAK = 0.07;
 const DEFAULTS = {
 	ffmpegPath: "ffmpeg",
 	captureMode: "microphone",
@@ -14946,9 +14951,12 @@ const DEFAULTS = {
 	logSimilarity: false,
 };
 
-const FEATURE_BANDS_HZ = [90, 150, 240, 360, 520, 740, 1040, 1450, 2000, 2750, 3600, 4700, 6200];
+const FEATURE_BANDS_HZ = [
+	90, 150, 240, 360, 520, 740, 1040, 1450, 2000, 2750, 3600, 4700, 6200,
+];
 const VARIABLE_NAMES = {
 	status: "detector_status",
+	referenceName: "reference_name",
 	lastSimilarity: "last_similarity",
 	lastMatchScore: "last_match_score",
 	lastMatchTime: "last_match_time",
@@ -14993,6 +15001,62 @@ function toString(value, fallback = "") {
 	return trimmed.length ? trimmed : fallback;
 }
 
+function toDeviceString(value, fallback = "") {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : fallback;
+	}
+	if (typeof value === "number" || typeof value === "boolean") {
+		return String(value);
+	}
+	return fallback;
+}
+
+function computeRms(samples) {
+	if (!(samples instanceof Float32Array) || samples.length === 0) {
+		return 0;
+	}
+	let sum = 0;
+	for (let i = 0; i < samples.length; i += 1) {
+		const sample = samples[i];
+		sum += sample * sample;
+	}
+	return Math.sqrt(sum / samples.length);
+}
+
+function computePeakAbs(samples) {
+	if (!(samples instanceof Float32Array) || samples.length === 0) {
+		return 0;
+	}
+	let peak = 0;
+	for (let i = 0; i < samples.length; i += 1) {
+		const abs = Math.abs(samples[i]);
+		if (abs > peak) {
+			peak = abs;
+		}
+	}
+	return peak;
+}
+
+function computeActivity(samples) {
+	if (!(samples instanceof Float32Array) || samples.length < 2) {
+		return 0;
+	}
+	let sum = 0;
+	for (let i = 1; i < samples.length; i += 1) {
+		sum += Math.abs(samples[i] - samples[i - 1]);
+	}
+	return sum / (samples.length - 1);
+}
+
+function ratioScore(a, b) {
+	if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) {
+		return 0;
+	}
+	const ratio = Math.min(a, b) / Math.max(a, b);
+	return clamp(Math.sqrt(ratio), 0, 1);
+}
+
 function normalizeVector(values) {
 	let norm = 0;
 	for (let i = 0; i < values.length; i += 1) {
@@ -15008,7 +15072,12 @@ function normalizeVector(values) {
 }
 
 function cosineSimilarity(a, b) {
-	if (!Array.isArray(a) || !Array.isArray(b) || a.length === 0 || a.length !== b.length) {
+	if (
+		!Array.isArray(a) ||
+		!Array.isArray(b) ||
+		a.length === 0 ||
+		a.length !== b.length
+	) {
 		return 0;
 	}
 	let dot = 0;
@@ -15107,7 +15176,9 @@ function buildSpectralProfile(samples) {
 	}
 	const frameSize = 1024;
 	const hop = 512;
-	const coeffs = FEATURE_BANDS_HZ.map((freq) => 2 * Math.cos((2 * Math.PI * freq) / SAMPLE_RATE));
+	const coeffs = FEATURE_BANDS_HZ.map(
+		(freq) => 2 * Math.cos((2 * Math.PI * freq) / SAMPLE_RATE),
+	);
 	const sums = FEATURE_BANDS_HZ.map(() => 0);
 	let frameCount = 0;
 
@@ -15208,9 +15279,8 @@ class SoundMatchTriggerPlugin extends Plugin {
 			restartTimer: null,
 			stopRequested: false,
 			settings: null,
-			referenceFeature: [],
-			referenceSampleCount: 0,
-			referenceFileLabel: "",
+			referenceProfiles: [],
+			maxReferenceSampleCount: 0,
 			stderrTail: [],
 		};
 	}
@@ -15218,7 +15288,7 @@ class SoundMatchTriggerPlugin extends Plugin {
 	async onload() {
 		await this._setVariableSafe(VARIABLE_NAMES.status, "stopped");
 		const settings = this._getSettingsSnapshot();
-		if (settings.autoStart && settings.referenceAudioFile) {
+		if (settings.autoStart && settings.referenceEntries.length) {
 			await this.startDetection("auto-start");
 		}
 	}
@@ -15227,11 +15297,92 @@ class SoundMatchTriggerPlugin extends Plugin {
 		await this.stopDetection("plugin unload");
 	}
 
+	async validateAuth(data = {}) {
+		const mergedSettings = {
+			...(this.settings || {}),
+			...(data || {}),
+		};
+		const settings = this._getSettingsSnapshot(mergedSettings);
+
+		if (!settings.referenceEntries.length) {
+			return {
+				ok: false,
+				message:
+					"Add at least one Reference Audio Map entry before activating.",
+			};
+		}
+
+		const ffmpegVersion = await this._runCommand(
+			settings.ffmpegPath,
+			["-hide_banner", "-version"],
+			10000,
+		);
+		if (ffmpegVersion.timedOut || ffmpegVersion.code !== 0) {
+			const detail = String(
+				ffmpegVersion.stderr || ffmpegVersion.error?.message || "",
+			).trim();
+			return {
+				ok: false,
+				message: `FFmpeg is not available at "${settings.ffmpegPath}". Install FFmpeg or set a valid FFmpeg Path.${detail ? ` ${detail}` : ""}`,
+			};
+		}
+
+		const ffmpegSmoke = await this._runCommand(
+			settings.ffmpegPath,
+			[
+				"-hide_banner",
+				"-loglevel",
+				"error",
+				"-f",
+				"lavfi",
+				"-i",
+				"anullsrc=r=16000:cl=mono",
+				"-t",
+				"0.1",
+				"-f",
+				"null",
+				"-",
+			],
+			10000,
+		);
+		if (ffmpegSmoke.timedOut || ffmpegSmoke.code !== 0) {
+			const detail = String(
+				ffmpegSmoke.stderr || ffmpegSmoke.error?.message || "",
+			).trim();
+			return {
+				ok: false,
+				message: `FFmpeg was found but failed a runtime check.${detail ? ` ${detail}` : ""}`,
+			};
+		}
+
+		const invalidReferences = [];
+		for (const entry of settings.referenceEntries) {
+			try {
+				await this._loadReferenceEntryProfile(settings, entry);
+			} catch (error) {
+				const label = entry?.name || entry?.path || "unknown";
+				invalidReferences.push(`${label}: ${this._errorMessage(error)}`);
+			}
+		}
+
+		if (invalidReferences.length) {
+			return {
+				ok: false,
+				message: `Reference map has invalid entries. ${invalidReferences[0]}`,
+			};
+		}
+
+		return {
+			ok: true,
+			message: `FFmpeg check passed. ${settings.referenceEntries.length} reference sound(s) ready.`,
+		};
+	}
+
 	async onsettingsupdate(settings, previousSettings = {}) {
 		const next = this._getSettingsSnapshot(settings);
 		const previous = this._getSettingsSnapshot(previousSettings);
 		const affectDetection =
-			next.referenceAudioFile !== previous.referenceAudioFile ||
+			next.referenceEntriesKey !== previous.referenceEntriesKey ||
 			next.ffmpegPath !== previous.ffmpegPath ||
 			next.captureMode !== previous.captureMode ||
 			next.inputDevice !== previous.inputDevice ||
@@ -15248,9 +15399,55 @@ class SoundMatchTriggerPlugin extends Plugin {
 			return;
 		}
 
-		if (!this._runtime.running && next.autoStart && next.referenceAudioFile) {
+		if (
+			!this._runtime.running &&
+			next.autoStart &&
+			next.referenceEntries.length
+		) {
 			await this.startDetection("settings update auto-start");
 		}
+	}
+
+	async refreshSettingsOptions({ fieldKey, values, settings } = {}) {
+		if (
+			fieldKey &&
+			fieldKey !== "inputDevice" &&
+			fieldKey !== "captureMode" &&
+			fieldKey !== "ffmpegPath"
+		) {
+			return;
+		}
+		if (typeof this.lumia?.updateSettingsFieldOptions !== "function") {
+			return;
+		}
+
+		const previewSettings = {
+			...(this.settings && typeof this.settings === "object"
+				? this.settings
+				: {}),
+			...(settings && typeof settings === "object" ? settings : {}),
+			...(values && typeof values === "object" ? values : {}),
+		};
+		const normalized = this._getSettingsSnapshot(previewSettings);
+		const discoveredDevices = await this._discoverCaptureDevices(
+			normalized,
+			normalized.captureMode,
+		);
+		const selectedDevice = toDeviceString(
+			values?.inputDevice ??
+				settings?.inputDevice ??
+				previewSettings?.inputDevice,
+			"",
+		);
+		const options = this._toInputDeviceOptions(
+			discoveredDevices,
+			selectedDevice,
+		);
+
+		await this.lumia.updateSettingsFieldOptions({
+			fieldKey: "inputDevice",
+			options,
+		});
 	}
 
 	async actions(config) {
@@ -15270,6 +15467,7 @@ class SoundMatchTriggerPlugin extends Plugin {
 					await this._triggerMatchAlert(
 						clamp(toNumber(value?.score, 0.95), 0, 1),
 						new Date().toISOString(),
+						this._runtime.referenceProfiles[0] || null,
 					);
 					break;
 				default:
@@ -15289,7 +15487,10 @@ class SoundMatchTriggerPlugin extends Plugin {
 		this._runtime.startPromise = this._startInternal(reason)
 			.catch(async (error) => {
 				await this._setVariableSafe(VARIABLE_NAMES.status, "error");
-				await this._log(`Failed to start detector: ${this._errorMessage(error)}`, "error");
+				await this._log(
+					`Failed to start detector: ${this._errorMessage(error)}`,
+					"error",
+				);
 				return false;
 			})
 			.finally(() => {
@@ -15318,18 +15519,30 @@ class SoundMatchTriggerPlugin extends Plugin {
 	}
 
 	_getSettingsSnapshot(raw = this.settings || {}) {
-		const captureMode = toString(raw.captureMode, DEFAULTS.captureMode).toLowerCase() === "system"
-			? "system"
-			: "microphone";
+		const captureMode =
+			toString(raw.captureMode, DEFAULTS.captureMode).toLowerCase() === "system"
+				? "system"
+				: "microphone";
+		const referenceEntries = this._normalizeReferenceEntries(
+			raw.referenceAudioMap,
+			raw.referenceAudioFile,
+		);
 		return {
-			referenceAudioFile: toString(raw.referenceAudioFile),
+			referenceEntries,
+			referenceEntriesKey: this._serializeReferenceEntries(referenceEntries),
 			ffmpegPath: toString(raw.ffmpegPath, DEFAULTS.ffmpegPath),
 			captureMode,
-			inputDevice: toString(raw.inputDevice),
-			threshold: clamp(toNumber(raw.threshold, DEFAULTS.threshold), 0.4, 0.99),
-			cooldownMs: Math.floor(clamp(toNumber(raw.cooldownMs, DEFAULTS.cooldownMs), 500, 60000)),
+			inputDevice: toDeviceString(raw.inputDevice),
+			threshold: clamp(toNumber(raw.threshold, DEFAULTS.threshold), 0.4, 0.97),
+			cooldownMs: Math.floor(
+				clamp(toNumber(raw.cooldownMs, DEFAULTS.cooldownMs), 500, 60000),
+			),
 			detectionIntervalMs: Math.floor(
-				clamp(toNumber(raw.detectionIntervalMs, DEFAULTS.detectionIntervalMs), 200, 5000),
+				clamp(
+					toNumber(raw.detectionIntervalMs, DEFAULTS.detectionIntervalMs),
+					200,
+					5000,
+				),
 			),
 			maxReferenceSeconds: clamp(
 				toNumber(raw.maxReferenceSeconds, DEFAULTS.maxReferenceSeconds),
@@ -15339,23 +15552,121 @@ class SoundMatchTriggerPlugin extends Plugin {
 			autoStart: toBoolean(raw.autoStart, DEFAULTS.autoStart),
 			autoRestart: toBoolean(raw.autoRestart, DEFAULTS.autoRestart),
 			restartDelayMs: Math.floor(
-				clamp(toNumber(raw.restartDelayMs, DEFAULTS.restartDelayMs), 500, 30000),
+				clamp(
+					toNumber(raw.restartDelayMs, DEFAULTS.restartDelayMs),
+					500,
+					30000,
+				),
 			),
 			logSimilarity: toBoolean(raw.logSimilarity, DEFAULTS.logSimilarity),
 		};
 	}
 
+	_normalizeReferenceEntries(rawMapValue, fallbackReferenceAudioFile) {
+		let source = rawMapValue;
+		if (typeof source === "string") {
+			const trimmed = source.trim();
+			if (!trimmed) {
+				source = [];
+			} else {
+				try {
+					source = JSON.parse(trimmed);
+				} catch (_error) {
+					source = [];
+				}
+			}
+		}
+
+		const output = [];
+		const pushEntry = (rawEntry, fallbackName = "") => {
+			if (rawEntry === undefined || rawEntry === null) {
+				return;
+			}
+
+			if (typeof rawEntry === "string") {
+				const filePath = toString(rawEntry);
+				if (!filePath) return;
+				const nameFromPath =
+					path.parse(filePath).name || path.basename(filePath);
+				const name = toString(fallbackName, nameFromPath);
+				output.push({
+					name,
+					path: filePath,
+				});
+				return;
+			}
+
+			if (typeof rawEntry !== "object") {
+				return;
+			}
+
+			const filePath = toString(
+				rawEntry.path || rawEntry.filePath || rawEntry.value,
+			);
+			if (!filePath) return;
+			const nameFromPath = path.parse(filePath).name || path.basename(filePath);
+			const name = toString(
+				rawEntry.name || rawEntry.label || fallbackName,
+				nameFromPath,
+			);
+			output.push({
+				name,
+				path: filePath,
+			});
+		};
+
+		if (Array.isArray(source)) {
+			for (const entry of source) {
+				pushEntry(entry);
+			}
+		} else if (source && typeof source === "object") {
+			for (const [key, entry] of Object.entries(source)) {
+				pushEntry(entry, key);
+			}
+		}
+
+		const fallbackFilePath = toString(fallbackReferenceAudioFile);
+		if (!output.length && fallbackFilePath) {
+			pushEntry({
+				name:
+					path.parse(fallbackFilePath).name || path.basename(fallbackFilePath),
+				path: fallbackFilePath,
+			});
+		}
+
+		return output;
+	}
+
+	_serializeReferenceEntries(entries) {
+		if (!Array.isArray(entries) || !entries.length) {
+			return "";
+		}
+		return entries
+			.map((entry) => `${entry.name}::${entry.path}`)
+			.sort()
+			.join("|");
+	}
+
 	async _startInternal(reason) {
 		const settings = this._getSettingsSnapshot();
-		if (!settings.referenceAudioFile) {
-			await this._log("Reference audio file is required before starting detection.", "warn");
+		if (!settings.referenceEntries.length) {
+			await this._log(
+				"At least one reference audio mapping is required before starting detection.",
+				"warn",
+			);
 			await this._setVariableSafe(VARIABLE_NAMES.status, "stopped");
 			return false;
 		}
 
-		const reference = await this._loadReferenceProfile(settings);
+		const referenceProfiles = await this._loadReferenceProfiles(settings);
 		const capture = this._buildCaptureConfig(settings);
-		const bufferCapacity = Math.max(reference.sampleCount * 2, SAMPLE_RATE * 20);
+		const maxReferenceSampleCount = Math.max(
+			...referenceProfiles.map((entry) => entry.sampleCount),
+		);
+		const bufferCapacity = Math.max(
+			maxReferenceSampleCount * 2,
+			SAMPLE_RATE * 20,
+		);
 
 		this._runtime.running = true;
 		this._runtime.stopRequested = false;
@@ -15366,9 +15677,8 @@ class SoundMatchTriggerPlugin extends Plugin {
 		this._runtime.lastTriggerAt = 0;
 		this._runtime.lastSimilarityAt = 0;
 		this._runtime.lastLoggedSimilarityAt = 0;
-		this._runtime.referenceFeature = reference.feature;
-		this._runtime.referenceSampleCount = reference.sampleCount;
-		this._runtime.referenceFileLabel = reference.fileLabel;
+		this._runtime.referenceProfiles = referenceProfiles;
+		this._runtime.maxReferenceSampleCount = maxReferenceSampleCount;
 		this._runtime.stderrTail = [];
 
 		if (this._runtime.restartTimer) {
@@ -15395,7 +15705,10 @@ class SoundMatchTriggerPlugin extends Plugin {
 		});
 
 		proc.on("error", async (error) => {
-			await this._log(`Capture process error: ${this._errorMessage(error)}`, "error");
+			await this._log(
+				`Capture process error: ${this._errorMessage(error)}`,
+				"error",
+			);
 		});
 
 		proc.on("exit", (code, signal) => {
@@ -15407,7 +15720,10 @@ class SoundMatchTriggerPlugin extends Plugin {
 			this._runtime.analysisInProgress = true;
 			this._analyzeLatestWindow()
 				.catch(async (error) => {
-					await this._log(`Analysis error: ${this._errorMessage(error)}`, "error");
+					await this._log(
+						`Analysis error: ${this._errorMessage(error)}`,
+						"error",
+					);
 				})
 				.finally(() => {
 					this._runtime.analysisInProgress = false;
@@ -15415,13 +15731,18 @@ class SoundMatchTriggerPlugin extends Plugin {
 		}, settings.detectionIntervalMs);
 
 		await this._setVariableSafe(VARIABLE_NAMES.status, "running");
-		await this._setVariableSafe(VARIABLE_NAMES.referenceFile, reference.fileLabel);
+		await this._setVariableSafe(
+			VARIABLE_NAMES.referenceName,
+			referenceProfiles[0]?.name || "",
+		);
+		await this._setVariableSafe(
+			VARIABLE_NAMES.referenceFile,
+			referenceProfiles[0]?.fileLabel || "",
+		);
 		await this._setVariableSafe(VARIABLE_NAMES.captureDevice, capture.label);
 		await this._setVariableSafe(VARIABLE_NAMES.lastSimilarity, 0);
 		await this._log(
-			`Detector started (${reason}). Reference=${reference.fileLabel} (${reference.durationSeconds.toFixed(
-				2,
-			)}s), mode=${settings.captureMode}, device=${capture.label}`,
+			`Detector started (${reason}). Loaded ${referenceProfiles.length} reference sounds, mode=${settings.captureMode}, device=${capture.label}`,
 		);
 		return true;
 	}
@@ -15456,9 +15777,8 @@ class SoundMatchTriggerPlugin extends Plugin {
 		this._runtime.running = false;
 		this._runtime.buffer = null;
 		this._runtime.leftoverBytes = Buffer.alloc(0);
-		this._runtime.referenceFeature = [];
-		this._runtime.referenceSampleCount = 0;
-		this._runtime.referenceFileLabel = "";
+		this._runtime.referenceProfiles = [];
+		this._runtime.maxReferenceSampleCount = 0;
 		this._runtime.settings = null;
 		await this._setVariableSafe(VARIABLE_NAMES.status, "stopped");
 		await this._log(`Detector stopped (${reason}).`);
@@ -15484,28 +15804,114 @@ class SoundMatchTriggerPlugin extends Plugin {
 
 	async _analyzeLatestWindow() {
 		const runtime = this._runtime;
-		if (!runtime.running || !runtime.buffer || runtime.referenceSampleCount <= 0) {
+		if (
+			!runtime.running ||
+			!runtime.buffer ||
+			runtime.maxReferenceSampleCount <= 0 ||
+			!runtime.referenceProfiles.length
+		) {
 			return;
 		}
-		const samples = runtime.buffer.getLatest(runtime.referenceSampleCount);
-		if (samples.length < runtime.referenceSampleCount) {
+
+		let bestMatch = null;
+		const analysisBySampleCount = new Map();
+		for (const reference of runtime.referenceProfiles) {
+			if (!reference || !reference.sampleCount) continue;
+			let analysis = analysisBySampleCount.get(reference.sampleCount);
+			if (!analysis) {
+				const samples = runtime.buffer.getLatest(reference.sampleCount);
+				if (samples.length < reference.sampleCount) {
+					continue;
+				}
+
+				const trimmed = trimSilence(samples);
+				const minLiveSamples = Math.max(
+					Math.floor(SAMPLE_RATE * MIN_ANALYSIS_SECONDS),
+					Math.floor(reference.sampleCount * 0.2),
+				);
+				const rms = computeRms(trimmed);
+				const peak = computePeakAbs(trimmed);
+				const activity = computeActivity(trimmed);
+				const feature =
+					trimmed.length >= minLiveSamples &&
+					rms >= MIN_ANALYSIS_RMS &&
+					peak >= MIN_ANALYSIS_PEAK
+						? buildFeatureVector(trimmed)
+						: [];
+				analysis = { feature, rms, peak, activity };
+				analysisBySampleCount.set(reference.sampleCount, analysis);
+			}
+			if (!analysis.feature.length) {
+				continue;
+			}
+
+			const baseSimilarity = cosineSimilarity(
+				reference.feature,
+				analysis.feature,
+			);
+			const energyScore = ratioScore(analysis.rms, reference.rms);
+			const peakScore = ratioScore(analysis.peak, reference.peak);
+			const activityScore = ratioScore(analysis.activity, reference.activity);
+			const profileSimilarity = clamp(
+				energyScore * 0.4 + peakScore * 0.3 + activityScore * 0.3,
+				0,
+				1,
+			);
+			const effectiveSimilarity = clamp(
+				baseSimilarity * (0.85 + profileSimilarity * 0.15),
+				0,
+				1,
+			);
+
+			if (
+				!bestMatch ||
+				effectiveSimilarity > bestMatch.effectiveSimilarity
+			) {
+				bestMatch = {
+					reference,
+					baseSimilarity,
+					effectiveSimilarity,
+					profileSimilarity,
+					liveRms: analysis.rms,
+					livePeak: analysis.peak,
+				};
+			}
+		}
+
+		if (!bestMatch) {
 			return;
 		}
-		const feature = buildFeatureVector(samples);
-		const similarity = cosineSimilarity(runtime.referenceFeature, feature);
+
+		const similarity = bestMatch.baseSimilarity;
 		const now = Date.now();
 
 		if (now - runtime.lastSimilarityAt > 1000) {
 			runtime.lastSimilarityAt = now;
-			await this._setVariableSafe(VARIABLE_NAMES.lastSimilarity, Number(similarity.toFixed(4)));
+			await this._setVariableSafe(
+				VARIABLE_NAMES.lastSimilarity,
+				Number(similarity.toFixed(4)),
+			);
 		}
 
-		if (runtime.settings?.logSimilarity && now - runtime.lastLoggedSimilarityAt > 1000) {
+		if (
+			runtime.settings?.logSimilarity &&
+			now - runtime.lastLoggedSimilarityAt > 1000
+		) {
 			runtime.lastLoggedSimilarityAt = now;
-			await this._log(`Similarity=${similarity.toFixed(4)} threshold=${runtime.settings.threshold}`);
+			const profileGate = clamp(0.45 + runtime.settings.threshold * 0.2, 0.55, 0.75);
+			await this._log(
+				`Best similarity=${similarity.toFixed(4)} (effective=${bestMatch.effectiveSimilarity.toFixed(4)} profile=${bestMatch.profileSimilarity.toFixed(3)} gate=${profileGate.toFixed(3)} rms=${bestMatch.liveRms.toFixed(4)} peak=${bestMatch.livePeak.toFixed(4)}) threshold=${runtime.settings.threshold} reference=${bestMatch.reference.name}`,
+			);
 		}
 
 		if (similarity < runtime.settings.threshold) {
+			return;
+		}
+		const profileGate = clamp(0.45 + runtime.settings.threshold * 0.2, 0.55, 0.75);
+		if (bestMatch.profileSimilarity < profileGate) {
+			return;
+		}
+		if (bestMatch.liveRms < MIN_TRIGGER_RMS || bestMatch.livePeak < MIN_TRIGGER_PEAK) {
 			return;
 		}
 		if (now - runtime.lastTriggerAt < runtime.settings.cooldownMs) {
@@ -15513,37 +15919,65 @@ class SoundMatchTriggerPlugin extends Plugin {
 		}
 
 		runtime.lastTriggerAt = now;
-		await this._triggerMatchAlert(similarity, new Date(now).toISOString());
+		await this._triggerMatchAlert(
+			similarity,
+			new Date(now).toISOString(),
+			bestMatch.reference,
+		);
 	}
 
-	async _triggerMatchAlert(similarity, timestampIso) {
+	async _triggerMatchAlert(similarity, timestampIso, referenceMatch = null) {
 		const runtime = this._runtime;
 		const score = Number(similarity.toFixed(4));
-		const referenceFile = runtime.referenceFileLabel || path.basename(this._getSettingsSnapshot().referenceAudioFile || "");
-		const captureDevice = this._captureLabel(runtime.settings || this._getSettingsSnapshot());
+		const fallbackReference =
+			referenceMatch ||
+			runtime.referenceProfiles[0] ||
+			this._getSettingsSnapshot().referenceEntries[0] ||
+			null;
+		const referenceFile =
+			fallbackReference?.fileLabel ||
+			path.basename(fallbackReference?.path || "");
+		const referenceName =
+			fallbackReference?.name || path.parse(referenceFile || "").name || "";
+		const variationValue = referenceName || referenceFile;
+		const captureDevice = this._captureLabel(
+			runtime.settings || this._getSettingsSnapshot(),
+		);
 
 		await this._setVariableSafe(VARIABLE_NAMES.lastMatchScore, score);
 		await this._setVariableSafe(VARIABLE_NAMES.lastMatchTime, timestampIso);
+		await this._setVariableSafe(VARIABLE_NAMES.referenceName, referenceName);
 		await this._setVariableSafe(VARIABLE_NAMES.referenceFile, referenceFile);
 		await this._setVariableSafe(VARIABLE_NAMES.captureDevice, captureDevice);
 
 		try {
 			await this.lumia.triggerAlert({
 				alert: "sound_detected",
+				dynamic: {
+					name: "value",
+					value: variationValue,
+				},
 				extraSettings: {
+					reference_name: referenceName,
 					last_match_score: score,
 					last_match_time: timestampIso,
 					reference_file: referenceFile,
 					capture_device: captureDevice,
 				},
-				showInEventList: true,
+				showInEventList: false,
 			});
 		} catch (error) {
-			await this._log(`Failed to trigger alert: ${this._errorMessage(error)}`, "error");
+			const errorMessage = this._errorMessage(error);
+			await this._log(`Failed to trigger alert: ${errorMessage}`, "error");
+			await this._toast(
+				`Sound Trigger Alert failed to fire alert: ${errorMessage}`,
+			);
 			return;
 		}
 
-		await this._log(`Sound matched: score=${score} reference=${referenceFile} device=${captureDevice}`);
+		await this._log(
+			`Sound matched: score=${score} reference=${referenceName} file=${referenceFile} variation=${variationValue} device=${captureDevice}`,
+		);
 	}
 
 	async _onCaptureExit(code, signal) {
@@ -15581,8 +16015,29 @@ class SoundMatchTriggerPlugin extends Plugin {
 		}, settings.restartDelayMs);
 	}
 
-	async _loadReferenceProfile(settings) {
-		const filePath = settings.referenceAudioFile;
+	async _loadReferenceProfiles(settings) {
+		const output = [];
+		for (const entry of settings.referenceEntries) {
+			try {
+				output.push(await this._loadReferenceEntryProfile(settings, entry));
+			} catch (error) {
+				const label = entry?.name || entry?.path || "unknown";
+				await this._log(
+					`Skipping reference "${label}": ${this._errorMessage(error)}`,
+					"warn",
+				);
+			}
+		}
+
+		if (!output.length) {
+			throw new Error("No valid reference audio mappings were loaded.");
+		}
+
+		return output;
+	}
+
+	async _loadReferenceEntryProfile(settings, entry) {
+		const filePath = entry.path;
 		await fs.access(filePath);
 
 		const decodeArgs = [
@@ -15601,7 +16056,11 @@ class SoundMatchTriggerPlugin extends Plugin {
 			"s16le",
 			"pipe:1",
 		];
-		const result = await this._runCommand(settings.ffmpegPath, decodeArgs, 30000);
+		const result = await this._runCommand(
+			settings.ffmpegPath,
+			decodeArgs,
+			30000,
+		);
 		if (result.code !== 0 || !result.stdout.length) {
 			throw new Error(
 				`Unable to decode reference file. Verify FFmpeg path and file format. ${result.stderr || ""}`.trim(),
@@ -15624,7 +16083,15 @@ class SoundMatchTriggerPlugin extends Plugin {
 		}
 
 		return {
+			name: toString(
+				entry.name,
+				path.parse(filePath).name || path.basename(filePath),
+			),
+			filePath,
 			feature,
+			rms: computeRms(samples),
+			peak: computePeakAbs(samples),
+			activity: computeActivity(samples),
 			sampleCount: samples.length,
 			durationSeconds: samples.length / SAMPLE_RATE,
 			fileLabel: path.basename(filePath),
@@ -15660,7 +16127,15 @@ class SoundMatchTriggerPlugin extends Plugin {
 			ffmpegArgs.push("-f", "pulse", "-i", source);
 		}
 
-		ffmpegArgs.push("-ac", "1", "-ar", String(SAMPLE_RATE), "-f", "s16le", "pipe:1");
+		ffmpegArgs.push(
+			"-ac",
+			"1",
+			"-ar",
+			String(SAMPLE_RATE),
+			"-f",
+			"s16le",
+			"pipe:1",
+		);
 		return {
 			args: ffmpegArgs,
 			label: this._captureLabel(settings),
@@ -15673,62 +16148,183 @@ class SoundMatchTriggerPlugin extends Plugin {
 		return `${mode}:${device}`;
 	}
 
-	async _listCaptureDevices(modeInput = "auto") {
-		const settings = this._getSettingsSnapshot();
-		const mode = modeInput && modeInput !== "auto" ? modeInput : settings.captureMode;
+	_toInputDeviceOptions(devices, selectedDevice = "") {
+		const byValue = new Map();
+		const add = (label, value) => {
+			const normalizedValue =
+				typeof value === "string" ? value : String(value ?? "");
+			if (byValue.has(normalizedValue)) {
+				return;
+			}
+			byValue.set(normalizedValue, {
+				label: toString(label, normalizedValue || "Default"),
+				value: normalizedValue,
+			});
+		};
+
+		add("Default", "");
+		for (const device of devices || []) {
+			if (!device || typeof device !== "object") continue;
+			const value = toString(device.value);
+			if (!value) continue;
+			add(toString(device.label, value), value);
+		}
+		if (selectedDevice && !byValue.has(selectedDevice)) {
+			add(selectedDevice, selectedDevice);
+		}
+
+		return Array.from(byValue.values());
+	}
+
+	async _discoverCaptureDevices(settings, modeInput = "auto") {
+		const mode =
+			modeInput && modeInput !== "auto" ? modeInput : settings.captureMode;
 		const ffmpegPath = settings.ffmpegPath;
 		const platform = process.platform;
-		let outputLines = [];
+		const output = [];
+		const pushOption = (value, label = value) => {
+			const normalizedValue = toString(value);
+			if (!normalizedValue) return;
+			output.push({
+				value: normalizedValue,
+				label: toString(label, normalizedValue),
+			});
+		};
 
 		if (platform === "win32") {
 			if (mode === "system") {
 				const result = await this._runCommand(
 					ffmpegPath,
-					["-hide_banner", "-list_devices", "true", "-f", "wasapi", "-i", "dummy"],
+					[
+						"-hide_banner",
+						"-list_devices",
+						"true",
+						"-f",
+						"wasapi",
+						"-i",
+						"dummy",
+					],
 					15000,
 				);
-				outputLines = this._parseQuotedDeviceLines(result.stderr);
+				for (const value of this._parseQuotedDeviceLines(result.stderr)) {
+					pushOption(value);
+				}
 			} else {
 				const result = await this._runCommand(
 					ffmpegPath,
-					["-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
+					[
+						"-hide_banner",
+						"-list_devices",
+						"true",
+						"-f",
+						"dshow",
+						"-i",
+						"dummy",
+					],
 					15000,
 				);
-				outputLines = this._parseQuotedDeviceLines(result.stderr);
+				for (const value of this._parseQuotedDeviceLines(result.stderr)) {
+					pushOption(value);
+				}
 			}
 		} else if (platform === "darwin") {
 			const result = await this._runCommand(
 				ffmpegPath,
-				["-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""],
+				[
+					"-hide_banner",
+					"-f",
+					"avfoundation",
+					"-list_devices",
+					"true",
+					"-i",
+					"",
+				],
 				15000,
 			);
-			outputLines = result.stderr
-				.split(/\r?\n/)
-				.map((line) => line.trim())
-				.filter((line) => /\[\d+\]/.test(line));
+			const lines = String(result.stderr || "").split(/\r?\n/);
+			let section = "";
+			for (const rawLine of lines) {
+				const line = rawLine.trim();
+				if (!line) continue;
+				if (/AVFoundation video devices/i.test(line)) {
+					section = "video";
+					continue;
+				}
+				if (/AVFoundation audio devices/i.test(line)) {
+					section = "audio";
+					continue;
+				}
+				// Sound Trigger Alert only records audio on macOS.
+				if (section !== "audio") {
+					continue;
+				}
+				const match = line.match(/\[(\d+)\]\s*(.+)$/);
+				if (!match) continue;
+				const index = match[1];
+				const name = match[2];
+				pushOption(index, `${index}: ${name}`);
+			}
 		} else if (platform === "linux") {
-			const pactlResult = await this._runCommand("pactl", ["list", "short", "sources"], 10000);
+			const pactlResult = await this._runCommand(
+				"pactl",
+				["list", "short", "sources"],
+				10000,
+			);
 			if (pactlResult.code === 0 && pactlResult.stdout.length) {
-				outputLines = pactlResult.stdout
+				const lines = pactlResult.stdout
 					.toString()
 					.split(/\r?\n/)
 					.map((line) => line.trim())
 					.filter(Boolean);
+				for (const line of lines) {
+					const parts = line.split(/\t+/).filter(Boolean);
+					const sourceName = toString(parts[1] || parts[0]);
+					if (!sourceName) continue;
+					pushOption(sourceName, sourceName);
+				}
 			} else {
 				const ffmpegResult = await this._runCommand(
 					ffmpegPath,
 					["-hide_banner", "-sources", "pulse"],
 					15000,
 				);
-				outputLines = ffmpegResult.stderr
+				const lines = String(ffmpegResult.stderr || "")
 					.split(/\r?\n/)
 					.map((line) => line.trim())
 					.filter(Boolean);
+				for (const line of lines) {
+					const match = line.match(/^\*\s+(.+)$/);
+					const value = toString((match && match[1]) || line);
+					if (!value) continue;
+					pushOption(value, value);
+				}
 			}
 		}
 
+		const deduped = new Map();
+		for (const item of output) {
+			if (!deduped.has(item.value)) {
+				deduped.set(item.value, item);
+			}
+		}
+		return Array.from(deduped.values());
+	}
+
+	async _listCaptureDevices(modeInput = "auto") {
+		const settings = this._getSettingsSnapshot();
+		const mode =
+			modeInput && modeInput !== "auto" ? modeInput : settings.captureMode;
+		const options = await this._discoverCaptureDevices(settings, mode);
+		const outputLines = options.map(
+			(entry) =>
+				`${entry.value}${entry.label && entry.label !== entry.value ? ` (${entry.label})` : ""}`,
+		);
+
 		if (!outputLines.length) {
-			await this._log("No capture devices found or FFmpeg/PulseAudio is unavailable.", "warn");
+			await this._log(
+				"No capture devices found or FFmpeg/PulseAudio is unavailable.",
+				"warn",
+			);
 			await this._toast("No devices listed. Check plugin logs.");
 			return;
 		}
@@ -15821,12 +16417,12 @@ module.exports = SoundMatchTriggerPlugin;
 
 ```
 
-## sound_match_trigger/manifest.json
+## sound_trigger_alert/manifest.json
 
 ```
 {
-	"id": "sound_match_trigger",
-	"name": "Sound Match Trigger",
+	"id": "sound_trigger_alert",
+	"name": "Sound Trigger Alert",
 	"version": "1.0.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
@@ -15841,16 +16437,30 @@ module.exports = SoundMatchTriggerPlugin;
 	"config": {
 		"settings": [
 			{
-				"key": "referenceAudioFile",
-				"label": "Reference Audio File",
-				"type": "file",
+				"key": "referenceAudioMap",
+				"label": "Reference Audio Map",
+				"type": "named_map",
+				"section": "General",
+				"sectionOrder": 1,
+				"valueType": "file",
+				"valueKey": "path",
+				"valueLabel": "Audio File",
+				"outputMode": "array",
 				"required": true,
-				"helperText": "The sound to detect (wav/mp3/etc)."
+				"helperText": "Add one or more named sounds to detect."
 			},
 			{
 				"key": "ffmpegPath",
 				"label": "FFmpeg Path",
 				"type": "text",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": {
+					"key": "advanced_runtime",
+					"label": "Advanced Runtime",
+					"helperText": "Only change these if you need custom FFmpeg/runtime tuning."
+				},
+				"refreshOnChange": true,
 				"defaultValue": "ffmpeg",
 				"helperText": "Binary path or command name. Install FFmpeg if detection fails to start."
 			},
@@ -15858,6 +16468,9 @@ module.exports = SoundMatchTriggerPlugin;
 				"key": "captureMode",
 				"label": "Capture Mode",
 				"type": "select",
+				"section": "General",
+				"sectionOrder": 1,
+				"refreshOnChange": true,
 				"defaultValue": "microphone",
 				"options": [
 					{
@@ -15874,23 +16487,37 @@ module.exports = SoundMatchTriggerPlugin;
 			{
 				"key": "inputDevice",
 				"label": "Input Device",
-				"type": "text",
+				"type": "select",
+				"section": "General",
+				"sectionOrder": 1,
+				"allowTyping": true,
+				"dynamicOptions": true,
 				"defaultValue": "",
+				"options": [
+					{
+						"label": "Default",
+						"value": ""
+					}
+				],
 				"helperText": "Optional device name/index. Leave empty for platform default."
 			},
 			{
 				"key": "threshold",
 				"label": "Detection Threshold (0-1)",
 				"type": "number",
+				"section": "General",
+				"sectionOrder": 1,
 				"defaultValue": 0.82,
 				"min": 0.4,
-				"max": 0.99,
-				"helperText": "Higher values reduce false positives but may miss quieter matches."
+				"max": 0.97,
+				"helperText": "Higher values reduce false positives but may miss matches. Typical range is 0.75-0.9."
 			},
 			{
 				"key": "cooldownMs",
 				"label": "Cooldown (ms)",
 				"type": "number",
+				"section": "General",
+				"sectionOrder": 1,
 				"defaultValue": 3000,
 				"min": 500,
 				"max": 60000,
@@ -15900,6 +16527,9 @@ module.exports = SoundMatchTriggerPlugin;
 				"key": "detectionIntervalMs",
 				"label": "Analyze Interval (ms)",
 				"type": "number",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_runtime",
 				"defaultValue": 700,
 				"min": 200,
 				"max": 5000,
@@ -15909,6 +16539,9 @@ module.exports = SoundMatchTriggerPlugin;
 				"key": "maxReferenceSeconds",
 				"label": "Max Reference Length (seconds)",
 				"type": "number",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_runtime",
 				"defaultValue": 6,
 				"min": 1,
 				"max": 30,
@@ -15918,18 +16551,26 @@ module.exports = SoundMatchTriggerPlugin;
 				"key": "autoStart",
 				"label": "Start Detector Automatically",
 				"type": "switch",
+				"section": "General",
+				"sectionOrder": 1,
 				"defaultValue": true
 			},
 			{
 				"key": "autoRestart",
 				"label": "Auto Restart On Capture Exit",
 				"type": "checkbox",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_runtime",
 				"defaultValue": true
 			},
 			{
 				"key": "restartDelayMs",
 				"label": "Restart Delay (ms)",
 				"type": "number",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_runtime",
 				"defaultValue": 2000,
 				"min": 500,
 				"max": 30000
@@ -15938,6 +16579,9 @@ module.exports = SoundMatchTriggerPlugin;
 				"key": "logSimilarity",
 				"label": "Log Similarity Scores",
 				"type": "switch",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"group": "advanced_runtime",
 				"defaultValue": false,
 				"helperText": "Useful for threshold tuning."
 			}
@@ -16007,6 +16651,11 @@ module.exports = SoundMatchTriggerPlugin;
 				"value": "stopped"
 			},
 			{
+				"name": "reference_name",
+				"description": "Name of the most recently matched reference entry.",
+				"value": ""
+			},
+			{
 				"name": "last_similarity",
 				"description": "Most recent similarity score (0-1).",
 				"value": 0
@@ -16023,7 +16672,7 @@ module.exports = SoundMatchTriggerPlugin;
 			},
 			{
 				"name": "reference_file",
-				"description": "File name of the active reference audio sample.",
+				"description": "File name of the most recently matched reference audio sample.",
 				"value": ""
 			},
 			{
@@ -16037,12 +16686,19 @@ module.exports = SoundMatchTriggerPlugin;
 				"title": "Sound Detected",
 				"key": "sound_detected",
 				"acceptedVariables": [
+					"reference_name",
 					"last_match_score",
 					"last_match_time",
 					"reference_file",
 					"capture_device"
 				],
-				"defaultMessage": "Matched {{reference_file}} (score {{last_match_score}}) on {{capture_device}}."
+				"defaultMessage": "Matched {{reference_name}} ({{reference_file}}) score {{last_match_score}} on {{capture_device}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_SELECTION",
+						"description": "Compares against each sound mapping variation value."
+					}
+				]
 			}
 		]
 	}
@@ -16050,11 +16706,11 @@ module.exports = SoundMatchTriggerPlugin;
 
 ```
 
-## sound_match_trigger/package.json
+## sound_trigger_alert/package.json
 
 ```
 {
-	"name": "lumia-sound-match-trigger",
+	"name": "lumia-sound-trigger-alert",
 	"version": "1.0.0",
 	"private": true,
 	"description": "Detect a user-provided sound in live audio and trigger Lumia alerts.",
@@ -16066,16 +16722,45 @@ module.exports = SoundMatchTriggerPlugin;
 
 ```
 
-## sound_match_trigger/settings_tutorial.md
+## sound_trigger_alert/settings_tutorial.md
 
 ```
-### Quick Start
-- Install FFmpeg and make sure `ffmpeg` is available on PATH (or set a full path in **FFmpeg Path**).
-- Choose **Reference Audio File** with the exact sound you want to detect.
-- Pick **Capture Mode**:
-  - **Microphone/Input Device**: live mic/input capture
-  - **System Output/Loopback**: desktop/output capture (Windows WASAPI loopback)
-- Optional: set **Input Device** if default is wrong.
+### How This Plugin Works
+- You add one or more reference sounds in **Reference Audio Map**.
+- The plugin listens to live audio from your selected capture source.
+- It compares recent live audio to each reference and picks the best match score.
+- If the score passes your threshold and cooldown rules, it triggers the `sound_detected` alert.
+- Alert variation matching uses the detected reference **Name** (`dynamic.value`).
+
+### Set Up Your Own Audio Detection
+1. Install FFmpeg (see section below) and make sure `ffmpeg` works in terminal.
+2. In **Reference Audio Map**, add an entry:
+   - **Name**: what this sound should be called (also used for variations)
+   - **Audio File**: the sound clip to detect
+3. Choose **Capture Mode**:
+   - **Microphone/Input Device** for live mic/input
+   - **System Output/Loopback** for desktop/output capture (Windows WASAPI loopback)
+4. Pick **Input Device** from the dropdown (or type a custom device value).
+5. Click **Activate**. The plugin validates FFmpeg and your reference files before activation completes.
+6. Play your target sound and tune threshold/cooldown as needed.
+
+### Install FFmpeg
+If FFmpeg is not already installed, use one of these options:
+
+- Windows:
+  - `winget install Gyan.FFmpeg`
+  - or `choco install ffmpeg -y`
+  - then restart Lumia Stream.
+- macOS:
+  - `brew install ffmpeg`
+- Linux:
+  - Ubuntu/Debian: `sudo apt update && sudo apt install -y ffmpeg`
+  - Fedora: `sudo dnf install -y ffmpeg`
+  - Arch: `sudo pacman -S ffmpeg`
+
+Verify install:
+- Run `ffmpeg -version` in terminal.
+- If command is not found, set **FFmpeg Path** to the full ffmpeg binary path.
 
 ### Tuning
 - **Detection Threshold**:
@@ -16083,8 +16768,8 @@ module.exports = SoundMatchTriggerPlugin;
   - Raise threshold to reduce false positives
   - Lower threshold if real matches are missed
 - **Cooldown** controls how often alerts can fire.
-- **Analyze Interval** controls responsiveness vs CPU usage.
-- **Max Reference Length** keeps matching fast; short, distinctive clips work best.
+- **Analyze Interval** and **Max Reference Length** are in **Advanced** and control CPU usage vs responsiveness.
+- Advanced runtime options (FFmpeg path, restart behavior, logging) are in the **Advanced** section.
 
 ### Platform Notes
 - Windows:

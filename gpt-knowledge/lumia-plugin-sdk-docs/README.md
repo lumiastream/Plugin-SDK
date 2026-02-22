@@ -194,7 +194,7 @@ The CLI is distributed separately via `lumia-plugin`. Use it with `npx` (require
 - `examples/ollama` – App plugin that queries a local Ollama server and exposes prompt helpers for templates.
 - `examples/openrgb` – Lights plugin that controls OpenRGB devices and profile actions from Lumia.
 - `examples/rumble` – Platforms plugin that tracks Rumble livestream state, engagement, and chat metadata.
-- `examples/sound_match_trigger` – Audio detector that matches a user-uploaded reference sound against live capture and triggers Lumia alerts.
+- `examples/sound_trigger_alert` – Sound Trigger Alert example that matches a user-uploaded reference sound against live capture and triggers Lumia alerts.
 - `examples/settings_field_showcase` – Reference plugin demonstrating all supported settings field types.
 - `examples/steam` – Steam integration that tracks profile status, games, and achievements with optional alerts/actions.
 
