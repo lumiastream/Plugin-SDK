@@ -90,6 +90,61 @@ export interface PluginBundleConfig {
 	overlays?: string[];
 }
 
+export type PluginNamedMapFieldType = "named_map";
+
+export type PluginNamedMapValueType =
+	| "text"
+	| "number"
+	| "select"
+	| "checkbox"
+	| "switch"
+	| "toggle"
+	| "file"
+	| "json";
+
+export type PluginNamedMapOutputMode = "array" | "object" | "map";
+
+export type PluginNamedMapObjectValueMode = "object" | "value" | "path";
+
+export interface PluginNamedMapOption {
+	id?: string;
+	label: string;
+	value: string | number | boolean;
+}
+
+export interface PluginNamedMapValueFieldConfig {
+	type?:
+		| "text"
+		| "number"
+		| "select"
+		| "checkbox"
+		| "switch"
+		| "slider"
+		| "file"
+		| "password"
+		| "toggle"
+		| "textarea"
+		| "email"
+		| "url"
+		| "color"
+		| "json"
+		| "roi";
+	placeholder?: string;
+	helperText?: string;
+	required?: boolean;
+	options?: PluginNamedMapOption[];
+	allowTyping?: boolean;
+	multiple?: boolean;
+	rows?: number;
+	validation?: {
+		pattern?: string;
+		min?: number;
+		max?: number;
+		minLength?: number;
+		maxLength?: number;
+	};
+}
+
 export interface PluginSetting {
 	key: string;
 	label: string;
@@ -107,7 +162,8 @@ export interface PluginSetting {
 		| "url"
 		| "color"
 		| "json"
-		| "roi";
+		| "roi"
+		| PluginNamedMapFieldType;
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
@@ -142,6 +198,38 @@ export interface PluginSetting {
 		minLength?: number;
 		maxLength?: number;
 	};
+	/**
+	 * named_map only: value field type per row. Defaults to "text".
+	 */
+	valueType?: PluginNamedMapValueType;
+	/**
+	 * named_map only: key used for the entry name in serialized payload (default: "name").
+	 */
+	nameKey?: string;
+	/**
+	 * named_map only: key used for the value in serialized payload (default: "value", or "path" for file values).
+	 */
+	valueKey?: string;
+	/**
+	 * named_map only: label/placeholder/default for each row value input.
+	 */
+	valueLabel?: string;
+	valuePlaceholder?: string;
+	valueDefault?: unknown;
+	/**
+	 * named_map only: override value input config for each row.
+	 */
+	valueField?: PluginNamedMapValueFieldConfig;
+	allowDuplicateNames?: boolean;
+	/**
+	 * named_map only: output serialization shape.
+	 */
+	outputMode?: PluginNamedMapOutputMode;
+	/**
+	 * named_map object output value shape (default: "object").
+	 */
+	objectValueMode?: PluginNamedMapObjectValueMode;
+	includeNameInObjectValue?: boolean;
 }
 
 export interface PluginVisibleIfCondition {
@@ -792,7 +880,8 @@ export interface PluginFormField {
 		| "slider"
 		| "file"
 		| "json"
-		| "roi";
+		| "roi"
+		| PluginNamedMapFieldType;
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
@@ -821,6 +910,17 @@ export interface PluginFormField {
 	hidden?: boolean;
 	visibleIf?: PluginVisibleIfCondition;
 	visible?: boolean;
+	valueType?: PluginNamedMapValueType;
+	nameKey?: string;
+	valueKey?: string;
+	valueLabel?: string;
+	valuePlaceholder?: string;
+	valueDefault?: unknown;
+	valueField?: PluginNamedMapValueFieldConfig;
+	allowDuplicateNames?: boolean;
+	outputMode?: PluginNamedMapOutputMode;
+	objectValueMode?: PluginNamedMapObjectValueMode;
+	includeNameInObjectValue?: boolean;
 }
 
 export interface PluginLight {

@@ -302,6 +302,31 @@ File path input with file browser dialog.
 
 ---
 
+#### `named_map` (settings only)
+Name-to-value map editor. Users can add multiple rows, where each row has:
+- `name` (unique key by default)
+- `value` (typed with `valueType` / `valueField`)
+
+```json
+{
+  "key": "sounds",
+  "label": "Named Sounds",
+  "type": "named_map",
+  "valueType": "file",
+  "outputMode": "array"
+}
+```
+
+**Properties:**
+- `valueType` - Row value input type (`text`, `number`, `select`, `checkbox`/`switch`/`toggle`, `file`, `json`)
+- `valueField` - Optional full field config override for the row value editor (`label`, `placeholder`, `options`, `rows`, etc.)
+- `nameKey` / `valueKey` - Customize serialized payload keys
+- `outputMode` - Store as `array` (default) or `object`/`map`
+- `objectValueMode` - For object output, choose `object` (default), `value`, or `path`
+- `allowDuplicateNames` - Allow duplicate names (default behavior is unique names)
+
+---
+
 #### `json`
 Structured JSON input stored as an object/array value.
 
@@ -370,6 +395,7 @@ Structured region-of-interest editor for screen detection coordinates.
 | `switch`/`toggle` | ✅ | ✅ | ❌ | - | `toggle` in settings, `switch` in actions |
 | `color` | ✅ | ✅ | ❌ | - | Color picker |
 | `file` | ✅ | ✅ | With `allowVariables` | - | File browser |
+| `named_map` | ✅ | ❌ | ❌ | Row-level required checks + duplicate-name checks | Name-to-value map |
 | `json` | ✅ | ❌ | ❌ | JSON parse | Structured object/array editor |
 | `roi` | ✅ | ❌ | ❌ | ROI shape + numeric bounds | Region-of-interest editor |
 
