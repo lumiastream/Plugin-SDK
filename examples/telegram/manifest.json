@@ -21,15 +21,15 @@
         "defaultValue": "bot",
         "options": [
           {
-            "label": "Bot (BotFather token) - Recommended",
+            "label": "BotFather (Recommended)",
             "value": "bot"
           },
           {
-            "label": "Lumia App (managed credentials)",
+            "label": "Use Built in Bot",
             "value": "lumia"
           },
           {
-            "label": "Your App (API ID + hash)",
+            "label": "Use Custom Bot",
             "value": "user"
           }
         ],

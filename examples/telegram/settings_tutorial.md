@@ -6,9 +6,9 @@ Pick one:
 
 **Bot (Recommended)** (BotFather token) automation & alerts using a Telegram bot.
 
-**Lumia App** (managed credentials) connects using your personal Telegram account.
+**Use Built in Bot** (managed credentials) connects using your personal Telegram account.
 
-**Your App** (API ID + hash) advanced setup with your own Telegram API
+**Use Custom Bot** (API ID + hash) advanced setup with your own Telegram API
 credentials.
 
 ---
@@ -21,6 +21,7 @@ credentials.
 2.  Run: /newbot
 3.  Create the bot and copy the **Bot Token**.
 4.  Paste the token into the plugin settings.
+5.  No phone verification is required in Bot mode.
 
 ![BotFather setup screenshot](./telegram_botfather.png)
 
@@ -51,7 +52,7 @@ will be available in plugin variables.
 
 ---
 
-## 3. Lumia App Mode
+## 3. Use Built in Bot Mode
 
 1.  Enter your phone number.
 2.  Click **Verify** to request a code and enter it in the popup (no Save required).
@@ -63,7 +64,7 @@ Your chats will load automatically.
 
 ---
 
-## 4. Your App Mode (Advanced)
+## 4. Use Custom Bot Mode (Advanced)
 
 1.  Go to [my.telegram.org](https://my.telegram.org)
 2.  Create an application.
@@ -114,5 +115,5 @@ permissions.
 **Bot (BotFather token) - Recommended**  
 Chats as a bot. The bot can only message users who started a chat with it or groups/channels it was added to. It cannot message your personal chats directly.
 
-**Lumia App (managed credentials)** or **Your App (API ID + hash)**  
+**Use Built in Bot** or **Use Custom Bot**  
 Uses your personal Telegram account. Can message any chat you can access in your Telegram app.

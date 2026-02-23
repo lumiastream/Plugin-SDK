@@ -165,14 +165,14 @@ class TelegramPlugin extends Plugin {
       return;
     }
 
-    const mode = this._authMode(values || this.settings);
-    if (mode === "bot") {
-      await this._toast(
-        "Verify is only available for Lumia App or Your App modes.",
-        "warn",
-      );
-      return;
-    }
+		const mode = this._authMode(values || this.settings);
+		if (mode === "bot") {
+			await this._toast(
+				"Verify is only available for Use Built in Bot or Use Custom Bot.",
+				"warn",
+			);
+			return;
+		}
 
     const phone = this._resolvePhoneNumber(values || this.settings, mode);
     if (!phone) {
@@ -191,9 +191,10 @@ class TelegramPlugin extends Plugin {
   }
 
   async validateAuth(data = {}) {
-    const mode = this._authMode(data);
+    const merged = { ...this.settings, ...(data || {}) };
+    const mode = this._authMode(merged);
     if (mode === "bot") {
-      const token = this._botToken(data);
+      const token = this._botToken(merged);
       if (!token) {
         return { ok: false, message: "Missing bot token." };
       }
@@ -217,7 +218,7 @@ class TelegramPlugin extends Plugin {
       return { ok: true };
     }
 
-    const credentials = this._resolveApiCredentials(data, mode);
+    const credentials = this._resolveApiCredentials(merged, mode);
     if (!credentials?.apiId) {
       return {
         ok: false,
@@ -237,12 +238,11 @@ class TelegramPlugin extends Plugin {
       };
     }
 
-    const session = this._userSessionString(data);
-    const phone = this._resolvePhoneNumber(data, mode);
-    if (!session && !phone) {
+    const session = this._userSessionString(merged);
+    if (!session) {
       return {
         ok: false,
-        message: "Provide a session string or phone number for login.",
+        message: "Phone not verified. Click Verify to sign in first.",
       };
     }
     return { ok: true };
@@ -594,7 +594,7 @@ class TelegramPlugin extends Plugin {
       }
       if (Object.keys(update).length) {
         this._suppressSettingsReconnect = true;
-        this.updateSettings(update);
+        this.updateSettings({ ...this.settings, ...update });
       }
     }
 
@@ -1414,13 +1414,14 @@ class TelegramPlugin extends Plugin {
 
   async _waitForUserPassword() {
     if (typeof this.lumia.prompt === "function") {
-      const result = await this.lumia.prompt({
-        title: "Telegram Two-Factor Password",
-        message: "Enter your Telegram 2FA password",
-        inputLabel: "2FA Password",
-        inputPlaceholder: "Password",
-        confirmLabel: "Continue",
-      });
+			const result = await this.lumia.prompt({
+				title: "Telegram Two-Factor Password",
+				message: "Enter your Telegram 2FA password",
+				inputLabel: "2FA Password",
+				inputPlaceholder: "Password",
+				confirmLabel: "Continue",
+				inputType: "password",
+			});
       if (!result || !result.value) {
         throw new Error("Two-factor password required.");
       }
