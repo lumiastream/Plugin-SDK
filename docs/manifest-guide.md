@@ -549,6 +549,7 @@ When declared, Lumia routes these commands to `modCommand(type, value)` in your 
 - **`toggle`** - Toggle switch
 - **`color`** - Color picker
 - **`file`** - File upload
+- **`named_map`** - Name-to-value map (settings only)
 
 Settings can also include **`disabled`** (boolean) to render a read-only field in the PluginAuth UI.
 
@@ -580,6 +581,28 @@ Settings can also include **`disabled`** (boolean) to render a read-only field i
 	]
 }
 ```
+
+#### Named Map (`named_map`)
+
+Use `named_map` when users should define multiple named entries, each with a typed value.
+
+```json
+{
+	"key": "sounds",
+	"label": "Named Sounds",
+	"type": "named_map",
+	"valueType": "file",
+	"outputMode": "array"
+}
+```
+
+Common `named_map` options:
+
+- `valueType`: row value type (`text`, `number`, `select`, `checkbox`/`switch`/`toggle`, `file`, `json`)
+- `valueField`: optional row editor config (placeholder, options, rows, etc.)
+- `nameKey` / `valueKey`: customize serialized keys
+- `outputMode`: `array` (default) or `object`/`map`
+- `objectValueMode`: for object output, choose `object` (default), `value`, or `path`
 
 ### Actions
 

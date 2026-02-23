@@ -139,6 +139,49 @@ Runtime hooks for lights plugins:
 
 Note: Selection and persistence are handled by the PluginAuth UI; plugins should not call `registerLights`/`updateChosenLights`.
 
+### Plugs configuration (optional for plug/accessory integrations)
+
+If your plugin provides plug/accessory control, add a `config.plugs` block so the PluginAuth UI can render discovery/manual-add controls and a selection list.
+
+```json
+{
+	"id": "my_plug_plugin",
+	"name": "My Plugs",
+	"category": "devices",
+	"config": {
+		"settings": [],
+		"plugs": {
+			"search": {
+				"buttonLabel": "Discover plugs",
+				"helperText": "Runs your searchPlugs hook"
+			},
+			"manualAdd": {
+				"buttonLabel": "Add plug",
+				"helperText": "Enter details for a plug",
+				"fields": [
+					{ "key": "name", "label": "Alias Name", "type": "text", "required": true },
+					{ "key": "mac", "label": "MAC Address", "type": "text", "required": true },
+					{ "key": "model", "label": "Model (optional)", "type": "text" }
+				]
+			},
+			"displayFields": [
+				{ "key": "name", "label": "Name" },
+				{ "key": "model", "label": "Model", "fallback": "Unknown model" }
+			],
+			"emptyStateText": "No plugs yet. Discover or add one."
+		}
+	}
+}
+```
+
+Runtime hooks for plugs/accessories:
+
+- Implement `searchPlugs` to return an array of discovered plugs for the UI to save.
+- Implement `addPlug` to handle manual-add requests and return the updated array.
+- Implement `onPlugChange` to receive runtime state updates (`state: true/false`) for selected plugs.
+
+Note: Selection and persistence are handled by the PluginAuth UI; plugins should not call `registerAccessories`/`updateChosenAccessories`.
+
 ### Studio Theme Configuration (optional for lights plugins)
 
 Use `config.themeConfig` when your lights plugin supports Studio theme scenes/effects/presets.
@@ -506,6 +549,7 @@ When declared, Lumia routes these commands to `modCommand(type, value)` in your 
 - **`toggle`** - Toggle switch
 - **`color`** - Color picker
 - **`file`** - File upload
+- **`named_map`** - Name-to-value map (settings only)
 
 Settings can also include **`disabled`** (boolean) to render a read-only field in the PluginAuth UI.
 
@@ -537,6 +581,28 @@ Settings can also include **`disabled`** (boolean) to render a read-only field i
 	]
 }
 ```
+
+#### Named Map (`named_map`)
+
+Use `named_map` when users should define multiple named entries, each with a typed value.
+
+```json
+{
+	"key": "sounds",
+	"label": "Named Sounds",
+	"type": "named_map",
+	"valueType": "file",
+	"outputMode": "array"
+}
+```
+
+Common `named_map` options:
+
+- `valueType`: row value type (`text`, `number`, `select`, `checkbox`/`switch`/`toggle`, `file`, `json`)
+- `valueField`: optional row editor config (placeholder, options, rows, etc.)
+- `nameKey` / `valueKey`: customize serialized keys
+- `outputMode`: `array` (default) or `object`/`map`
+- `objectValueMode`: for object output, choose `object` (default), `value`, or `path`
 
 ### Actions
 
