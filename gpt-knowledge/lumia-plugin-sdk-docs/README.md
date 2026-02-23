@@ -104,7 +104,7 @@ Interact with Lumia Stream using the strongly typed `ILumiaAPI` helper on the pl
 await this.lumia.triggerAlert({
   alert: "follow",
   extraSettings: { username: "StreamerFan" },
-  showInEventList: true,
+  showInEventList: false,
 });
 await this.lumia.playAudio({ path: "alert.mp3", volume: 0.7 });
 this.lumia.setVariable("follower_count", 1337);
@@ -113,6 +113,8 @@ this.lumia.displayChat({
   message: "Hello from the plugin!",
 });
 ```
+
+`showInEventList` should stay `false` for most plugins. Enable it only when users expect those plugin-triggered events in Event List (typically streaming platform/event-source plugins).
 
 See the [API reference](./docs/api-reference.md) for the full surface area.
 
