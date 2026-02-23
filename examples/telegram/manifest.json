@@ -364,7 +364,10 @@
           "last_message_id",
           "last_message_at"
         ],
-        "defaultMessage": "{{last_chatter}}: {{last_message}}"
+        "defaultMessage": "{{last_chatter}}: {{last_message}}",
+        "defaults": {
+          "on": false
+        }
       }
     ]
   }
