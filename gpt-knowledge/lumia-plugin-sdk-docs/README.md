@@ -16,17 +16,17 @@ npm install @lumiastream/plugin
 import { Plugin } from "@lumiastream/plugin";
 
 export default class MyPlugin extends Plugin {
-	constructor(manifest, context) {
-		super(manifest, context);
-	}
+  constructor(manifest, context) {
+    super(manifest, context);
+  }
 
-	async onload() {
-		// Plugin loaded
-	}
+  async onload() {
+    // Plugin loaded
+  }
 
-	async onunload() {
-		// Plugin unloaded
-	}
+  async onunload() {
+    // Plugin unloaded
+  }
 }
 ```
 
@@ -38,26 +38,26 @@ Every plugin requires a `manifest.json` file that describes your plugin, its met
 
 ```json
 {
-	"id": "my_awesome_plugin",
-	"name": "My Awesome Plugin",
-	"version": "1.0.0",
-	"author": "Your Name",
-	"description": "A brief description of what your plugin does",
-	"lumiaVersion": "^9.0.0",
-	"category": "utilities",
-	"config": {
-		"hasAI": true,
-		"hasChatbot": true,
-		"modcommandOptions": ["delete", "ban", "timeout"],
-		"settings": [
-			{
-				"key": "apiKey",
-				"label": "API Key",
-				"type": "text",
-				"required": true
-			}
-		]
-	}
+  "id": "my_awesome_plugin",
+  "name": "My Awesome Plugin",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "description": "A brief description of what your plugin does",
+  "lumiaVersion": "^9.0.0",
+  "category": "utilities",
+  "config": {
+    "hasAI": true,
+    "hasChatbot": true,
+    "modcommandOptions": ["delete", "ban", "timeout"],
+    "settings": [
+      {
+        "key": "apiKey",
+        "label": "API Key",
+        "type": "text",
+        "required": true
+      }
+    ]
+  }
 }
 ```
 
@@ -102,15 +102,15 @@ Interact with Lumia Stream using the strongly typed `ILumiaAPI` helper on the pl
 
 ```js
 await this.lumia.triggerAlert({
-    alert: "follow",
-    extraSettings: { username: "StreamerFan" },
-    showInEventList: true,
+  alert: "follow",
+  extraSettings: { username: "StreamerFan" },
+  showInEventList: true,
 });
 await this.lumia.playAudio({ path: "alert.mp3", volume: 0.7 });
 this.lumia.setVariable("follower_count", 1337);
 this.lumia.displayChat({
-    username: "Viewer123",
-    message: "Hello from the plugin!",
+  username: "Viewer123",
+  message: "Hello from the plugin!",
 });
 ```
 
@@ -121,16 +121,21 @@ See the [API reference](./docs/api-reference.md) for the full surface area.
 Plugins can share heavy resources (for example OpenCV/ONNX runtimes) across the plugin host process:
 
 ```js
-const sharedCv = await this.lumia.acquireShared("opencv.runtime", () => {
+const sharedCv = await this.lumia.acquireShared(
+  "opencv.runtime",
+  () => {
     return require("@lumiastream/opencv-runtime");
-}, {
+  },
+  {
     dispose: (runtime) => runtime?.shutdown?.(),
-});
+  },
+);
 // ...use sharedCv...
 await this.lumia.releaseShared("opencv.runtime");
 ```
 
 Notes:
+
 - The first plugin call for a key should provide `factory`.
 - Later plugins can call `acquireShared(key)` to reuse the same instance.
 - If a plugin unloads without releasing, Lumia auto-releases its remaining references.
@@ -141,11 +146,11 @@ For Bluetooth plugins using `@abandonware/noble`, use the shared noble helper in
 const ble = await this.lumia.acquireSharedNoble();
 await ble.waitForPoweredOn(15000);
 const unsubscribe = ble.onDiscover((peripheral) => {
-    // handle BLE peripheral discovery
+  // handle BLE peripheral discovery
 });
 await ble.startScanning({
-    serviceUuids: ["180d"], // optional
-    allowDuplicates: false,
+  serviceUuids: ["180d"], // optional
+  allowDuplicates: false,
 });
 // ... later
 await ble.stopScanning();
@@ -154,6 +159,7 @@ await this.lumia.releaseSharedNoble();
 ```
 
 Notes:
+
 - `acquireSharedNoble()` defaults to key `bluetooth.runtime.noble.manager.v1`.
 - Scan/listener controls are plugin-scoped, so plugins can share one adapter runtime without fighting over scan state.
 
@@ -193,6 +199,7 @@ The CLI is distributed separately via `lumia-plugin`. Use it with `npx` (require
 - `examples/ntfy` – App plugin that subscribes to ntfy topics and triggers Lumia alerts/variables.
 - `examples/ollama` – App plugin that queries a local Ollama server and exposes prompt helpers for templates.
 - `examples/openrgb` – Lights plugin that controls OpenRGB devices and profile actions from Lumia.
+- `examples/telegram` – Chat plugin that sends Telegram messages and triggers alerts from incoming Telegram chats.
 - `examples/rumble` – Platforms plugin that tracks Rumble livestream state, engagement, and chat metadata.
 - `examples/sound_trigger_alert` – Sound Trigger Alert example that matches a user-uploaded reference sound against live capture and triggers Lumia alerts.
 - `examples/settings_field_showcase` – Reference plugin demonstrating all supported settings field types.

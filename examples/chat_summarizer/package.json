@@ -5,6 +5,6 @@
 	"description": "Lumia Stream plugin that summarizes chat and highlights users by category.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.0"
+		"@lumiastream/plugin": "^0.4.4"
 	}
 }

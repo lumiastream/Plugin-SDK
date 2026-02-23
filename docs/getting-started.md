@@ -516,6 +516,7 @@ export default class EventPlugin extends Plugin {
 ## Next Steps
 
 - Review the [API Reference](./api-reference.md) for the full SDK surface area
-- Explore the [examples](../examples/) for implementation ideas (e.g., `weather`, and the more advanced `rumble` sample)
+- Explore the [examples](../examples/) for implementation ideas.
+  - `examples/rumble` – Platforms plugin that tracks Rumble livestream state, engagement, and chat metadata.
 - Dive into the [manifest guide](./manifest-guide.md) for advanced configuration options
 - Join the [Lumia Stream community](https://lumiastream.com/discord) for support and feedback
