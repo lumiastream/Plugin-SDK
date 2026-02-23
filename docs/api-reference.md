@@ -158,11 +158,11 @@ By default, `acquireSharedNoble` uses the host key `bluetooth.runtime.noble.mana
   Example:
   ```js
   const result = await lumia.prompt({
-    title: "Telegram Verification",
-    message: "Enter the code from Telegram",
+    title: "Phone Verification",
+    message: "Enter the verification code",
     inputLabel: "Login Code",
     inputPlaceholder: "12345",
-    confirmLabel: "Verify"
+    confirmLabel: "Verify",
   });
   if (result?.value) {
     // use result.value
@@ -263,7 +263,7 @@ Use `skipCommandProcessing` (top-level) to show a message in chat without runnin
 
 ```js
 {
-	hasAI: true;
+  hasAI: true;
 }
 ```
 
@@ -273,7 +273,7 @@ When `hasAI` is enabled, Lumia routes prompt requests to your plugin by calling 
 
 ```js
 {
-	hasChatbot: true;
+  hasChatbot: true;
 }
 ```
 
@@ -283,7 +283,7 @@ When `hasChatbot` is enabled, Lumia routes chatbot messages for that platform to
 
 ```js
 {
-	modcommandOptions: ["delete", "ban", "timeout"];
+  modcommandOptions: ["delete", "ban", "timeout"];
 }
 ```
 

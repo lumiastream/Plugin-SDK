@@ -199,7 +199,6 @@ The CLI is distributed separately via `lumia-plugin`. Use it with `npx` (require
 - `examples/ntfy` – App plugin that subscribes to ntfy topics and triggers Lumia alerts/variables.
 - `examples/ollama` – App plugin that queries a local Ollama server and exposes prompt helpers for templates.
 - `examples/openrgb` – Lights plugin that controls OpenRGB devices and profile actions from Lumia.
-- `examples/telegram` – Chat plugin that sends Telegram messages and triggers alerts from incoming Telegram chats.
 - `examples/rumble` – Platforms plugin that tracks Rumble livestream state, engagement, and chat metadata.
 - `examples/sound_trigger_alert` – Sound Trigger Alert example that matches a user-uploaded reference sound against live capture and triggers Lumia alerts.
 - `examples/settings_field_showcase` – Reference plugin demonstrating all supported settings field types.
