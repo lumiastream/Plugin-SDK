@@ -748,6 +748,19 @@ export interface ILumiaAPI {
 	}) => Promise<boolean>;
 	getLights: () => Promise<any>;
 	showToast: (params: { message: string; time?: number }) => Promise<boolean>;
+	/**
+	 * Open a SweetAlert input prompt.
+	 * Returns { value } on confirm or null if cancelled/failed.
+	 */
+	prompt: (params: {
+		title?: string;
+		message?: string;
+		inputLabel?: string;
+		inputPlaceholder?: string;
+		confirmLabel?: string;
+		showCancelButton?: boolean;
+		inputType?: "text" | "password";
+	}) => Promise<{ value: string } | null>;
 	log: (
 		params:
 			| {
