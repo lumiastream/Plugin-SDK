@@ -33,6 +33,7 @@ const pluginModCommandOptions = new Set([
   "remove-vip",
   "add-moderator",
   "remove-moderator",
+  "profile",
 ]);
 
 function isNonEmptyString(value: unknown): value is string {
@@ -186,6 +187,9 @@ export function validatePluginManifest(manifest: PartialManifest | null | undefi
     }
     if (config.hasAI !== undefined && typeof config.hasAI !== "boolean") {
       errors.push("config.hasAI must be a boolean when provided");
+    }
+    if (config.hasChatterProfileUrl !== undefined) {
+      errors.push('config.hasChatterProfileUrl is no longer supported. Use config.modcommandOptions with "profile" instead.');
     }
     if (config.chatbot !== undefined) {
       errors.push("config.chatbot is no longer supported. Use config.hasChatbot (boolean).");

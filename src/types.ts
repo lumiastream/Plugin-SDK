@@ -440,7 +440,8 @@ export type PluginModCommandOption =
 	| "add-vip"
 	| "remove-vip"
 	| "add-moderator"
-	| "remove-moderator";
+	| "remove-moderator"
+	| "profile";
 
 export interface PluginModCommandPayload {
 	username?: string;
@@ -449,6 +450,14 @@ export interface PluginModCommandPayload {
 	reason?: string;
 	language?: string;
 	duration?: number;
+}
+
+export interface PluginChatterProfileUrlPayload {
+	username?: string;
+	displayname?: string;
+	userId?: string | number;
+	platform?: string;
+	extraSettings?: Record<string, any>;
 }
 
 export interface PluginChatbotHandlerOptions {
@@ -816,6 +825,7 @@ export interface PluginRuntime {
 		| void;
 	chatbot?(config: PluginChatbotHandlerOptions): Promise<boolean | void> | boolean | void;
 	modCommand?(type: PluginModCommandOption, value: PluginModCommandPayload): Promise<boolean | void> | boolean | void;
+	chatterProfileUrl?(value: PluginChatterProfileUrlPayload): Promise<string | { url?: string; profileUrl?: string; href?: string; link?: string } | void> | string | { url?: string; profileUrl?: string; href?: string; link?: string } | void;
 	actions?(config: {
 		actions: PluginActionPayload[];
 		extraSettings?: Record<string, unknown>;
