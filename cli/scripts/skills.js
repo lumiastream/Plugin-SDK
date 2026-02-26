@@ -117,7 +117,7 @@ Usage:
 Options:
   --target <path>      Project path to update (default: current directory)
   --tools <list>       Comma-separated: claude,copilot,gemini,cursor,codex
-                       (default: claude,copilot,gemini,cursor)
+                       (default: claude,copilot,gemini,cursor,codex)
   --codex-home <path>  Codex home path used when tools include codex
                        (default: $CODEX_HOME or ~/.codex)
   --dry-run            Print planned updates without writing files
@@ -169,7 +169,7 @@ function parseArgs(argv) {
 	const parsed = {
 		action: "install",
 		target: process.cwd(),
-		tools: ["claude", "copilot", "gemini", "cursor"],
+		tools: ["claude", "copilot", "gemini", "cursor", "codex"],
 		codexHome: defaultCodexHome,
 		dryRun: false,
 	};
