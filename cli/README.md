@@ -8,6 +8,19 @@ The `lumia-plugin` package bundles the command-line tools for creating, building
 npx lumia-plugin create <directory>
 npx lumia-plugin build [--dir <path>] [--out <file>]
 npx lumia-plugin validate <plugin-directory>
+npx lumia-plugin skills [tool] [--target <path>] [--codex-home <path>]
+```
+
+Quick examples:
+
+```bash
+npx lumia-plugin skills
+npx lumia-plugin skills claude
+npx lumia-plugin skills copilot
+npx lumia-plugin skills gemini
+npx lumia-plugin skills cursor
+npx lumia-plugin skills codex
+npx lumia-plugin skills codex --codex-home "$CODEX_HOME"
 ```
 
 Run any command with `--help` to see detailed options.

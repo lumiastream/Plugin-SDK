@@ -9,6 +9,7 @@ const commands = {
 	create: "create-plugin.js",
 	build: "build-plugin.js",
 	validate: "validate-plugin.js",
+	skills: "skills.js",
 };
 
 const scriptArgs = args.slice(1);
@@ -22,11 +23,19 @@ Commands:
   create [directory]     Create a new plugin from template
   build [directory]      Build a plugin into .lumiaplugin package
   validate [file]        Validate a .lumiaplugin package
+  skills [tool]          Install/update skills
 
 Examples:
   lumia-plugin create my_plugin
   lumia-plugin build ./my_plugin
   lumia-plugin validate my_plugin.lumiaplugin
+  lumia-plugin skills
+  lumia-plugin skills claude
+  lumia-plugin skills copilot
+  lumia-plugin skills gemini
+  lumia-plugin skills cursor
+  lumia-plugin skills codex
+  lumia-plugin skills codex --codex-home "$CODEX_HOME"
 `);
 	process.exit(command ? 1 : 0);
 }

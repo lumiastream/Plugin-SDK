@@ -11,7 +11,7 @@
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.6"
+		"@lumiastream/plugin": "^0.5.1"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
