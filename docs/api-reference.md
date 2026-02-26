@@ -152,7 +152,7 @@ By default, `acquireSharedNoble` uses the host key `bluetooth.runtime.noble.mana
 
 ### UX Helpers
 
-- **`showToast(options: { message: string; time?: number }): Promise<boolean>`** – display a toast notification within Lumia Stream.  
+- **`showToast(options: { message: string; time?: number; type?: "info" | "success" | "warning" | "warn" | "error" }): Promise<boolean>`** – display a toast notification within Lumia Stream.  
   `time` is in **milliseconds**.
 - **`prompt(options: { title?: string; message?: string; inputLabel?: string; inputPlaceholder?: string; confirmLabel?: string; showCancelButton?: boolean; inputType?: "text" | "password" }): Promise<{ value: string } | null>`** – open a SweetAlert input prompt. Returns `{ value }` on confirm or `null` if cancelled/failed.
   Example:

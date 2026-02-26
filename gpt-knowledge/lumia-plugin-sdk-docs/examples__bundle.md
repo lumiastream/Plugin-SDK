@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.4"
+		"@lumiastream/plugin": "^0.4.6"
 	}
 }
 
@@ -14582,10 +14582,7 @@ module.exports = SettingsFieldShowcasePlugin;
 				"allowTyping": true,
 				"section": "Basics",
 				"sectionOrder": 1,
-				"defaultValue": [
-					"valorant",
-					"overwatch"
-				],
+				"defaultValue": ["valorant", "overwatch"],
 				"options": [
 					{
 						"label": "Valorant",
@@ -14721,6 +14718,15 @@ module.exports = SettingsFieldShowcasePlugin;
 				"helperText": "Example of type `url`."
 			},
 			{
+				"key": "datetimeField",
+				"label": "Datetime Field",
+				"type": "datetime",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"defaultValue": "2026-03-01T15:30",
+				"helperText": "Example of type `datetime` (YYYY-MM-DDTHH:mm)."
+			},
+			{
 				"key": "colorField",
 				"label": "Color Field",
 				"type": "color",
@@ -14817,7 +14823,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.4"
+		"@lumiastream/plugin": "^0.4.6"
 	}
 }
 
@@ -14831,6 +14837,7 @@ module.exports = SettingsFieldShowcasePlugin;
 This example includes every supported settings field type:
 
 - `text`
+- `datetime`
 - `number`
 - `select`
 - `select` with `multiple: true`
@@ -21059,7 +21066,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.4.4"
+		"@lumiastream/plugin": "^0.4.6"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",

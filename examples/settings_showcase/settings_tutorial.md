@@ -3,6 +3,7 @@
 This example includes every supported settings field type:
 
 - `text`
+- `datetime`
 - `number`
 - `select`
 - `select` with `multiple: true`
