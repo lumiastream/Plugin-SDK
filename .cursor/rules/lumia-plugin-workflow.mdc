@@ -1,0 +1,68 @@
+---
+description: "Lumia plugin workflow for scaffold, implementation, validation, and packaging."
+globs:
+  - "**/manifest.json"
+  - "**/main.js"
+  - "**/main.ts"
+  - "**/src/main.ts"
+alwaysApply: false
+---
+<!-- GENERATED: scripts/sync-cursor-rules.js -->
+> sdk_version: 0.4.6
+> generated_at_utc: 2026-02-26T18:39:30.134Z
+
+# Lumia Plugin Workflow
+
+Use this rule when editing Lumia Stream plugins in this repository or similar plugin projects.
+
+Audit script note:
+- `npx lumia-plugin validate` is always available.
+- `node skills/lumia-plugin-codex-skill/scripts/plugin-audit.js <plugin-dir>` is optional and only works when the Codex skill files are present in the workspace.
+
+## Scope
+
+Use this workflow when building or modifying plugins that target the Lumia Stream plugin runtime.
+
+## 1. Prepare
+
+1. Confirm plugin root contains `manifest.json`.
+2. Confirm plugin entry path:
+- Use `manifest.main` when present.
+- Otherwise use `main.js`.
+3. If creating from scratch, scaffold with:
+
+```bash
+npx lumia-plugin create <plugin_name>
+```
+
+## 2. Implement
+
+1. Read `manifest.json` first.
+2. Ensure every declared capability has matching runtime hooks.
+3. Keep hook signatures stable and use defensive parsing for action/settings values.
+
+## 3. Validate
+
+Run both checks:
+
+```bash
+npx lumia-plugin validate <plugin-dir>
+node skills/lumia-plugin-codex-skill/scripts/plugin-audit.js <plugin-dir>
+```
+
+Validation goals:
+- No manifest schema/basic errors
+- No missing required hooks for declared capabilities
+- No obvious mismatch between manifest and runtime code
+
+## 4. Package
+
+```bash
+npx lumia-plugin build <plugin-dir> --out <plugin-name>.lumiaplugin
+```
+
+Before handoff, report:
+1. Main files changed
+2. Validation result
+3. Package output path
+4. Remaining integration risks (API auth, device reachability, etc.)

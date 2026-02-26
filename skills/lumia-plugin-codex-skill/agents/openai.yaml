@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lumia Plugin Dev (Codex)"
+  short_description: "Build and validate Lumia Stream plugins"
+  default_prompt: "Use $lumia-plugin-codex-skill to scaffold, implement, validate, and package a Lumia Stream plugin."
