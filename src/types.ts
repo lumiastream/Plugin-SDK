@@ -94,6 +94,7 @@ export type PluginNamedMapFieldType = "named_map";
 
 export type PluginNamedMapValueType =
 	| "text"
+	| "datetime"
 	| "number"
 	| "select"
 	| "checkbox"
@@ -115,6 +116,7 @@ export interface PluginNamedMapOption {
 export interface PluginNamedMapValueFieldConfig {
 	type?:
 		| "text"
+		| "datetime"
 		| "number"
 		| "select"
 		| "checkbox"
@@ -150,6 +152,7 @@ export interface PluginSetting {
 	label: string;
 	type:
 		| "text"
+		| "datetime"
 		| "number"
 		| "select"
 		| "checkbox"
@@ -256,6 +259,7 @@ export interface PluginActionField {
 	label: string;
 	type:
 		| "text"
+		| "datetime"
 		| "number"
 		| "select"
 		| "checkbox"
@@ -747,7 +751,11 @@ export interface ILumiaAPI {
 		transition?: number;
 	}) => Promise<boolean>;
 	getLights: () => Promise<any>;
-	showToast: (params: { message: string; time?: number }) => Promise<boolean>;
+	showToast: (params: {
+		message: string;
+		time?: number;
+		type?: "info" | "success" | "warning" | "warn" | "error";
+	}) => Promise<boolean>;
 	/**
 	 * Open a SweetAlert input prompt.
 	 * Returns { value } on confirm or null if cancelled/failed.
@@ -881,6 +889,7 @@ export interface PluginFormField {
 	label: string;
 	type:
 		| "text"
+		| "datetime"
 		| "password"
 		| "number"
 		| "email"
