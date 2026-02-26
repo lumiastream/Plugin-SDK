@@ -1,6 +1,6 @@
 {
 	"name": "@lumiastream/plugin",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"description": "Official Lumia Stream Plugin SDK for building Lumia Stream plugins.",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -20,10 +20,10 @@
 		"sync:developer-docs": "node scripts/sync-developer-docs.js",
 		"sync:skills": "node scripts/sync-skills.js",
 		"validate:skills": "node scripts/validate-skills.js",
-		"update:assistant-files": "node scripts/update-assistant-files.js",
+		"update:skills": "node scripts/update-skills.js",
 		"sync-cli-version": "node scripts/sync-cli-version.js",
 		"publish-cli": "node scripts/publish-cli.js",
-		"prepublishOnly": "npm run build && npm run sync-cli-version && npm run sync:skills && npm run validate:skills",
+		"prepublishOnly": "npm run build && npm run sync-cli-version && npm run sync:skills && npm run validate:skills && npm run package-docs",
 		"postpublish": "npm run publish-cli"
 	},
 	"exports": {

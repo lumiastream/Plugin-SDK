@@ -8,8 +8,8 @@ globs:
 alwaysApply: false
 ---
 <!-- GENERATED: scripts/sync-cursor-rules.js -->
-> sdk_version: 0.5.0
-> generated_at_utc: 2026-02-26T18:41:05.867Z
+> sdk_version: 0.5.1
+> generated_at_utc: 2026-02-26T18:58:05.079Z
 
 # Lumia Plugin Workflow
 

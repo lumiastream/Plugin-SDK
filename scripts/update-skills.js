@@ -108,7 +108,7 @@ const CODEX_TOOL_FILES = [
 
 function usage() {
 	console.log(`Usage:
-  node scripts/update-assistant-files.js [options]
+  node scripts/update-skills.js [options]
 
 Options:
   --target <path>      Project path to update (default: current directory)
@@ -292,7 +292,7 @@ async function main() {
 		return;
 	}
 
-	console.log(`Updated ${plan.length} assistant files.`);
+	console.log(`Updated ${plan.length} skills.`);
 }
 
 main().catch((error) => {

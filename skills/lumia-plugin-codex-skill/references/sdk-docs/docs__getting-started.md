@@ -16,153 +16,59 @@ The repository ships simple helpers so you can bootstrap and package plugins wit
 - `npx lumia-plugin build ./path/to/plugin` runs the same build pipeline globally (optional `--out`).
 - `npx lumia-plugin validate ./path/to/plugin` validates manifests without cloning the repo.
 
-## AI Assistant Support (Optional)
+## Skills Support (Optional)
 
-Use the built-in assistant resources if you develop plugins in Codex Desktop, Claude, GitHub Copilot, Gemini CLI, or Cursor.
+Use the built-in skill files if you develop plugins in Codex Desktop, Claude, GitHub Copilot, Gemini CLI, or Cursor.
 
-### Codex Desktop Skill
+### Easy Install (Recommended)
 
-Location:
-
-- `skills/lumia-plugin-codex-skill`
-
-Install/download into Codex:
+Install common project skill files (Claude + Copilot + Gemini + Cursor):
 
 ```bash
-python3 "$CODEX_HOME/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
-  --repo lumiastream/Plugin-SDK \
-  --path skills/lumia-plugin-codex-skill
+npx lumia-plugin skills --target /path/to/your-plugin
 ```
 
-No-curl option (browser only):
+Install one specific tool:
 
-1. Download [Plugin-SDK zip](https://github.com/lumiastream/Plugin-SDK/archive/refs/heads/main.zip).
-2. Extract and copy `skills/lumia-plugin-codex-skill` into `$CODEX_HOME/skills/lumia-plugin-codex-skill`.
-3. Restart Codex Desktop.
+```bash
+npx lumia-plugin skills claude --target /path/to/your-plugin
+npx lumia-plugin skills copilot --target /path/to/your-plugin
+npx lumia-plugin skills gemini --target /path/to/your-plugin
+npx lumia-plugin skills cursor --target /path/to/your-plugin
+npx lumia-plugin skills codex
+```
 
-Restart Codex Desktop after installation.
+Optional Codex home override:
 
-Use in prompts:
+```bash
+npx lumia-plugin skills codex --codex-home "$CODEX_HOME"
+```
+
+List available skill bundles:
+
+```bash
+npx lumia-plugin skills list
+```
+
+Use in Codex prompts:
 
 - `$lumia-plugin-codex-skill`
 - Example: `Use $lumia-plugin-codex-skill to validate my plugin manifest and hooks before packaging`
 
-### Claude Skill
-
-Location:
-
-- `skills/lumia-plugin-claude-skill/lumia-plugin-claude-skill.md`
-
-Install/download into another plugin project:
-
-```bash
-curl -L https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/skills/lumia-plugin-claude-skill/lumia-plugin-claude-skill.md \
-  -o /path/to/your-plugin/CLAUDE.md
-```
-
-No-curl option (browser only):
-
-1. Open [Claude skill file](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/skills/lumia-plugin-claude-skill/lumia-plugin-claude-skill.md).
-2. Save it as `CLAUDE.md` in your plugin root.
-
-Use in Claude:
-
-- Open your plugin project in Claude.
-- Ask Claude to follow `CLAUDE.md` while building or validating the plugin.
-
-### GitHub Copilot
-
-Location:
-
-- `.github/copilot-instructions.md`
-
-Install/download into another plugin project:
-
-```bash
-mkdir -p /path/to/your-plugin/.github
-curl -L https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/.github/copilot-instructions.md \
-  -o /path/to/your-plugin/.github/copilot-instructions.md
-```
-
-No-curl option (browser only):
-
-1. Open [Copilot instructions](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/.github/copilot-instructions.md).
-2. Save it as `.github/copilot-instructions.md` in your plugin project.
-
-Use in Copilot:
-
-- Open your plugin project in VS Code/GitHub with Copilot enabled.
-- Copilot uses repo instructions automatically.
-
-### Gemini CLI
-
-Location:
-
-- `GEMINI.md`
-
-Install/download into another plugin project:
-
-```bash
-curl -L https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/GEMINI.md \
-  -o /path/to/your-plugin/GEMINI.md
-```
-
-No-curl option (browser only):
-
-1. Open [Gemini instructions](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/GEMINI.md).
-2. Save it as `GEMINI.md` in your plugin root.
-
-Use in Gemini CLI:
-
-- Run Gemini CLI from your plugin project root.
-- Ask Gemini to follow `GEMINI.md` while building or validating the plugin.
-
-### Cursor Rules
-
-Location:
-
-- `.cursor/rules/lumia-plugin-workflow.mdc`
-- `.cursor/rules/lumia-plugin-manifest-contracts.mdc`
-
-Install/download into another plugin project:
-
-```bash
-mkdir -p /path/to/your-plugin/.cursor/rules
-cp .cursor/rules/lumia-plugin-*.mdc /path/to/your-plugin/.cursor/rules/
-mkdir -p /path/to/your-plugin/scripts
-cp skills/lumia-plugin-codex-skill/scripts/plugin-audit.js /path/to/your-plugin/scripts/plugin-audit.js
-```
-
-No-curl option (browser only):
-
-1. Open [Cursor workflow rule](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/.cursor/rules/lumia-plugin-workflow.mdc) and save as `.cursor/rules/lumia-plugin-workflow.mdc`.
-2. Open [Cursor manifest rule](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/.cursor/rules/lumia-plugin-manifest-contracts.mdc) and save as `.cursor/rules/lumia-plugin-manifest-contracts.mdc`.
-3. Open [Audit script](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/skills/lumia-plugin-codex-skill/scripts/plugin-audit.js) and save as `scripts/plugin-audit.js`.
-
-Use in Cursor:
-
-- Open your plugin project in Cursor.
-- Rules load automatically when editing matching files.
-- Run `node scripts/plugin-audit.js <plugin-dir>` only if you copied the audit script.
-
 ### Updating Later (No Full Redownload)
 
-Use the updater script from this repo to pull only changed assistant files:
+Run the same command again to update to latest skill files:
 
 ```bash
-npm run update:assistant-files -- --target /path/to/your-plugin
+npx lumia-plugin skills --target /path/to/your-plugin
 ```
 
-Choose specific tools:
+Tool-specific updates:
 
 ```bash
-npm run update:assistant-files -- --target /path/to/your-plugin --tools claude,copilot,gemini,cursor
-```
-
-Update Codex Desktop skill files directly:
-
-```bash
-npm run update:assistant-files -- --tools codex --codex-home "$CODEX_HOME"
+npx lumia-plugin skills --tools claude,copilot,gemini,cursor --target /path/to/your-plugin
+npx lumia-plugin skills codex
+npx lumia-plugin skills codex --codex-home "$CODEX_HOME"
 ```
 
 ## 1. Project Setup

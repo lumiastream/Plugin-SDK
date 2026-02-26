@@ -171,7 +171,7 @@ Plugins execute in an isolated **Node.js** process (no browser DOM). Use Node-co
 - `npm run sync:developer-docs` – sync core SDK docs and generated example pages into `../Developer-Docs/docs/plugin-sdk` (no manual copy/paste).
 - `npm run sync:skills` – refresh Codex skill docs snapshot, Claude skill docs snapshot, and Cursor rules together.
 - `npm run validate:skills` – validate Codex skill + Claude skill + Copilot instructions + Gemini instructions + Cursor rule version alignment.
-- `npm run update:assistant-files -- --target <plugin-path>` – pull latest assistant files (Claude/Copilot/Gemini/Cursor, optional Codex) from `main`.
+- `npm run update:skills -- --target <plugin-path>` – pull latest skill files (Claude/Copilot/Gemini/Cursor, optional Codex) from `main`.
 
 ## CLI Helpers
 
@@ -181,189 +181,61 @@ The CLI is distributed separately via `lumia-plugin`. Use it with `npx` (require
 - `npx lumia-plugin validate ./path/to/plugin` check `manifest.json`, entry files, and config for common mistakes
 - `npx lumia-plugin build ./path/to/plugin --out ./plugin.lumiaplugin` bundle the directory into a distributable archive
 
-## AI Editor Support (Codex + Claude + Copilot + Gemini CLI + Cursor)
+## Skills Support (Codex + Claude + Copilot + Gemini CLI + Cursor)
 
-This repository ships cross-tool guidance for all three tools using this repo as source:
+This repository ships cross-tool guidance for all supported tools using this repo as source:
 
 - [https://github.com/lumiastream/Plugin-SDK](https://github.com/lumiastream/Plugin-SDK)
 
-### Codex Desktop
+### Easy Install (Recommended)
 
-Location:
-
-- `skills/lumia-plugin-codex-skill`
-
-What it does:
-
-- Guides Lumia plugin workflow (scaffold, implement, validate, package)
-- Maps `manifest.json` capabilities to required/recommended runtime hooks
-- Includes `plugin-audit.js` to detect manifest-to-hook mismatches
-
-Install/download into Codex Desktop:
+Install common project skill files (Claude + Copilot + Gemini + Cursor):
 
 ```bash
-python3 "$CODEX_HOME/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
-  --repo lumiastream/Plugin-SDK \
-  --path skills/lumia-plugin-codex-skill
+npx lumia-plugin skills --target /path/to/your-plugin
 ```
 
-Browser-only install (no curl):
-
-1. Download the repo zip: [Download Plugin-SDK zip](https://github.com/lumiastream/Plugin-SDK/archive/refs/heads/main.zip)
-2. Extract it and copy `skills/lumia-plugin-codex-skill` to `$CODEX_HOME/skills/lumia-plugin-codex-skill`
-3. Restart Codex Desktop
-
-Use:
-
-- Mention `$lumia-plugin-codex-skill` in your prompt
-- Example: `Use $lumia-plugin-codex-skill to scaffold and validate a lights plugin with theme support`
-
-Restart Codex Desktop after installation.
-
-### Claude
-
-Location:
-
-- `skills/lumia-plugin-claude-skill/lumia-plugin-claude-skill.md`
-
-What it does:
-
-- Provides Lumia plugin workflow and capability contract guidance for Claude sessions
-- Includes audit/validation guidance and references synced from SDK docs
-
-Install/download into another project:
+Install one specific tool:
 
 ```bash
-curl -L https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/skills/lumia-plugin-claude-skill/lumia-plugin-claude-skill.md \
-  -o /path/to/your-plugin/CLAUDE.md
+npx lumia-plugin skills claude --target /path/to/your-plugin
+npx lumia-plugin skills copilot --target /path/to/your-plugin
+npx lumia-plugin skills gemini --target /path/to/your-plugin
+npx lumia-plugin skills cursor --target /path/to/your-plugin
+npx lumia-plugin skills codex
 ```
 
-Browser-only install (no curl):
-
-1. Open [Claude skill file](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/skills/lumia-plugin-claude-skill/lumia-plugin-claude-skill.md)
-2. Save it as `CLAUDE.md` in your plugin project root
-
-Optional references bundle:
+Optional Codex home override:
 
 ```bash
-git clone https://github.com/lumiastream/Plugin-SDK.git /tmp/lumia-plugin-sdk
-mkdir -p /path/to/your-plugin/.claude/lumia-plugin-references
-cp -R /tmp/lumia-plugin-sdk/skills/lumia-plugin-claude-skill/references/* /path/to/your-plugin/.claude/lumia-plugin-references/
+npx lumia-plugin skills codex --codex-home "$CODEX_HOME"
 ```
 
-Use:
-
-- Open your plugin project in Claude
-- Ask Claude to follow `CLAUDE.md` while implementing or validating the plugin
-
-### GitHub Copilot
-
-Location:
-
-- `.github/copilot-instructions.md`
-
-What it does:
-
-- Adds repository-wide Lumia plugin implementation and validation guidance for Copilot
-- Includes workflow steps and manifest capability contract checks
-
-Install/download into another project:
+List available skill bundles:
 
 ```bash
-mkdir -p /path/to/your-plugin/.github
-curl -L https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/.github/copilot-instructions.md \
-  -o /path/to/your-plugin/.github/copilot-instructions.md
+npx lumia-plugin skills list
 ```
-
-Browser-only install (no curl):
-
-1. Open [Copilot instructions file](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/.github/copilot-instructions.md)
-2. Save it as `.github/copilot-instructions.md` in your plugin project
-
-Use:
-
-- Open your plugin project in VS Code or GitHub with Copilot enabled
-- Copilot Chat uses repository instructions automatically
-
-### Gemini CLI
-
-Location:
-
-- `GEMINI.md`
-
-What it does:
-
-- Provides project guidance for Gemini CLI sessions targeting Lumia plugin development
-- Includes workflow, capability contracts, and validation commands
-
-Install/download into another project:
-
-```bash
-curl -L https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/GEMINI.md \
-  -o /path/to/your-plugin/GEMINI.md
-```
-
-Browser-only install (no curl):
-
-1. Open [Gemini instructions file](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/GEMINI.md)
-2. Save it as `GEMINI.md` in your plugin project root
-
-Use:
-
-- Run Gemini CLI from your plugin project root
-- Ask Gemini to follow `GEMINI.md` while implementing or validating plugin changes
-
-### Cursor
-
-Location:
-
-- `.cursor/rules/lumia-plugin-workflow.mdc`
-- `.cursor/rules/lumia-plugin-manifest-contracts.mdc`
-
-What it does:
-
-- Enforces Lumia plugin workflow steps while editing plugin files
-- Applies capability contract checks when `manifest.json` and runtime hooks change
-
-Install/download into another project:
-
-```bash
-mkdir -p /path/to/your-plugin/.cursor/rules
-cp .cursor/rules/lumia-plugin-*.mdc /path/to/your-plugin/.cursor/rules/
-mkdir -p /path/to/your-plugin/scripts
-cp skills/lumia-plugin-codex-skill/scripts/plugin-audit.js /path/to/your-plugin/scripts/plugin-audit.js
-```
-
-Browser-only install (no curl):
-
-1. Open [Cursor workflow rule](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/.cursor/rules/lumia-plugin-workflow.mdc) and save as `.cursor/rules/lumia-plugin-workflow.mdc`
-2. Open [Cursor manifest rule](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/.cursor/rules/lumia-plugin-manifest-contracts.mdc) and save as `.cursor/rules/lumia-plugin-manifest-contracts.mdc`
-3. Open [Audit script](https://raw.githubusercontent.com/lumiastream/Plugin-SDK/main/skills/lumia-plugin-codex-skill/scripts/plugin-audit.js) and save as `scripts/plugin-audit.js`
-
-Use:
-
-- Open the plugin project in Cursor
-- Cursor applies matching rules automatically based on file globs
-- Run `node scripts/plugin-audit.js <plugin-dir>` only if you copied the audit script
 
 ### Easy Updates (No Full Redownload)
 
-Instead of re-downloading everything, users can pull only the latest assistant files from `main` with one command:
+Run the same command again to update to latest skill files:
 
 ```bash
-npm run update:assistant-files -- --target /path/to/your-plugin
+npx lumia-plugin skills --target /path/to/your-plugin
 ```
 
 Optional tool selection:
 
 ```bash
-npm run update:assistant-files -- --target /path/to/your-plugin --tools claude,copilot,gemini,cursor
+npx lumia-plugin skills --tools claude,copilot,gemini,cursor --target /path/to/your-plugin
 ```
 
 Optional Codex skill update (for Codex Desktop install path):
 
 ```bash
-npm run update:assistant-files -- --tools codex --codex-home "$CODEX_HOME"
+npx lumia-plugin skills codex
+npx lumia-plugin skills codex --codex-home "$CODEX_HOME"
 ```
 
 ### Automatic Sync on Publish
