@@ -11,6 +11,7 @@ import {
   type PluginAIModelOption,
   type PluginModCommandOption,
   type PluginModCommandPayload,
+  type PluginChatterProfileUrlPayload,
 } from './types';
 
 /**
@@ -66,6 +67,12 @@ export abstract class Plugin {
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async modCommand(_type: PluginModCommandOption, _value: PluginModCommandPayload): Promise<boolean | void> {}
+
+  /**
+   * Resolve a chatter profile URL when manifest config.modcommandOptions includes "profile".
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async chatterProfileUrl(_value: PluginChatterProfileUrlPayload): Promise<string | { url?: string; profileUrl?: string; href?: string; link?: string } | void> {}
 
   /**
    * Refresh dynamic action field options in the UI.

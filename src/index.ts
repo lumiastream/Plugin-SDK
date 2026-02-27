@@ -45,6 +45,7 @@ export type {
   PluginAIModelsRequestOptions,
   PluginModCommandOption,
   PluginModCommandPayload,
+  PluginChatterProfileUrlPayload,
   PluginSharedResourceOptions,
   PluginNobleScanOptions,
   PluginSharedNobleClient,
