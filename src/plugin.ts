@@ -141,12 +141,22 @@ export abstract class Plugin {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async removeLight(_data: Record<string, any>): Promise<any> {
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async searchPlugs(_query?: Record<string, any>): Promise<any> {
     return [];
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async addPlug(_data: Record<string, any>): Promise<any> {
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async removePlug(_data: Record<string, any>): Promise<any> {
     return null;
   }
 
