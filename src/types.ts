@@ -857,8 +857,10 @@ export interface PluginRuntime {
 	searchLights?(config?: Record<string, any>): Promise<any>;
 	searchThemes?(config?: Record<string, any>): Promise<any>;
 	addLight?(config: Record<string, any>): Promise<any>;
+	removeLight?(config: Record<string, any>): Promise<any>;
 	searchPlugs?(config?: Record<string, any>): Promise<any>;
 	addPlug?(config: Record<string, any>): Promise<any>;
+	removePlug?(config: Record<string, any>): Promise<any>;
 	onLightChange?(config: {
 		brand: string;
 		lights: PluginLight[];
