@@ -6,9 +6,38 @@ const VARIABLE_NAMES = {
 	lastSavedValuesJson: "last_saved_values_json",
 };
 
+const TEAM_OPTIONS_BY_LEAGUE = Object.freeze({
+	nfl: Object.freeze([
+		{ label: "Kansas City Chiefs", value: "nfl:kc" },
+		{ label: "San Francisco 49ers", value: "nfl:sf" },
+		{ label: "Buffalo Bills", value: "nfl:buf" },
+		{ label: "Detroit Lions", value: "nfl:det" },
+	]),
+	nba: Object.freeze([
+		{ label: "Boston Celtics", value: "nba:bos" },
+		{ label: "Los Angeles Lakers", value: "nba:lal" },
+		{ label: "Milwaukee Bucks", value: "nba:mil" },
+		{ label: "Denver Nuggets", value: "nba:den" },
+	]),
+	mlb: Object.freeze([
+		{ label: "Los Angeles Dodgers", value: "mlb:lad" },
+		{ label: "Atlanta Braves", value: "mlb:atl" },
+		{ label: "New York Yankees", value: "mlb:nyy" },
+		{ label: "Houston Astros", value: "mlb:hou" },
+	]),
+	nhl: Object.freeze([
+		{ label: "Vegas Golden Knights", value: "nhl:vgk" },
+		{ label: "Colorado Avalanche", value: "nhl:col" },
+		{ label: "New York Rangers", value: "nhl:nyr" },
+		{ label: "Edmonton Oilers", value: "nhl:edm" },
+	]),
+});
+
 const FIELD_SPECS = [
 	{ key: "textField", label: "text", type: "text" },
+	{ key: "validatedTextField", label: "validated_text", type: "text" },
 	{ key: "numberField", label: "number", type: "number" },
+	{ key: "pollIntervalField", label: "poll_interval", type: "number" },
 	{ key: "selectField", label: "select", type: "select" },
 	{
 		key: "selectMultipleField",
@@ -18,17 +47,42 @@ const FIELD_SPECS = [
 	},
 	{ key: "checkboxField", label: "checkbox", type: "checkbox" },
 	{ key: "sliderField", label: "slider", type: "slider" },
+	{ key: "disabledInfoField", label: "disabled_info", type: "text" },
 	{ key: "hiddenTextField", label: "hidden_text", type: "text" },
 	{ key: "groupedTextField", label: "grouped_text", type: "text" },
 	{ key: "fileField", label: "file", type: "file" },
 	{ key: "passwordField", label: "password", type: "password" },
+	{
+		key: "oauthAccessToken",
+		label: "oauth_access_token",
+		type: "password",
+	},
+	{
+		key: "oauthRefreshToken",
+		label: "oauth_refresh_token",
+		type: "password",
+	},
+	{
+		key: "oauthTokenSecret",
+		label: "oauth_token_secret",
+		type: "password",
+	},
 	{ key: "toggleField", label: "toggle", type: "toggle" },
 	{ key: "textareaField", label: "textarea", type: "textarea" },
 	{ key: "emailField", label: "email", type: "email" },
 	{ key: "urlField", label: "url", type: "url" },
+	{ key: "datetimeField", label: "datetime", type: "datetime" },
 	{ key: "colorField", label: "color", type: "color" },
+	{ key: "leagueField", label: "league", type: "select" },
+	{
+		key: "teamLookupField",
+		label: "team_lookup",
+		type: "select",
+		multiple: true,
+	},
 	{ key: "jsonField", label: "json", type: "json" },
 	{ key: "roiField", label: "roi", type: "roi" },
+	{ key: "namedMapField", label: "named_map", type: "named_map" },
 ];
 
 function asString(value, fallback = "") {
@@ -122,6 +176,45 @@ function asRoi(value) {
 	return { x, y, width, height, unit };
 }
 
+function asNamedMap(value) {
+	const parsed = asJsonValue(value);
+	if (!parsed) {
+		return [];
+	}
+
+	if (Array.isArray(parsed)) {
+		return parsed
+			.map((entry) => {
+				if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+					return null;
+				}
+				const name = asString(entry.name ?? entry.key, "").trim();
+				const rawValue = entry.value ?? entry.path ?? "";
+				const mappedValue =
+					typeof rawValue === "string"
+						? rawValue
+						: formatForOutput(asJsonValue(rawValue));
+				if (!name && !mappedValue) {
+					return null;
+				}
+				return { name, value: mappedValue };
+			})
+			.filter(Boolean);
+	}
+
+	if (typeof parsed === "object") {
+		return Object.entries(parsed).map(([name, rawValue]) => ({
+			name: asString(name, "").trim(),
+			value:
+				typeof rawValue === "string"
+					? rawValue
+					: formatForOutput(asJsonValue(rawValue)),
+		}));
+	}
+
+	return [];
+}
+
 function normalizeValueByType(type, value, field = {}) {
 	switch (type) {
 		case "number":
@@ -139,6 +232,8 @@ function normalizeValueByType(type, value, field = {}) {
 			return asJsonValue(value);
 		case "roi":
 			return asRoi(value);
+		case "named_map":
+			return asNamedMap(value);
 		case "password": {
 			const raw = asString(value, "");
 			if (!raw.length) {
@@ -185,23 +280,68 @@ class SettingsFieldShowcasePlugin extends Plugin {
 	async onload() {
 		await this.lumia.updateConnection(true);
 		await this._log("[settings_field_showcase] Loaded.");
-		await this._emitAllFieldValues(this.settings, { showToasts: false, reason: "load" });
+		void this.refreshSettingsOptions({ fieldKey: "leagueField" });
+		await this._emitAllFieldValues(this.settings, { reason: "load" });
 	}
 
 	async onunload() {
 		await this.lumia.updateConnection(false);
 	}
 
-	async onsettingsupdate(settings) {
-		await this._emitAllFieldValues(settings, { showToasts: true, reason: "save" });
+	async onsettingsupdate(settings, previous = {}) {
+		if (this._league(settings) !== this._league(previous)) {
+			void this.refreshSettingsOptions({ fieldKey: "leagueField", settings });
+		}
+		await this._emitAllFieldValues(settings, { reason: "save" });
 	}
 
 	async validateAuth() {
 		return { ok: true };
 	}
 
+	async refreshSettingsOptions({ fieldKey, values, settings } = {}) {
+		if (
+			fieldKey &&
+			fieldKey !== "leagueField" &&
+			fieldKey !== "teamLookupField"
+		) {
+			return;
+		}
+
+		if (typeof this.lumia?.updateSettingsFieldOptions !== "function") {
+			return;
+		}
+
+		const previewSettings = {
+			...(this.settings && typeof this.settings === "object"
+				? this.settings
+				: {}),
+			...(settings && typeof settings === "object" ? settings : {}),
+			...(values && typeof values === "object" ? values : {}),
+		};
+
+		const league = this._league(previewSettings);
+		const baseOptions = TEAM_OPTIONS_BY_LEAGUE[league] || TEAM_OPTIONS_BY_LEAGUE.nfl;
+		const selectedValues = asStringList(
+			values?.teamLookupField ??
+				settings?.teamLookupField ??
+				previewSettings.teamLookupField,
+		);
+		const knownValues = new Set(baseOptions.map((option) => option.value));
+		const customOptions = selectedValues
+			.filter((value) => !knownValues.has(value))
+			.map((value) => ({
+				label: `Custom: ${value}`,
+				value,
+			}));
+
+		await this.lumia.updateSettingsFieldOptions({
+			fieldKey: "teamLookupField",
+			options: [...baseOptions, ...customOptions],
+		});
+	}
+
 	async _emitAllFieldValues(settings, options = {}) {
-		const showToasts = options.showToasts === true;
 		const reason = asString(options.reason, "save");
 		const snapshot = {};
 
@@ -212,12 +352,6 @@ class SettingsFieldShowcasePlugin extends Plugin {
 
 			await this._log(`[settings_field_showcase] ${field.label} (${field.key}) = ${output}`);
 
-			if (showToasts) {
-				await this.lumia.showToast({
-					message: `${field.label}: ${truncate(output, 90)}`,
-					time: 2600,
-				});
-			}
 		}
 
 		this._saveCount += 1;
@@ -238,16 +372,15 @@ class SettingsFieldShowcasePlugin extends Plugin {
 			),
 		);
 
-		if (showToasts) {
-			await this.lumia.showToast({
-				message: `Settings saved. Logged ${FIELD_SPECS.length} field values.`,
-				time: 3500,
-			});
-		}
 	}
 
 	async _log(message) {
 		await this.lumia.log(message);
+	}
+
+	_league(settings = this.settings) {
+		const token = asString(settings?.leagueField, "nfl").trim().toLowerCase();
+		return TEAM_OPTIONS_BY_LEAGUE[token] ? token : "nfl";
 	}
 }
 

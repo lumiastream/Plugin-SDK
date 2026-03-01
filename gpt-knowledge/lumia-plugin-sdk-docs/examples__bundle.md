@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.5.2"
+		"@lumiastream/plugin": "^0.6.0"
 	}
 }
 
@@ -14262,9 +14262,38 @@ const VARIABLE_NAMES = {
 	lastSavedValuesJson: "last_saved_values_json",
 };
 
+const TEAM_OPTIONS_BY_LEAGUE = Object.freeze({
+	nfl: Object.freeze([
+		{ label: "Kansas City Chiefs", value: "nfl:kc" },
+		{ label: "San Francisco 49ers", value: "nfl:sf" },
+		{ label: "Buffalo Bills", value: "nfl:buf" },
+		{ label: "Detroit Lions", value: "nfl:det" },
+	]),
+	nba: Object.freeze([
+		{ label: "Boston Celtics", value: "nba:bos" },
+		{ label: "Los Angeles Lakers", value: "nba:lal" },
+		{ label: "Milwaukee Bucks", value: "nba:mil" },
+		{ label: "Denver Nuggets", value: "nba:den" },
+	]),
+	mlb: Object.freeze([
+		{ label: "Los Angeles Dodgers", value: "mlb:lad" },
+		{ label: "Atlanta Braves", value: "mlb:atl" },
+		{ label: "New York Yankees", value: "mlb:nyy" },
+		{ label: "Houston Astros", value: "mlb:hou" },
+	]),
+	nhl: Object.freeze([
+		{ label: "Vegas Golden Knights", value: "nhl:vgk" },
+		{ label: "Colorado Avalanche", value: "nhl:col" },
+		{ label: "New York Rangers", value: "nhl:nyr" },
+		{ label: "Edmonton Oilers", value: "nhl:edm" },
+	]),
+});
+
 const FIELD_SPECS = [
 	{ key: "textField", label: "text", type: "text" },
+	{ key: "validatedTextField", label: "validated_text", type: "text" },
 	{ key: "numberField", label: "number", type: "number" },
+	{ key: "pollIntervalField", label: "poll_interval", type: "number" },
 	{ key: "selectField", label: "select", type: "select" },
 	{
 		key: "selectMultipleField",
@@ -14274,17 +14303,42 @@ const FIELD_SPECS = [
 	},
 	{ key: "checkboxField", label: "checkbox", type: "checkbox" },
 	{ key: "sliderField", label: "slider", type: "slider" },
+	{ key: "disabledInfoField", label: "disabled_info", type: "text" },
 	{ key: "hiddenTextField", label: "hidden_text", type: "text" },
 	{ key: "groupedTextField", label: "grouped_text", type: "text" },
 	{ key: "fileField", label: "file", type: "file" },
 	{ key: "passwordField", label: "password", type: "password" },
+	{
+		key: "oauthAccessToken",
+		label: "oauth_access_token",
+		type: "password",
+	},
+	{
+		key: "oauthRefreshToken",
+		label: "oauth_refresh_token",
+		type: "password",
+	},
+	{
+		key: "oauthTokenSecret",
+		label: "oauth_token_secret",
+		type: "password",
+	},
 	{ key: "toggleField", label: "toggle", type: "toggle" },
 	{ key: "textareaField", label: "textarea", type: "textarea" },
 	{ key: "emailField", label: "email", type: "email" },
 	{ key: "urlField", label: "url", type: "url" },
+	{ key: "datetimeField", label: "datetime", type: "datetime" },
 	{ key: "colorField", label: "color", type: "color" },
+	{ key: "leagueField", label: "league", type: "select" },
+	{
+		key: "teamLookupField",
+		label: "team_lookup",
+		type: "select",
+		multiple: true,
+	},
 	{ key: "jsonField", label: "json", type: "json" },
 	{ key: "roiField", label: "roi", type: "roi" },
+	{ key: "namedMapField", label: "named_map", type: "named_map" },
 ];
 
 function asString(value, fallback = "") {
@@ -14378,6 +14432,45 @@ function asRoi(value) {
 	return { x, y, width, height, unit };
 }
 
+function asNamedMap(value) {
+	const parsed = asJsonValue(value);
+	if (!parsed) {
+		return [];
+	}
+
+	if (Array.isArray(parsed)) {
+		return parsed
+			.map((entry) => {
+				if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+					return null;
+				}
+				const name = asString(entry.name ?? entry.key, "").trim();
+				const rawValue = entry.value ?? entry.path ?? "";
+				const mappedValue =
+					typeof rawValue === "string"
+						? rawValue
+						: formatForOutput(asJsonValue(rawValue));
+				if (!name && !mappedValue) {
+					return null;
+				}
+				return { name, value: mappedValue };
+			})
+			.filter(Boolean);
+	}
+
+	if (typeof parsed === "object") {
+		return Object.entries(parsed).map(([name, rawValue]) => ({
+			name: asString(name, "").trim(),
+			value:
+				typeof rawValue === "string"
+					? rawValue
+					: formatForOutput(asJsonValue(rawValue)),
+		}));
+	}
+
+	return [];
+}
+
 function normalizeValueByType(type, value, field = {}) {
 	switch (type) {
 		case "number":
@@ -14395,6 +14488,8 @@ function normalizeValueByType(type, value, field = {}) {
 			return asJsonValue(value);
 		case "roi":
 			return asRoi(value);
+		case "named_map":
+			return asNamedMap(value);
 		case "password": {
 			const raw = asString(value, "");
 			if (!raw.length) {
@@ -14441,23 +14536,68 @@ class SettingsFieldShowcasePlugin extends Plugin {
 	async onload() {
 		await this.lumia.updateConnection(true);
 		await this._log("[settings_field_showcase] Loaded.");
-		await this._emitAllFieldValues(this.settings, { showToasts: false, reason: "load" });
+		void this.refreshSettingsOptions({ fieldKey: "leagueField" });
+		await this._emitAllFieldValues(this.settings, { reason: "load" });
 	}
 
 	async onunload() {
 		await this.lumia.updateConnection(false);
 	}
 
-	async onsettingsupdate(settings) {
-		await this._emitAllFieldValues(settings, { showToasts: true, reason: "save" });
+	async onsettingsupdate(settings, previous = {}) {
+		if (this._league(settings) !== this._league(previous)) {
+			void this.refreshSettingsOptions({ fieldKey: "leagueField", settings });
+		}
+		await this._emitAllFieldValues(settings, { reason: "save" });
 	}
 
 	async validateAuth() {
 		return { ok: true };
 	}
 
+	async refreshSettingsOptions({ fieldKey, values, settings } = {}) {
+		if (
+			fieldKey &&
+			fieldKey !== "leagueField" &&
+			fieldKey !== "teamLookupField"
+		) {
+			return;
+		}
+
+		if (typeof this.lumia?.updateSettingsFieldOptions !== "function") {
+			return;
+		}
+
+		const previewSettings = {
+			...(this.settings && typeof this.settings === "object"
+				? this.settings
+				: {}),
+			...(settings && typeof settings === "object" ? settings : {}),
+			...(values && typeof values === "object" ? values : {}),
+		};
+
+		const league = this._league(previewSettings);
+		const baseOptions = TEAM_OPTIONS_BY_LEAGUE[league] || TEAM_OPTIONS_BY_LEAGUE.nfl;
+		const selectedValues = asStringList(
+			values?.teamLookupField ??
+				settings?.teamLookupField ??
+				previewSettings.teamLookupField,
+		);
+		const knownValues = new Set(baseOptions.map((option) => option.value));
+		const customOptions = selectedValues
+			.filter((value) => !knownValues.has(value))
+			.map((value) => ({
+				label: `Custom: ${value}`,
+				value,
+			}));
+
+		await this.lumia.updateSettingsFieldOptions({
+			fieldKey: "teamLookupField",
+			options: [...baseOptions, ...customOptions],
+		});
+	}
+
 	async _emitAllFieldValues(settings, options = {}) {
-		const showToasts = options.showToasts === true;
 		const reason = asString(options.reason, "save");
 		const snapshot = {};
 
@@ -14468,12 +14608,6 @@ class SettingsFieldShowcasePlugin extends Plugin {
 
 			await this._log(`[settings_field_showcase] ${field.label} (${field.key}) = ${output}`);
 
-			if (showToasts) {
-				await this.lumia.showToast({
-					message: `${field.label}: ${truncate(output, 90)}`,
-					time: 2600,
-				});
-			}
 		}
 
 		this._saveCount += 1;
@@ -14494,16 +14628,15 @@ class SettingsFieldShowcasePlugin extends Plugin {
 			),
 		);
 
-		if (showToasts) {
-			await this.lumia.showToast({
-				message: `Settings saved. Logged ${FIELD_SPECS.length} field values.`,
-				time: 3500,
-			});
-		}
 	}
 
 	async _log(message) {
 		await this.lumia.log(message);
+	}
+
+	_league(settings = this.settings) {
+		const token = asString(settings?.leagueField, "nfl").trim().toLowerCase();
+		return TEAM_OPTIONS_BY_LEAGUE[token] ? token : "nfl";
 	}
 }
 
@@ -14517,18 +14650,35 @@ module.exports = SettingsFieldShowcasePlugin;
 {
 	"id": "settings_showcase",
 	"name": "Settings Showcase",
-	"version": "1.1.2",
+	"version": "1.1.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
 	"repository": "",
-	"description": "Example plugin demonstrating every available settings field type with logging/toasts on save.",
+	"description": "Example plugin demonstrating every available settings field type with logging on save.",
 	"license": "MIT",
 	"lumiaVersion": "^9.0.0",
 	"category": "utilities",
 	"icon": "settings_showcase.png",
 	"config": {
 		"settings_tutorial": "settings_tutorial.md",
+		"oauth": {
+			"buttonLabel": "Authorize Custom OAuth Example",
+			"helperText": "Demonstrates custom OAuth configuration with serviceUrl override, extraParams, and tokenKeys mapping.",
+			"openInBrowser": true,
+			"serviceUrl": "https://example.com/oauth/authorize?provider=settings_showcase",
+			"extraParams": "external=true&source=settings_showcase",
+			"scopes": [
+				"profile.read",
+				"activity.read",
+				"chat.write"
+			],
+			"tokenKeys": {
+				"accessToken": "oauthAccessToken",
+				"refreshToken": "oauthRefreshToken",
+				"tokenSecret": "oauthTokenSecret"
+			}
+		},
 		"settings": [
 			{
 				"key": "textField",
@@ -14540,6 +14690,20 @@ module.exports = SettingsFieldShowcasePlugin;
 				"helperText": "Example of type `text`."
 			},
 			{
+				"key": "validatedTextField",
+				"label": "Validated Text Field",
+				"type": "text",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": "stream_alert",
+				"validation": {
+					"minLength": 3,
+					"maxLength": 24,
+					"pattern": "^[a-z0-9_]+$"
+				},
+				"helperText": "Example of `validation` with minLength/maxLength/pattern."
+			},
+			{
 				"key": "numberField",
 				"label": "Number Field",
 				"type": "number",
@@ -14549,6 +14713,19 @@ module.exports = SettingsFieldShowcasePlugin;
 				"min": 0,
 				"max": 1000,
 				"helperText": "Example of type `number`."
+			},
+			{
+				"key": "pollIntervalField",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"section": "Basics",
+				"sectionOrder": 1,
+				"defaultValue": 15,
+				"validation": {
+					"min": 5,
+					"max": 600
+				},
+				"helperText": "Example of `validation` min/max, similar to polling plugins."
 			},
 			{
 				"key": "selectField",
@@ -14632,6 +14809,16 @@ module.exports = SettingsFieldShowcasePlugin;
 				"sectionOrder": 2,
 				"defaultValue": true,
 				"helperText": "Controls visibleIf examples below."
+			},
+			{
+				"key": "disabledInfoField",
+				"label": "Disabled Read-Only Field",
+				"type": "text",
+				"section": "Visibility",
+				"sectionOrder": 2,
+				"defaultValue": "Runtime-managed status field",
+				"disabled": true,
+				"helperText": "Demonstrates `disabled: true`."
 			},
 			{
 				"key": "hiddenTextField",
@@ -14736,6 +14923,49 @@ module.exports = SettingsFieldShowcasePlugin;
 				"helperText": "Example of type `color`."
 			},
 			{
+				"key": "leagueField",
+				"label": "League (Dynamic Source)",
+				"type": "select",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"defaultValue": "nfl",
+				"refreshOnChange": true,
+				"options": [
+					{
+						"label": "NFL",
+						"value": "nfl"
+					},
+					{
+						"label": "NBA",
+						"value": "nba"
+					},
+					{
+						"label": "MLB",
+						"value": "mlb"
+					},
+					{
+						"label": "NHL",
+						"value": "nhl"
+					}
+				],
+				"helperText": "Changing this refreshes team options below."
+			},
+			{
+				"key": "teamLookupField",
+				"label": "Teams (Dynamic + Lookup)",
+				"type": "select",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"multiple": true,
+				"lookup": true,
+				"dynamicOptions": true,
+				"refreshOnChange": true,
+				"defaultValue": ["nfl:kc"],
+				"placeholder": "Search leagues or teams",
+				"options": [],
+				"helperText": "Example of `dynamicOptions` + `lookup` + `refreshOnChange`."
+			},
+			{
 				"key": "jsonField",
 				"label": "JSON Field",
 				"type": "json",
@@ -14786,6 +15016,70 @@ module.exports = SettingsFieldShowcasePlugin;
 					"unit": "ratio"
 				},
 				"helperText": "Example of type `roi` with `visibleIf` and array matching."
+			},
+			{
+				"key": "namedMapField",
+				"label": "Named Targets Map",
+				"type": "named_map",
+				"section": "Advanced",
+				"sectionOrder": 3,
+				"group": {
+					"key": "named_map_examples_group",
+					"label": "Named Mapping",
+					"helperText": "Map user-defined names to values (real-world multi-channel pattern).",
+					"order": 2
+				},
+				"valueType": "text",
+				"valueLabel": "Target Value",
+				"valuePlaceholder": "username|channelId|chatroomId",
+				"valueField": {
+					"type": "text",
+					"required": true,
+					"placeholder": "lumiastream|123456|987654"
+				},
+				"outputMode": "array",
+				"allowDuplicateNames": false,
+				"defaultValue": [
+					{
+						"name": "primary",
+						"value": "lumiastream"
+					},
+					{
+						"name": "mods",
+						"value": "lumiastream_mods"
+					}
+				],
+				"helperText": "Example of type `named_map`."
+			},
+			{
+				"key": "oauthAccessToken",
+				"label": "OAuth Access Token (Mapped)",
+				"type": "password",
+				"section": "OAuth Example",
+				"sectionOrder": 4,
+				"disabled": true,
+				"required": false,
+				"helperText": "Auto-filled by oauth.tokenKeys.accessToken."
+			},
+			{
+				"key": "oauthRefreshToken",
+				"label": "OAuth Refresh Token (Mapped)",
+				"type": "password",
+				"section": "OAuth Example",
+				"sectionOrder": 4,
+				"disabled": true,
+				"required": false,
+				"helperText": "Auto-filled by oauth.tokenKeys.refreshToken."
+			},
+			{
+				"key": "oauthTokenSecret",
+				"label": "OAuth Token Secret (Mapped)",
+				"type": "password",
+				"section": "OAuth Example",
+				"sectionOrder": 4,
+				"disabled": true,
+				"required": false,
+				"helperText": "Auto-filled by oauth.tokenKeys.tokenSecret."
 			}
 		],
 		"variables": [
@@ -14823,7 +15117,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.5.2"
+		"@lumiastream/plugin": "^0.6.0"
 	}
 }
 
@@ -14853,21 +15147,40 @@ This example includes every supported settings field type:
 - `color`
 - `json`
 - `roi`
+- `named_map`
 
 It also demonstrates field metadata:
 
 - `hidden`
+- `disabled`
 - `section`
 - `sectionOrder`
 - `group` (object and string forms)
 - `rows`
 - `visibleIf`
+- `validation`
+- `dynamicOptions`
+- `lookup`
+- `refreshOnChange`
+
+OAuth example included:
+
+- `config.oauth.serviceUrl` override
+- `config.oauth.extraParams`
+- custom `config.oauth.tokenKeys` mapping to:
+  - `oauthAccessToken`
+  - `oauthRefreshToken`
+  - `oauthTokenSecret`
 
 When you save settings, the plugin:
 
 - logs each value
-- shows toast notifications
 - updates `save_count`, `last_saved_at`, and `last_saved_values_json`
+
+Additional real-world examples included:
+
+- sports-style dynamic team selection (`leagueField` + `teamLookupField`)
+- named key/value mapping for channel or target aliases (`namedMapField`)
 
 ```
 
@@ -21066,7 +21379,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.5.2"
+		"@lumiastream/plugin": "^0.6.0"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
