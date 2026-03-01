@@ -53,6 +53,11 @@ export interface PluginAlertVariationSelection {
 export interface PluginAlertVariationCondition {
 	type: string;
 	description?: string;
+	/**
+	 * When true (and `type` is `EQUAL_SELECTION`), Lumia allows custom typed values
+	 * in addition to the manifest-provided `selections`.
+	 */
+	dynamicSelections?: boolean;
 	selections?: PluginAlertVariationSelection[];
 }
 
@@ -394,6 +399,43 @@ export interface PluginOAuthConfig {
 	tokenKeys?: PluginOAuthTokenKeys;
 }
 
+export interface PluginCustomAuthDisplayConfig {
+	/**
+	 * Relative file path to the custom auth HTML entry (from plugin root).
+	 */
+	entry: string;
+	/**
+	 * When true, PluginAuth opens the custom auth modal automatically.
+	 */
+	autoAutoOpen?: boolean;
+	/**
+	 * Optional button label shown in PluginAuth for opening the custom auth modal.
+	 */
+	authButtonLabel?: string;
+	/**
+	 * Modal title shown in PluginAuth.
+	 */
+	title: string;
+}
+
+export interface PluginCustomAuthDisplaySignalRequest {
+	type: string;
+	payload?: unknown;
+	settings?: Record<string, any>;
+	connection?: string;
+	sessionId?: string;
+	[key: string]: unknown;
+}
+
+export interface PluginCustomAuthDisplayCloseRequest {
+	reason?: string;
+	payload?: unknown;
+	settings?: Record<string, any>;
+	connection?: string;
+	sessionId?: string;
+	[key: string]: unknown;
+}
+
 export type PluginTranslationDictionary = Record<string, unknown>;
 
 export type PluginTranslationLanguageMap = Record<string, PluginTranslationDictionary | string>;
@@ -427,6 +469,7 @@ export interface PluginIntegrationConfig {
 	lights?: PluginLightsConfig;
 	plugs?: PluginPlugsConfig;
 	oauth?: PluginOAuthConfig;
+	customAuthDisplay?: PluginCustomAuthDisplayConfig;
 	hasAI?: boolean;
 	hasChatbot?: boolean;
 	modcommandOptions?: PluginModCommandOption[];
@@ -861,6 +904,8 @@ export interface PluginRuntime {
 	searchPlugs?(config?: Record<string, any>): Promise<any>;
 	addPlug?(config: Record<string, any>): Promise<any>;
 	removePlug?(config: Record<string, any>): Promise<any>;
+	onCustomAuthDisplaySignal?(config: PluginCustomAuthDisplaySignalRequest): Promise<any>;
+	onCustomAuthDisplayClose?(config: PluginCustomAuthDisplayCloseRequest): Promise<void> | void;
 	onLightChange?(config: {
 		brand: string;
 		lights: PluginLight[];

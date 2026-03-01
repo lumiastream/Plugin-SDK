@@ -11,6 +11,8 @@ import {
   type PluginAIModelOption,
   type PluginModCommandOption,
   type PluginModCommandPayload,
+  type PluginCustomAuthDisplaySignalRequest,
+  type PluginCustomAuthDisplayCloseRequest,
 } from './types';
 
 /**
@@ -158,6 +160,16 @@ export abstract class Plugin {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async removePlug(_data: Record<string, any>): Promise<any> {
     return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onCustomAuthDisplaySignal(_config: PluginCustomAuthDisplaySignalRequest): Promise<any> {
+    return undefined;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onCustomAuthDisplayClose(_config: PluginCustomAuthDisplayCloseRequest): Promise<void> {
+    return;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
