@@ -469,7 +469,7 @@ export interface PluginIntegrationConfig {
 	lights?: PluginLightsConfig;
 	plugs?: PluginPlugsConfig;
 	oauth?: PluginOAuthConfig;
-	customAuthDisplay?: PluginCustomAuthDisplayConfig;
+	custom_auth_display?: PluginCustomAuthDisplayConfig;
 	hasAI?: boolean;
 	hasChatbot?: boolean;
 	modcommandOptions?: PluginModCommandOption[];

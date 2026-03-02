@@ -1,7 +1,7 @@
 {
 	"id": "settings_showcase",
 	"name": "Settings Showcase",
-	"version": "1.1.3",
+	"version": "1.1.6",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -19,24 +19,32 @@
 			"openInBrowser": true,
 			"serviceUrl": "https://example.com/oauth/authorize?provider=settings_showcase",
 			"extraParams": "external=true&source=settings_showcase",
-			"scopes": [
-				"profile.read",
-				"activity.read",
-				"chat.write"
-			],
+			"scopes": ["profile.read", "activity.read", "chat.write"],
 			"tokenKeys": {
 				"accessToken": "oauthAccessToken",
 				"refreshToken": "oauthRefreshToken",
 				"tokenSecret": "oauthTokenSecret"
 			}
 		},
+		"custom_auth_display": {
+			"entry": "./auth/setup-wizard.html",
+			"autoAutoOpen": false,
+			"authButtonLabel": "Open Settings Showcase Wizard",
+			"title": "Settings Showcase Custom Auth"
+		},
 		"settings": [
 			{
 				"key": "textField",
 				"label": "Text Field",
 				"type": "text",
-				"section": "Basics",
+				"section": "Text & Numbers",
 				"sectionOrder": 1,
+				"group": {
+					"key": "core_text_group",
+					"label": "Core Text Inputs",
+					"helperText": "Foundational text input examples.",
+					"order": 1
+				},
 				"defaultValue": "Hello Lumia",
 				"helperText": "Example of type `text`."
 			},
@@ -44,8 +52,9 @@
 				"key": "validatedTextField",
 				"label": "Validated Text Field",
 				"type": "text",
-				"section": "Basics",
+				"section": "Text & Numbers",
 				"sectionOrder": 1,
+				"group": "core_text_group",
 				"defaultValue": "stream_alert",
 				"validation": {
 					"minLength": 3,
@@ -58,8 +67,14 @@
 				"key": "numberField",
 				"label": "Number Field",
 				"type": "number",
-				"section": "Basics",
+				"section": "Text & Numbers",
 				"sectionOrder": 1,
+				"group": {
+					"key": "numeric_range_group",
+					"label": "Numeric Range Inputs",
+					"helperText": "Number field examples with limits and validation.",
+					"order": 2
+				},
 				"defaultValue": 42,
 				"min": 0,
 				"max": 1000,
@@ -69,8 +84,9 @@
 				"key": "pollIntervalField",
 				"label": "Poll Interval (seconds)",
 				"type": "number",
-				"section": "Basics",
+				"section": "Text & Numbers",
 				"sectionOrder": 1,
+				"group": "numeric_range_group",
 				"defaultValue": 15,
 				"validation": {
 					"min": 5,
@@ -83,8 +99,14 @@
 				"label": "Select Field",
 				"type": "select",
 				"allowTyping": true,
-				"section": "Basics",
-				"sectionOrder": 1,
+				"section": "Selections",
+				"sectionOrder": 2,
+				"group": {
+					"key": "selection_modes_group",
+					"label": "Selection Modes",
+					"helperText": "Single-select and multi-select behaviors.",
+					"order": 1
+				},
 				"defaultValue": "custom",
 				"options": [
 					{
@@ -108,8 +130,9 @@
 				"type": "select",
 				"multiple": true,
 				"allowTyping": true,
-				"section": "Basics",
-				"sectionOrder": 1,
+				"section": "Selections",
+				"sectionOrder": 2,
+				"group": "selection_modes_group",
 				"defaultValue": ["valorant", "overwatch"],
 				"options": [
 					{
@@ -135,8 +158,14 @@
 				"key": "checkboxField",
 				"label": "Checkbox Field",
 				"type": "checkbox",
-				"section": "Basics",
-				"sectionOrder": 1,
+				"section": "Booleans & Sliders",
+				"sectionOrder": 3,
+				"group": {
+					"key": "state_controls_group",
+					"label": "State Controls",
+					"helperText": "Boolean and range controls for state toggles.",
+					"order": 1
+				},
 				"defaultValue": true,
 				"helperText": "Example of type `checkbox`."
 			},
@@ -144,8 +173,9 @@
 				"key": "sliderField",
 				"label": "Slider Field",
 				"type": "slider",
-				"section": "Basics",
-				"sectionOrder": 1,
+				"section": "Booleans & Sliders",
+				"sectionOrder": 3,
+				"group": "state_controls_group",
 				"defaultValue": 65,
 				"min": 0,
 				"max": 100,
@@ -156,8 +186,9 @@
 				"key": "toggleField",
 				"label": "Toggle Field",
 				"type": "toggle",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Booleans & Sliders",
+				"sectionOrder": 3,
+				"group": "state_controls_group",
 				"defaultValue": true,
 				"helperText": "Controls visibleIf examples below."
 			},
@@ -165,8 +196,14 @@
 				"key": "disabledInfoField",
 				"label": "Disabled Read-Only Field",
 				"type": "text",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
+				"group": {
+					"key": "metadata_flags_group",
+					"label": "Metadata Flags",
+					"helperText": "Examples of disabled and hidden field metadata.",
+					"order": 1
+				},
 				"defaultValue": "Runtime-managed status field",
 				"disabled": true,
 				"helperText": "Demonstrates `disabled: true`."
@@ -175,8 +212,9 @@
 				"key": "hiddenTextField",
 				"label": "Hidden Text Field",
 				"type": "text",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
+				"group": "metadata_flags_group",
 				"hidden": true,
 				"defaultValue": "hidden_default_value",
 				"helperText": "Demonstrates `hidden: true`."
@@ -185,8 +223,8 @@
 				"key": "groupedTextField",
 				"label": "Grouped Text Field",
 				"type": "text",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
 				"group": {
 					"key": "visibility_group",
 					"label": "Grouped Visibility Fields",
@@ -203,8 +241,8 @@
 				"key": "fileField",
 				"label": "File Field",
 				"type": "file",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
 				"group": "visibility_group",
 				"visibleIf": {
 					"key": "toggleField",
@@ -216,8 +254,8 @@
 				"key": "passwordField",
 				"label": "Password Field",
 				"type": "password",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
 				"group": "visibility_group",
 				"defaultValue": "super_secret_value",
 				"helperText": "Example of type `password`."
@@ -226,8 +264,8 @@
 				"key": "textareaField",
 				"label": "Textarea Field",
 				"type": "textarea",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
 				"group": "visibility_group",
 				"rows": 4,
 				"defaultValue": "This is a multiline example.",
@@ -241,8 +279,14 @@
 				"key": "emailField",
 				"label": "Email Field",
 				"type": "email",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Specialized Inputs",
+				"sectionOrder": 5,
+				"group": {
+					"key": "contact_format_group",
+					"label": "Contact & Link Inputs",
+					"helperText": "Typed fields for contact and URL values.",
+					"order": 1
+				},
 				"defaultValue": "name@example.com",
 				"helperText": "Example of type `email`."
 			},
@@ -250,8 +294,9 @@
 				"key": "urlField",
 				"label": "URL Field",
 				"type": "url",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Specialized Inputs",
+				"sectionOrder": 5,
+				"group": "contact_format_group",
 				"defaultValue": "https://lumiastream.com",
 				"helperText": "Example of type `url`."
 			},
@@ -259,8 +304,14 @@
 				"key": "datetimeField",
 				"label": "Datetime Field",
 				"type": "datetime",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Specialized Inputs",
+				"sectionOrder": 5,
+				"group": {
+					"key": "time_color_group",
+					"label": "Time & Color Inputs",
+					"helperText": "Structured datetime and color input examples.",
+					"order": 2
+				},
 				"defaultValue": "2026-03-01T15:30",
 				"helperText": "Example of type `datetime` (YYYY-MM-DDTHH:mm)."
 			},
@@ -268,8 +319,9 @@
 				"key": "colorField",
 				"label": "Color Field",
 				"type": "color",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Specialized Inputs",
+				"sectionOrder": 5,
+				"group": "time_color_group",
 				"defaultValue": "#33aaff",
 				"helperText": "Example of type `color`."
 			},
@@ -277,8 +329,14 @@
 				"key": "leagueField",
 				"label": "League (Dynamic Source)",
 				"type": "select",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Dynamic Lookup",
+				"sectionOrder": 6,
+				"group": {
+					"key": "dynamic_lookup_group",
+					"label": "Runtime Option Loading",
+					"helperText": "Demonstrates dynamic options, lookup, and dependency refresh.",
+					"order": 1
+				},
 				"defaultValue": "nfl",
 				"refreshOnChange": true,
 				"options": [
@@ -305,8 +363,9 @@
 				"key": "teamLookupField",
 				"label": "Teams (Dynamic + Lookup)",
 				"type": "select",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Dynamic Lookup",
+				"sectionOrder": 6,
+				"group": "dynamic_lookup_group",
 				"multiple": true,
 				"lookup": true,
 				"dynamicOptions": true,
@@ -320,12 +379,12 @@
 				"key": "jsonField",
 				"label": "JSON Field",
 				"type": "json",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Structured Data",
+				"sectionOrder": 7,
 				"group": {
-					"key": "advanced_detection_group",
-					"label": "Advanced Detection Rules",
-					"helperText": "Grouped advanced examples with custom JSON + ROI.",
+					"key": "structured_json_group",
+					"label": "Structured Rule Payloads",
+					"helperText": "Examples of structured JSON for advanced configuration payloads.",
 					"order": 1
 				},
 				"rows": 8,
@@ -352,9 +411,14 @@
 				"key": "roiField",
 				"label": "ROI Field",
 				"type": "roi",
-				"section": "Advanced",
-				"sectionOrder": 3,
-				"group": "advanced_detection_group",
+				"section": "ROI",
+				"sectionOrder": 8,
+				"group": {
+					"key": "roi_capture_group",
+					"label": "Region Capture",
+					"helperText": "ROI is isolated because it is specific to screen-detection workflows.",
+					"order": 1
+				},
 				"visibleIf": {
 					"key": "selectMultipleField",
 					"equals": "valorant"
@@ -372,8 +436,8 @@
 				"key": "namedMapField",
 				"label": "Named Targets Map",
 				"type": "named_map",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Structured Data",
+				"sectionOrder": 7,
 				"group": {
 					"key": "named_map_examples_group",
 					"label": "Named Mapping",
@@ -407,7 +471,13 @@
 				"label": "OAuth Access Token (Mapped)",
 				"type": "password",
 				"section": "OAuth Example",
-				"sectionOrder": 4,
+				"sectionOrder": 9,
+				"group": {
+					"key": "oauth_mapped_tokens_group",
+					"label": "Mapped OAuth Tokens",
+					"helperText": "Read-only fields populated by oauth.tokenKeys mapping.",
+					"order": 1
+				},
 				"disabled": true,
 				"required": false,
 				"helperText": "Auto-filled by oauth.tokenKeys.accessToken."
@@ -417,7 +487,8 @@
 				"label": "OAuth Refresh Token (Mapped)",
 				"type": "password",
 				"section": "OAuth Example",
-				"sectionOrder": 4,
+				"sectionOrder": 9,
+				"group": "oauth_mapped_tokens_group",
 				"disabled": true,
 				"required": false,
 				"helperText": "Auto-filled by oauth.tokenKeys.refreshToken."
@@ -427,7 +498,8 @@
 				"label": "OAuth Token Secret (Mapped)",
 				"type": "password",
 				"section": "OAuth Example",
-				"sectionOrder": 4,
+				"sectionOrder": 9,
+				"group": "oauth_mapped_tokens_group",
 				"disabled": true,
 				"required": false,
 				"helperText": "Auto-filled by oauth.tokenKeys.tokenSecret."

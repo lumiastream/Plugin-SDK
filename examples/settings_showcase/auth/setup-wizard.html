@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings Showcase Custom Auth</title>
+  <style>
+    :root {
+      --background: #191743;
+      --containerbackground: #1f1f3a;
+      --cardbackground: #15142b;
+      --cardborder: #393853;
+      --primary: #ff4076;
+      --white: #ffffff;
+      --white2: #cac9d5;
+      --success: #5dda6c;
+      --warning: #dcc984;
+      --error: #fd5454;
+      --transwhite: rgba(255, 255, 255, 0.05);
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 82% 10%, rgba(255, 64, 118, 0.18), transparent 35%),
+        radial-gradient(circle at 8% 95%, rgba(83, 83, 149, 0.24), transparent 40%),
+        var(--background);
+      color: var(--white);
+      font: 14px/1.5 Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+    }
+
+    .panel {
+      width: min(860px, 100%);
+      border: 1px solid var(--cardborder);
+      border-radius: 16px;
+      background: linear-gradient(
+        180deg,
+        rgba(31, 31, 58, 0.98),
+        rgba(21, 20, 43, 0.98)
+      );
+      padding: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    .muted {
+      margin: 0 0 14px;
+      color: var(--white2);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--cardborder);
+      border-radius: var(--radius);
+      background: var(--transwhite);
+      padding: 12px;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      color: var(--white2);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--cardborder);
+      border-radius: 10px;
+      padding: 9px 10px;
+      background: var(--transwhite);
+      color: var(--white);
+      outline: none;
+      margin-bottom: 8px;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--primary);
+    }
+
+    .buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid var(--cardborder);
+      border-radius: 10px;
+      padding: 9px 12px;
+      background: var(--transwhite);
+      color: var(--white);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--primary);
+    }
+
+    .primary {
+      border-color: rgba(255, 64, 118, 0.7);
+      background: rgba(255, 64, 118, 0.16);
+    }
+
+    .good {
+      border-color: rgba(93, 218, 108, 0.7);
+      background: rgba(93, 218, 108, 0.14);
+    }
+
+    .warn {
+      border-color: rgba(220, 201, 132, 0.7);
+      background: rgba(220, 201, 132, 0.14);
+    }
+
+    .bad {
+      border-color: rgba(253, 84, 84, 0.7);
+      background: rgba(253, 84, 84, 0.14);
+    }
+
+    pre {
+      margin: 0;
+      border: 1px solid var(--cardborder);
+      border-radius: 10px;
+      background: var(--cardbackground);
+      color: var(--white2);
+      padding: 10px;
+      min-height: 120px;
+      max-height: 260px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <section class="panel">
+    <h1>Settings Showcase Custom Auth</h1>
+    <p class="muted">
+      This demo page shows how <code>custom_auth_display</code> can push setup actions to plugin runtime.
+    </p>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Update League Setting</h2>
+        <label for="league">League</label>
+        <select id="league">
+          <option value="nfl">NFL</option>
+          <option value="nba">NBA</option>
+          <option value="mlb">MLB</option>
+          <option value="nhl">NHL</option>
+        </select>
+        <div class="buttons">
+          <button id="setLeagueBtn" class="primary">Set League Field</button>
+          <button id="snapshotBtn">Get Settings Snapshot</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Update Grouped Text</h2>
+        <label for="groupedText">Grouped Text Value</label>
+        <input id="groupedText" type="text" value="Configured from custom auth display" />
+        <div class="buttons">
+          <button id="setTextBtn" class="good">Set Grouped Text</button>
+          <button id="pingBtn" class="warn">Ping Plugin</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Bridge Response Log</h2>
+      <pre id="statusLog">Initializing customAuthDisplay bridge...</pre>
+      <div class="buttons" style="margin-top: 10px;">
+        <button id="clearLogBtn">Clear Log</button>
+        <button id="closeBtn" class="bad">Close Wizard</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const statusLog = document.getElementById("statusLog");
+    const bridge = window.customAuthDisplay || null;
+
+    function appendLog(line) {
+      const current = statusLog.textContent || "";
+      statusLog.textContent = current
+        ? current + "\\n" + line
+        : line;
+      statusLog.scrollTop = statusLog.scrollHeight;
+    }
+
+    function toJson(value) {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    }
+
+    async function sendSignal(type, payload) {
+      if (!bridge || typeof bridge.signal !== "function") {
+        appendLog("[bridge missing] window.customAuthDisplay.signal is unavailable");
+        return null;
+      }
+      appendLog("-> signal: " + type + " payload=" + toJson(payload || {}));
+      try {
+        const response = await bridge.signal(type, payload || {});
+        appendLog("<- response: " + toJson(response));
+        return response;
+      } catch (error) {
+        appendLog("<- error: " + (error && error.message ? error.message : String(error)));
+        return null;
+      }
+    }
+
+    document.getElementById("setLeagueBtn").addEventListener("click", async () => {
+      const league = document.getElementById("league").value;
+      await sendSignal("setLeague", { league: league });
+    });
+
+    document.getElementById("setTextBtn").addEventListener("click", async () => {
+      const text = document.getElementById("groupedText").value;
+      await sendSignal("setGroupedText", { text: text });
+    });
+
+    document.getElementById("snapshotBtn").addEventListener("click", async () => {
+      await sendSignal("snapshot");
+    });
+
+    document.getElementById("pingBtn").addEventListener("click", async () => {
+      await sendSignal("ping");
+    });
+
+    document.getElementById("clearLogBtn").addEventListener("click", () => {
+      statusLog.textContent = "";
+    });
+
+    document.getElementById("closeBtn").addEventListener("click", async () => {
+      if (bridge && typeof bridge.close === "function") {
+        bridge.close("settings_showcase_done");
+        return;
+      }
+      await sendSignal("close");
+    });
+
+    (async () => {
+      appendLog("Custom auth page ready.");
+      await sendSignal("ready", {
+        source: "settings_showcase_custom_auth",
+        version: "1.0.0",
+      });
+    })();
+  </script>
+</body>
+</html>

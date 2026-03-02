@@ -299,6 +299,85 @@ class SettingsFieldShowcasePlugin extends Plugin {
 		return { ok: true };
 	}
 
+	async onCustomAuthDisplaySignal(config = {}) {
+		const signalType = asString(
+			config?.type ?? config?.signalType ?? config?.signal,
+			"",
+		)
+			.trim()
+			.toLowerCase();
+		const payload =
+			config?.payload && typeof config.payload === "object"
+				? config.payload
+				: {};
+
+		switch (signalType) {
+			case "ready":
+				return {
+					ok: true,
+					pluginId: this.manifest?.id,
+					message: "Settings showcase custom auth is ready.",
+					league: this._league(),
+				};
+			case "ping":
+				return {
+					ok: true,
+					pongAt: new Date().toISOString(),
+					saveCount: this._saveCount,
+				};
+			case "setleague": {
+				const requestedLeague = asString(payload.league ?? payload.value, "nfl")
+					.trim()
+					.toLowerCase();
+				const nextLeague = TEAM_OPTIONS_BY_LEAGUE[requestedLeague]
+					? requestedLeague
+					: "nfl";
+				this.updateSettings({ leagueField: nextLeague });
+				void this.refreshSettingsOptions({
+					fieldKey: "leagueField",
+					settings: { ...this.settings, leagueField: nextLeague },
+				});
+				return {
+					ok: true,
+					leagueField: nextLeague,
+					message: "League field updated from custom auth display.",
+				};
+			}
+			case "setgroupedtext": {
+				const nextValue =
+					asString(payload.text, "").trim() ||
+					"Updated from custom auth display";
+				this.updateSettings({ groupedTextField: nextValue });
+				return {
+					ok: true,
+					groupedTextField: nextValue,
+					message: "Grouped text field updated from custom auth display.",
+				};
+			}
+			case "snapshot":
+				return {
+					ok: true,
+					fields: {
+						leagueField: asString(this.settings?.leagueField, ""),
+						groupedTextField: asString(this.settings?.groupedTextField, ""),
+						selectField: asString(this.settings?.selectField, ""),
+					},
+				};
+			case "close":
+				return { ok: true, close: true };
+			default:
+				throw new Error(
+					`Unsupported customAuthDisplay signal: ${signalType || "unknown"}`,
+				);
+		}
+	}
+
+	async onCustomAuthDisplayClose(config = {}) {
+		await this._log(
+			`[settings_field_showcase] custom auth display closed: ${formatForOutput(config)}`,
+		);
+	}
+
 	async refreshSettingsOptions({ fieldKey, values, settings } = {}) {
 		if (
 			fieldKey &&

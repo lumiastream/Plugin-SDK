@@ -539,7 +539,7 @@ Manifest shape:
 ```json
 {
 	"config": {
-		"customAuthDisplay": {
+		"custom_auth_display": {
 			"entry": "./auth/index.html",
 			"autoAutoOpen": true,
 			"authButtonLabel": "Open Device Setup",

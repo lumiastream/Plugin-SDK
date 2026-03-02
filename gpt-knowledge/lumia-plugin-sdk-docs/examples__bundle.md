@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.6.0"
+		"@lumiastream/plugin": "^0.6.1"
 	}
 }
 
@@ -14555,6 +14555,85 @@ class SettingsFieldShowcasePlugin extends Plugin {
 		return { ok: true };
 	}
 
+	async onCustomAuthDisplaySignal(config = {}) {
+		const signalType = asString(
+			config?.type ?? config?.signalType ?? config?.signal,
+			"",
+		)
+			.trim()
+			.toLowerCase();
+		const payload =
+			config?.payload && typeof config.payload === "object"
+				? config.payload
+				: {};
+
+		switch (signalType) {
+			case "ready":
+				return {
+					ok: true,
+					pluginId: this.manifest?.id,
+					message: "Settings showcase custom auth is ready.",
+					league: this._league(),
+				};
+			case "ping":
+				return {
+					ok: true,
+					pongAt: new Date().toISOString(),
+					saveCount: this._saveCount,
+				};
+			case "setleague": {
+				const requestedLeague = asString(payload.league ?? payload.value, "nfl")
+					.trim()
+					.toLowerCase();
+				const nextLeague = TEAM_OPTIONS_BY_LEAGUE[requestedLeague]
+					? requestedLeague
+					: "nfl";
+				this.updateSettings({ leagueField: nextLeague });
+				void this.refreshSettingsOptions({
+					fieldKey: "leagueField",
+					settings: { ...this.settings, leagueField: nextLeague },
+				});
+				return {
+					ok: true,
+					leagueField: nextLeague,
+					message: "League field updated from custom auth display.",
+				};
+			}
+			case "setgroupedtext": {
+				const nextValue =
+					asString(payload.text, "").trim() ||
+					"Updated from custom auth display";
+				this.updateSettings({ groupedTextField: nextValue });
+				return {
+					ok: true,
+					groupedTextField: nextValue,
+					message: "Grouped text field updated from custom auth display.",
+				};
+			}
+			case "snapshot":
+				return {
+					ok: true,
+					fields: {
+						leagueField: asString(this.settings?.leagueField, ""),
+						groupedTextField: asString(this.settings?.groupedTextField, ""),
+						selectField: asString(this.settings?.selectField, ""),
+					},
+				};
+			case "close":
+				return { ok: true, close: true };
+			default:
+				throw new Error(
+					`Unsupported customAuthDisplay signal: ${signalType || "unknown"}`,
+				);
+		}
+	}
+
+	async onCustomAuthDisplayClose(config = {}) {
+		await this._log(
+			`[settings_field_showcase] custom auth display closed: ${formatForOutput(config)}`,
+		);
+	}
+
 	async refreshSettingsOptions({ fieldKey, values, settings } = {}) {
 		if (
 			fieldKey &&
@@ -14650,7 +14729,7 @@ module.exports = SettingsFieldShowcasePlugin;
 {
 	"id": "settings_showcase",
 	"name": "Settings Showcase",
-	"version": "1.1.3",
+	"version": "1.1.6",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -14668,24 +14747,32 @@ module.exports = SettingsFieldShowcasePlugin;
 			"openInBrowser": true,
 			"serviceUrl": "https://example.com/oauth/authorize?provider=settings_showcase",
 			"extraParams": "external=true&source=settings_showcase",
-			"scopes": [
-				"profile.read",
-				"activity.read",
-				"chat.write"
-			],
+			"scopes": ["profile.read", "activity.read", "chat.write"],
 			"tokenKeys": {
 				"accessToken": "oauthAccessToken",
 				"refreshToken": "oauthRefreshToken",
 				"tokenSecret": "oauthTokenSecret"
 			}
 		},
+		"custom_auth_display": {
+			"entry": "./auth/setup-wizard.html",
+			"autoAutoOpen": false,
+			"authButtonLabel": "Open Settings Showcase Wizard",
+			"title": "Settings Showcase Custom Auth"
+		},
 		"settings": [
 			{
 				"key": "textField",
 				"label": "Text Field",
 				"type": "text",
-				"section": "Basics",
+				"section": "Text & Numbers",
 				"sectionOrder": 1,
+				"group": {
+					"key": "core_text_group",
+					"label": "Core Text Inputs",
+					"helperText": "Foundational text input examples.",
+					"order": 1
+				},
 				"defaultValue": "Hello Lumia",
 				"helperText": "Example of type `text`."
 			},
@@ -14693,8 +14780,9 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "validatedTextField",
 				"label": "Validated Text Field",
 				"type": "text",
-				"section": "Basics",
+				"section": "Text & Numbers",
 				"sectionOrder": 1,
+				"group": "core_text_group",
 				"defaultValue": "stream_alert",
 				"validation": {
 					"minLength": 3,
@@ -14707,8 +14795,14 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "numberField",
 				"label": "Number Field",
 				"type": "number",
-				"section": "Basics",
+				"section": "Text & Numbers",
 				"sectionOrder": 1,
+				"group": {
+					"key": "numeric_range_group",
+					"label": "Numeric Range Inputs",
+					"helperText": "Number field examples with limits and validation.",
+					"order": 2
+				},
 				"defaultValue": 42,
 				"min": 0,
 				"max": 1000,
@@ -14718,8 +14812,9 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "pollIntervalField",
 				"label": "Poll Interval (seconds)",
 				"type": "number",
-				"section": "Basics",
+				"section": "Text & Numbers",
 				"sectionOrder": 1,
+				"group": "numeric_range_group",
 				"defaultValue": 15,
 				"validation": {
 					"min": 5,
@@ -14732,8 +14827,14 @@ module.exports = SettingsFieldShowcasePlugin;
 				"label": "Select Field",
 				"type": "select",
 				"allowTyping": true,
-				"section": "Basics",
-				"sectionOrder": 1,
+				"section": "Selections",
+				"sectionOrder": 2,
+				"group": {
+					"key": "selection_modes_group",
+					"label": "Selection Modes",
+					"helperText": "Single-select and multi-select behaviors.",
+					"order": 1
+				},
 				"defaultValue": "custom",
 				"options": [
 					{
@@ -14757,8 +14858,9 @@ module.exports = SettingsFieldShowcasePlugin;
 				"type": "select",
 				"multiple": true,
 				"allowTyping": true,
-				"section": "Basics",
-				"sectionOrder": 1,
+				"section": "Selections",
+				"sectionOrder": 2,
+				"group": "selection_modes_group",
 				"defaultValue": ["valorant", "overwatch"],
 				"options": [
 					{
@@ -14784,8 +14886,14 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "checkboxField",
 				"label": "Checkbox Field",
 				"type": "checkbox",
-				"section": "Basics",
-				"sectionOrder": 1,
+				"section": "Booleans & Sliders",
+				"sectionOrder": 3,
+				"group": {
+					"key": "state_controls_group",
+					"label": "State Controls",
+					"helperText": "Boolean and range controls for state toggles.",
+					"order": 1
+				},
 				"defaultValue": true,
 				"helperText": "Example of type `checkbox`."
 			},
@@ -14793,8 +14901,9 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "sliderField",
 				"label": "Slider Field",
 				"type": "slider",
-				"section": "Basics",
-				"sectionOrder": 1,
+				"section": "Booleans & Sliders",
+				"sectionOrder": 3,
+				"group": "state_controls_group",
 				"defaultValue": 65,
 				"min": 0,
 				"max": 100,
@@ -14805,8 +14914,9 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "toggleField",
 				"label": "Toggle Field",
 				"type": "toggle",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Booleans & Sliders",
+				"sectionOrder": 3,
+				"group": "state_controls_group",
 				"defaultValue": true,
 				"helperText": "Controls visibleIf examples below."
 			},
@@ -14814,8 +14924,14 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "disabledInfoField",
 				"label": "Disabled Read-Only Field",
 				"type": "text",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
+				"group": {
+					"key": "metadata_flags_group",
+					"label": "Metadata Flags",
+					"helperText": "Examples of disabled and hidden field metadata.",
+					"order": 1
+				},
 				"defaultValue": "Runtime-managed status field",
 				"disabled": true,
 				"helperText": "Demonstrates `disabled: true`."
@@ -14824,8 +14940,9 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "hiddenTextField",
 				"label": "Hidden Text Field",
 				"type": "text",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
+				"group": "metadata_flags_group",
 				"hidden": true,
 				"defaultValue": "hidden_default_value",
 				"helperText": "Demonstrates `hidden: true`."
@@ -14834,8 +14951,8 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "groupedTextField",
 				"label": "Grouped Text Field",
 				"type": "text",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
 				"group": {
 					"key": "visibility_group",
 					"label": "Grouped Visibility Fields",
@@ -14852,8 +14969,8 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "fileField",
 				"label": "File Field",
 				"type": "file",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
 				"group": "visibility_group",
 				"visibleIf": {
 					"key": "toggleField",
@@ -14865,8 +14982,8 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "passwordField",
 				"label": "Password Field",
 				"type": "password",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
 				"group": "visibility_group",
 				"defaultValue": "super_secret_value",
 				"helperText": "Example of type `password`."
@@ -14875,8 +14992,8 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "textareaField",
 				"label": "Textarea Field",
 				"type": "textarea",
-				"section": "Visibility",
-				"sectionOrder": 2,
+				"section": "Visibility & Layout",
+				"sectionOrder": 4,
 				"group": "visibility_group",
 				"rows": 4,
 				"defaultValue": "This is a multiline example.",
@@ -14890,8 +15007,14 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "emailField",
 				"label": "Email Field",
 				"type": "email",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Specialized Inputs",
+				"sectionOrder": 5,
+				"group": {
+					"key": "contact_format_group",
+					"label": "Contact & Link Inputs",
+					"helperText": "Typed fields for contact and URL values.",
+					"order": 1
+				},
 				"defaultValue": "name@example.com",
 				"helperText": "Example of type `email`."
 			},
@@ -14899,8 +15022,9 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "urlField",
 				"label": "URL Field",
 				"type": "url",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Specialized Inputs",
+				"sectionOrder": 5,
+				"group": "contact_format_group",
 				"defaultValue": "https://lumiastream.com",
 				"helperText": "Example of type `url`."
 			},
@@ -14908,8 +15032,14 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "datetimeField",
 				"label": "Datetime Field",
 				"type": "datetime",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Specialized Inputs",
+				"sectionOrder": 5,
+				"group": {
+					"key": "time_color_group",
+					"label": "Time & Color Inputs",
+					"helperText": "Structured datetime and color input examples.",
+					"order": 2
+				},
 				"defaultValue": "2026-03-01T15:30",
 				"helperText": "Example of type `datetime` (YYYY-MM-DDTHH:mm)."
 			},
@@ -14917,8 +15047,9 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "colorField",
 				"label": "Color Field",
 				"type": "color",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Specialized Inputs",
+				"sectionOrder": 5,
+				"group": "time_color_group",
 				"defaultValue": "#33aaff",
 				"helperText": "Example of type `color`."
 			},
@@ -14926,8 +15057,14 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "leagueField",
 				"label": "League (Dynamic Source)",
 				"type": "select",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Dynamic Lookup",
+				"sectionOrder": 6,
+				"group": {
+					"key": "dynamic_lookup_group",
+					"label": "Runtime Option Loading",
+					"helperText": "Demonstrates dynamic options, lookup, and dependency refresh.",
+					"order": 1
+				},
 				"defaultValue": "nfl",
 				"refreshOnChange": true,
 				"options": [
@@ -14954,8 +15091,9 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "teamLookupField",
 				"label": "Teams (Dynamic + Lookup)",
 				"type": "select",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Dynamic Lookup",
+				"sectionOrder": 6,
+				"group": "dynamic_lookup_group",
 				"multiple": true,
 				"lookup": true,
 				"dynamicOptions": true,
@@ -14969,12 +15107,12 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "jsonField",
 				"label": "JSON Field",
 				"type": "json",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Structured Data",
+				"sectionOrder": 7,
 				"group": {
-					"key": "advanced_detection_group",
-					"label": "Advanced Detection Rules",
-					"helperText": "Grouped advanced examples with custom JSON + ROI.",
+					"key": "structured_json_group",
+					"label": "Structured Rule Payloads",
+					"helperText": "Examples of structured JSON for advanced configuration payloads.",
 					"order": 1
 				},
 				"rows": 8,
@@ -15001,9 +15139,14 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "roiField",
 				"label": "ROI Field",
 				"type": "roi",
-				"section": "Advanced",
-				"sectionOrder": 3,
-				"group": "advanced_detection_group",
+				"section": "ROI",
+				"sectionOrder": 8,
+				"group": {
+					"key": "roi_capture_group",
+					"label": "Region Capture",
+					"helperText": "ROI is isolated because it is specific to screen-detection workflows.",
+					"order": 1
+				},
 				"visibleIf": {
 					"key": "selectMultipleField",
 					"equals": "valorant"
@@ -15021,8 +15164,8 @@ module.exports = SettingsFieldShowcasePlugin;
 				"key": "namedMapField",
 				"label": "Named Targets Map",
 				"type": "named_map",
-				"section": "Advanced",
-				"sectionOrder": 3,
+				"section": "Structured Data",
+				"sectionOrder": 7,
 				"group": {
 					"key": "named_map_examples_group",
 					"label": "Named Mapping",
@@ -15056,7 +15199,13 @@ module.exports = SettingsFieldShowcasePlugin;
 				"label": "OAuth Access Token (Mapped)",
 				"type": "password",
 				"section": "OAuth Example",
-				"sectionOrder": 4,
+				"sectionOrder": 9,
+				"group": {
+					"key": "oauth_mapped_tokens_group",
+					"label": "Mapped OAuth Tokens",
+					"helperText": "Read-only fields populated by oauth.tokenKeys mapping.",
+					"order": 1
+				},
 				"disabled": true,
 				"required": false,
 				"helperText": "Auto-filled by oauth.tokenKeys.accessToken."
@@ -15066,7 +15215,8 @@ module.exports = SettingsFieldShowcasePlugin;
 				"label": "OAuth Refresh Token (Mapped)",
 				"type": "password",
 				"section": "OAuth Example",
-				"sectionOrder": 4,
+				"sectionOrder": 9,
+				"group": "oauth_mapped_tokens_group",
 				"disabled": true,
 				"required": false,
 				"helperText": "Auto-filled by oauth.tokenKeys.refreshToken."
@@ -15076,7 +15226,8 @@ module.exports = SettingsFieldShowcasePlugin;
 				"label": "OAuth Token Secret (Mapped)",
 				"type": "password",
 				"section": "OAuth Example",
-				"sectionOrder": 4,
+				"sectionOrder": 9,
+				"group": "oauth_mapped_tokens_group",
 				"disabled": true,
 				"required": false,
 				"helperText": "Auto-filled by oauth.tokenKeys.tokenSecret."
@@ -15117,7 +15268,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.6.0"
+		"@lumiastream/plugin": "^0.6.1"
 	}
 }
 
@@ -15172,6 +15323,17 @@ OAuth example included:
   - `oauthRefreshToken`
   - `oauthTokenSecret`
 
+Custom auth display example included:
+
+- `config.custom_auth_display` with:
+  - `entry: ./auth/setup-wizard.html`
+  - `autoAutoOpen`
+  - `authButtonLabel`
+  - `title`
+- runtime hooks:
+  - `onCustomAuthDisplaySignal(config)`
+  - `onCustomAuthDisplayClose(config)`
+
 When you save settings, the plugin:
 
 - logs each value
@@ -15181,6 +15343,49 @@ Additional real-world examples included:
 
 - sports-style dynamic team selection (`leagueField` + `teamLookupField`)
 - named key/value mapping for channel or target aliases (`namedMapField`)
+
+Tab layout is intentionally split into focused sections:
+
+- `Text & Numbers`
+- `Selections`
+- `Booleans & Sliders`
+- `Visibility & Layout`
+- `Specialized Inputs`
+- `Dynamic Lookup`
+- `Structured Data`
+- `ROI`
+- `OAuth Example`
+
+### Embedded Media Examples In `settings_tutorial`
+
+This section demonstrates embedding rich media in PluginAuth setup docs, using the same pattern as `local_tuya` (plain markdown + inline HTML).
+
+#### Embedded Image (local plugin asset)
+
+![Settings Showcase Preview](./settings_showcase.png)
+
+#### Embedded Audio
+
+<audio controls preload="none" src="https://www.w3schools.com/html/horse.mp3">
+  Your browser does not support the audio element.
+</audio>
+
+Audio fallback link: https://www.w3schools.com/html/horse.mp3
+
+#### Embedded Video (MP4)
+
+<video controls preload="none" width="560">
+  <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
+  Your browser does not support the video tag.
+</video>
+
+Video fallback link: https://www.w3schools.com/html/mov_bbb.mp4
+
+#### Embedded YouTube Video
+
+<iframe src="https://www.youtube-nocookie.com/embed/VCd0kYWLvMQ" title="Lumia Plugin Media Embed Example" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+YouTube fallback link: https://www.youtube.com/watch?v=VCd0kYWLvMQ
 
 ```
 
@@ -21379,7 +21584,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.6.0"
+		"@lumiastream/plugin": "^0.6.1"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",

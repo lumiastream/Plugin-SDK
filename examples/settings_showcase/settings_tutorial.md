@@ -44,6 +44,17 @@ OAuth example included:
   - `oauthRefreshToken`
   - `oauthTokenSecret`
 
+Custom auth display example included:
+
+- `config.custom_auth_display` with:
+  - `entry: ./auth/setup-wizard.html`
+  - `autoAutoOpen`
+  - `authButtonLabel`
+  - `title`
+- runtime hooks:
+  - `onCustomAuthDisplaySignal(config)`
+  - `onCustomAuthDisplayClose(config)`
+
 When you save settings, the plugin:
 
 - logs each value
@@ -53,3 +64,46 @@ Additional real-world examples included:
 
 - sports-style dynamic team selection (`leagueField` + `teamLookupField`)
 - named key/value mapping for channel or target aliases (`namedMapField`)
+
+Tab layout is intentionally split into focused sections:
+
+- `Text & Numbers`
+- `Selections`
+- `Booleans & Sliders`
+- `Visibility & Layout`
+- `Specialized Inputs`
+- `Dynamic Lookup`
+- `Structured Data`
+- `ROI`
+- `OAuth Example`
+
+### Embedded Media Examples In `settings_tutorial`
+
+This section demonstrates embedding rich media in PluginAuth setup docs, using the same pattern as `local_tuya` (plain markdown + inline HTML).
+
+#### Embedded Image (local plugin asset)
+
+![Settings Showcase Preview](./settings_showcase.png)
+
+#### Embedded Audio
+
+<audio controls preload="none" src="https://www.w3schools.com/html/horse.mp3">
+  Your browser does not support the audio element.
+</audio>
+
+Audio fallback link: https://www.w3schools.com/html/horse.mp3
+
+#### Embedded Video (MP4)
+
+<video controls preload="none" width="560">
+  <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
+  Your browser does not support the video tag.
+</video>
+
+Video fallback link: https://www.w3schools.com/html/mov_bbb.mp4
+
+#### Embedded YouTube Video
+
+<iframe src="https://www.youtube-nocookie.com/embed/VCd0kYWLvMQ" title="Lumia Plugin Media Embed Example" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+YouTube fallback link: https://www.youtube.com/watch?v=VCd0kYWLvMQ
