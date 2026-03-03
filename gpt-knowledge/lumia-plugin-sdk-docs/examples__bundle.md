@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.6.1"
+		"@lumiastream/plugin": "^0.7.0"
 	}
 }
 
@@ -14261,6 +14261,12 @@ const VARIABLE_NAMES = {
 	lastSavedAt: "last_saved_at",
 	lastSavedValuesJson: "last_saved_values_json",
 };
+const ACTION_VARIABLE_NAMES = {
+	actionMessage: "settings_showcase_action_message",
+	actionStatus: "settings_showcase_action_status",
+	actionSaveCount: "settings_showcase_action_save_count",
+	actionSnapshot: "settings_showcase_action_snapshot",
+};
 
 const TEAM_OPTIONS_BY_LEAGUE = Object.freeze({
 	nfl: Object.freeze([
@@ -14553,6 +14559,62 @@ class SettingsFieldShowcasePlugin extends Plugin {
 
 	async validateAuth() {
 		return { ok: true };
+	}
+
+	async actions(config = {}) {
+		const actions = Array.isArray(config?.actions) ? config.actions : [];
+		const newlyPassedVariables = {};
+		let shouldStop = false;
+
+		for (const action of actions) {
+			if (action?.type !== "passVariablesExample") {
+				continue;
+			}
+
+			const params =
+				action?.value && typeof action.value === "object"
+					? action.value
+					: {};
+			const message =
+				asString(
+					params?.message,
+					"Hello from settings_showcase action",
+				).trim() || "Hello from settings_showcase action";
+			const includeSnapshot = asBoolean(params?.includeSnapshot, true);
+			const stopChain = asBoolean(params?.stopChain, false);
+
+			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionMessage] = message;
+			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionStatus] = "ok";
+			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionSaveCount] =
+				this._saveCount;
+
+			if (includeSnapshot) {
+				newlyPassedVariables[ACTION_VARIABLE_NAMES.actionSnapshot] =
+					JSON.stringify({
+						savedAt: new Date().toISOString(),
+						leagueField: asString(this.settings?.leagueField, ""),
+						selectField: asString(this.settings?.selectField, ""),
+						toggleField: asBoolean(this.settings?.toggleField, false),
+						saveCount: this._saveCount,
+					});
+			}
+
+			shouldStop = shouldStop || stopChain;
+			await this._log(
+				`[settings_field_showcase] passVariablesExample emitted variables (shouldStop=${stopChain})`,
+			);
+		}
+
+		const hasReturnedVariables =
+			Object.keys(newlyPassedVariables).length > 0;
+		if (!hasReturnedVariables && !shouldStop) {
+			return;
+		}
+
+		return {
+			...(hasReturnedVariables ? { newlyPassedVariables } : {}),
+			...(shouldStop ? { shouldStop: true } : {}),
+		};
 	}
 
 	async onCustomAuthDisplaySignal(config = {}) {
@@ -15232,8 +15294,45 @@ module.exports = SettingsFieldShowcasePlugin;
 				"required": false,
 				"helperText": "Auto-filled by oauth.tokenKeys.tokenSecret."
 			}
-		],
-		"variables": [
+			],
+			"actions": [
+				{
+					"type": "passVariablesExample",
+					"label": "Pass Variables Example",
+					"description": "Demonstrates returning newlyPassedVariables from actions() for later actions in the same command.",
+					"acceptedVariables": [
+						"settings_showcase_action_message",
+						"settings_showcase_action_status",
+						"settings_showcase_action_save_count",
+						"settings_showcase_action_snapshot"
+					],
+					"fields": [
+						{
+							"key": "message",
+							"label": "Message",
+							"type": "text",
+							"defaultValue": "Hello from settings_showcase action",
+							"allowVariables": true,
+							"helperText": "Returned as settings_showcase_action_message."
+						},
+						{
+							"key": "includeSnapshot",
+							"label": "Include Snapshot",
+							"type": "switch",
+							"defaultValue": true,
+							"helperText": "When enabled, returns a compact JSON snapshot in settings_showcase_action_snapshot."
+						},
+						{
+							"key": "stopChain",
+							"label": "Stop Remaining Actions",
+							"type": "switch",
+							"defaultValue": false,
+							"helperText": "When enabled, actions() also returns shouldStop: true."
+						}
+					]
+				}
+			],
+			"variables": [
 			{
 				"name": "save_count",
 				"description": "How many times settings were saved/updated.",
@@ -15268,7 +15367,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.6.1"
+		"@lumiastream/plugin": "^0.7.0"
 	}
 }
 
@@ -15339,6 +15438,17 @@ When you save settings, the plugin:
 - logs each value
 - updates `save_count`, `last_saved_at`, and `last_saved_values_json`
 
+Action return example included:
+
+- `passVariablesExample` demonstrates `actions()` returning:
+  - `newlyPassedVariables`
+  - optional `shouldStop`
+- returned variables are plugin-prefixed and can be used by later actions in the same command:
+  - `{{settings_showcase_action_message}}`
+  - `{{settings_showcase_action_status}}`
+  - `{{settings_showcase_action_save_count}}`
+  - `{{settings_showcase_action_snapshot}}`
+
 Additional real-world examples included:
 
 - sports-style dynamic team selection (`leagueField` + `teamLookupField`)
@@ -15396,7 +15506,11 @@ YouTube fallback link: https://www.youtube.com/watch?v=VCd0kYWLvMQ
 	"en": {
 		"save_count": "How many times settings were saved/updated.",
 		"last_saved_at": "Timestamp of the last settings save.",
-		"last_saved_values_json": "JSON snapshot of values saved most recently."
+		"last_saved_values_json": "JSON snapshot of values saved most recently.",
+		"settings_showcase_action_message": "Message returned from the passVariablesExample action.",
+		"settings_showcase_action_status": "Status returned from the passVariablesExample action.",
+		"settings_showcase_action_save_count": "Current save counter returned by the passVariablesExample action.",
+		"settings_showcase_action_snapshot": "Compact JSON snapshot returned by the passVariablesExample action."
 	}
 }
 
@@ -15423,7 +15537,6 @@ const DEFAULTS = {
 	pollInterval: 120,
 	minPollInterval: 15,
 	maxPollInterval: 900,
-	achievementRefreshSeconds: 180,
 	ownedGamesRefreshSeconds: 600,
 	userAgent: "LumiaStream Steam Plugin/1.0.0",
 	logThrottleMs: 5 * 60 * 1000,
@@ -15476,7 +15589,6 @@ class SteamPlugin extends Plugin {
 		this._lastAchievementUnlocked = null;
 		this._lastAchievementCount = null;
 		this._lastOwnedFetchAt = 0;
-		this._lastAchievementsFetchAt = 0;
 		this._lastAchievementFetchAppId = 0;
 	}
 
@@ -15519,7 +15631,6 @@ class SteamPlugin extends Plugin {
 			this._lastAchievementUnlocked = null;
 			this._lastAchievementCount = null;
 			this._lastOwnedFetchAt = 0;
-			this._lastAchievementsFetchAt = 0;
 			this._lastAchievementFetchAppId = 0;
 		}
 
@@ -15632,7 +15743,6 @@ class SteamPlugin extends Plugin {
 				const achievementAppId = this._determineAchievementAppId(summaryResult.data);
 				if (!achievementAppId) {
 					this._lastAchievementFetchAppId = 0;
-					this._lastAchievementsFetchAt = 0;
 				}
 
 				const shouldFetchOwned =
@@ -15649,12 +15759,9 @@ class SteamPlugin extends Plugin {
 					}
 				}
 
-				const shouldFetchAchievements =
-					Boolean(achievementAppId) &&
-					(forceFullRefresh ||
-						this._lastAchievementFetchAppId !== achievementAppId ||
-						!this._lastAchievementsFetchAt ||
-						now - this._lastAchievementsFetchAt >= this._achievementRefreshMs());
+				// Poll current-game achievements each cycle so multiple unlocks in
+				// the same play session can be detected without long delays.
+				const shouldFetchAchievements = Boolean(achievementAppId);
 
 				let achievementsResult = { ok: false, data: null };
 				if (shouldFetchAchievements) {
@@ -15662,7 +15769,6 @@ class SteamPlugin extends Plugin {
 						this._fetchAchievements(steamId, achievementAppId),
 					);
 					if (achievementsResult.ok) {
-						this._lastAchievementsFetchAt = Date.now();
 						this._lastAchievementFetchAppId = achievementAppId;
 					}
 				}
@@ -16335,15 +16441,6 @@ class SteamPlugin extends Plugin {
 		);
 	}
 
-	_achievementRefreshMs(settings = this.settings) {
-		const pollSeconds = this._pollInterval(settings);
-		const refreshSeconds = Math.max(
-			DEFAULTS.achievementRefreshSeconds,
-			pollSeconds * 2,
-		);
-		return refreshSeconds * 1000;
-	}
-
 	_ownedGamesRefreshMs(settings = this.settings) {
 		const pollSeconds = this._pollInterval(settings);
 		const refreshSeconds = Math.max(
@@ -16468,7 +16565,7 @@ module.exports = SteamPlugin;
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -16501,7 +16598,7 @@ module.exports = SteamPlugin;
 				"defaultValue": 15,
 				"min": 15,
 				"max": 900,
-				"helperText": "How often to refresh current status/game (15-900 seconds). Achievements and owned games refresh less frequently automatically."
+				"helperText": "How often to refresh current status/game and current-game achievements (15-900 seconds). Owned games refresh less frequently automatically."
 			},
 			{
 				"key": "alertGameChangedWhenStopped",
@@ -16611,10 +16708,7 @@ module.exports = SteamPlugin;
 			{
 				"title": "Online Status Changed",
 				"key": "online_state_changed",
-				"acceptedVariables": [
-					"persona_username",
-					"online_status"
-				],
+				"acceptedVariables": ["persona_username", "online_status"],
 				"defaultMessage": "{{persona_username}} is now {{online_status}}.",
 				"variationConditions": [
 					{
@@ -16673,10 +16767,7 @@ module.exports = SteamPlugin;
 			{
 				"title": "Game Changed",
 				"key": "current_game_changed",
-				"acceptedVariables": [
-					"current_game_name",
-					"current_game_appid"
-				],
+				"acceptedVariables": ["current_game_name", "current_game_appid"],
 				"defaultMessage": "Now playing {{current_game_name}}.",
 				"variationConditions": [
 					{
@@ -21584,7 +21675,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.6.1"
+		"@lumiastream/plugin": "^0.7.0"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",

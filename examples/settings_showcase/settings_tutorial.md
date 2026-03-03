@@ -60,6 +60,17 @@ When you save settings, the plugin:
 - logs each value
 - updates `save_count`, `last_saved_at`, and `last_saved_values_json`
 
+Action return example included:
+
+- `passVariablesExample` demonstrates `actions()` returning:
+  - `newlyPassedVariables`
+  - optional `shouldStop`
+- returned variables are plugin-prefixed and can be used by later actions in the same command:
+  - `{{settings_showcase_action_message}}`
+  - `{{settings_showcase_action_status}}`
+  - `{{settings_showcase_action_save_count}}`
+  - `{{settings_showcase_action_snapshot}}`
+
 Additional real-world examples included:
 
 - sports-style dynamic team selection (`leagueField` + `teamLookupField`)

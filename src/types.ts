@@ -73,6 +73,9 @@ export interface PluginAlertExtraOption {
 export interface PluginAlertDefinition {
 	title: string;
 	key: string;
+	/**
+	 * Variable keys available for this alert template scope.
+	 */
 	acceptedVariables?: string[];
 	defaultMessage?: string;
 	variationConditions?: PluginAlertVariationCondition[];
@@ -316,6 +319,12 @@ export interface PluginActionDefinition {
 	description?: string;
 	icon?: string;
 	/**
+	 * Variable keys that this action exposes for downstream actions/messages.
+	 * Must use your plugin prefix (e.g. "<pluginId>_song_name").
+	 * Unprefixed entries are ignored by Lumia.
+	 */
+	acceptedVariables?: string[];
+	/**
 	 * When true, the UI refreshes dynamic options when the action is selected.
 	 */
 	refreshOnChange?: boolean;
@@ -340,6 +349,20 @@ export interface PluginActionPayload {
 	variables?: Record<string, unknown>;
 	args?: unknown;
 	[key: string]: unknown;
+}
+
+export interface PluginActionResult {
+	/**
+	 * Variables returned from this action that should be merged into runtime extraSettings
+	 * and made available to subsequent actions in the same execution chain.
+	 * Keys must be prefixed with your plugin id (e.g. "<pluginId>_next_value").
+	 * Unprefixed keys are ignored by Lumia.
+	 */
+	newlyPassedVariables?: Record<string, unknown>;
+	/**
+	 * When true, Lumia stops processing the remaining actions in the current chain.
+	 */
+	shouldStop?: boolean;
 }
 
 export interface PluginVariableFunctionDefinition {
@@ -883,7 +906,7 @@ export interface PluginRuntime {
 	actions?(config: {
 		actions: PluginActionPayload[];
 		extraSettings?: Record<string, unknown>;
-	}): Promise<void>;
+	}): Promise<PluginActionResult | void> | PluginActionResult | void;
 	variableFunction?(
 		config: PluginVariableFunctionContext,
 	): Promise<string | PluginVariableFunctionResult | undefined>;

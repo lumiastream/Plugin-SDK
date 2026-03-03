@@ -5,6 +5,12 @@ const VARIABLE_NAMES = {
 	lastSavedAt: "last_saved_at",
 	lastSavedValuesJson: "last_saved_values_json",
 };
+const ACTION_VARIABLE_NAMES = {
+	actionMessage: "settings_showcase_action_message",
+	actionStatus: "settings_showcase_action_status",
+	actionSaveCount: "settings_showcase_action_save_count",
+	actionSnapshot: "settings_showcase_action_snapshot",
+};
 
 const TEAM_OPTIONS_BY_LEAGUE = Object.freeze({
 	nfl: Object.freeze([
@@ -297,6 +303,62 @@ class SettingsFieldShowcasePlugin extends Plugin {
 
 	async validateAuth() {
 		return { ok: true };
+	}
+
+	async actions(config = {}) {
+		const actions = Array.isArray(config?.actions) ? config.actions : [];
+		const newlyPassedVariables = {};
+		let shouldStop = false;
+
+		for (const action of actions) {
+			if (action?.type !== "passVariablesExample") {
+				continue;
+			}
+
+			const params =
+				action?.value && typeof action.value === "object"
+					? action.value
+					: {};
+			const message =
+				asString(
+					params?.message,
+					"Hello from settings_showcase action",
+				).trim() || "Hello from settings_showcase action";
+			const includeSnapshot = asBoolean(params?.includeSnapshot, true);
+			const stopChain = asBoolean(params?.stopChain, false);
+
+			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionMessage] = message;
+			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionStatus] = "ok";
+			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionSaveCount] =
+				this._saveCount;
+
+			if (includeSnapshot) {
+				newlyPassedVariables[ACTION_VARIABLE_NAMES.actionSnapshot] =
+					JSON.stringify({
+						savedAt: new Date().toISOString(),
+						leagueField: asString(this.settings?.leagueField, ""),
+						selectField: asString(this.settings?.selectField, ""),
+						toggleField: asBoolean(this.settings?.toggleField, false),
+						saveCount: this._saveCount,
+					});
+			}
+
+			shouldStop = shouldStop || stopChain;
+			await this._log(
+				`[settings_field_showcase] passVariablesExample emitted variables (shouldStop=${stopChain})`,
+			);
+		}
+
+		const hasReturnedVariables =
+			Object.keys(newlyPassedVariables).length > 0;
+		if (!hasReturnedVariables && !shouldStop) {
+			return;
+		}
+
+		return {
+			...(hasReturnedVariables ? { newlyPassedVariables } : {}),
+			...(shouldStop ? { shouldStop: true } : {}),
+		};
 	}
 
 	async onCustomAuthDisplaySignal(config = {}) {

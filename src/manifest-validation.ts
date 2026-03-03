@@ -137,6 +137,33 @@ function validateTranslations(value: unknown): string[] {
   return errors;
 }
 
+function validatePrefixedAcceptedVariables(pluginId: string, value: unknown, path: string): string[] {
+  const errors: string[] = [];
+  if (value === undefined) {
+    return errors;
+  }
+
+  const normalizedPluginId = pluginId.trim().toLowerCase();
+  const requiredPrefix = `${normalizedPluginId}_`;
+  if (!Array.isArray(value)) {
+    return [`${path} must be an array of strings prefixed with "${requiredPrefix}"`];
+  }
+
+  value.forEach((entry, index) => {
+    if (!isNonEmptyString(entry)) {
+      errors.push(`${path}[${index}] must be a non-empty string`);
+      return;
+    }
+
+    const normalizedEntry = entry.trim().toLowerCase();
+    if (!normalizedEntry.startsWith(requiredPrefix)) {
+      errors.push(`${path}[${index}] must start with "${requiredPrefix}" (unprefixed values are ignored by Lumia)`);
+    }
+  });
+
+  return errors;
+}
+
 /**
  * Perform lightweight validation on a plugin manifest definition.
  * Returns an array of error strings. An empty array indicates the
@@ -195,6 +222,20 @@ export function validatePluginManifest(manifest: PartialManifest | null | undefi
     }
     if (config.translations !== undefined) {
       errors.push(...validateTranslations(config.translations));
+    }
+    if (isNonEmptyString(id) && Array.isArray(config.actions)) {
+      config.actions.forEach((action, index) => {
+        if (!isPlainObject(action)) {
+          return;
+        }
+        errors.push(
+          ...validatePrefixedAcceptedVariables(
+            id,
+            action.acceptedVariables,
+            `config.actions[${index}].acceptedVariables`,
+          ),
+        );
+      });
     }
   }
 
