@@ -1,7 +1,7 @@
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -34,7 +34,7 @@
 				"defaultValue": 15,
 				"min": 15,
 				"max": 900,
-				"helperText": "How often to refresh current status/game (15-900 seconds). Achievements and owned games refresh less frequently automatically."
+				"helperText": "How often to refresh current status/game and current-game achievements (15-900 seconds). Owned games refresh less frequently automatically."
 			},
 			{
 				"key": "alertGameChangedWhenStopped",
@@ -144,10 +144,7 @@
 			{
 				"title": "Online Status Changed",
 				"key": "online_state_changed",
-				"acceptedVariables": [
-					"persona_username",
-					"online_status"
-				],
+				"acceptedVariables": ["persona_username", "online_status"],
 				"defaultMessage": "{{persona_username}} is now {{online_status}}.",
 				"variationConditions": [
 					{
@@ -206,10 +203,7 @@
 			{
 				"title": "Game Changed",
 				"key": "current_game_changed",
-				"acceptedVariables": [
-					"current_game_name",
-					"current_game_appid"
-				],
+				"acceptedVariables": ["current_game_name", "current_game_appid"],
 				"defaultMessage": "Now playing {{current_game_name}}.",
 				"variationConditions": [
 					{

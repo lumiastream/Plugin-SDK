@@ -4,7 +4,6 @@ const DEFAULTS = {
 	pollInterval: 120,
 	minPollInterval: 15,
 	maxPollInterval: 900,
-	achievementRefreshSeconds: 180,
 	ownedGamesRefreshSeconds: 600,
 	userAgent: "LumiaStream Steam Plugin/1.0.0",
 	logThrottleMs: 5 * 60 * 1000,
@@ -57,7 +56,6 @@ class SteamPlugin extends Plugin {
 		this._lastAchievementUnlocked = null;
 		this._lastAchievementCount = null;
 		this._lastOwnedFetchAt = 0;
-		this._lastAchievementsFetchAt = 0;
 		this._lastAchievementFetchAppId = 0;
 	}
 
@@ -100,7 +98,6 @@ class SteamPlugin extends Plugin {
 			this._lastAchievementUnlocked = null;
 			this._lastAchievementCount = null;
 			this._lastOwnedFetchAt = 0;
-			this._lastAchievementsFetchAt = 0;
 			this._lastAchievementFetchAppId = 0;
 		}
 
@@ -213,7 +210,6 @@ class SteamPlugin extends Plugin {
 				const achievementAppId = this._determineAchievementAppId(summaryResult.data);
 				if (!achievementAppId) {
 					this._lastAchievementFetchAppId = 0;
-					this._lastAchievementsFetchAt = 0;
 				}
 
 				const shouldFetchOwned =
@@ -230,12 +226,9 @@ class SteamPlugin extends Plugin {
 					}
 				}
 
-				const shouldFetchAchievements =
-					Boolean(achievementAppId) &&
-					(forceFullRefresh ||
-						this._lastAchievementFetchAppId !== achievementAppId ||
-						!this._lastAchievementsFetchAt ||
-						now - this._lastAchievementsFetchAt >= this._achievementRefreshMs());
+				// Poll current-game achievements each cycle so multiple unlocks in
+				// the same play session can be detected without long delays.
+				const shouldFetchAchievements = Boolean(achievementAppId);
 
 				let achievementsResult = { ok: false, data: null };
 				if (shouldFetchAchievements) {
@@ -243,7 +236,6 @@ class SteamPlugin extends Plugin {
 						this._fetchAchievements(steamId, achievementAppId),
 					);
 					if (achievementsResult.ok) {
-						this._lastAchievementsFetchAt = Date.now();
 						this._lastAchievementFetchAppId = achievementAppId;
 					}
 				}
@@ -914,15 +906,6 @@ class SteamPlugin extends Plugin {
 			Math.max(interval, DEFAULTS.minPollInterval),
 			DEFAULTS.maxPollInterval,
 		);
-	}
-
-	_achievementRefreshMs(settings = this.settings) {
-		const pollSeconds = this._pollInterval(settings);
-		const refreshSeconds = Math.max(
-			DEFAULTS.achievementRefreshSeconds,
-			pollSeconds * 2,
-		);
-		return refreshSeconds * 1000;
 	}
 
 	_ownedGamesRefreshMs(settings = this.settings) {
