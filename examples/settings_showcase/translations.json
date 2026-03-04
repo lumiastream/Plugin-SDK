@@ -2,6 +2,10 @@
 	"en": {
 		"save_count": "How many times settings were saved/updated.",
 		"last_saved_at": "Timestamp of the last settings save.",
-		"last_saved_values_json": "JSON snapshot of values saved most recently."
+		"last_saved_values_json": "JSON snapshot of values saved most recently.",
+		"settings_showcase_action_message": "Message returned from the passVariablesExample action.",
+		"settings_showcase_action_status": "Status returned from the passVariablesExample action.",
+		"settings_showcase_action_save_count": "Current save counter returned by the passVariablesExample action.",
+		"settings_showcase_action_snapshot": "Compact JSON snapshot returned by the passVariablesExample action."
 	}
 }

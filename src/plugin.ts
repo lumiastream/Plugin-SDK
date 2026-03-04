@@ -5,6 +5,7 @@ import {
   type PluginDisplayChatOptions,
   type PluginAuthValidationResponse,
   type PluginActionPayload,
+  type PluginActionResult,
   type PluginAIRequestOptions,
   type PluginAIResponse,
   type PluginAIModelsRequestOptions,
@@ -45,7 +46,7 @@ export abstract class Plugin {
    * Handle custom actions triggered from the UI or Lumia automations.
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async actions(_config: { actions: PluginActionPayload[]; extraSettings?: Record<string, unknown> }): Promise<void> {}
+  async actions(_config: { actions: PluginActionPayload[]; extraSettings?: Record<string, unknown> }): Promise<PluginActionResult | void> {}
 
   /**
    * Optional AI prompt handler used when `config.hasAI` is enabled.

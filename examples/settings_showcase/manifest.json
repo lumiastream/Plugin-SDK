@@ -504,8 +504,45 @@
 				"required": false,
 				"helperText": "Auto-filled by oauth.tokenKeys.tokenSecret."
 			}
-		],
-		"variables": [
+			],
+			"actions": [
+				{
+					"type": "passVariablesExample",
+					"label": "Pass Variables Example",
+					"description": "Demonstrates returning newlyPassedVariables from actions() for later actions in the same command.",
+					"acceptedVariables": [
+						"settings_showcase_action_message",
+						"settings_showcase_action_status",
+						"settings_showcase_action_save_count",
+						"settings_showcase_action_snapshot"
+					],
+					"fields": [
+						{
+							"key": "message",
+							"label": "Message",
+							"type": "text",
+							"defaultValue": "Hello from settings_showcase action",
+							"allowVariables": true,
+							"helperText": "Returned as settings_showcase_action_message."
+						},
+						{
+							"key": "includeSnapshot",
+							"label": "Include Snapshot",
+							"type": "switch",
+							"defaultValue": true,
+							"helperText": "When enabled, returns a compact JSON snapshot in settings_showcase_action_snapshot."
+						},
+						{
+							"key": "stopChain",
+							"label": "Stop Remaining Actions",
+							"type": "switch",
+							"defaultValue": false,
+							"helperText": "When enabled, actions() also returns shouldStop: true."
+						}
+					]
+				}
+			],
+			"variables": [
 			{
 				"name": "save_count",
 				"description": "How many times settings were saved/updated.",
