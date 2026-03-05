@@ -1,7 +1,7 @@
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.5",
+	"version": "1.0.6",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -80,6 +80,11 @@
 				"value": "Offline"
 			},
 			{
+				"name": "last_logoff",
+				"description": "Last logoff Unix timestamp.",
+				"value": 0
+			},
+			{
 				"name": "profile_url",
 				"description": "Profile URL.",
 				"value": ""
@@ -115,6 +120,16 @@
 				"value": 0
 			},
 			{
+				"name": "current_game_achievement_name",
+				"description": "Most recently unlocked current-game achievement name.",
+				"value": ""
+			},
+			{
+				"name": "current_game_achievement_description",
+				"description": "Most recently unlocked current-game achievement description.",
+				"value": ""
+			},
+			{
 				"name": "requested_game_appid",
 				"description": "App ID for the last requested game.",
 				"value": 0
@@ -146,6 +161,9 @@
 				"key": "online_state_changed",
 				"acceptedVariables": ["persona_username", "online_status"],
 				"defaultMessage": "{{persona_username}} is now {{online_status}}.",
+				"defaults": {
+					"on": false
+				},
 				"variationConditions": [
 					{
 						"type": "EQUAL_SELECTION",
@@ -192,13 +210,36 @@
 			},
 			{
 				"title": "Achievement Unlocked",
-				"key": "achievement_progress_changed",
+				"key": "achievement_unlocked",
 				"acceptedVariables": [
 					"current_game_name",
+					"achievement_name",
+					"achievement_description",
 					"current_game_achievement_unlocked_count",
 					"current_game_achievement_count"
 				],
-				"defaultMessage": "{{current_game_name}} achievements: {{current_game_achievement_unlocked_count}}/{{current_game_achievement_count}}."
+				"defaultMessage": "{{current_game_name}}: {{achievement_name}} - {{achievement_description}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Achievement Name"
+					}
+				]
+			},
+			{
+				"title": "Achievement Progress Changed",
+				"key": "achievement_progress_changed",
+				"acceptedVariables": [
+					"current_game_name",
+					"achievement_name",
+					"achievement_description",
+					"current_game_achievement_unlocked_count",
+					"current_game_achievement_count"
+				],
+				"defaultMessage": "{{current_game_name}} achievements: {{current_game_achievement_unlocked_count}}/{{current_game_achievement_count}}.",
+				"defaults": {
+					"on": false
+				}
 			},
 			{
 				"title": "Game Changed",
