@@ -1,7 +1,7 @@
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.6",
+	"version": "1.0.7",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -17,6 +17,8 @@
 				"key": "apiKey",
 				"label": "Steam Web API Key",
 				"type": "password",
+				"section": "General",
+				"sectionOrder": 1,
 				"helperText": "Required for all Steam Web API requests.",
 				"required": true
 			},
@@ -24,6 +26,8 @@
 				"key": "steamIdOrVanity",
 				"label": "Steam ID or Vanity Name",
 				"type": "text",
+				"section": "General",
+				"sectionOrder": 1,
 				"helperText": "Enter a SteamID64 or a vanity URL name.",
 				"required": true
 			},
@@ -31,17 +35,22 @@
 				"key": "pollInterval",
 				"label": "Poll Interval (seconds)",
 				"type": "number",
+				"section": "General",
+				"sectionOrder": 1,
 				"defaultValue": 15,
 				"min": 15,
 				"max": 900,
 				"helperText": "How often to refresh current status/game and current-game achievements (15-900 seconds). Owned games refresh less frequently automatically."
 			},
 			{
-				"key": "alertGameChangedWhenStopped",
-				"label": "Alert When Game Stops",
+				"key": "debugLogs",
+				"label": "Enable Debug Logs",
 				"type": "checkbox",
-				"defaultValue": true,
-				"helperText": "When enabled, Game Changed alerts also trigger when you stop playing."
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"defaultValue": false,
+				"refreshOnChange": true,
+				"helperText": "Writes detailed Steam plugin diagnostics to Lumia logs for troubleshooting."
 			}
 		],
 		"settings_tutorial": "./settings_tutorial.md",
@@ -178,31 +187,6 @@
 								"label": "Offline",
 								"value": "offline",
 								"message": "{{persona_username}} went Offline."
-							},
-							{
-								"label": "Busy",
-								"value": "busy",
-								"message": "{{persona_username}} is Busy."
-							},
-							{
-								"label": "Away",
-								"value": "away",
-								"message": "{{persona_username}} is Away."
-							},
-							{
-								"label": "Snooze",
-								"value": "snooze",
-								"message": "{{persona_username}} is Snoozing."
-							},
-							{
-								"label": "Looking To Trade",
-								"value": "trade",
-								"message": "{{persona_username}} is Looking to Trade."
-							},
-							{
-								"label": "Looking To Play",
-								"value": "play",
-								"message": "{{persona_username}} is Looking to Play."
 							}
 						]
 					}
@@ -250,6 +234,18 @@
 					{
 						"type": "EQUAL_STRING",
 						"description": "Game Name"
+					}
+				]
+			},
+			{
+				"title": "Game Over",
+				"key": "current_game_over",
+				"acceptedVariables": ["previous_game_name"],
+				"defaultMessage": "Stopped playing {{previous_game_name}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Previous Game Name"
 					}
 				]
 			}

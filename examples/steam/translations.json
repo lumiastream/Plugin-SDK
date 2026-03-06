@@ -2,7 +2,7 @@
 	"en": {
 		"steamid": "SteamID64.",
 		"persona_username": "Username (Steam persona name).",
-		"online_status": "Online status (text).",
+		"online_status": "Online status (Online or Offline).",
 		"last_logoff": "Last logoff Unix timestamp.",
 		"profile_url": "Profile URL.",
 		"avatar": "Avatar URL.",

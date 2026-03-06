@@ -17,6 +17,7 @@ const ALERT_KEYS = {
 	achievementUnlocked: "achievement_unlocked",
 	achievementProgressChanged: "achievement_progress_changed",
 	currentGameChanged: "current_game_changed",
+	currentGameOver: "current_game_over",
 };
 
 const VARIABLE_NAMES = {
@@ -179,6 +180,25 @@ class SteamPlugin extends Plugin {
 		await this._log(message, severity);
 	}
 
+	async _tempDebug(message, { throttleKey = "", intervalMs = 30 * 1000 } = {}) {
+		if (!this._debugEnabled()) {
+			return;
+		}
+
+		const prefixed = `[TEMP DEBUG] ${message}`;
+		if (throttleKey) {
+			await this._logThrottled(
+				`temp-debug:${throttleKey}`,
+				prefixed,
+				"info",
+				intervalMs,
+			);
+			return;
+		}
+
+		await this._log(prefixed, "info");
+	}
+
 	async _refreshData({ reason } = {}) {
 		if (!this._hasRequiredSettings()) {
 			await this._updateConnectionState(false);
@@ -236,6 +256,33 @@ class SteamPlugin extends Plugin {
 						this._fetchAchievements(steamId, achievementAppId),
 					);
 				}
+
+				const currentGameName = this._coerceString(
+					summaryResult?.data?.gameextrainfo,
+					"",
+				);
+				const achievementEntries = Array.isArray(
+					achievementsResult?.data?.playerstats?.achievements,
+				)
+					? achievementsResult.data.playerstats.achievements
+					: [];
+				const achievementCount = achievementEntries.length;
+				const unlockedCount = achievementEntries.filter(
+					(achievement) => achievement?.achieved === 1,
+				).length;
+				const achievementSnapshot = this._summarizeAchievements(
+					achievementEntries,
+					40,
+				);
+				await this._tempDebug(
+					`refresh reason=${reason ?? "unknown"} steamId=${steamId} game='${currentGameName || "none"}' appId=${achievementAppId || 0} summaryOk=${summaryResult.ok} ownedFetched=${shouldFetchOwned} ownedOk=${ownedResult.ok} achievementsFetched=${shouldFetchAchievements} achievementsOk=${shouldFetchAchievements ? achievementsResult.ok : "skipped"} unlocked=${unlockedCount}/${achievementCount} achievements='${achievementSnapshot || "none"}'`,
+					{
+						throttleKey: `refresh:${achievementAppId || 0}:${
+							currentGameName || "none"
+						}:${unlockedCount}/${achievementCount}`,
+						intervalMs: 15 * 1000,
+					},
+				);
 
 				await this._applySummary(summaryResult.data, steamId);
 				if (shouldFetchOwned) {
@@ -350,7 +397,7 @@ class SteamPlugin extends Plugin {
 
 		const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?key=${encodeURIComponent(
 			this._apiKey(),
-		)}&steamid=${encodeURIComponent(steamId)}&appid=${targetAppId}`;
+		)}&steamid=${encodeURIComponent(steamId)}&appid=${targetAppId}&l=en&_=${Date.now()}`;
 		return this._fetchJson(url);
 	}
 
@@ -383,6 +430,14 @@ class SteamPlugin extends Plugin {
 
 	async _fetchJson(url) {
 		let response = await this._request(url);
+		if (url.includes("/ISteamUserStats/GetPlayerAchievements/")) {
+			const appIdMatch = url.match(/[?&]appid=(\d+)/);
+			const appId = appIdMatch?.[1] ?? "unknown";
+			await this._tempDebug(
+				`achievement_http appId=${appId} status=${response.status} cacheControl='${this._coerceString(response.headers.get("cache-control"), "")}' age='${this._coerceString(response.headers.get("age"), "")}' etag='${this._coerceString(response.headers.get("etag"), "")}'`,
+				{ throttleKey: `achievement-http:${appId}:${response.status}`, intervalMs: 10 * 1000 },
+			);
+		}
 
 		if (response.status === 429) {
 			const retryAfter = this._coerceNumber(
@@ -415,9 +470,11 @@ class SteamPlugin extends Plugin {
 		const headers = {
 			Accept: "application/json",
 			"User-Agent": DEFAULTS.userAgent,
+			"Cache-Control": "no-cache, no-store, max-age=0",
+			Pragma: "no-cache",
 		};
 
-		return fetch(url, { headers });
+		return fetch(url, { headers, cache: "no-store" });
 	}
 
 	async _applySummary(summary, steamId) {
@@ -638,21 +695,23 @@ class SteamPlugin extends Plugin {
 			Boolean(currentGameAppId) &&
 			(previousGameAppId === null || currentGameAppId !== previousGameAppId);
 		const changedToNoGame =
-			!currentGameAppId &&
-			previousGameAppId !== null &&
-			Boolean(this.settings?.alertGameChangedWhenStopped ?? true);
+			!currentGameAppId && previousGameAppId !== null;
 
-		if (changedToNewGame || changedToNoGame) {
-			const dynamicValue = changedToNoGame
-				? "Stopped Playing"
-				: alertVars.current_game_name;
+		if (changedToNewGame) {
 			await this.lumia.triggerAlert({
 				alert: ALERT_KEYS.currentGameChanged,
 				...this._buildAlertPayload(alertVars, {
-					dynamicValue,
-					extraSettings: changedToNoGame
-						? { previous_game_name: previousGameName ?? "" }
-						: undefined,
+					dynamicValue: alertVars.current_game_name,
+				}),
+			});
+		}
+
+		if (changedToNoGame) {
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.currentGameOver,
+				...this._buildAlertPayload(alertVars, {
+					dynamicValue: previousGameName || "Stopped Playing",
+					extraSettings: { previous_game_name: previousGameName ?? "" },
 				}),
 			});
 		}
@@ -768,6 +827,9 @@ class SteamPlugin extends Plugin {
 		}
 
 		const steamId = await this._resolveSteamId();
+		await this._tempDebug(
+			`fetch_game input='${gameInput}' steamId=${steamId}`,
+		);
 		let appId = null;
 		let gameName = "";
 
@@ -782,9 +844,24 @@ class SteamPlugin extends Plugin {
 			const games = Array.isArray(ownedGames?.response?.games)
 				? ownedGames.response.games
 				: [];
+			const ownedSample = games
+				.slice(0, 5)
+				.map((game) => this._coerceString(game?.name, ""))
+				.filter(Boolean)
+				.join(" | ");
+			await this._tempDebug(
+				`fetch_game ownedGamesCount=${games.length} sample='${ownedSample}'`,
+			);
 			if (!appId) {
 				const match = this._resolveGameFromOwnedGames(games, gameInput);
 				if (!match) {
+					const ranked = this._rankGameMatches(games, gameInput)
+						.slice(0, 5)
+						.map((item) => `${item.name} (${item.appid}) score=${item.score}`)
+						.join(" | ");
+					await this._tempDebug(
+						`fetch_game no_match input='${gameInput}' topMatches='${ranked || "none"}'`,
+					);
 					await this._log(`No close match found for '${gameInput}'.`, "warn");
 					await this._showActionToast(
 						`No owned game matched '${gameInput}'.`,
@@ -812,12 +889,26 @@ class SteamPlugin extends Plugin {
 			);
 			return;
 		}
+		await this._tempDebug(
+			`fetch_game resolved appId=${appId} gameName='${gameName || "unknown"}'`,
+		);
 
 		const achievements = await this._fetchAchievements(steamId, appId);
 		const list = Array.isArray(achievements?.playerstats?.achievements)
 			? achievements.playerstats.achievements
 			: [];
 		const unlocked = list.filter((a) => a?.achieved === 1).length;
+		const achievementSnapshot = this._summarizeAchievements(list, 80);
+		const playerStatsSuccess = achievements?.playerstats?.success;
+		const playerStatsGameName = this._coerceString(
+			achievements?.playerstats?.gameName,
+			"",
+		);
+		await this._tempDebug(
+			`fetch_game achievements appId=${appId} playerStatsSuccess=${
+				playerStatsSuccess === undefined ? "undefined" : playerStatsSuccess
+			} gameName='${playerStatsGameName || gameName || "unknown"}' unlocked=${unlocked}/${list.length} achievements='${achievementSnapshot || "none"}'`,
+		);
 
 		await this._setVariableIfChanged(VARIABLE_NAMES.requestedGameAppId, appId);
 		await this._setVariableIfChanged(
@@ -901,17 +992,34 @@ class SteamPlugin extends Plugin {
 			.trim();
 	}
 
+	_summarizeAchievementEntry(achievement) {
+		const key = this._coerceString(
+			achievement?.apiname ?? achievement?.name ?? achievement?.displayName,
+			"unknown",
+		).trim();
+		const achieved = achievement?.achieved === 1 ? 1 : 0;
+		return `${key}:${achieved}`;
+	}
+
+	_summarizeAchievements(achievementList, limit = 40) {
+		if (!Array.isArray(achievementList) || !achievementList.length) {
+			return "";
+		}
+
+		const max = Math.max(1, this._coerceNumber(limit, 40));
+		const limited = achievementList.slice(0, max);
+		const summary = limited
+			.map((achievement) => this._summarizeAchievementEntry(achievement))
+			.join(", ");
+		const remaining = achievementList.length - limited.length;
+		if (remaining > 0) {
+			return `${summary} ... +${remaining} more`;
+		}
+		return summary;
+	}
+
 	_mapPersonaState(value) {
-		const map = {
-			0: "Offline",
-			1: "Online",
-			2: "Busy",
-			3: "Away",
-			4: "Snooze",
-			5: "Looking to Trade",
-			6: "Looking to Play",
-		};
-		return map[value] ?? "Offline";
+		return this._coerceNumber(value, 0) === 0 ? "Offline" : "Online";
 	}
 
 	_buildAlertVariables({
@@ -1071,6 +1179,10 @@ class SteamPlugin extends Plugin {
 			pollSeconds * 5,
 		);
 		return refreshSeconds * 1000;
+	}
+
+	_debugEnabled(settings = this.settings) {
+		return Boolean(settings?.debugLogs);
 	}
 
 	async _updateConnectionState(state) {
