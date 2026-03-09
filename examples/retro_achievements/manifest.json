@@ -1,0 +1,217 @@
+{
+	"id": "retro_achievements",
+	"name": "RetroAchievements",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Track RetroAchievements profile stats, recently played games, and unlocked achievements in Lumia.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "games",
+	"keywords": "retroachievements, retro gaming, achievements, hardcore mode",
+	"icon": "retro_achievements.png",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "RetroAchievements Web API Key",
+				"type": "password",
+				"section": "General",
+				"sectionOrder": 1,
+				"required": true,
+				"helperText": "Get this key from your RetroAchievements account settings."
+			},
+			{
+				"key": "username",
+				"label": "RetroAchievements Username",
+				"type": "text",
+				"section": "General",
+				"sectionOrder": 1,
+				"required": true,
+				"helperText": "Your exact RetroAchievements username."
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"section": "General",
+				"sectionOrder": 1,
+				"defaultValue": 30,
+				"min": 15,
+				"max": 900,
+				"helperText": "How often to refresh profile/game data (15-900 seconds)."
+			},
+			{
+				"key": "debugLogs",
+				"label": "Enable Debug Logs",
+				"type": "checkbox",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"defaultValue": false,
+				"refreshOnChange": true,
+				"helperText": "Writes detailed RetroAchievements diagnostics to Lumia logs."
+			}
+		],
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
+		"actions": [
+			{
+				"type": "refresh",
+				"label": "Refresh Now",
+				"description": "Force an immediate profile and achievement refresh.",
+				"fields": []
+			},
+			{
+				"type": "fetch_game",
+				"label": "Fetch Game Progress",
+				"description": "Fetch progress by game title (recently played) or game ID.",
+				"acceptedVariables": [
+					"retro_achievements_username",
+					"retro_achievements_requested_game_id",
+					"retro_achievements_requested_game_title",
+					"retro_achievements_requested_game_console",
+					"retro_achievements_requested_game_icon",
+					"retro_achievements_requested_game_achievement_total",
+					"retro_achievements_requested_game_achievement_unlocked",
+					"retro_achievements_requested_game_achievement_unlocked_hardcore",
+					"retro_achievements_requested_game_completion",
+					"retro_achievements_requested_game_payload"
+				],
+				"fields": [
+					{
+						"key": "game",
+						"label": "Game Title or Game ID",
+						"type": "text",
+						"placeholder": "ex: Super Mario World or 228",
+						"allowVariables": true,
+						"helperText": "Title matching uses your recently played list."
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "total_points",
+				"description": "Total hardcore points.",
+				"value": 0
+			},
+			{
+				"name": "total_softcore_points",
+				"description": "Total softcore points.",
+				"value": 0
+			},
+			{
+				"name": "total_true_points",
+				"description": "Total true points.",
+				"value": 0
+			},
+			{
+				"name": "total_rank",
+				"description": "Global rank.",
+				"value": 0
+			},
+			{
+				"name": "last_game_id",
+				"description": "Most recent game ID from profile.",
+				"value": 0
+			},
+			{
+				"name": "last_game_title",
+				"description": "Most recent game title from profile.",
+				"value": ""
+			},
+			{
+				"name": "last_game_console",
+				"description": "Console name for last game (when available).",
+				"value": ""
+			},
+			{
+				"name": "last_game_icon",
+				"description": "Game icon URL for last game.",
+				"value": ""
+			},
+			{
+				"name": "last_game_achievement_total",
+				"description": "Total achievements in the last game.",
+				"value": 0
+			},
+			{
+				"name": "last_game_achievement_unlocked",
+				"description": "Unlocked achievements in the last game.",
+				"value": 0
+			},
+			{
+				"name": "last_game_achievement_unlocked_hardcore",
+				"description": "Hardcore unlocked achievements in the last game.",
+				"value": 0
+			},
+			{
+				"name": "last_game_completion",
+				"description": "Completion percentage text from API.",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Current Game Changed",
+				"key": "current_game_changed",
+				"acceptedVariables": [
+					"username",
+					"last_game_id",
+					"last_game_title",
+					"last_game_console",
+					"last_game_icon",
+					"previous_game_id",
+					"previous_game_title"
+				],
+				"defaultMessage": "{{username}} is now playing {{last_game_title}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Game Title"
+					}
+				]
+			},
+			{
+				"title": "Achievement Unlocked",
+				"key": "achievement_unlocked",
+				"acceptedVariables": [
+					"username",
+					"game_id",
+					"game_title",
+					"game_console",
+					"achievement_id",
+					"achievement_title",
+					"achievement_description",
+					"achievement_points",
+					"achievement_hardcore",
+					"achievement_date_awarded",
+					"achievement_badge_url",
+					"game_achievement_total",
+					"game_achievement_unlocked"
+				],
+				"defaultMessage": "{{username}} unlocked {{achievement_title}} in {{game_title}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Achievement Title"
+					}
+				]
+			},
+			{
+				"title": "Hardcore Achievement",
+				"key": "hardcore_achievement_unlocked",
+				"acceptedVariables": [
+					"username",
+					"game_title",
+					"achievement_title",
+					"achievement_points",
+					"achievement_badge_url"
+				],
+				"defaultMessage": "{{username}} hardcore unlocked {{achievement_title}} in {{game_title}}."
+			}
+		],
+		"translations": "./translations.json"
+	}
+}

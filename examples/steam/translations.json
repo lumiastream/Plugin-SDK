@@ -12,11 +12,6 @@
 		"current_game_achievement_count": "Total achievements for the current/last played game.",
 		"current_game_achievement_unlocked_count": "Unlocked achievements for the current/last played game.",
 		"current_game_achievement_name": "Most recently unlocked current-game achievement name.",
-		"current_game_achievement_description": "Most recently unlocked current-game achievement description.",
-		"requested_game_appid": "App ID for the last requested game.",
-		"requested_game_name": "Name for the last requested game.",
-		"requested_game_achievement_count": "Total achievements for the last requested game.",
-		"requested_game_achievement_unlocked": "Unlocked achievements for the last requested game.",
-		"requested_game_achievements": "JSON payload of achievements for the last requested game."
+		"current_game_achievement_description": "Most recently unlocked current-game achievement description."
 	}
 }

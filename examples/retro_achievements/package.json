@@ -1,0 +1,11 @@
+{
+	"name": "lumia-plugin-retro-achievements",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin for RetroAchievements profile and achievement tracking.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.1"
+	}
+}

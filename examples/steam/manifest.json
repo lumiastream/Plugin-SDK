@@ -1,7 +1,7 @@
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.7",
+	"version": "1.0.8",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -60,6 +60,14 @@
 				"type": "fetch_game",
 				"label": "Fetch Achievements For Game",
 				"description": "Fetch achievements by game name or App ID (owned games only).",
+				"acceptedVariables": [
+					"steam_requested_game_input",
+					"steam_requested_game_appid",
+					"steam_requested_game_name",
+					"steam_requested_game_achievement_count",
+					"steam_requested_game_achievement_unlocked",
+					"steam_requested_game_achievements"
+				],
 				"fields": [
 					{
 						"key": "game",
@@ -136,31 +144,6 @@
 			{
 				"name": "current_game_achievement_description",
 				"description": "Most recently unlocked current-game achievement description.",
-				"value": ""
-			},
-			{
-				"name": "requested_game_appid",
-				"description": "App ID for the last requested game.",
-				"value": 0
-			},
-			{
-				"name": "requested_game_name",
-				"description": "Name for the last requested game.",
-				"value": ""
-			},
-			{
-				"name": "requested_game_achievement_count",
-				"description": "Total achievements for the last requested game.",
-				"value": 0
-			},
-			{
-				"name": "requested_game_achievement_unlocked",
-				"description": "Unlocked achievements for the last requested game.",
-				"value": 0
-			},
-			{
-				"name": "requested_game_achievements",
-				"description": "JSON payload of achievements for the last requested game.",
 				"value": ""
 			}
 		],

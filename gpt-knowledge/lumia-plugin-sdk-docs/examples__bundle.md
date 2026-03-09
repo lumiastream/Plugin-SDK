@@ -12514,6 +12514,1556 @@ module.exports = OpenRGBPlugin;
 
 ```
 
+## retro_achievements/actions_tutorial.md
+
+```
+---
+### Refresh Now
+Runs an immediate RetroAchievements refresh cycle.
+
+### Fetch Game Progress
+Use **Fetch Game Progress** with either:
+- A numeric game ID, or
+- A title from your recently played list.
+
+The action triggers the **Requested Game Progress** alert with local `requested_game_*` variables.
+---
+
+```
+
+## retro_achievements/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const DEFAULTS = {
+	pollInterval: 30,
+	minPollInterval: 15,
+	maxPollInterval: 900,
+	recentAchievementsWindowMinutes: 120,
+	recentPlayedCount: 100,
+	userAgent: "LumiaStream RetroAchievements Plugin/1.0.0",
+	logThrottleMs: 5 * 60 * 1000,
+	matchThreshold: 0.7,
+	maxSeenUnlocks: 2000,
+};
+
+const RA_API_BASE = "https://retroachievements.org/API";
+const RA_SITE_BASE = "https://retroachievements.org";
+
+const ALERT_KEYS = {
+	currentGameChanged: "current_game_changed",
+	achievementUnlocked: "achievement_unlocked",
+	hardcoreAchievementUnlocked: "hardcore_achievement_unlocked",
+};
+
+const VARIABLE_NAMES = {
+	totalPoints: "total_points",
+	totalSoftcorePoints: "total_softcore_points",
+	totalTruePoints: "total_true_points",
+	totalRank: "total_rank",
+	lastGameId: "last_game_id",
+	lastGameTitle: "last_game_title",
+	lastGameConsole: "last_game_console",
+	lastGameIcon: "last_game_icon",
+	lastGameAchievementTotal: "last_game_achievement_total",
+	lastGameAchievementUnlocked: "last_game_achievement_unlocked",
+	lastGameAchievementUnlockedHardcore: "last_game_achievement_unlocked_hardcore",
+	lastGameCompletion: "last_game_completion",
+};
+
+const ACTION_VARIABLE_NAMES = {
+	username: "retro_achievements_username",
+	requestedGameId: "retro_achievements_requested_game_id",
+	requestedGameTitle: "retro_achievements_requested_game_title",
+	requestedGameConsole: "retro_achievements_requested_game_console",
+	requestedGameIcon: "retro_achievements_requested_game_icon",
+	requestedGameAchievementTotal:
+		"retro_achievements_requested_game_achievement_total",
+	requestedGameAchievementUnlocked:
+		"retro_achievements_requested_game_achievement_unlocked",
+	requestedGameAchievementUnlockedHardcore:
+		"retro_achievements_requested_game_achievement_unlocked_hardcore",
+	requestedGameCompletion: "retro_achievements_requested_game_completion",
+	requestedGamePayload: "retro_achievements_requested_game_payload",
+};
+
+class RetroAchievementsPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._pollTimer = null;
+		this._refreshPromise = null;
+		this._lastConnectionState = null;
+		this._lastVariables = new Map();
+		this._logTimestamps = new Map();
+		this._hasInitialSync = false;
+		this._lastGameId = null;
+		this._lastGameTitle = "";
+		this._seenUnlockKeys = new Set();
+		this._seenUnlockOrder = [];
+	}
+
+	async onload() {
+		if (!this._hasRequiredSettings()) {
+			await this._log("Missing RetroAchievements API key or username.", "warn");
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		await this._refreshData({ reason: "startup" });
+		this._schedulePolling();
+	}
+
+	async onunload() {
+		this._clearPolling();
+		await this._updateConnectionState(false);
+	}
+
+	async onsettingsupdate(settings = {}, previous = {}) {
+		const pollChanged =
+			this._pollIntervalSeconds(settings) !== this._pollIntervalSeconds(previous);
+		const authChanged =
+			this._coerceString(settings?.apiKey, "") !==
+				this._coerceString(previous?.apiKey, "") ||
+			this._coerceString(settings?.username, "").trim().toLowerCase() !==
+				this._coerceString(previous?.username, "").trim().toLowerCase();
+
+		if (pollChanged) {
+			this._schedulePolling();
+		}
+
+		if (authChanged) {
+			this._resetRuntimeState();
+		}
+
+		await this._refreshData({ reason: "settings-update" });
+	}
+
+	async actions(config = {}) {
+		const actions = Array.isArray(config.actions) ? config.actions : [];
+		const newlyPassedVariables = {};
+		for (const action of actions) {
+			try {
+				switch (action?.type) {
+					case "refresh":
+						await this._refreshData({ reason: "manual-action" });
+						break;
+					case "fetch_game":
+						this._mergeActionVariables(
+							newlyPassedVariables,
+							await this._handleFetchGame(action?.value || {}),
+						);
+						break;
+					default:
+						break;
+				}
+			} catch (error) {
+				await this._log(
+					`Action ${this._coerceString(action?.type, "unknown")} failed: ${this._errorMessage(error)}`,
+					"error",
+				);
+			}
+		}
+
+		if (Object.keys(newlyPassedVariables).length) {
+			return { newlyPassedVariables };
+		}
+	}
+
+	async validateAuth(data = {}) {
+		const apiKey = this._coerceString(data?.apiKey, this._apiKey()).trim();
+		const username = this._coerceString(data?.username, this._username()).trim();
+		if (!apiKey || !username) {
+			return false;
+		}
+
+		try {
+			const profile = await this._fetchUserProfile({ apiKey, username });
+			return Boolean(this._coerceString(profile?.User, "").trim());
+		} catch (error) {
+			await this._log(
+				`RetroAchievements validation failed: ${this._errorMessage(error)}`,
+				"warn",
+			);
+			return false;
+		}
+	}
+
+	_tag() {
+		return `[${this.manifest?.id ?? "retro_achievements"}]`;
+	}
+
+	async _log(message, severity = "info") {
+		const prefix = this._tag();
+		let decorated = `${prefix} ${message}`;
+		if (severity === "warn") {
+			decorated = `${prefix} WARN ${message}`;
+		}
+		if (severity === "error") {
+			decorated = `${prefix} ERROR ${message}`;
+		}
+		await this.lumia.log(decorated);
+	}
+
+	async _logThrottled(
+		key,
+		message,
+		severity = "info",
+		intervalMs = DEFAULTS.logThrottleMs,
+	) {
+		const now = Date.now();
+		const last = this._logTimestamps.get(key) ?? 0;
+		if (now - last < intervalMs) {
+			return;
+		}
+		this._logTimestamps.set(key, now);
+		await this._log(message, severity);
+	}
+
+	async _tempDebug(message, { throttleKey = "", intervalMs = 20 * 1000 } = {}) {
+		if (!this._debugEnabled()) {
+			return;
+		}
+
+		if (throttleKey) {
+			await this._logThrottled(
+				`debug:${throttleKey}`,
+				`[debug] ${message}`,
+				"info",
+				intervalMs,
+			);
+			return;
+		}
+
+		await this._log(`[debug] ${message}`);
+	}
+
+	_resetRuntimeState() {
+		this._hasInitialSync = false;
+		this._lastGameId = null;
+		this._lastGameTitle = "";
+		this._seenUnlockKeys.clear();
+		this._seenUnlockOrder = [];
+	}
+
+	async _refreshData({ reason = "poll" } = {}) {
+		if (!this._hasRequiredSettings()) {
+			await this._updateConnectionState(false);
+			return;
+		}
+
+		if (this._refreshPromise) {
+			return this._refreshPromise;
+		}
+
+		this._refreshPromise = (async () => {
+			try {
+				const profile = await this._fetchUserProfile();
+				const currentGameId = this._profileLastGameId(profile);
+
+				const recentPlayedResult = await this._safeFetch("recently played games", () =>
+					this._fetchRecentlyPlayedGames(),
+				);
+				const recentAchievementsResult = await this._safeFetch(
+					"recent achievements",
+					() => this._fetchRecentAchievements(),
+				);
+				const gameProgressResult = currentGameId
+					? await this._safeFetch("current game progress", () =>
+							this._fetchGameInfoAndUserProgress(currentGameId),
+						)
+					: { ok: false, data: null };
+
+				const currentGame = this._findRecentlyPlayedGame(
+					recentPlayedResult.data,
+					currentGameId,
+				);
+				const sortedRecentAchievements = this._sortRecentAchievements(
+					recentAchievementsResult.data,
+				);
+
+				await this._applyProfile(profile, currentGame);
+				await this._applyGameProgress(gameProgressResult.data, currentGame);
+
+				await this._emitAlerts({
+					profile,
+					currentGame,
+					gameProgress: gameProgressResult.data,
+					recentAchievements: sortedRecentAchievements,
+				});
+
+				await this._tempDebug(
+					`refresh reason=${reason} user=${this._profileUser(profile)} gameId=${currentGameId} recentUnlocks=${sortedRecentAchievements.length} points=${this._profileTotalPoints(profile)}/${this._profileSoftcorePoints(profile)}/${this._profileTruePoints(profile)}`,
+					{
+						throttleKey: `refresh:${currentGameId}:${sortedRecentAchievements.length}`,
+						intervalMs: 15 * 1000,
+					},
+				);
+
+				await this._updateConnectionState(true);
+			} catch (error) {
+				await this._logThrottled(
+					"refresh-failed",
+					`RetroAchievements refresh failed: ${this._errorMessage(error)}`,
+					"warn",
+				);
+				await this._updateConnectionState(false);
+			}
+
+			this._refreshPromise = null;
+		})();
+
+		return this._refreshPromise;
+	}
+
+	async _fetchUserProfile(overrides = {}) {
+		const apiKey = this._coerceString(overrides.apiKey, this._apiKey()).trim();
+		const username = this._coerceString(overrides.username, this._username()).trim();
+
+		const query = new URLSearchParams({
+			y: apiKey,
+			u: username,
+		});
+		const url = `${RA_API_BASE}/API_GetUserProfile.php?${query.toString()}`;
+		const response = await this._fetchJson(url);
+		if (!response || typeof response !== "object" || Array.isArray(response)) {
+			throw new Error("Unexpected profile response from RetroAchievements API.");
+		}
+		if (!this._profileUser(response)) {
+			throw new Error("RetroAchievements profile response did not include a user.");
+		}
+		return response;
+	}
+
+	async _fetchRecentlyPlayedGames() {
+		const query = new URLSearchParams({
+			y: this._apiKey(),
+			u: this._username(),
+			c: String(DEFAULTS.recentPlayedCount),
+		});
+		const url = `${RA_API_BASE}/API_GetUserRecentlyPlayedGames.php?${query.toString()}`;
+		const response = await this._fetchJson(url);
+		if (Array.isArray(response)) {
+			return response;
+		}
+		return [];
+	}
+
+	async _fetchRecentAchievements() {
+		const query = new URLSearchParams({
+			y: this._apiKey(),
+			u: this._username(),
+			m: String(DEFAULTS.recentAchievementsWindowMinutes),
+		});
+		const url = `${RA_API_BASE}/API_GetUserRecentAchievements.php?${query.toString()}`;
+		const response = await this._fetchJson(url);
+		if (Array.isArray(response)) {
+			return response;
+		}
+		return [];
+	}
+
+	async _fetchGameInfoAndUserProgress(gameId) {
+		const targetGameId = this._coerceNumber(gameId, 0);
+		if (!targetGameId) {
+			return null;
+		}
+
+		const query = new URLSearchParams({
+			y: this._apiKey(),
+			u: this._username(),
+			g: String(targetGameId),
+		});
+		const url = `${RA_API_BASE}/API_GetGameInfoAndUserProgress.php?${query.toString()}`;
+		const response = await this._fetchJson(url);
+		if (!response || typeof response !== "object" || Array.isArray(response)) {
+			return null;
+		}
+		return response;
+	}
+
+	async _fetchJson(url) {
+		const response = await this._request(url);
+		if (!response.ok) {
+			const body = await response.text();
+			throw new Error(
+				`RetroAchievements API error (${response.status}) on ${url}: ${this._truncateError(body) || "No response body"}`,
+			);
+		}
+
+		const payload = await response.json();
+		if (
+			payload &&
+			typeof payload === "object" &&
+			!Array.isArray(payload) &&
+			this._coerceString(payload.Error, "")
+		) {
+			throw new Error(this._coerceString(payload.Error, "RetroAchievements API error"));
+		}
+		return payload;
+	}
+
+	async _request(url) {
+		const headers = {
+			Accept: "application/json",
+			"User-Agent": DEFAULTS.userAgent,
+			"Cache-Control": "no-cache, no-store, max-age=0",
+			Pragma: "no-cache",
+		};
+
+		return fetch(url, { headers, cache: "no-store" });
+	}
+
+	async _applyProfile(profile, currentGame = null) {
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.totalPoints,
+			this._profileTotalPoints(profile),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.totalSoftcorePoints,
+			this._profileSoftcorePoints(profile),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.totalTruePoints,
+			this._profileTruePoints(profile),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.totalRank,
+			this._profileRank(profile),
+		);
+
+		const lastGameId = this._profileLastGameId(profile);
+		await this._setVariableIfChanged(VARIABLE_NAMES.lastGameId, lastGameId);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastGameTitle,
+			this._profileLastGameTitle(
+				profile,
+				this._coerceString(currentGame?.Title, ""),
+			),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastGameConsole,
+			this._coerceString(currentGame?.ConsoleName, ""),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastGameIcon,
+			this._absoluteImageUrl(currentGame?.ImageIcon),
+		);
+	}
+
+	async _applyGameProgress(progress, currentGame = null) {
+		if (!progress) {
+			await this._setVariableIfChanged(VARIABLE_NAMES.lastGameAchievementTotal, 0);
+			await this._setVariableIfChanged(VARIABLE_NAMES.lastGameAchievementUnlocked, 0);
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.lastGameAchievementUnlockedHardcore,
+				0,
+			);
+			await this._setVariableIfChanged(VARIABLE_NAMES.lastGameCompletion, "");
+			return;
+		}
+
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastGameAchievementTotal,
+			this._coerceNumber(progress?.NumPossibleAchievements, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastGameAchievementUnlocked,
+			this._coerceNumber(progress?.NumAchieved, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastGameAchievementUnlockedHardcore,
+			this._coerceNumber(progress?.NumAchievedHardcore, 0),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.lastGameCompletion,
+			this._coerceString(progress?.UserCompletion, ""),
+		);
+
+		const resolvedTitle = this._coerceString(
+			progress?.Title,
+			this._coerceString(currentGame?.Title, ""),
+		);
+		if (resolvedTitle) {
+			await this._setVariableIfChanged(VARIABLE_NAMES.lastGameTitle, resolvedTitle);
+		}
+
+		const resolvedConsole = this._coerceString(
+			progress?.ConsoleName,
+			this._coerceString(currentGame?.ConsoleName, ""),
+		);
+		if (resolvedConsole) {
+			await this._setVariableIfChanged(VARIABLE_NAMES.lastGameConsole, resolvedConsole);
+		}
+
+		const resolvedIcon = this._absoluteImageUrl(progress?.ImageIcon || currentGame?.ImageIcon);
+		if (resolvedIcon) {
+			await this._setVariableIfChanged(VARIABLE_NAMES.lastGameIcon, resolvedIcon);
+		}
+	}
+
+	async _emitAlerts({
+		profile,
+		currentGame,
+		gameProgress,
+		recentAchievements = [],
+	}) {
+		const lastGameId = this._profileLastGameId(profile);
+		const lastGameTitle = this._profileLastGameTitle(
+			profile,
+			this._coerceString(currentGame?.Title, ""),
+		);
+
+		if (!this._hasInitialSync) {
+			for (const achievement of recentAchievements) {
+				this._rememberRecentAchievementKey(this._buildRecentAchievementKey(achievement));
+			}
+			this._lastGameId = lastGameId;
+			this._lastGameTitle = lastGameTitle;
+			this._hasInitialSync = true;
+			return;
+		}
+
+		if (
+			this._lastGameId !== null &&
+			lastGameId > 0 &&
+			lastGameId !== this._lastGameId
+		) {
+			const vars = this._buildCurrentGameAlertVariables({
+				profile,
+				currentGame,
+				gameProgress,
+			});
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.currentGameChanged,
+				...this._buildAlertPayload(vars, {
+					dynamicValue: vars.last_game_title,
+					previous_game_id: this._lastGameId,
+					previous_game_title: this._lastGameTitle,
+				}),
+			});
+		}
+
+		const newUnlocks = [];
+		for (const achievement of recentAchievements) {
+			const key = this._buildRecentAchievementKey(achievement);
+			if (!key || this._seenUnlockKeys.has(key)) {
+				continue;
+			}
+			this._rememberRecentAchievementKey(key);
+			newUnlocks.push(achievement);
+		}
+
+		for (const achievement of newUnlocks) {
+			const vars = this._buildAchievementAlertVariables({
+				profile,
+				currentGame,
+				gameProgress,
+				achievement,
+			});
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.achievementUnlocked,
+				...this._buildAlertPayload(vars, {
+					dynamicValue: vars.achievement_title,
+				}),
+			});
+
+			if (vars.achievement_hardcore) {
+				await this.lumia.triggerAlert({
+					alert: ALERT_KEYS.hardcoreAchievementUnlocked,
+					...this._buildAlertPayload(vars, {
+						dynamicValue: vars.achievement_title,
+					}),
+				});
+			}
+		}
+
+		this._lastGameId = lastGameId;
+		this._lastGameTitle = lastGameTitle;
+	}
+
+	_buildCurrentGameAlertVariables({ profile, currentGame, gameProgress }) {
+		return {
+			username: this._profileUser(profile) || this._username(),
+			last_game_id: this._profileLastGameId(profile),
+			last_game_title: this._profileLastGameTitle(
+				profile,
+				this._coerceString(currentGame?.Title, ""),
+			),
+			last_game_console: this._coerceString(currentGame?.ConsoleName, ""),
+			last_game_icon: this._absoluteImageUrl(currentGame?.ImageIcon),
+		};
+	}
+
+	_buildAchievementAlertVariables({
+		profile,
+		currentGame,
+		gameProgress,
+		achievement,
+	}) {
+		return {
+			username: this._profileUser(profile) || this._username(),
+			game_id: this._achievementGameId(achievement) || this._profileLastGameId(profile),
+			game_title:
+				this._achievementGameTitle(achievement) ||
+				this._profileLastGameTitle(
+					profile,
+					this._coerceString(currentGame?.Title, ""),
+				),
+			game_console: this._coerceString(
+				currentGame?.ConsoleName ?? gameProgress?.ConsoleName,
+				"",
+			),
+			game_achievement_total: this._coerceNumber(
+				gameProgress?.NumPossibleAchievements,
+				0,
+			),
+			game_achievement_unlocked: this._coerceNumber(gameProgress?.NumAchieved, 0),
+			achievement_id: this._achievementId(achievement),
+			achievement_title: this._achievementTitle(achievement),
+			achievement_description: this._achievementDescription(achievement),
+			achievement_points: this._achievementPoints(achievement),
+			achievement_hardcore: this._achievementHardcore(achievement),
+			achievement_date_awarded: this._achievementDate(achievement),
+			achievement_badge_url:
+				this._achievementBadgeUrl(achievement) ||
+				this._badgeUrl(this._achievementBadgeName(achievement)),
+		};
+	}
+
+	_buildAlertPayload(variables, { dynamicValue, ...extraSettings } = {}) {
+		const value =
+			dynamicValue ||
+			this._coerceString(variables?.achievement_title, "") ||
+			this._coerceString(variables?.last_game_title, "") ||
+			this._coerceString(variables?.game_title, "") ||
+			this._coerceString(variables?.username, "");
+		return {
+			dynamic: {
+				value,
+			},
+			extraSettings: {
+				...(variables || {}),
+				...(extraSettings || {}),
+			},
+		};
+	}
+
+	_buildRecentAchievementKey(achievement) {
+		const id = this._achievementId(achievement);
+		if (!id) {
+			return "";
+		}
+		const awardedAt = this._achievementDate(achievement);
+		const hardcore = this._achievementHardcore(achievement) ? "1" : "0";
+		return `${id}:${awardedAt}:${hardcore}`;
+	}
+
+	_rememberRecentAchievementKey(key) {
+		if (!key || this._seenUnlockKeys.has(key)) {
+			return;
+		}
+		this._seenUnlockKeys.add(key);
+		this._seenUnlockOrder.push(key);
+		while (this._seenUnlockOrder.length > DEFAULTS.maxSeenUnlocks) {
+			const oldest = this._seenUnlockOrder.shift();
+			if (oldest) {
+				this._seenUnlockKeys.delete(oldest);
+			}
+		}
+	}
+
+	_sortRecentAchievements(achievements) {
+		if (!Array.isArray(achievements)) {
+			return [];
+		}
+
+		return [...achievements].sort((a, b) => {
+			const aTime = Date.parse(this._achievementDate(a)) || 0;
+			const bTime = Date.parse(this._achievementDate(b)) || 0;
+			if (aTime !== bTime) {
+				return aTime - bTime;
+			}
+			return this._achievementId(a) - this._achievementId(b);
+		});
+	}
+
+	_profileUser(profile) {
+		return this._coerceString(profile?.User ?? profile?.user, "").trim();
+	}
+
+	_profileTotalPoints(profile) {
+		return this._coerceNumber(
+			profile?.TotalPoints ?? profile?.totalPoints ?? profile?.Points ?? profile?.points,
+			0,
+		);
+	}
+
+	_profileSoftcorePoints(profile) {
+		return this._coerceNumber(
+			profile?.TotalSoftcorePoints ??
+				profile?.totalSoftcorePoints ??
+				profile?.SoftcorePoints ??
+				profile?.softcorePoints,
+			0,
+		);
+	}
+
+	_profileTruePoints(profile) {
+		return this._coerceNumber(
+			profile?.TotalTruePoints ?? profile?.totalTruePoints,
+			0,
+		);
+	}
+
+	_profileRank(profile) {
+		return this._coerceNumber(
+			profile?.Rank ?? profile?.rank ?? profile?.TotalRank ?? profile?.totalRank,
+			0,
+		);
+	}
+
+	_profileLastGameId(profile) {
+		return this._coerceNumber(profile?.LastGameID ?? profile?.lastGameId, 0);
+	}
+
+	_profileLastGameTitle(profile, fallback = "") {
+		return this._coerceString(profile?.LastGame ?? profile?.lastGame, fallback);
+	}
+
+	_achievementId(achievement) {
+		return this._coerceNumber(
+			achievement?.AchievementID ??
+				achievement?.achievementId ??
+				achievement?.ID ??
+				achievement?.id,
+			0,
+		);
+	}
+
+	_achievementTitle(achievement) {
+		return this._coerceString(achievement?.Title ?? achievement?.title, "");
+	}
+
+	_achievementDescription(achievement) {
+		return this._coerceString(
+			achievement?.Description ?? achievement?.description,
+			"",
+		);
+	}
+
+	_achievementPoints(achievement) {
+		return this._coerceNumber(achievement?.Points ?? achievement?.points, 0);
+	}
+
+	_achievementTrueRatio(achievement) {
+		return this._coerceNumber(
+			achievement?.TrueRatio ?? achievement?.trueRatio,
+			0,
+		);
+	}
+
+	_achievementGameId(achievement) {
+		return this._coerceNumber(achievement?.GameID ?? achievement?.gameId, 0);
+	}
+
+	_achievementGameTitle(achievement) {
+		return this._coerceString(
+			achievement?.GameTitle ?? achievement?.gameTitle,
+			"",
+		);
+	}
+
+	_achievementDate(achievement) {
+		return this._coerceString(
+			achievement?.DateAwarded ??
+				achievement?.dateAwarded ??
+				achievement?.Date ??
+				achievement?.date,
+			"",
+		);
+	}
+
+	_achievementHardcore(achievement) {
+		return this._coerceBoolean(
+			achievement?.HardcoreAwarded ??
+				achievement?.hardcoreAwarded ??
+				achievement?.HardcoreMode ??
+				achievement?.hardcoreMode,
+			false,
+		);
+	}
+
+	_achievementBadgeName(achievement) {
+		return this._coerceString(achievement?.BadgeName ?? achievement?.badgeName, "");
+	}
+
+	_achievementBadgeUrl(achievement) {
+		return this._absoluteImageUrl(
+			this._coerceString(achievement?.BadgeURL ?? achievement?.badgeUrl, ""),
+		);
+	}
+
+	_findRecentlyPlayedGame(recentlyPlayed, gameId) {
+		if (!Array.isArray(recentlyPlayed) || !recentlyPlayed.length || !gameId) {
+			return null;
+		}
+
+		const target = this._coerceNumber(gameId, 0);
+		return (
+			recentlyPlayed.find(
+				(game) => this._coerceNumber(game?.GameID, 0) === target,
+			) || null
+		);
+	}
+
+	_absoluteImageUrl(imagePath) {
+		const value = this._coerceString(imagePath, "").trim();
+		if (!value) {
+			return "";
+		}
+		if (/^https?:\/\//i.test(value)) {
+			return value;
+		}
+		return `${RA_SITE_BASE}${value.startsWith("/") ? "" : "/"}${value}`;
+	}
+
+	_badgeUrl(badgeName) {
+		const badge = this._coerceString(badgeName, "").trim();
+		if (!badge) {
+			return "";
+		}
+		return `${RA_SITE_BASE}/Badge/${encodeURIComponent(badge)}.png`;
+	}
+
+	async _handleFetchGame(params = {}) {
+		if (!this._hasRequiredSettings()) {
+			await this._showActionToast(
+				"Missing RetroAchievements API key or username in plugin settings.",
+				"warn",
+			);
+			return null;
+		}
+
+		const gameInput = this._coerceString(params?.game, "").trim();
+		if (!gameInput) {
+			await this._showActionToast("Game title or game ID is required.", "warn");
+			return null;
+		}
+
+		const resolved = await this._resolveGameInput(gameInput);
+		if (!resolved?.gameId) {
+			await this._showActionToast(
+				`Could not resolve game '${gameInput}' from recently played titles.`,
+				"warn",
+			);
+			return null;
+		}
+
+		const progress = await this._fetchGameInfoAndUserProgress(resolved.gameId);
+		if (!progress) {
+			await this._showActionToast(
+				`No game progress returned for game ID ${resolved.gameId}.`,
+				"warn",
+			);
+			return null;
+		}
+
+		const resolvedTitle =
+			this._coerceString(progress?.Title, "") ||
+			this._coerceString(resolved?.title, "") ||
+			gameInput;
+
+		const requestedVars = {
+			username: this._username(),
+			requested_game_id: resolved.gameId,
+			requested_game_title: resolvedTitle,
+			requested_game_console: this._coerceString(progress?.ConsoleName, ""),
+			requested_game_icon: this._absoluteImageUrl(progress?.ImageIcon),
+			requested_game_achievement_total: this._coerceNumber(
+				progress?.NumPossibleAchievements,
+				0,
+			),
+			requested_game_achievement_unlocked: this._coerceNumber(
+				progress?.NumAchieved,
+				0,
+			),
+			requested_game_achievement_unlocked_hardcore: this._coerceNumber(
+				progress?.NumAchievedHardcore,
+				0,
+			),
+			requested_game_completion: this._coerceString(progress?.UserCompletion, ""),
+			requested_game_payload: JSON.stringify(progress || {}),
+		};
+
+		await this._showActionToast(
+			`Fetched progress for ${resolvedTitle}.`,
+			"success",
+		);
+
+		return this._buildFetchGameActionVariables(requestedVars);
+	}
+
+	_buildFetchGameActionVariables(requestedVars = {}) {
+		return {
+			[ACTION_VARIABLE_NAMES.username]: this._coerceString(
+				requestedVars.username,
+				"",
+			),
+			[ACTION_VARIABLE_NAMES.requestedGameId]: this._coerceNumber(
+				requestedVars.requested_game_id,
+				0,
+			),
+			[ACTION_VARIABLE_NAMES.requestedGameTitle]: this._coerceString(
+				requestedVars.requested_game_title,
+				"",
+			),
+			[ACTION_VARIABLE_NAMES.requestedGameConsole]: this._coerceString(
+				requestedVars.requested_game_console,
+				"",
+			),
+			[ACTION_VARIABLE_NAMES.requestedGameIcon]: this._coerceString(
+				requestedVars.requested_game_icon,
+				"",
+			),
+			[ACTION_VARIABLE_NAMES.requestedGameAchievementTotal]: this._coerceNumber(
+				requestedVars.requested_game_achievement_total,
+				0,
+			),
+			[ACTION_VARIABLE_NAMES.requestedGameAchievementUnlocked]: this._coerceNumber(
+				requestedVars.requested_game_achievement_unlocked,
+				0,
+			),
+			[ACTION_VARIABLE_NAMES.requestedGameAchievementUnlockedHardcore]:
+				this._coerceNumber(
+					requestedVars.requested_game_achievement_unlocked_hardcore,
+					0,
+				),
+			[ACTION_VARIABLE_NAMES.requestedGameCompletion]: this._coerceString(
+				requestedVars.requested_game_completion,
+				"",
+			),
+			[ACTION_VARIABLE_NAMES.requestedGamePayload]: this._coerceString(
+				requestedVars.requested_game_payload,
+				"",
+			),
+		};
+	}
+
+	_mergeActionVariables(target, variables) {
+		if (!variables || typeof variables !== "object") {
+			return;
+		}
+		for (const [key, value] of Object.entries(variables)) {
+			if (!key) {
+				continue;
+			}
+			target[key] = value;
+		}
+	}
+
+	async _resolveGameInput(gameInput) {
+		const numericOnly = gameInput.match(/^\d+$/);
+		if (numericOnly) {
+			return {
+				gameId: this._coerceNumber(numericOnly[0], 0),
+				title: "",
+			};
+		}
+
+		const recentlyPlayed = await this._fetchRecentlyPlayedGames();
+		const match = this._resolveGameByTitle(recentlyPlayed, gameInput);
+		if (!match) {
+			return null;
+		}
+
+		return {
+			gameId: this._coerceNumber(match?.GameID, 0),
+			title: this._coerceString(match?.Title, ""),
+		};
+	}
+
+	_resolveGameByTitle(games, input) {
+		const ranked = this._rankGameMatches(games, input);
+		if (!ranked.length) {
+			return null;
+		}
+		if (ranked[0].score < DEFAULTS.matchThreshold) {
+			return null;
+		}
+		return ranked[0].game;
+	}
+
+	_rankGameMatches(games, input) {
+		if (!Array.isArray(games) || !games.length) {
+			return [];
+		}
+		const normalizedInput = this._normalizeMatchText(input);
+		if (!normalizedInput) {
+			return [];
+		}
+
+		const results = [];
+		for (const game of games) {
+			const name = this._coerceString(game?.Title, "");
+			if (!name) {
+				continue;
+			}
+			const score = this._scoreMatch(name, normalizedInput);
+			if (score <= 0) {
+				continue;
+			}
+			results.push({
+				game,
+				score: Number(score.toFixed(3)),
+			});
+		}
+
+		results.sort((a, b) => b.score - a.score);
+		return results.slice(0, 10);
+	}
+
+	_scoreMatch(name, normalizedInput) {
+		const normalizedName = this._normalizeMatchText(name);
+		if (!normalizedName) {
+			return 0;
+		}
+		if (normalizedName === normalizedInput) {
+			return 1;
+		}
+		if (normalizedName.startsWith(normalizedInput)) {
+			return 0.95;
+		}
+		if (normalizedInput.startsWith(normalizedName)) {
+			return 0.9;
+		}
+		if (
+			normalizedName.includes(normalizedInput) ||
+			normalizedInput.includes(normalizedName)
+		) {
+			return 0.85;
+		}
+		const distance = this._levenshtein(normalizedName, normalizedInput);
+		const maxLen = Math.max(normalizedName.length, normalizedInput.length);
+		return maxLen ? 1 - distance / maxLen : 0;
+	}
+
+	_normalizeMatchText(value) {
+		return this._coerceString(value, "")
+			.toLowerCase()
+			.replace(/\s+/g, " ")
+			.trim();
+	}
+
+	_levenshtein(a, b) {
+		if (a === b) {
+			return 0;
+		}
+		if (!a) {
+			return b.length;
+		}
+		if (!b) {
+			return a.length;
+		}
+
+		const matrix = Array.from({ length: a.length + 1 }, () =>
+			new Array(b.length + 1).fill(0),
+		);
+		for (let i = 0; i <= a.length; i += 1) {
+			matrix[i][0] = i;
+		}
+		for (let j = 0; j <= b.length; j += 1) {
+			matrix[0][j] = j;
+		}
+
+		for (let i = 1; i <= a.length; i += 1) {
+			for (let j = 1; j <= b.length; j += 1) {
+				const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+				matrix[i][j] = Math.min(
+					matrix[i - 1][j] + 1,
+					matrix[i][j - 1] + 1,
+					matrix[i - 1][j - 1] + cost,
+				);
+			}
+		}
+
+		return matrix[a.length][b.length];
+	}
+
+	async _showActionToast(message, type = "info") {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({
+				message,
+				time: 4,
+				type,
+			});
+		} catch {
+			return;
+		}
+	}
+
+	_schedulePolling() {
+		this._clearPolling();
+
+		const intervalSeconds = this._pollIntervalSeconds();
+		if (!this._hasRequiredSettings() || intervalSeconds <= 0) {
+			return;
+		}
+
+		this._pollTimer = setInterval(() => {
+			void this._refreshData({ reason: "poll" });
+		}, intervalSeconds * 1000);
+	}
+
+	_clearPolling() {
+		if (this._pollTimer) {
+			clearInterval(this._pollTimer);
+			this._pollTimer = null;
+		}
+	}
+
+	_hasRequiredSettings() {
+		return Boolean(this._apiKey() && this._username());
+	}
+
+	_apiKey() {
+		return this._coerceString(this.settings?.apiKey, "").trim();
+	}
+
+	_username() {
+		return this._coerceString(this.settings?.username, "").trim();
+	}
+
+	_pollIntervalSeconds(settings = this.settings) {
+		const value = this._coerceNumber(settings?.pollInterval, DEFAULTS.pollInterval);
+		if (!Number.isFinite(value)) {
+			return DEFAULTS.pollInterval;
+		}
+		return Math.min(
+			Math.max(value, DEFAULTS.minPollInterval),
+			DEFAULTS.maxPollInterval,
+		);
+	}
+
+	_debugEnabled(settings = this.settings) {
+		return Boolean(settings?.debugLogs);
+	}
+
+	async _updateConnectionState(state) {
+		if (this._lastConnectionState === state) {
+			return;
+		}
+
+		this._lastConnectionState = state;
+		if (typeof this.lumia.updateConnection !== "function") {
+			return;
+		}
+
+		try {
+			await this.lumia.updateConnection(state);
+		} catch (error) {
+			await this._log(
+				`Failed to update connection state: ${this._errorMessage(error)}`,
+				"warn",
+			);
+		}
+	}
+
+	async _safeFetch(label, fn) {
+		try {
+			return { ok: true, data: await fn() };
+		} catch (error) {
+			await this._logThrottled(
+				`fetch:${label}`,
+				`${label} request failed: ${this._errorMessage(error)}`,
+				"warn",
+			);
+			return { ok: false, data: null };
+		}
+	}
+
+	async _setVariable(name, value) {
+		if (typeof this.lumia.setVariable !== "function") {
+			return;
+		}
+		await this.lumia.setVariable(name, value);
+	}
+
+	async _setVariableIfChanged(name, value) {
+		const normalized = this._normalizeValue(value);
+		const previous = this._lastVariables.get(name);
+		if (this._valuesEqual(previous, normalized)) {
+			return false;
+		}
+
+		this._lastVariables.set(name, normalized);
+		await this._setVariable(name, value);
+		return true;
+	}
+
+	_normalizeValue(value) {
+		if (value === null || value === undefined) {
+			return "";
+		}
+		if (typeof value === "object") {
+			try {
+				return JSON.stringify(value);
+			} catch {
+				return String(value);
+			}
+		}
+		return String(value);
+	}
+
+	_valuesEqual(a, b) {
+		return a === b;
+	}
+
+	_errorMessage(error) {
+		if (!error) {
+			return "Unknown error";
+		}
+		if (typeof error === "string") {
+			return error;
+		}
+		return error?.message || String(error);
+	}
+
+	_truncateError(value) {
+		const text = this._coerceString(value, "").replace(/\s+/g, " ").trim();
+		if (!text) {
+			return "";
+		}
+		if (text.length <= 200) {
+			return text;
+		}
+		return `${text.slice(0, 200)}...`;
+	}
+
+	_coerceNumber(value, fallback = 0) {
+		const number = Number(value);
+		return Number.isFinite(number) ? number : fallback;
+	}
+
+	_coerceString(value, fallback = "") {
+		if (typeof value === "string") {
+			return value;
+		}
+		if (value === null || value === undefined) {
+			return fallback;
+		}
+		return String(value);
+	}
+
+	_coerceBoolean(value, fallback = false) {
+		if (typeof value === "boolean") {
+			return value;
+		}
+		if (typeof value === "number") {
+			return value !== 0;
+		}
+		if (typeof value === "string") {
+			const normalized = value.trim().toLowerCase();
+			if (["1", "true", "yes", "on"].includes(normalized)) {
+				return true;
+			}
+			if (["0", "false", "no", "off", ""].includes(normalized)) {
+				return false;
+			}
+		}
+		return fallback;
+	}
+}
+
+module.exports = RetroAchievementsPlugin;
+
+```
+
+## retro_achievements/manifest.json
+
+```
+{
+	"id": "retro_achievements",
+	"name": "RetroAchievements",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Track RetroAchievements profile stats, recently played games, and unlocked achievements in Lumia.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "games",
+	"keywords": "retroachievements, retro gaming, achievements, hardcore mode",
+	"icon": "retro_achievements.png",
+	"config": {
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "RetroAchievements Web API Key",
+				"type": "password",
+				"section": "General",
+				"sectionOrder": 1,
+				"required": true,
+				"helperText": "Get this key from your RetroAchievements account settings."
+			},
+			{
+				"key": "username",
+				"label": "RetroAchievements Username",
+				"type": "text",
+				"section": "General",
+				"sectionOrder": 1,
+				"required": true,
+				"helperText": "Your exact RetroAchievements username."
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"section": "General",
+				"sectionOrder": 1,
+				"defaultValue": 30,
+				"min": 15,
+				"max": 900,
+				"helperText": "How often to refresh profile/game data (15-900 seconds)."
+			},
+			{
+				"key": "debugLogs",
+				"label": "Enable Debug Logs",
+				"type": "checkbox",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"defaultValue": false,
+				"refreshOnChange": true,
+				"helperText": "Writes detailed RetroAchievements diagnostics to Lumia logs."
+			}
+		],
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
+		"actions": [
+			{
+				"type": "refresh",
+				"label": "Refresh Now",
+				"description": "Force an immediate profile and achievement refresh.",
+				"fields": []
+			},
+			{
+				"type": "fetch_game",
+				"label": "Fetch Game Progress",
+				"description": "Fetch progress by game title (recently played) or game ID.",
+				"acceptedVariables": [
+					"retro_achievements_username",
+					"retro_achievements_requested_game_id",
+					"retro_achievements_requested_game_title",
+					"retro_achievements_requested_game_console",
+					"retro_achievements_requested_game_icon",
+					"retro_achievements_requested_game_achievement_total",
+					"retro_achievements_requested_game_achievement_unlocked",
+					"retro_achievements_requested_game_achievement_unlocked_hardcore",
+					"retro_achievements_requested_game_completion",
+					"retro_achievements_requested_game_payload"
+				],
+				"fields": [
+					{
+						"key": "game",
+						"label": "Game Title or Game ID",
+						"type": "text",
+						"placeholder": "ex: Super Mario World or 228",
+						"allowVariables": true,
+						"helperText": "Title matching uses your recently played list."
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "total_points",
+				"description": "Total hardcore points.",
+				"value": 0
+			},
+			{
+				"name": "total_softcore_points",
+				"description": "Total softcore points.",
+				"value": 0
+			},
+			{
+				"name": "total_true_points",
+				"description": "Total true points.",
+				"value": 0
+			},
+			{
+				"name": "total_rank",
+				"description": "Global rank.",
+				"value": 0
+			},
+			{
+				"name": "last_game_id",
+				"description": "Most recent game ID from profile.",
+				"value": 0
+			},
+			{
+				"name": "last_game_title",
+				"description": "Most recent game title from profile.",
+				"value": ""
+			},
+			{
+				"name": "last_game_console",
+				"description": "Console name for last game (when available).",
+				"value": ""
+			},
+			{
+				"name": "last_game_icon",
+				"description": "Game icon URL for last game.",
+				"value": ""
+			},
+			{
+				"name": "last_game_achievement_total",
+				"description": "Total achievements in the last game.",
+				"value": 0
+			},
+			{
+				"name": "last_game_achievement_unlocked",
+				"description": "Unlocked achievements in the last game.",
+				"value": 0
+			},
+			{
+				"name": "last_game_achievement_unlocked_hardcore",
+				"description": "Hardcore unlocked achievements in the last game.",
+				"value": 0
+			},
+			{
+				"name": "last_game_completion",
+				"description": "Completion percentage text from API.",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Current Game Changed",
+				"key": "current_game_changed",
+				"acceptedVariables": [
+					"username",
+					"last_game_id",
+					"last_game_title",
+					"last_game_console",
+					"last_game_icon",
+					"previous_game_id",
+					"previous_game_title"
+				],
+				"defaultMessage": "{{username}} is now playing {{last_game_title}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Game Title"
+					}
+				]
+			},
+			{
+				"title": "Achievement Unlocked",
+				"key": "achievement_unlocked",
+				"acceptedVariables": [
+					"username",
+					"game_id",
+					"game_title",
+					"game_console",
+					"achievement_id",
+					"achievement_title",
+					"achievement_description",
+					"achievement_points",
+					"achievement_hardcore",
+					"achievement_date_awarded",
+					"achievement_badge_url",
+					"game_achievement_total",
+					"game_achievement_unlocked"
+				],
+				"defaultMessage": "{{username}} unlocked {{achievement_title}} in {{game_title}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Achievement Title"
+					}
+				]
+			},
+			{
+				"title": "Hardcore Achievement",
+				"key": "hardcore_achievement_unlocked",
+				"acceptedVariables": [
+					"username",
+					"game_title",
+					"achievement_title",
+					"achievement_points",
+					"achievement_badge_url"
+				],
+				"defaultMessage": "{{username}} hardcore unlocked {{achievement_title}} in {{game_title}}."
+			}
+		],
+		"translations": "./translations.json"
+	}
+}
+
+```
+
+## retro_achievements/package.json
+
+```
+{
+	"name": "lumia-plugin-retro-achievements",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin for RetroAchievements profile and achievement tracking.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.1"
+	}
+}
+
+```
+
+## retro_achievements/settings_tutorial.md
+
+```
+---
+### RetroAchievements API Key
+1) Sign in to your [RetroAchievements account settings](https://retroachievements.org/settings).
+2) Copy your **Web API Key**.
+3) Paste it into **RetroAchievements Web API Key** in plugin settings.
+
+### Username
+1) Enter your exact RetroAchievements username in **RetroAchievements Username**.
+2) Save settings to start polling profile/game data.
+
+### Polling Tips
+- Keep **Poll Interval** at 30 seconds or higher to reduce API pressure.
+- The plugin uses a fixed 120-minute recent-achievement lookback for reliable unlock detection.
+---
+
+```
+
+## retro_achievements/translations.json
+
+```
+{
+	"en": {
+		"total_points": "Total hardcore points.",
+		"total_softcore_points": "Total softcore points.",
+		"total_true_points": "Total true points.",
+		"total_rank": "Global rank.",
+		"last_game_id": "Most recent game ID from profile.",
+		"last_game_title": "Most recent game title from profile.",
+		"last_game_console": "Console name for last game.",
+		"last_game_icon": "Icon URL for last game.",
+		"last_game_achievement_total": "Total achievements in the last game.",
+		"last_game_achievement_unlocked": "Unlocked achievements in the last game.",
+		"last_game_achievement_unlocked_hardcore": "Hardcore unlocked achievements in the last game.",
+		"last_game_completion": "Completion percentage text from API."
+	}
+}
+
+```
+
 ## rumble/actions_tutorial.md
 
 ```
@@ -15523,7 +17073,7 @@ YouTube fallback link: https://www.youtube.com/watch?v=VCd0kYWLvMQ
 ---
 ### Fetch Game Achievements
 Use **Fetch Achievements For Game** to query a specific game by name or App ID.
-The results are stored in the requested game variables.
+The results are returned from the action through its accepted variables.
 ---
 
 ```
@@ -15547,8 +17097,10 @@ const STEAM_API_BASE = "https://api.steampowered.com";
 
 const ALERT_KEYS = {
 	onlineStateChanged: "online_state_changed",
+	achievementUnlocked: "achievement_unlocked",
 	achievementProgressChanged: "achievement_progress_changed",
 	currentGameChanged: "current_game_changed",
+	currentGameOver: "current_game_over",
 };
 
 const VARIABLE_NAMES = {
@@ -15563,11 +17115,17 @@ const VARIABLE_NAMES = {
 	gameCount: "game_count",
 	currentGameAchievementCount: "current_game_achievement_count",
 	currentGameAchievementUnlocked: "current_game_achievement_unlocked_count",
-	requestedGameAppId: "requested_game_appid",
-	requestedGameName: "requested_game_name",
-	requestedGameAchievementCount: "requested_game_achievement_count",
-	requestedGameAchievementUnlocked: "requested_game_achievement_unlocked",
-	requestedGameAchievements: "requested_game_achievements",
+	achievementName: "current_game_achievement_name",
+	achievementDescription: "current_game_achievement_description",
+};
+
+const ACTION_VARIABLE_NAMES = {
+	requestedGameInput: "steam_requested_game_input",
+	requestedGameAppId: "steam_requested_game_appid",
+	requestedGameName: "steam_requested_game_name",
+	requestedGameAchievementCount: "steam_requested_game_achievement_count",
+	requestedGameAchievementUnlocked: "steam_requested_game_achievement_unlocked",
+	requestedGameAchievements: "steam_requested_game_achievements",
 };
 
 class SteamPlugin extends Plugin {
@@ -15587,9 +17145,9 @@ class SteamPlugin extends Plugin {
 		this._lastCurrentGameName = "";
 		this._lastAchievementAppId = null;
 		this._lastAchievementUnlocked = null;
-		this._lastAchievementCount = null;
+		this._lastAchievementUnlockedKeys = null;
+		this._achievementSchemaCache = new Map();
 		this._lastOwnedFetchAt = 0;
-		this._lastAchievementFetchAppId = 0;
 	}
 
 	async onload() {
@@ -15629,16 +17187,18 @@ class SteamPlugin extends Plugin {
 			this._lastCurrentGameName = "";
 			this._lastAchievementAppId = null;
 			this._lastAchievementUnlocked = null;
-			this._lastAchievementCount = null;
+			this._lastAchievementUnlockedKeys = null;
+			this._achievementSchemaCache.clear();
 			this._lastOwnedFetchAt = 0;
-			this._lastAchievementFetchAppId = 0;
 		}
 
 		await this._refreshData({ reason: "settings-update" });
 	}
 
 	async actions(config) {
-		for (const action of config.actions) {
+		const actions = Array.isArray(config?.actions) ? config.actions : [];
+		const newlyPassedVariables = {};
+		for (const action of actions) {
 			const params = action.value;
 			try {
 				switch (action.type) {
@@ -15646,7 +17206,10 @@ class SteamPlugin extends Plugin {
 						await this._refreshData({ reason: "manual-action" });
 						break;
 					case "fetch_game":
-						await this._handleFetchGame(params);
+						this._mergeActionVariables(
+							newlyPassedVariables,
+							await this._handleFetchGame(params),
+						);
 						break;
 				}
 			} catch (error) {
@@ -15656,6 +17219,22 @@ class SteamPlugin extends Plugin {
 					"error",
 				);
 			}
+		}
+
+		if (Object.keys(newlyPassedVariables).length) {
+			return { newlyPassedVariables };
+		}
+	}
+
+	_mergeActionVariables(target, variables) {
+		if (!variables || typeof variables !== "object") {
+			return;
+		}
+		for (const [key, value] of Object.entries(variables)) {
+			if (!key) {
+				continue;
+			}
+			target[key] = value;
 		}
 	}
 
@@ -15709,6 +17288,25 @@ class SteamPlugin extends Plugin {
 		await this._log(message, severity);
 	}
 
+	async _tempDebug(message, { throttleKey = "", intervalMs = 30 * 1000 } = {}) {
+		if (!this._debugEnabled()) {
+			return;
+		}
+
+		const prefixed = `[TEMP DEBUG] ${message}`;
+		if (throttleKey) {
+			await this._logThrottled(
+				`temp-debug:${throttleKey}`,
+				prefixed,
+				"info",
+				intervalMs,
+			);
+			return;
+		}
+
+		await this._log(prefixed, "info");
+	}
+
 	async _refreshData({ reason } = {}) {
 		if (!this._hasRequiredSettings()) {
 			await this._updateConnectionState(false);
@@ -15741,9 +17339,6 @@ class SteamPlugin extends Plugin {
 					this._fetchPlayerSummary(steamId),
 				);
 				const achievementAppId = this._determineAchievementAppId(summaryResult.data);
-				if (!achievementAppId) {
-					this._lastAchievementFetchAppId = 0;
-				}
 
 				const shouldFetchOwned =
 					forceFullRefresh ||
@@ -15768,17 +17363,43 @@ class SteamPlugin extends Plugin {
 					achievementsResult = await this._safeFetch("achievements", () =>
 						this._fetchAchievements(steamId, achievementAppId),
 					);
-					if (achievementsResult.ok) {
-						this._lastAchievementFetchAppId = achievementAppId;
-					}
 				}
+
+				const currentGameName = this._coerceString(
+					summaryResult?.data?.gameextrainfo,
+					"",
+				);
+				const achievementEntries = Array.isArray(
+					achievementsResult?.data?.playerstats?.achievements,
+				)
+					? achievementsResult.data.playerstats.achievements
+					: [];
+				const achievementCount = achievementEntries.length;
+				const unlockedCount = achievementEntries.filter(
+					(achievement) => achievement?.achieved === 1,
+				).length;
+				const achievementSnapshot = this._summarizeAchievements(
+					achievementEntries,
+					40,
+				);
+				await this._tempDebug(
+					`refresh reason=${reason ?? "unknown"} steamId=${steamId} game='${currentGameName || "none"}' appId=${achievementAppId || 0} summaryOk=${summaryResult.ok} ownedFetched=${shouldFetchOwned} ownedOk=${ownedResult.ok} achievementsFetched=${shouldFetchAchievements} achievementsOk=${shouldFetchAchievements ? achievementsResult.ok : "skipped"} unlocked=${unlockedCount}/${achievementCount} achievements='${achievementSnapshot || "none"}'`,
+					{
+						throttleKey: `refresh:${achievementAppId || 0}:${
+							currentGameName || "none"
+						}:${unlockedCount}/${achievementCount}`,
+						intervalMs: 15 * 1000,
+					},
+				);
 
 				await this._applySummary(summaryResult.data, steamId);
 				if (shouldFetchOwned) {
 					await this._applyOwnedGames(ownedResult.data);
 				}
-				if (shouldFetchAchievements || !achievementAppId) {
+				if (shouldFetchAchievements) {
 					await this._applyAchievements(achievementsResult.data);
+				} else {
+					await this._applyAchievements(null, { clear: true });
 				}
 				await this._emitAlerts({
 					summary: summaryResult.data,
@@ -15884,7 +17505,19 @@ class SteamPlugin extends Plugin {
 
 		const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?key=${encodeURIComponent(
 			this._apiKey(),
-		)}&steamid=${encodeURIComponent(steamId)}&appid=${targetAppId}`;
+		)}&steamid=${encodeURIComponent(steamId)}&appid=${targetAppId}&l=en&_=${Date.now()}`;
+		return this._fetchJson(url);
+	}
+
+	async _fetchAchievementSchema(appId) {
+		const targetAppId = this._coerceNumber(appId, 0);
+		if (!targetAppId) {
+			return null;
+		}
+
+		const url = `${STEAM_API_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(
+			this._apiKey(),
+		)}&appid=${targetAppId}&l=en`;
 		return this._fetchJson(url);
 	}
 
@@ -15905,6 +17538,14 @@ class SteamPlugin extends Plugin {
 
 	async _fetchJson(url) {
 		let response = await this._request(url);
+		if (url.includes("/ISteamUserStats/GetPlayerAchievements/")) {
+			const appIdMatch = url.match(/[?&]appid=(\d+)/);
+			const appId = appIdMatch?.[1] ?? "unknown";
+			await this._tempDebug(
+				`achievement_http appId=${appId} status=${response.status} cacheControl='${this._coerceString(response.headers.get("cache-control"), "")}' age='${this._coerceString(response.headers.get("age"), "")}' etag='${this._coerceString(response.headers.get("etag"), "")}'`,
+				{ throttleKey: `achievement-http:${appId}:${response.status}`, intervalMs: 10 * 1000 },
+			);
+		}
 
 		if (response.status === 429) {
 			const retryAfter = this._coerceNumber(
@@ -15937,9 +17578,11 @@ class SteamPlugin extends Plugin {
 		const headers = {
 			Accept: "application/json",
 			"User-Agent": DEFAULTS.userAgent,
+			"Cache-Control": "no-cache, no-store, max-age=0",
+			Pragma: "no-cache",
 		};
 
-		return fetch(url, { headers });
+		return fetch(url, { headers, cache: "no-store" });
 	}
 
 	async _applySummary(summary, steamId) {
@@ -15993,8 +17636,11 @@ class SteamPlugin extends Plugin {
 		);
 	}
 
-	async _applyAchievements(payload) {
+	async _applyAchievements(payload, { clear = false } = {}) {
 		if (!payload) {
+			if (!clear) {
+				return;
+			}
 			await this._setVariableIfChanged(
 				VARIABLE_NAMES.currentGameAchievementCount,
 				0,
@@ -16002,6 +17648,11 @@ class SteamPlugin extends Plugin {
 			await this._setVariableIfChanged(
 				VARIABLE_NAMES.currentGameAchievementUnlocked,
 				0,
+			);
+			await this._setVariableIfChanged(VARIABLE_NAMES.achievementName, "");
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.achievementDescription,
+				"",
 			);
 			return;
 		}
@@ -16022,10 +17673,6 @@ class SteamPlugin extends Plugin {
 	}
 
 	async _emitAlerts({ summary, achievementAppId, achievements }) {
-		if (this.settings?.enableAlerts === false) {
-			return;
-		}
-
 		const hasSummary = Boolean(summary && typeof summary === "object");
 		// Do not emit status/game-change alerts until we have at least one real
 		// profile snapshot to use as baseline.
@@ -16045,9 +17692,13 @@ class SteamPlugin extends Plugin {
 		)
 			? achievements.playerstats.achievements
 			: null;
-		const unlocked = achievementList
-			? achievementList.filter((a) => a?.achieved === 1).length
-			: 0;
+		const unlockedAchievements = achievementList
+			? achievementList.filter((a) => a?.achieved === 1)
+			: [];
+		const unlockedAchievementKeys = achievementList
+			? this._getAchievementUnlockedKeys(unlockedAchievements)
+			: null;
+		const unlocked = unlockedAchievements.length;
 		const total = achievementList ? achievementList.length : 0;
 		const alertVars = this._buildAlertVariables({
 			summary,
@@ -16062,7 +17713,7 @@ class SteamPlugin extends Plugin {
 			this._lastCurrentGameName = currentGameName;
 			this._lastAchievementAppId = achievementAppId || null;
 			this._lastAchievementUnlocked = achievementList ? unlocked : null;
-			this._lastAchievementCount = achievementList ? total : null;
+			this._lastAchievementUnlockedKeys = unlockedAchievementKeys;
 			this._hasInitialSync = true;
 			return;
 		}
@@ -16087,10 +17738,61 @@ class SteamPlugin extends Plugin {
 			this._lastAchievementUnlocked !== null &&
 			unlocked !== this._lastAchievementUnlocked
 		) {
+			const newlyUnlocked = unlockedAchievements.filter((achievement) => {
+				const key = this._achievementKey(achievement);
+				if (!key) {
+					return false;
+				}
+
+				return !this._lastAchievementUnlockedKeys?.has(key);
+			});
+			const achievementAlertVars = this._buildAlertVariables({
+				summary,
+				onlineStatus: personaState,
+				achievementUnlocked: unlocked,
+				achievementCount: total,
+				achievementName: "",
+				achievementDescription: "",
+			});
+
+			const sortedNewlyUnlocked = [...newlyUnlocked].sort(
+				(a, b) =>
+					this._coerceNumber(a?.unlocktime, 0) -
+					this._coerceNumber(b?.unlocktime, 0),
+			);
+			for (const unlockedAchievement of sortedNewlyUnlocked) {
+				const unlockedDetails = await this._resolveAchievementDetails(
+					achievementAppId,
+					unlockedAchievement,
+				);
+				const unlockedAlertVars = this._buildAlertVariables({
+					summary,
+					onlineStatus: personaState,
+					achievementUnlocked: unlocked,
+					achievementCount: total,
+					achievementName: unlockedDetails.name,
+					achievementDescription: unlockedDetails.description,
+				});
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.achievementName,
+					unlockedDetails.name,
+				);
+				await this._setVariableIfChanged(
+					VARIABLE_NAMES.achievementDescription,
+					unlockedDetails.description,
+				);
+				await this.lumia.triggerAlert({
+					alert: ALERT_KEYS.achievementUnlocked,
+					...this._buildAlertPayload(unlockedAlertVars, {
+						dynamicValue: unlockedAlertVars.achievement_name,
+					}),
+				});
+			}
+
 			await this.lumia.triggerAlert({
 				alert: ALERT_KEYS.achievementProgressChanged,
-				...this._buildAlertPayload(alertVars, {
-					dynamicValue: `${alertVars.current_game_achievement_unlocked_count}/${alertVars.current_game_achievement_count}`,
+				...this._buildAlertPayload(achievementAlertVars, {
+					dynamicValue: `${achievementAlertVars.current_game_achievement_unlocked_count}/${achievementAlertVars.current_game_achievement_count}`,
 				}),
 			});
 		}
@@ -16101,21 +17803,23 @@ class SteamPlugin extends Plugin {
 			Boolean(currentGameAppId) &&
 			(previousGameAppId === null || currentGameAppId !== previousGameAppId);
 		const changedToNoGame =
-			!currentGameAppId &&
-			previousGameAppId !== null &&
-			Boolean(this.settings?.alertGameChangedWhenStopped ?? true);
+			!currentGameAppId && previousGameAppId !== null;
 
-		if (changedToNewGame || changedToNoGame) {
-			const dynamicValue = changedToNoGame
-				? "Stopped Playing"
-				: alertVars.current_game_name;
+		if (changedToNewGame) {
 			await this.lumia.triggerAlert({
 				alert: ALERT_KEYS.currentGameChanged,
 				...this._buildAlertPayload(alertVars, {
-					dynamicValue,
-					extraSettings: changedToNoGame
-						? { previous_game_name: previousGameName ?? "" }
-						: undefined,
+					dynamicValue: alertVars.current_game_name,
+				}),
+			});
+		}
+
+		if (changedToNoGame) {
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.currentGameOver,
+				...this._buildAlertPayload(alertVars, {
+					dynamicValue: previousGameName || "Stopped Playing",
+					extraSettings: { previous_game_name: previousGameName ?? "" },
 				}),
 			});
 		}
@@ -16132,23 +17836,108 @@ class SteamPlugin extends Plugin {
 		if (achievementAppId && achievementList) {
 			this._lastAchievementAppId = achievementAppId;
 			this._lastAchievementUnlocked = unlocked;
-			this._lastAchievementCount = total;
+			this._lastAchievementUnlockedKeys = unlockedAchievementKeys;
 		}
+	}
+
+	_achievementKey(achievement) {
+		const key = this._coerceString(achievement?.apiname, "").trim();
+		return key || "";
+	}
+
+	_getAchievementUnlockedKeys(achievementList) {
+		const keys = new Set();
+		for (const achievement of achievementList) {
+			const key = this._achievementKey(achievement);
+			if (!key) {
+				continue;
+			}
+			keys.add(key);
+		}
+		return keys;
+	}
+
+	async _getAchievementSchemaByApp(appId) {
+		const targetAppId = this._coerceNumber(appId, 0);
+		if (!targetAppId) {
+			return null;
+		}
+
+		if (this._achievementSchemaCache.has(targetAppId)) {
+			return this._achievementSchemaCache.get(targetAppId);
+		}
+
+		const schemaResult = await this._safeFetch("achievement schema", () =>
+			this._fetchAchievementSchema(targetAppId),
+		);
+		const schemaAchievements = Array.isArray(
+			schemaResult?.data?.game?.availableGameStats?.achievements,
+		)
+			? schemaResult.data.game.availableGameStats.achievements
+			: [];
+		const schemaMap = new Map();
+		for (const achievement of schemaAchievements) {
+			const key = this._coerceString(achievement?.name, "").trim();
+			if (!key) {
+				continue;
+			}
+			schemaMap.set(key, {
+				name: this._coerceString(
+					achievement?.displayName ?? achievement?.name,
+					"",
+				),
+				description: this._coerceString(achievement?.description, ""),
+			});
+		}
+
+		this._achievementSchemaCache.set(targetAppId, schemaMap);
+		return schemaMap;
+	}
+
+	async _resolveAchievementDetails(appId, achievement) {
+		const apiName = this._coerceString(achievement?.apiname, "").trim();
+		if (!apiName) {
+			return { name: "", description: "" };
+		}
+
+		const runtimeName = this._coerceString(
+			achievement?.name ?? achievement?.displayName,
+			"",
+		).trim();
+		const runtimeDescription = this._coerceString(
+			achievement?.description,
+			"",
+		).trim();
+		if (runtimeName && runtimeDescription) {
+			return { name: runtimeName, description: runtimeDescription };
+		}
+
+		const schemaMap = await this._getAchievementSchemaByApp(appId);
+		const schemaMatch = schemaMap?.get(apiName);
+
+		return {
+			name: runtimeName || this._coerceString(schemaMatch?.name, apiName),
+			description:
+				runtimeDescription || this._coerceString(schemaMatch?.description, ""),
+		};
 	}
 
 	async _handleFetchGame(params = {}) {
 		if (!this._hasRequiredSettings()) {
 			await this._log("Missing Steam API key or Steam ID.", "warn");
-			return;
+			return null;
 		}
 
 		const gameInput = this._coerceString(params?.game, "").trim();
 		if (!gameInput) {
 			await this._log("Game name or App ID is required.", "warn");
-			return;
+			return null;
 		}
 
 		const steamId = await this._resolveSteamId();
+		await this._tempDebug(
+			`fetch_game input='${gameInput}' steamId=${steamId}`,
+		);
 		let appId = null;
 		let gameName = "";
 
@@ -16163,15 +17952,30 @@ class SteamPlugin extends Plugin {
 			const games = Array.isArray(ownedGames?.response?.games)
 				? ownedGames.response.games
 				: [];
+			const ownedSample = games
+				.slice(0, 5)
+				.map((game) => this._coerceString(game?.name, ""))
+				.filter(Boolean)
+				.join(" | ");
+			await this._tempDebug(
+				`fetch_game ownedGamesCount=${games.length} sample='${ownedSample}'`,
+			);
 			if (!appId) {
 				const match = this._resolveGameFromOwnedGames(games, gameInput);
 				if (!match) {
+					const ranked = this._rankGameMatches(games, gameInput)
+						.slice(0, 5)
+						.map((item) => `${item.name} (${item.appid}) score=${item.score}`)
+						.join(" | ");
+					await this._tempDebug(
+						`fetch_game no_match input='${gameInput}' topMatches='${ranked || "none"}'`,
+					);
 					await this._log(`No close match found for '${gameInput}'.`, "warn");
 					await this._showActionToast(
 						`No owned game matched '${gameInput}'.`,
 						"warn",
 					);
-					return;
+					return null;
 				}
 				appId = match.appid;
 				gameName = match.name;
@@ -16191,39 +17995,49 @@ class SteamPlugin extends Plugin {
 				`Unable to resolve game '${gameInput}'.`,
 				"warn",
 			);
-			return;
+			return null;
 		}
+		await this._tempDebug(
+			`fetch_game resolved appId=${appId} gameName='${gameName || "unknown"}'`,
+		);
 
 		const achievements = await this._fetchAchievements(steamId, appId);
 		const list = Array.isArray(achievements?.playerstats?.achievements)
 			? achievements.playerstats.achievements
 			: [];
 		const unlocked = list.filter((a) => a?.achieved === 1).length;
+		const achievementSnapshot = this._summarizeAchievements(list, 80);
+		const playerStatsSuccess = achievements?.playerstats?.success;
+		const playerStatsGameName = this._coerceString(
+			achievements?.playerstats?.gameName,
+			"",
+		);
+		await this._tempDebug(
+			`fetch_game achievements appId=${appId} playerStatsSuccess=${
+				playerStatsSuccess === undefined ? "undefined" : playerStatsSuccess
+			} gameName='${playerStatsGameName || gameName || "unknown"}' unlocked=${unlocked}/${list.length} achievements='${achievementSnapshot || "none"}'`,
+		);
 
-		await this._setVariableIfChanged(VARIABLE_NAMES.requestedGameAppId, appId);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.requestedGameName,
-			gameName || this._coerceString(gameInput, ""),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.requestedGameAchievementCount,
-			list.length,
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.requestedGameAchievementUnlocked,
-			unlocked,
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.requestedGameAchievements,
-			JSON.stringify(achievements ?? {}),
-		);
+		const resolvedGameName = gameName || this._coerceString(gameInput, "");
+		const actionVariables = {
+			[ACTION_VARIABLE_NAMES.requestedGameInput]: gameInput,
+			[ACTION_VARIABLE_NAMES.requestedGameAppId]: appId,
+			[ACTION_VARIABLE_NAMES.requestedGameName]: resolvedGameName,
+			[ACTION_VARIABLE_NAMES.requestedGameAchievementCount]: list.length,
+			[ACTION_VARIABLE_NAMES.requestedGameAchievementUnlocked]: unlocked,
+			[ACTION_VARIABLE_NAMES.requestedGameAchievements]: JSON.stringify(
+				achievements ?? {},
+			),
+		};
 
 		await this._showActionToast(
 			gameName
-				? `Fetched achievements for ${gameName}. Requested game variables updated.`
-				: `Fetched achievements for App ID ${appId}. Requested game variables updated.`,
+				? `Fetched achievements for ${gameName}.`
+				: `Fetched achievements for App ID ${appId}.`,
 			"success",
 		);
+
+		return actionVariables;
 	}
 
 	_resolveGameFromOwnedGames(games, input) {
@@ -16282,17 +18096,34 @@ class SteamPlugin extends Plugin {
 			.trim();
 	}
 
+	_summarizeAchievementEntry(achievement) {
+		const key = this._coerceString(
+			achievement?.apiname ?? achievement?.name ?? achievement?.displayName,
+			"unknown",
+		).trim();
+		const achieved = achievement?.achieved === 1 ? 1 : 0;
+		return `${key}:${achieved}`;
+	}
+
+	_summarizeAchievements(achievementList, limit = 40) {
+		if (!Array.isArray(achievementList) || !achievementList.length) {
+			return "";
+		}
+
+		const max = Math.max(1, this._coerceNumber(limit, 40));
+		const limited = achievementList.slice(0, max);
+		const summary = limited
+			.map((achievement) => this._summarizeAchievementEntry(achievement))
+			.join(", ");
+		const remaining = achievementList.length - limited.length;
+		if (remaining > 0) {
+			return `${summary} ... +${remaining} more`;
+		}
+		return summary;
+	}
+
 	_mapPersonaState(value) {
-		const map = {
-			0: "Offline",
-			1: "Online",
-			2: "Busy",
-			3: "Away",
-			4: "Snooze",
-			5: "Looking to Trade",
-			6: "Looking to Play",
-		};
-		return map[value] ?? "Offline";
+		return this._coerceNumber(value, 0) === 0 ? "Offline" : "Online";
 	}
 
 	_buildAlertVariables({
@@ -16300,6 +18131,8 @@ class SteamPlugin extends Plugin {
 		onlineStatus,
 		achievementUnlocked,
 		achievementCount,
+		achievementName = "",
+		achievementDescription = "",
 	}) {
 		return {
 			persona_username: this._coerceString(summary?.personaname, ""),
@@ -16311,6 +18144,8 @@ class SteamPlugin extends Plugin {
 				0,
 			),
 			current_game_achievement_count: this._coerceNumber(achievementCount, 0),
+			achievement_name: this._coerceString(achievementName, ""),
+			achievement_description: this._coerceString(achievementDescription, ""),
 		};
 	}
 
@@ -16450,6 +18285,10 @@ class SteamPlugin extends Plugin {
 		return refreshSeconds * 1000;
 	}
 
+	_debugEnabled(settings = this.settings) {
+		return Boolean(settings?.debugLogs);
+	}
+
 	async _updateConnectionState(state) {
 		if (this._lastConnectionState === state) {
 			return;
@@ -16565,7 +18404,7 @@ module.exports = SteamPlugin;
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.5",
+	"version": "1.0.8",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -16581,6 +18420,8 @@ module.exports = SteamPlugin;
 				"key": "apiKey",
 				"label": "Steam Web API Key",
 				"type": "password",
+				"section": "General",
+				"sectionOrder": 1,
 				"helperText": "Required for all Steam Web API requests.",
 				"required": true
 			},
@@ -16588,6 +18429,8 @@ module.exports = SteamPlugin;
 				"key": "steamIdOrVanity",
 				"label": "Steam ID or Vanity Name",
 				"type": "text",
+				"section": "General",
+				"sectionOrder": 1,
 				"helperText": "Enter a SteamID64 or a vanity URL name.",
 				"required": true
 			},
@@ -16595,17 +18438,22 @@ module.exports = SteamPlugin;
 				"key": "pollInterval",
 				"label": "Poll Interval (seconds)",
 				"type": "number",
+				"section": "General",
+				"sectionOrder": 1,
 				"defaultValue": 15,
 				"min": 15,
 				"max": 900,
 				"helperText": "How often to refresh current status/game and current-game achievements (15-900 seconds). Owned games refresh less frequently automatically."
 			},
 			{
-				"key": "alertGameChangedWhenStopped",
-				"label": "Alert When Game Stops",
+				"key": "debugLogs",
+				"label": "Enable Debug Logs",
 				"type": "checkbox",
-				"defaultValue": true,
-				"helperText": "When enabled, Game Changed alerts also trigger when you stop playing."
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"defaultValue": false,
+				"refreshOnChange": true,
+				"helperText": "Writes detailed Steam plugin diagnostics to Lumia logs for troubleshooting."
 			}
 		],
 		"settings_tutorial": "./settings_tutorial.md",
@@ -16615,6 +18463,14 @@ module.exports = SteamPlugin;
 				"type": "fetch_game",
 				"label": "Fetch Achievements For Game",
 				"description": "Fetch achievements by game name or App ID (owned games only).",
+				"acceptedVariables": [
+					"steam_requested_game_input",
+					"steam_requested_game_appid",
+					"steam_requested_game_name",
+					"steam_requested_game_achievement_count",
+					"steam_requested_game_achievement_unlocked",
+					"steam_requested_game_achievements"
+				],
 				"fields": [
 					{
 						"key": "game",
@@ -16642,6 +18498,11 @@ module.exports = SteamPlugin;
 				"name": "online_status",
 				"description": "Online status (text).",
 				"value": "Offline"
+			},
+			{
+				"name": "last_logoff",
+				"description": "Last logoff Unix timestamp.",
+				"value": 0
 			},
 			{
 				"name": "profile_url",
@@ -16679,28 +18540,13 @@ module.exports = SteamPlugin;
 				"value": 0
 			},
 			{
-				"name": "requested_game_appid",
-				"description": "App ID for the last requested game.",
-				"value": 0
-			},
-			{
-				"name": "requested_game_name",
-				"description": "Name for the last requested game.",
+				"name": "current_game_achievement_name",
+				"description": "Most recently unlocked current-game achievement name.",
 				"value": ""
 			},
 			{
-				"name": "requested_game_achievement_count",
-				"description": "Total achievements for the last requested game.",
-				"value": 0
-			},
-			{
-				"name": "requested_game_achievement_unlocked",
-				"description": "Unlocked achievements for the last requested game.",
-				"value": 0
-			},
-			{
-				"name": "requested_game_achievements",
-				"description": "JSON payload of achievements for the last requested game.",
+				"name": "current_game_achievement_description",
+				"description": "Most recently unlocked current-game achievement description.",
 				"value": ""
 			}
 		],
@@ -16710,6 +18556,9 @@ module.exports = SteamPlugin;
 				"key": "online_state_changed",
 				"acceptedVariables": ["persona_username", "online_status"],
 				"defaultMessage": "{{persona_username}} is now {{online_status}}.",
+				"defaults": {
+					"on": false
+				},
 				"variationConditions": [
 					{
 						"type": "EQUAL_SELECTION",
@@ -16724,31 +18573,6 @@ module.exports = SteamPlugin;
 								"label": "Offline",
 								"value": "offline",
 								"message": "{{persona_username}} went Offline."
-							},
-							{
-								"label": "Busy",
-								"value": "busy",
-								"message": "{{persona_username}} is Busy."
-							},
-							{
-								"label": "Away",
-								"value": "away",
-								"message": "{{persona_username}} is Away."
-							},
-							{
-								"label": "Snooze",
-								"value": "snooze",
-								"message": "{{persona_username}} is Snoozing."
-							},
-							{
-								"label": "Looking To Trade",
-								"value": "trade",
-								"message": "{{persona_username}} is Looking to Trade."
-							},
-							{
-								"label": "Looking To Play",
-								"value": "play",
-								"message": "{{persona_username}} is Looking to Play."
 							}
 						]
 					}
@@ -16756,13 +18580,36 @@ module.exports = SteamPlugin;
 			},
 			{
 				"title": "Achievement Unlocked",
-				"key": "achievement_progress_changed",
+				"key": "achievement_unlocked",
 				"acceptedVariables": [
 					"current_game_name",
+					"achievement_name",
+					"achievement_description",
 					"current_game_achievement_unlocked_count",
 					"current_game_achievement_count"
 				],
-				"defaultMessage": "{{current_game_name}} achievements: {{current_game_achievement_unlocked_count}}/{{current_game_achievement_count}}."
+				"defaultMessage": "{{current_game_name}}: {{achievement_name}} - {{achievement_description}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Achievement Name"
+					}
+				]
+			},
+			{
+				"title": "Achievement Progress Changed",
+				"key": "achievement_progress_changed",
+				"acceptedVariables": [
+					"current_game_name",
+					"achievement_name",
+					"achievement_description",
+					"current_game_achievement_unlocked_count",
+					"current_game_achievement_count"
+				],
+				"defaultMessage": "{{current_game_name}} achievements: {{current_game_achievement_unlocked_count}}/{{current_game_achievement_count}}.",
+				"defaults": {
+					"on": false
+				}
 			},
 			{
 				"title": "Game Changed",
@@ -16773,6 +18620,18 @@ module.exports = SteamPlugin;
 					{
 						"type": "EQUAL_STRING",
 						"description": "Game Name"
+					}
+				]
+			},
+			{
+				"title": "Game Over",
+				"key": "current_game_over",
+				"acceptedVariables": ["previous_game_name"],
+				"defaultMessage": "Stopped playing {{previous_game_name}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Previous Game Name"
 					}
 				]
 			}
@@ -16830,7 +18689,8 @@ Achievement stats are pulled automatically from your **current** game while you 
 	"en": {
 		"steamid": "SteamID64.",
 		"persona_username": "Username (Steam persona name).",
-		"online_status": "Online status (text).",
+		"online_status": "Online status (Online or Offline).",
+		"last_logoff": "Last logoff Unix timestamp.",
 		"profile_url": "Profile URL.",
 		"avatar": "Avatar URL.",
 		"current_game_name": "Current in-game name (if playing).",
@@ -16838,11 +18698,8 @@ Achievement stats are pulled automatically from your **current** game while you 
 		"game_count": "Owned games count.",
 		"current_game_achievement_count": "Total achievements for the current/last played game.",
 		"current_game_achievement_unlocked_count": "Unlocked achievements for the current/last played game.",
-		"requested_game_appid": "App ID for the last requested game.",
-		"requested_game_name": "Name for the last requested game.",
-		"requested_game_achievement_count": "Total achievements for the last requested game.",
-		"requested_game_achievement_unlocked": "Unlocked achievements for the last requested game.",
-		"requested_game_achievements": "JSON payload of achievements for the last requested game."
+		"current_game_achievement_name": "Most recently unlocked current-game achievement name.",
+		"current_game_achievement_description": "Most recently unlocked current-game achievement description."
 	}
 }
 

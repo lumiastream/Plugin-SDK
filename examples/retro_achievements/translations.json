@@ -1,0 +1,16 @@
+{
+	"en": {
+		"total_points": "Total hardcore points.",
+		"total_softcore_points": "Total softcore points.",
+		"total_true_points": "Total true points.",
+		"total_rank": "Global rank.",
+		"last_game_id": "Most recent game ID from profile.",
+		"last_game_title": "Most recent game title from profile.",
+		"last_game_console": "Console name for last game.",
+		"last_game_icon": "Icon URL for last game.",
+		"last_game_achievement_total": "Total achievements in the last game.",
+		"last_game_achievement_unlocked": "Unlocked achievements in the last game.",
+		"last_game_achievement_unlocked_hardcore": "Hardcore unlocked achievements in the last game.",
+		"last_game_completion": "Completion percentage text from API."
+	}
+}

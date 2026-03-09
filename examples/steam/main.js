@@ -34,11 +34,15 @@ const VARIABLE_NAMES = {
 	currentGameAchievementUnlocked: "current_game_achievement_unlocked_count",
 	achievementName: "current_game_achievement_name",
 	achievementDescription: "current_game_achievement_description",
-	requestedGameAppId: "requested_game_appid",
-	requestedGameName: "requested_game_name",
-	requestedGameAchievementCount: "requested_game_achievement_count",
-	requestedGameAchievementUnlocked: "requested_game_achievement_unlocked",
-	requestedGameAchievements: "requested_game_achievements",
+};
+
+const ACTION_VARIABLE_NAMES = {
+	requestedGameInput: "steam_requested_game_input",
+	requestedGameAppId: "steam_requested_game_appid",
+	requestedGameName: "steam_requested_game_name",
+	requestedGameAchievementCount: "steam_requested_game_achievement_count",
+	requestedGameAchievementUnlocked: "steam_requested_game_achievement_unlocked",
+	requestedGameAchievements: "steam_requested_game_achievements",
 };
 
 class SteamPlugin extends Plugin {
@@ -109,7 +113,9 @@ class SteamPlugin extends Plugin {
 	}
 
 	async actions(config) {
-		for (const action of config.actions) {
+		const actions = Array.isArray(config?.actions) ? config.actions : [];
+		const newlyPassedVariables = {};
+		for (const action of actions) {
 			const params = action.value;
 			try {
 				switch (action.type) {
@@ -117,7 +123,10 @@ class SteamPlugin extends Plugin {
 						await this._refreshData({ reason: "manual-action" });
 						break;
 					case "fetch_game":
-						await this._handleFetchGame(params);
+						this._mergeActionVariables(
+							newlyPassedVariables,
+							await this._handleFetchGame(params),
+						);
 						break;
 				}
 			} catch (error) {
@@ -127,6 +136,22 @@ class SteamPlugin extends Plugin {
 					"error",
 				);
 			}
+		}
+
+		if (Object.keys(newlyPassedVariables).length) {
+			return { newlyPassedVariables };
+		}
+	}
+
+	_mergeActionVariables(target, variables) {
+		if (!variables || typeof variables !== "object") {
+			return;
+		}
+		for (const [key, value] of Object.entries(variables)) {
+			if (!key) {
+				continue;
+			}
+			target[key] = value;
 		}
 	}
 
@@ -817,13 +842,13 @@ class SteamPlugin extends Plugin {
 	async _handleFetchGame(params = {}) {
 		if (!this._hasRequiredSettings()) {
 			await this._log("Missing Steam API key or Steam ID.", "warn");
-			return;
+			return null;
 		}
 
 		const gameInput = this._coerceString(params?.game, "").trim();
 		if (!gameInput) {
 			await this._log("Game name or App ID is required.", "warn");
-			return;
+			return null;
 		}
 
 		const steamId = await this._resolveSteamId();
@@ -867,7 +892,7 @@ class SteamPlugin extends Plugin {
 						`No owned game matched '${gameInput}'.`,
 						"warn",
 					);
-					return;
+					return null;
 				}
 				appId = match.appid;
 				gameName = match.name;
@@ -887,7 +912,7 @@ class SteamPlugin extends Plugin {
 				`Unable to resolve game '${gameInput}'.`,
 				"warn",
 			);
-			return;
+			return null;
 		}
 		await this._tempDebug(
 			`fetch_game resolved appId=${appId} gameName='${gameName || "unknown"}'`,
@@ -910,30 +935,26 @@ class SteamPlugin extends Plugin {
 			} gameName='${playerStatsGameName || gameName || "unknown"}' unlocked=${unlocked}/${list.length} achievements='${achievementSnapshot || "none"}'`,
 		);
 
-		await this._setVariableIfChanged(VARIABLE_NAMES.requestedGameAppId, appId);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.requestedGameName,
-			gameName || this._coerceString(gameInput, ""),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.requestedGameAchievementCount,
-			list.length,
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.requestedGameAchievementUnlocked,
-			unlocked,
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.requestedGameAchievements,
-			JSON.stringify(achievements ?? {}),
-		);
+		const resolvedGameName = gameName || this._coerceString(gameInput, "");
+		const actionVariables = {
+			[ACTION_VARIABLE_NAMES.requestedGameInput]: gameInput,
+			[ACTION_VARIABLE_NAMES.requestedGameAppId]: appId,
+			[ACTION_VARIABLE_NAMES.requestedGameName]: resolvedGameName,
+			[ACTION_VARIABLE_NAMES.requestedGameAchievementCount]: list.length,
+			[ACTION_VARIABLE_NAMES.requestedGameAchievementUnlocked]: unlocked,
+			[ACTION_VARIABLE_NAMES.requestedGameAchievements]: JSON.stringify(
+				achievements ?? {},
+			),
+		};
 
 		await this._showActionToast(
 			gameName
-				? `Fetched achievements for ${gameName}. Requested game variables updated.`
-				: `Fetched achievements for App ID ${appId}. Requested game variables updated.`,
+				? `Fetched achievements for ${gameName}.`
+				: `Fetched achievements for App ID ${appId}.`,
 			"success",
 		);
+
+		return actionVariables;
 	}
 
 	_resolveGameFromOwnedGames(games, input) {
