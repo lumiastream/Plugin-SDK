@@ -18,7 +18,6 @@ const RA_SITE_BASE = "https://retroachievements.org";
 const ALERT_KEYS = {
 	currentGameChanged: "current_game_changed",
 	achievementUnlocked: "achievement_unlocked",
-	hardcoreAchievementUnlocked: "hardcore_achievement_unlocked",
 };
 
 const VARIABLE_NAMES = {
@@ -531,15 +530,6 @@ class RetroAchievementsPlugin extends Plugin {
 					dynamicValue: vars.achievement_title,
 				}),
 			});
-
-			if (vars.achievement_hardcore) {
-				await this.lumia.triggerAlert({
-					alert: ALERT_KEYS.hardcoreAchievementUnlocked,
-					...this._buildAlertPayload(vars, {
-						dynamicValue: vars.achievement_title,
-					}),
-				});
-			}
 		}
 
 		this._lastGameId = lastGameId;

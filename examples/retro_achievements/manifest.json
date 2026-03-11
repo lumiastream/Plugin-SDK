@@ -1,7 +1,7 @@
 {
 	"id": "retro_achievements",
 	"name": "RetroAchievements",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -198,18 +198,6 @@
 						"description": "Achievement Title"
 					}
 				]
-			},
-			{
-				"title": "Hardcore Achievement",
-				"key": "hardcore_achievement_unlocked",
-				"acceptedVariables": [
-					"username",
-					"game_title",
-					"achievement_title",
-					"achievement_points",
-					"achievement_badge_url"
-				],
-				"defaultMessage": "{{username}} hardcore unlocked {{achievement_title}} in {{game_title}}."
 			}
 		],
 		"translations": "./translations.json"
