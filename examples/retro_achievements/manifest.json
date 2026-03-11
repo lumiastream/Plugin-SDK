@@ -1,7 +1,7 @@
 {
 	"id": "retro_achievements",
 	"name": "RetroAchievements",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -170,6 +170,22 @@
 					{
 						"type": "EQUAL_STRING",
 						"description": "Game Title"
+					}
+				]
+			},
+			{
+				"title": "Current Game Over",
+				"key": "current_game_over",
+				"acceptedVariables": [
+					"username",
+					"previous_game_id",
+					"previous_game_title"
+				],
+				"defaultMessage": "{{username}} stopped playing {{previous_game_title}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Previous Game Title"
 					}
 				]
 			},

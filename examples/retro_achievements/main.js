@@ -17,6 +17,7 @@ const RA_SITE_BASE = "https://retroachievements.org";
 
 const ALERT_KEYS = {
 	currentGameChanged: "current_game_changed",
+	currentGameOver: "current_game_over",
 	achievementUnlocked: "achievement_unlocked",
 };
 
@@ -487,11 +488,13 @@ class RetroAchievementsPlugin extends Plugin {
 			return;
 		}
 
-		if (
-			this._lastGameId !== null &&
-			lastGameId > 0 &&
-			lastGameId !== this._lastGameId
-		) {
+		const previousGameId = this._lastGameId;
+		const previousGameTitle = this._lastGameTitle;
+		const changedToNewGame =
+			lastGameId > 0 && (previousGameId === null || lastGameId !== previousGameId);
+		const changedToNoGame = !lastGameId && previousGameId !== null;
+
+		if (changedToNewGame) {
 			const vars = this._buildCurrentGameAlertVariables({
 				profile,
 				currentGame,
@@ -501,8 +504,24 @@ class RetroAchievementsPlugin extends Plugin {
 				alert: ALERT_KEYS.currentGameChanged,
 				...this._buildAlertPayload(vars, {
 					dynamicValue: vars.last_game_title,
-					previous_game_id: this._lastGameId,
-					previous_game_title: this._lastGameTitle,
+					previous_game_id: previousGameId,
+					previous_game_title: previousGameTitle,
+				}),
+			});
+		}
+
+		if (changedToNoGame) {
+			const vars = this._buildCurrentGameAlertVariables({
+				profile,
+				currentGame,
+				gameProgress,
+			});
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.currentGameOver,
+				...this._buildAlertPayload(vars, {
+					dynamicValue: previousGameTitle || "Stopped Playing",
+					previous_game_id: previousGameId,
+					previous_game_title: previousGameTitle,
 				}),
 			});
 		}
