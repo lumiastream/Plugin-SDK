@@ -125,7 +125,6 @@
 				"name": "last_message",
 				"system": false,
 				"origin": "build",
-				"allowedPlaces": ["automations", "overlays"],
 				"description": "Stores the most recent message handled by the plugin.",
 				"value": "",
 				"example": "Hello from Build!"
@@ -134,7 +133,6 @@
 				"name": "last_alert_color",
 				"system": false,
 				"origin": "build",
-				"allowedPlaces": ["automations", "overlays"],
 				"description": "Tracks the color used by the latest sample alert.",
 				"value": "",
 				"example": "#00c2ff"

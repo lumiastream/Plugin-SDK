@@ -12553,8 +12553,8 @@ const RA_SITE_BASE = "https://retroachievements.org";
 
 const ALERT_KEYS = {
 	currentGameChanged: "current_game_changed",
+	currentGameOver: "current_game_over",
 	achievementUnlocked: "achievement_unlocked",
-	hardcoreAchievementUnlocked: "hardcore_achievement_unlocked",
 };
 
 const VARIABLE_NAMES = {
@@ -13024,11 +13024,13 @@ class RetroAchievementsPlugin extends Plugin {
 			return;
 		}
 
-		if (
-			this._lastGameId !== null &&
-			lastGameId > 0 &&
-			lastGameId !== this._lastGameId
-		) {
+		const previousGameId = this._lastGameId;
+		const previousGameTitle = this._lastGameTitle;
+		const changedToNewGame =
+			lastGameId > 0 && (previousGameId === null || lastGameId !== previousGameId);
+		const changedToNoGame = !lastGameId && previousGameId !== null;
+
+		if (changedToNewGame) {
 			const vars = this._buildCurrentGameAlertVariables({
 				profile,
 				currentGame,
@@ -13038,8 +13040,24 @@ class RetroAchievementsPlugin extends Plugin {
 				alert: ALERT_KEYS.currentGameChanged,
 				...this._buildAlertPayload(vars, {
 					dynamicValue: vars.last_game_title,
-					previous_game_id: this._lastGameId,
-					previous_game_title: this._lastGameTitle,
+					previous_game_id: previousGameId,
+					previous_game_title: previousGameTitle,
+				}),
+			});
+		}
+
+		if (changedToNoGame) {
+			const vars = this._buildCurrentGameAlertVariables({
+				profile,
+				currentGame,
+				gameProgress,
+			});
+			await this.lumia.triggerAlert({
+				alert: ALERT_KEYS.currentGameOver,
+				...this._buildAlertPayload(vars, {
+					dynamicValue: previousGameTitle || "Stopped Playing",
+					previous_game_id: previousGameId,
+					previous_game_title: previousGameTitle,
 				}),
 			});
 		}
@@ -13067,15 +13085,6 @@ class RetroAchievementsPlugin extends Plugin {
 					dynamicValue: vars.achievement_title,
 				}),
 			});
-
-			if (vars.achievement_hardcore) {
-				await this.lumia.triggerAlert({
-					alert: ALERT_KEYS.hardcoreAchievementUnlocked,
-					...this._buildAlertPayload(vars, {
-						dynamicValue: vars.achievement_title,
-					}),
-				});
-			}
 		}
 
 		this._lastGameId = lastGameId;
@@ -13788,7 +13797,7 @@ module.exports = RetroAchievementsPlugin;
 {
 	"id": "retro_achievements",
 	"name": "RetroAchievements",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -13961,6 +13970,22 @@ module.exports = RetroAchievementsPlugin;
 				]
 			},
 			{
+				"title": "Current Game Over",
+				"key": "current_game_over",
+				"acceptedVariables": [
+					"username",
+					"previous_game_id",
+					"previous_game_title"
+				],
+				"defaultMessage": "{{username}} stopped playing {{previous_game_title}}.",
+				"variationConditions": [
+					{
+						"type": "EQUAL_STRING",
+						"description": "Previous Game Title"
+					}
+				]
+			},
+			{
 				"title": "Achievement Unlocked",
 				"key": "achievement_unlocked",
 				"acceptedVariables": [
@@ -13985,18 +14010,6 @@ module.exports = RetroAchievementsPlugin;
 						"description": "Achievement Title"
 					}
 				]
-			},
-			{
-				"title": "Hardcore Achievement",
-				"key": "hardcore_achievement_unlocked",
-				"acceptedVariables": [
-					"username",
-					"game_title",
-					"achievement_title",
-					"achievement_points",
-					"achievement_badge_url"
-				],
-				"defaultMessage": "{{username}} hardcore unlocked {{achievement_title}} in {{game_title}}."
 			}
 		],
 		"translations": "./translations.json"
@@ -14010,7 +14023,7 @@ module.exports = RetroAchievementsPlugin;
 ```
 {
 	"name": "lumia-plugin-retro-achievements",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"private": true,
 	"description": "Lumia Stream plugin for RetroAchievements profile and achievement tracking.",
 	"main": "main.js",
