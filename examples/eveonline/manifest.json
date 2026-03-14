@@ -1,7 +1,7 @@
 {
 	"id": "eveonline",
 	"name": "EVE Online",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -230,37 +230,25 @@
 			{
 				"title": "Wallet Spike",
 				"key": "eve_wallet_spike",
-				"acceptedVariables": [
-					"character_name",
-					"wallet_balance"
-				],
+				"acceptedVariables": ["character_name", "wallet_balance"],
 				"defaultMessage": "{{character_name}} wallet increased ({{wallet_balance}} ISK)."
 			},
 			{
 				"title": "Wallet Drop",
 				"key": "eve_wallet_drop",
-				"acceptedVariables": [
-					"character_name",
-					"wallet_balance"
-				],
+				"acceptedVariables": ["character_name", "wallet_balance"],
 				"defaultMessage": "{{character_name}} wallet decreased ({{wallet_balance}} ISK)."
 			},
 			{
 				"title": "New Killmail",
 				"key": "eve_killmail_new",
-				"acceptedVariables": [
-					"character_name",
-					"killmails_recent_count"
-				],
+				"acceptedVariables": ["character_name", "killmails_recent_count"],
 				"defaultMessage": "New killmail detected for {{character_name}}."
 			},
 			{
 				"title": "New Notification",
 				"key": "eve_notification_new",
-				"acceptedVariables": [
-					"character_name",
-					"notifications_count"
-				],
+				"acceptedVariables": ["character_name", "notifications_count"],
 				"defaultMessage": "New EVE notification for {{character_name}}."
 			},
 			{
@@ -288,11 +276,7 @@
 			{
 				"title": "Ship Changed",
 				"key": "eve_ship_changed",
-				"acceptedVariables": [
-					"character_name",
-					"ship_type_id",
-					"ship_name"
-				],
+				"acceptedVariables": ["character_name", "ship_type_id", "ship_name"],
 				"defaultMessage": "{{character_name}} switched ships ({{ship_name}})."
 			}
 		],
