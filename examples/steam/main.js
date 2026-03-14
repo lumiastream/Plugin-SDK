@@ -4,6 +4,8 @@ const DEFAULTS = {
 	pollInterval: 120,
 	minPollInterval: 15,
 	maxPollInterval: 900,
+	requestTimeoutMs: 15000,
+	stuckRefreshMs: 60000,
 	ownedGamesRefreshSeconds: 600,
 	userAgent: "LumiaStream Steam Plugin/1.0.0",
 	logThrottleMs: 5 * 60 * 1000,
@@ -50,6 +52,7 @@ class SteamPlugin extends Plugin {
 		super(manifest, context);
 		this._pollTimer = null;
 		this._refreshPromise = null;
+		this._refreshStartedAt = 0;
 		this._lastConnectionState = null;
 		this._lastVariables = new Map();
 		this._logTimestamps = new Map();
@@ -240,9 +243,20 @@ class SteamPlugin extends Plugin {
 		}
 
 		if (this._refreshPromise) {
-			return this._refreshPromise;
+			const elapsed = Date.now() - this._refreshStartedAt;
+			if (elapsed <= DEFAULTS.stuckRefreshMs) {
+				return this._refreshPromise;
+			}
+			await this._logThrottled(
+				"refresh-stuck",
+				`Steam refresh appears stuck for ${Math.round(elapsed / 1000)}s; restarting refresh loop.`,
+				"warn",
+			);
+			this._refreshPromise = null;
+			this._refreshStartedAt = 0;
 		}
 
+		this._refreshStartedAt = Date.now();
 		this._refreshPromise = (async () => {
 			try {
 				const steamId = await this._resolveSteamId();
@@ -338,8 +352,10 @@ class SteamPlugin extends Plugin {
 					"warn",
 				);
 				await this._updateConnectionState(false);
+			} finally {
+				this._refreshPromise = null;
+				this._refreshStartedAt = 0;
 			}
-			this._refreshPromise = null;
 		})();
 
 		return this._refreshPromise;
@@ -498,8 +514,43 @@ class SteamPlugin extends Plugin {
 			"Cache-Control": "no-cache, no-store, max-age=0",
 			Pragma: "no-cache",
 		};
+		const timeoutMs = Math.max(1000, DEFAULTS.requestTimeoutMs);
+		const supportsAbort = typeof AbortController !== "undefined";
 
-		return fetch(url, { headers, cache: "no-store" });
+		if (!supportsAbort) {
+			let timeoutId = null;
+			try {
+				return await Promise.race([
+					fetch(url, { headers, cache: "no-store" }),
+					new Promise((_, reject) => {
+						timeoutId = setTimeout(() => {
+							reject(new Error(`Steam request timed out after ${timeoutMs}ms.`));
+						}, timeoutMs);
+					}),
+				]);
+			} finally {
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+				}
+			}
+		}
+
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+		try {
+			return await fetch(url, {
+				headers,
+				cache: "no-store",
+				signal: controller.signal,
+			});
+		} catch (error) {
+			if (error?.name === "AbortError") {
+				throw new Error(`Steam request timed out after ${timeoutMs}ms.`);
+			}
+			throw error;
+		} finally {
+			clearTimeout(timeoutId);
+		}
 	}
 
 	async _applySummary(summary, steamId) {

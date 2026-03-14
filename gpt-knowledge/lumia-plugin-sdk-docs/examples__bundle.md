@@ -2835,6 +2835,8 @@ const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULTS = {
 	pollInterval: 120,
+	requestTimeoutMs: 15000,
+	stuckRefreshMs: 60000,
 	compatibilityDate: "2026-02-03",
 	userAgent: "LumiaStream EVE Online Plugin/1.0.0",
 	walletAlertThreshold: 1000000,
@@ -2889,6 +2891,7 @@ class EveOnlinePlugin extends Plugin {
 		super(manifest, context);
 		this._pollTimer = null;
 		this._refreshPromise = null;
+		this._refreshStartedAt = 0;
 		this._tokenRefreshPromise = null;
 		this._lastConnectionState = null;
 		this._lastVariables = new Map();
@@ -3004,9 +3007,19 @@ class EveOnlinePlugin extends Plugin {
 		}
 
 		if (this._refreshPromise) {
-			return this._refreshPromise;
+			const elapsed = Date.now() - this._refreshStartedAt;
+			if (elapsed <= DEFAULTS.stuckRefreshMs) {
+				return this._refreshPromise;
+			}
+			await this._log(
+				`Refresh appears stuck for ${Math.round(elapsed / 1000)}s; restarting refresh loop.`,
+				"warn",
+			);
+			this._refreshPromise = null;
+			this._refreshStartedAt = 0;
 		}
 
+		this._refreshStartedAt = Date.now();
 		this._refreshPromise = (async () => {
 			try {
 				const accessToken = await this._ensureAccessToken();
@@ -3090,8 +3103,10 @@ class EveOnlinePlugin extends Plugin {
 				const message = this._errorMessage(error);
 				await this._log(`Failed to refresh ESI data: ${message}`, "warn");
 				await this._updateConnectionState(false);
+			} finally {
+				this._refreshPromise = null;
+				this._refreshStartedAt = 0;
 			}
-			this._refreshPromise = null;
 		})();
 
 		return this._refreshPromise;
@@ -3138,7 +3153,7 @@ class EveOnlinePlugin extends Plugin {
 	}
 
 	async _verifyToken(accessToken) {
-		const response = await fetch(SSO_VERIFY_URL, {
+		const response = await this._fetchWithTimeout(SSO_VERIFY_URL, {
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
 				Accept: "application/json",
@@ -3308,7 +3323,7 @@ class EveOnlinePlugin extends Plugin {
 			headers["If-None-Match"] = etag;
 		}
 
-		const response = await fetch(url, { headers });
+		const response = await this._fetchWithTimeout(url, { headers });
 
 		const responseEtag = response.headers.get("etag");
 		this._updateCooldown(url, response);
@@ -3338,6 +3353,44 @@ class EveOnlinePlugin extends Plugin {
 		}
 
 		return response;
+	}
+
+	async _fetchWithTimeout(url, options = {}) {
+		const timeoutMs = Math.max(1000, DEFAULTS.requestTimeoutMs);
+		const supportsAbort = typeof AbortController !== "undefined";
+		if (!supportsAbort) {
+			let timeoutId = null;
+			try {
+				return await Promise.race([
+					fetch(url, options),
+					new Promise((_, reject) => {
+						timeoutId = setTimeout(() => {
+							reject(new Error(`EVE request timed out after ${timeoutMs}ms.`));
+						}, timeoutMs);
+					}),
+				]);
+			} finally {
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+				}
+			}
+		}
+
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+		try {
+			return await fetch(url, {
+				...options,
+				signal: controller.signal,
+			});
+		} catch (error) {
+			if (error?.name === "AbortError") {
+				throw new Error(`EVE request timed out after ${timeoutMs}ms.`);
+			}
+			throw error;
+		} finally {
+			clearTimeout(timeoutId);
+		}
 	}
 
 	async _refreshAccessToken() {
@@ -12540,6 +12593,8 @@ const DEFAULTS = {
 	pollInterval: 30,
 	minPollInterval: 15,
 	maxPollInterval: 900,
+	requestTimeoutMs: 15000,
+	stuckRefreshMs: 60000,
 	recentAchievementsWindowMinutes: 120,
 	recentPlayedCount: 100,
 	userAgent: "LumiaStream RetroAchievements Plugin/1.0.0",
@@ -12597,6 +12652,7 @@ class RetroAchievementsPlugin extends Plugin {
 		this._lastVariables = new Map();
 		this._logTimestamps = new Map();
 		this._hasInitialSync = false;
+		this._refreshStartedAt = 0;
 		this._lastGameId = null;
 		this._lastGameTitle = "";
 		this._seenUnlockKeys = new Set();
@@ -12702,7 +12758,19 @@ class RetroAchievementsPlugin extends Plugin {
 		if (severity === "error") {
 			decorated = `${prefix} ERROR ${message}`;
 		}
-		await this.lumia.log(decorated);
+		try {
+			await this.lumia.log(decorated);
+		} catch {
+			// Keep plugin flow alive when logging transport is unavailable.
+		}
+
+		if (severity === "warn") {
+			console.warn(decorated);
+		} else if (severity === "error") {
+			console.error(decorated);
+		} else if (this._debugEnabled()) {
+			console.log(decorated);
+		}
 	}
 
 	async _logThrottled(
@@ -12753,9 +12821,21 @@ class RetroAchievementsPlugin extends Plugin {
 		}
 
 		if (this._refreshPromise) {
-			return this._refreshPromise;
+			const elapsed = Date.now() - this._refreshStartedAt;
+			if (elapsed <= DEFAULTS.stuckRefreshMs) {
+				return this._refreshPromise;
+			}
+
+			await this._logThrottled(
+				"refresh-stuck",
+				`Refresh appears stuck for ${Math.round(elapsed / 1000)}s; starting a new refresh cycle.`,
+				"warn",
+			);
+			this._refreshPromise = null;
+			this._refreshStartedAt = 0;
 		}
 
+		this._refreshStartedAt = Date.now();
 		this._refreshPromise = (async () => {
 			try {
 				const profile = await this._fetchUserProfile();
@@ -12808,9 +12888,10 @@ class RetroAchievementsPlugin extends Plugin {
 					"warn",
 				);
 				await this._updateConnectionState(false);
+			} finally {
+				this._refreshPromise = null;
+				this._refreshStartedAt = 0;
 			}
-
-			this._refreshPromise = null;
 		})();
 
 		return this._refreshPromise;
@@ -12910,8 +12991,47 @@ class RetroAchievementsPlugin extends Plugin {
 			"Cache-Control": "no-cache, no-store, max-age=0",
 			Pragma: "no-cache",
 		};
+		const timeoutMs = Math.max(1000, DEFAULTS.requestTimeoutMs);
+		const supportsAbort = typeof AbortController !== "undefined";
 
-		return fetch(url, { headers, cache: "no-store" });
+		if (!supportsAbort) {
+			let timeoutId = null;
+			try {
+				return await Promise.race([
+					fetch(url, { headers, cache: "no-store" }),
+					new Promise((_, reject) => {
+						timeoutId = setTimeout(() => {
+							reject(
+								new Error(
+									`RetroAchievements request timed out after ${timeoutMs}ms.`,
+								),
+							);
+						}, timeoutMs);
+					}),
+				]);
+			} finally {
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+				}
+			}
+		}
+
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+		try {
+			return await fetch(url, {
+				headers,
+				cache: "no-store",
+				signal: controller.signal,
+			});
+		} catch (error) {
+			if (error?.name === "AbortError") {
+				throw new Error(`RetroAchievements request timed out after ${timeoutMs}ms.`);
+			}
+			throw error;
+		} finally {
+			clearTimeout(timeoutId);
+		}
 	}
 
 	async _applyProfile(profile, currentGame = null) {
@@ -13666,6 +13786,7 @@ class RetroAchievementsPlugin extends Plugin {
 			return;
 		}
 
+		const previousState = this._lastConnectionState;
 		this._lastConnectionState = state;
 		if (typeof this.lumia.updateConnection !== "function") {
 			return;
@@ -13673,6 +13794,16 @@ class RetroAchievementsPlugin extends Plugin {
 
 		try {
 			await this.lumia.updateConnection(state);
+			if (!state) {
+				await this._logThrottled(
+					"connection-down",
+					"RetroAchievements connection is down; polling will continue automatically.",
+					"warn",
+					60 * 1000,
+				);
+			} else if (previousState === false) {
+				await this._log("RetroAchievements connection restored.");
+			}
 		} catch (error) {
 			await this._log(
 				`Failed to update connection state: ${this._errorMessage(error)}`,
@@ -17100,6 +17231,8 @@ const DEFAULTS = {
 	pollInterval: 120,
 	minPollInterval: 15,
 	maxPollInterval: 900,
+	requestTimeoutMs: 15000,
+	stuckRefreshMs: 60000,
 	ownedGamesRefreshSeconds: 600,
 	userAgent: "LumiaStream Steam Plugin/1.0.0",
 	logThrottleMs: 5 * 60 * 1000,
@@ -17146,6 +17279,7 @@ class SteamPlugin extends Plugin {
 		super(manifest, context);
 		this._pollTimer = null;
 		this._refreshPromise = null;
+		this._refreshStartedAt = 0;
 		this._lastConnectionState = null;
 		this._lastVariables = new Map();
 		this._logTimestamps = new Map();
@@ -17336,9 +17470,20 @@ class SteamPlugin extends Plugin {
 		}
 
 		if (this._refreshPromise) {
-			return this._refreshPromise;
+			const elapsed = Date.now() - this._refreshStartedAt;
+			if (elapsed <= DEFAULTS.stuckRefreshMs) {
+				return this._refreshPromise;
+			}
+			await this._logThrottled(
+				"refresh-stuck",
+				`Steam refresh appears stuck for ${Math.round(elapsed / 1000)}s; restarting refresh loop.`,
+				"warn",
+			);
+			this._refreshPromise = null;
+			this._refreshStartedAt = 0;
 		}
 
+		this._refreshStartedAt = Date.now();
 		this._refreshPromise = (async () => {
 			try {
 				const steamId = await this._resolveSteamId();
@@ -17434,8 +17579,10 @@ class SteamPlugin extends Plugin {
 					"warn",
 				);
 				await this._updateConnectionState(false);
+			} finally {
+				this._refreshPromise = null;
+				this._refreshStartedAt = 0;
 			}
-			this._refreshPromise = null;
 		})();
 
 		return this._refreshPromise;
@@ -17594,8 +17741,43 @@ class SteamPlugin extends Plugin {
 			"Cache-Control": "no-cache, no-store, max-age=0",
 			Pragma: "no-cache",
 		};
+		const timeoutMs = Math.max(1000, DEFAULTS.requestTimeoutMs);
+		const supportsAbort = typeof AbortController !== "undefined";
 
-		return fetch(url, { headers, cache: "no-store" });
+		if (!supportsAbort) {
+			let timeoutId = null;
+			try {
+				return await Promise.race([
+					fetch(url, { headers, cache: "no-store" }),
+					new Promise((_, reject) => {
+						timeoutId = setTimeout(() => {
+							reject(new Error(`Steam request timed out after ${timeoutMs}ms.`));
+						}, timeoutMs);
+					}),
+				]);
+			} finally {
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+				}
+			}
+		}
+
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+		try {
+			return await fetch(url, {
+				headers,
+				cache: "no-store",
+				signal: controller.signal,
+			});
+		} catch (error) {
+			if (error?.name === "AbortError") {
+				throw new Error(`Steam request timed out after ${timeoutMs}ms.`);
+			}
+			throw error;
+		} finally {
+			clearTimeout(timeoutId);
+		}
 	}
 
 	async _applySummary(summary, steamId) {

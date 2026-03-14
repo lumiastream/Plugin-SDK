@@ -2,6 +2,8 @@ const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULTS = {
 	pollInterval: 120,
+	requestTimeoutMs: 15000,
+	stuckRefreshMs: 60000,
 	compatibilityDate: "2026-02-03",
 	userAgent: "LumiaStream EVE Online Plugin/1.0.0",
 	walletAlertThreshold: 1000000,
@@ -56,6 +58,7 @@ class EveOnlinePlugin extends Plugin {
 		super(manifest, context);
 		this._pollTimer = null;
 		this._refreshPromise = null;
+		this._refreshStartedAt = 0;
 		this._tokenRefreshPromise = null;
 		this._lastConnectionState = null;
 		this._lastVariables = new Map();
@@ -171,9 +174,19 @@ class EveOnlinePlugin extends Plugin {
 		}
 
 		if (this._refreshPromise) {
-			return this._refreshPromise;
+			const elapsed = Date.now() - this._refreshStartedAt;
+			if (elapsed <= DEFAULTS.stuckRefreshMs) {
+				return this._refreshPromise;
+			}
+			await this._log(
+				`Refresh appears stuck for ${Math.round(elapsed / 1000)}s; restarting refresh loop.`,
+				"warn",
+			);
+			this._refreshPromise = null;
+			this._refreshStartedAt = 0;
 		}
 
+		this._refreshStartedAt = Date.now();
 		this._refreshPromise = (async () => {
 			try {
 				const accessToken = await this._ensureAccessToken();
@@ -257,8 +270,10 @@ class EveOnlinePlugin extends Plugin {
 				const message = this._errorMessage(error);
 				await this._log(`Failed to refresh ESI data: ${message}`, "warn");
 				await this._updateConnectionState(false);
+			} finally {
+				this._refreshPromise = null;
+				this._refreshStartedAt = 0;
 			}
-			this._refreshPromise = null;
 		})();
 
 		return this._refreshPromise;
@@ -305,7 +320,7 @@ class EveOnlinePlugin extends Plugin {
 	}
 
 	async _verifyToken(accessToken) {
-		const response = await fetch(SSO_VERIFY_URL, {
+		const response = await this._fetchWithTimeout(SSO_VERIFY_URL, {
 			headers: {
 				Authorization: `Bearer ${accessToken}`,
 				Accept: "application/json",
@@ -475,7 +490,7 @@ class EveOnlinePlugin extends Plugin {
 			headers["If-None-Match"] = etag;
 		}
 
-		const response = await fetch(url, { headers });
+		const response = await this._fetchWithTimeout(url, { headers });
 
 		const responseEtag = response.headers.get("etag");
 		this._updateCooldown(url, response);
@@ -505,6 +520,44 @@ class EveOnlinePlugin extends Plugin {
 		}
 
 		return response;
+	}
+
+	async _fetchWithTimeout(url, options = {}) {
+		const timeoutMs = Math.max(1000, DEFAULTS.requestTimeoutMs);
+		const supportsAbort = typeof AbortController !== "undefined";
+		if (!supportsAbort) {
+			let timeoutId = null;
+			try {
+				return await Promise.race([
+					fetch(url, options),
+					new Promise((_, reject) => {
+						timeoutId = setTimeout(() => {
+							reject(new Error(`EVE request timed out after ${timeoutMs}ms.`));
+						}, timeoutMs);
+					}),
+				]);
+			} finally {
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+				}
+			}
+		}
+
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+		try {
+			return await fetch(url, {
+				...options,
+				signal: controller.signal,
+			});
+		} catch (error) {
+			if (error?.name === "AbortError") {
+				throw new Error(`EVE request timed out after ${timeoutMs}ms.`);
+			}
+			throw error;
+		} finally {
+			clearTimeout(timeoutId);
+		}
 	}
 
 	async _refreshAccessToken() {
