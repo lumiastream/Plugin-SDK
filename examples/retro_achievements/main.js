@@ -175,11 +175,7 @@ class RetroAchievementsPlugin extends Plugin {
 			// Keep plugin flow alive when logging transport is unavailable.
 		}
 
-		if (severity === "warn") {
-			console.warn(decorated);
-		} else if (severity === "error") {
-			console.error(decorated);
-		} else if (this._debugEnabled()) {
+		if (this._debugEnabled()) {
 			console.log(decorated);
 		}
 	}
