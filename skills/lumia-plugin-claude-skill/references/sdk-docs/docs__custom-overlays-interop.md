@@ -59,7 +59,12 @@ Notes:
 
 - Use `data.alert` to branch alert types.
 - `Overlay.getVariable` should use a string literal key so dependencies can be detected.
-- Available listeners: `chat`, `alert`, `hfx`, `virtuallight`, `overlaycontent`.
+- Available listeners:
+  - `alert` — fired when a plugin or Lumia triggers an alert; `data.alert` is the key, `data.extraSettings` is the payload
+  - `chat` — fired for each chat message displayed in Lumia; `data.username`, `data.message`, etc.
+  - `overlaycontent` — fired for direct overlay pushes via `overlaySendCustomContent`; `data.codeId` and `data.content`
+  - `hfx` — fired for HFX (haptics/effects) events
+  - `virtuallight` — fired when a virtual light state changes
 
 ## Optional Direct Push: `overlaycontent`
 
