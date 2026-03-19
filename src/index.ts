@@ -16,6 +16,8 @@ export type {
   PluginPackage,
   PluginVariableDefinition,
   PluginAlertDefinition,
+  PluginAlertVariationGenerationConfig,
+  PluginGeneratedAlertVariation,
   PluginIntegrationConfig,
   PluginOAuthConfig,
   PluginOAuthTokenKeys,

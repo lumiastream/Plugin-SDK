@@ -1,8 +1,8 @@
 # GitHub Copilot Instructions
 
 <!-- GENERATED: scripts/sync-copilot-instructions.js -->
-- sdk_version: 0.7.0
-- generated_at_utc: 2026-03-14T23:07:19.347Z
+- sdk_version: 0.7.1
+- generated_at_utc: 2026-03-18T21:45:34.162Z
 
 Use these instructions when developing Lumia Stream plugins in this repository or compatible plugin projects.
 

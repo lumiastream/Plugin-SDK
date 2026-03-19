@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.0"
+		"@lumiastream/plugin": "^0.7.1"
 	}
 }
 
@@ -3914,7 +3914,7 @@ module.exports = EveOnlinePlugin;
 {
 	"id": "eveonline",
 	"name": "EVE Online",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -4143,37 +4143,25 @@ module.exports = EveOnlinePlugin;
 			{
 				"title": "Wallet Spike",
 				"key": "eve_wallet_spike",
-				"acceptedVariables": [
-					"character_name",
-					"wallet_balance"
-				],
+				"acceptedVariables": ["character_name", "wallet_balance"],
 				"defaultMessage": "{{character_name}} wallet increased ({{wallet_balance}} ISK)."
 			},
 			{
 				"title": "Wallet Drop",
 				"key": "eve_wallet_drop",
-				"acceptedVariables": [
-					"character_name",
-					"wallet_balance"
-				],
+				"acceptedVariables": ["character_name", "wallet_balance"],
 				"defaultMessage": "{{character_name}} wallet decreased ({{wallet_balance}} ISK)."
 			},
 			{
 				"title": "New Killmail",
 				"key": "eve_killmail_new",
-				"acceptedVariables": [
-					"character_name",
-					"killmails_recent_count"
-				],
+				"acceptedVariables": ["character_name", "killmails_recent_count"],
 				"defaultMessage": "New killmail detected for {{character_name}}."
 			},
 			{
 				"title": "New Notification",
 				"key": "eve_notification_new",
-				"acceptedVariables": [
-					"character_name",
-					"notifications_count"
-				],
+				"acceptedVariables": ["character_name", "notifications_count"],
 				"defaultMessage": "New EVE notification for {{character_name}}."
 			},
 			{
@@ -4201,11 +4189,7 @@ module.exports = EveOnlinePlugin;
 			{
 				"title": "Ship Changed",
 				"key": "eve_ship_changed",
-				"acceptedVariables": [
-					"character_name",
-					"ship_type_id",
-					"ship_name"
-				],
+				"acceptedVariables": ["character_name", "ship_type_id", "ship_name"],
 				"defaultMessage": "{{character_name}} switched ships ({{ship_name}})."
 			}
 		],
@@ -12764,11 +12748,7 @@ class RetroAchievementsPlugin extends Plugin {
 			// Keep plugin flow alive when logging transport is unavailable.
 		}
 
-		if (severity === "warn") {
-			console.warn(decorated);
-		} else if (severity === "error") {
-			console.error(decorated);
-		} else if (this._debugEnabled()) {
+		if (this._debugEnabled()) {
 			console.log(decorated);
 		}
 	}
@@ -13928,7 +13908,7 @@ module.exports = RetroAchievementsPlugin;
 {
 	"id": "retro_achievements",
 	"name": "RetroAchievements",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -17061,7 +17041,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.0"
+		"@lumiastream/plugin": "^0.7.1"
 	}
 }
 
@@ -18599,7 +18579,7 @@ module.exports = SteamPlugin;
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.8",
+	"version": "1.0.9",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -23727,7 +23707,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.0"
+		"@lumiastream/plugin": "^0.7.1"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",

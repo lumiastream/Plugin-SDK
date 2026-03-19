@@ -57,7 +57,7 @@ export interface PluginAlertVariationCondition {
 	 * When true (and `type` is `EQUAL_SELECTION`), Lumia allows custom typed values
 	 * in addition to the manifest-provided `selections`.
 	 */
-	dynamicSelections?: boolean;
+	dynamicOptions?: boolean;
 	selections?: PluginAlertVariationSelection[];
 }
 
@@ -70,6 +70,32 @@ export interface PluginAlertExtraOption {
 	max?: number;
 }
 
+export interface PluginGeneratedAlertVariation {
+	name: string;
+	condition?: string | number;
+	conditionType?: string;
+	conditionExtra?: string | number;
+	image?: string;
+	value?: {
+		linked?: string | [number, number, number] | { r: number; g: number; b: number };
+	};
+	tts?: {
+		on: boolean;
+	};
+	chatbot?: {
+		on: boolean;
+	};
+	on?: boolean;
+}
+
+export interface PluginAlertVariationGenerationConfig {
+	title?: string;
+	description?: string;
+	buttonLabel?: string;
+	generateLabel?: string;
+	fields?: PluginFormField[];
+}
+
 export interface PluginAlertDefinition {
 	title: string;
 	key: string;
@@ -79,6 +105,7 @@ export interface PluginAlertDefinition {
 	acceptedVariables?: string[];
 	defaultMessage?: string;
 	variationConditions?: PluginAlertVariationCondition[];
+	variationGeneration?: PluginAlertVariationGenerationConfig;
 }
 
 export interface PluginDependency {
@@ -920,6 +947,16 @@ export interface PluginRuntime {
 		values?: Record<string, any>;
 		settings?: Record<string, any>;
 	}): Promise<void>;
+	generateVariations?(config: {
+		alertKey: string;
+		options?: Record<string, any>;
+		existingVariations?: Array<{
+			name?: string;
+			condition?: string | number;
+			conditionType?: string;
+			conditionExtra?: string | number;
+		}>;
+	}): Promise<PluginGeneratedAlertVariation[] | void> | PluginGeneratedAlertVariation[] | void;
 	searchLights?(config?: Record<string, any>): Promise<any>;
 	searchThemes?(config?: Record<string, any>): Promise<any>;
 	addLight?(config: Record<string, any>): Promise<any>;
