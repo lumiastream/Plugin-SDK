@@ -13,9 +13,10 @@ Develop Lumia plugins with fast feedback loops: scaffold from the best-fit examp
 
 1. Identify plugin root and confirm `manifest.json` exists.
 2. Run `npx lumia-plugin validate <plugin-dir>` to surface baseline errors.
-3. Read capability contracts in [references/manifest-capability-contracts.md](./references/manifest-capability-contracts.md) before editing hook code.
-4. Run `node scripts/plugin-audit.js <plugin-dir>` to check capability-to-hook alignment.
-5. Build package with `npx lumia-plugin build <plugin-dir> [--out <name>.lumiaplugin]`.
+3. Confirm field types against the SDK docs before editing `config.settings` or `config.actions[].fields`.
+4. Read capability contracts in [references/manifest-capability-contracts.md](./references/manifest-capability-contracts.md) before editing hook code.
+5. Run `node scripts/plugin-audit.js <plugin-dir>` to check capability-to-hook alignment.
+6. Build package with `npx lumia-plugin build <plugin-dir> [--out <name>.lumiaplugin]`.
 
 ## Workflow
 
@@ -30,6 +31,8 @@ Develop Lumia plugins with fast feedback loops: scaffold from the best-fit examp
 - Treat `manifest.json` as the source of truth for runtime behavior.
 - Add or update hook methods in the entry file to satisfy declared capabilities.
 - Validate settings/actions field objects for required keys before runtime testing.
+- Validate field types by context instead of reusing similar-looking controls from memory.
+  Use `toggle` as the canonical boolean field type in both `config.settings` and `config.actions[].fields`.
 - Use the contract table in [references/manifest-capability-contracts.md](./references/manifest-capability-contracts.md) for required and recommended hook coverage.
 
 ### 3. Validate aggressively
@@ -50,6 +53,7 @@ Develop Lumia plugins with fast feedback loops: scaffold from the best-fit examp
 - Target Node.js runtime behavior only; avoid browser-only APIs (`window`, `document`, `localStorage`, `XMLHttpRequest`).
 - Keep plugin IDs stable and semver versions valid.
 - Avoid inventing undocumented manifest fields.
+- Do not assume every similarly named field type is interchangeable across settings and actions; verify against the SDK field-types docs first.
 - Prefer deterministic checks (CLI validation + audit script) over assumption-based approvals.
 
 ## Resources (optional)
@@ -60,4 +64,5 @@ Develop Lumia plugins with fast feedback loops: scaffold from the best-fit examp
 ### references/
 - [references/workflow.md](./references/workflow.md): command-level workflow for scaffold, edit, validate, and build.
 - [references/manifest-capability-contracts.md](./references/manifest-capability-contracts.md): mapping from manifest capability fields to hook expectations.
+- [references/sdk-docs/docs__field-types-reference.md](./references/sdk-docs/docs__field-types-reference.md): supported field types and manifest gotchas.
 - [references/sdk-docs/INDEX.md](./references/sdk-docs/INDEX.md): auto-synced SDK documentation snapshot generated during publish workflows.

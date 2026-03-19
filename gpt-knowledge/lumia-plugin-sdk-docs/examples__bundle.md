@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.1"
+		"@lumiastream/plugin": "^0.7.2"
 	}
 }
 
@@ -14188,6 +14188,1083 @@ module.exports = RetroAchievementsPlugin;
 
 ```
 
+## rss_feed_monitor/README.md
+
+```
+# RSS Feed Monitor
+
+Monitor multiple RSS or Atom feeds and trigger a Lumia alert for each newly discovered item. This plugin is alert-only and does not publish Lumia variables.
+
+## Alert Variations
+
+The `Feed Item Changed` alert supports feed-name variations. In Lumia's alert editor, add a variation with the selection condition and pick one of the configured feed names from the dropdown.
+
+## Feed Format
+
+Add one named feed row in the plugin settings for each source:
+
+- `Name`: the label used in alerts and variables
+- `Feed URL`: the RSS or Atom endpoint
+
+Older string-based formats are still accepted by the runtime for backward compatibility, but the UI now uses the native `named_map` field.
+
+## Persistence
+
+Seen item state and pending alerts are stored in:
+
+```text
+~/Library/Application Support/LumiaStream/plugin-cache/rss_feed_monitor/state.json
+```
+
+That lets the plugin replay missed alerts after Lumia has been offline.
+
+```
+
+## rss_feed_monitor/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+const crypto = require("node:crypto");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+
+const DEFAULTS = {
+  pollInterval: 300,
+  itemWindow: 25,
+  requestTimeoutMs: 15000,
+  userAgent: "Lumia Stream RSS Feed Monitor/1.0.0",
+  maxSeenIdsPerFeed: 500,
+};
+
+const ALERT_KEYS = {
+  itemChanged: "rss_feed_item_changed",
+};
+
+const VARIATION_SELECTION_ACTION_TYPES = new Set([
+  "active_input",
+  "preview_input",
+  "transition_input",
+]);
+
+class RssFeedMonitorPlugin extends Plugin {
+  constructor(manifest, context) {
+    super(manifest, context);
+    this._pollTimer = null;
+    this._refreshPromise = null;
+    this._drainPromise = null;
+    this._lastConnectionState = null;
+    this._state = this._emptyState();
+  }
+
+  async onload() {
+    await this._loadStateFromDisk();
+    await this._drainPendingAlerts();
+
+    const feeds = this._configuredFeeds();
+    if (!feeds.length) {
+      await this._updateConnectionState(false);
+      await this._log(
+        "No valid RSS or Atom feed URLs configured. Add one or more feeds in plugin settings."
+      );
+      return;
+    }
+
+    await this._refreshFeeds({ reason: "startup" });
+    this._schedulePolling();
+  }
+
+  async onunload() {
+    this._clearPolling();
+    await this._updateConnectionState(false);
+  }
+
+  async onsettingsupdate(settings, previous = {}) {
+    const pollChanged =
+      this._pollInterval(settings) !== this._pollInterval(previous);
+    const itemWindowChanged =
+      this._itemWindow(settings) !== this._itemWindow(previous);
+    const feedsChanged =
+      this._feedsSignature(settings) !== this._feedsSignature(previous);
+
+    if (pollChanged) {
+      this._schedulePolling();
+    }
+
+    if (feedsChanged) {
+      this._pruneStateForFeeds(this._configuredFeeds(settings));
+      await this._saveStateToDisk();
+    }
+
+    const feeds = this._configuredFeeds(settings);
+    if (!feeds.length) {
+      this._clearPolling();
+      await this._updateConnectionState(false);
+      await this._log(
+        "Feed monitoring paused because no valid feed URLs are configured."
+      );
+      return;
+    }
+
+    if (!this._pollTimer) {
+      this._schedulePolling();
+    }
+
+    if (feedsChanged || itemWindowChanged) {
+      await this._refreshFeeds({ reason: "settings-update" });
+    }
+  }
+
+  async validateAuth(data = {}) {
+    const feeds = this._configuredFeeds(data);
+    if (!feeds.length) {
+      return {
+        ok: false,
+        message: "Add at least one valid RSS or Atom feed URL.",
+      };
+    }
+
+    try {
+      const result = await this._fetchAndParseFeed(feeds[0]);
+      if (!Array.isArray(result.items) || !result.items.length) {
+        return {
+          ok: false,
+          message: "The feed loaded, but no items were found.",
+        };
+      }
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        message: `Feed validation failed: ${this._errorMessage(error)}`,
+      };
+    }
+  }
+
+  async refreshActionOptions({ actionType, values } = {}) {
+    if (!VARIATION_SELECTION_ACTION_TYPES.has(String(actionType || ""))) {
+      return;
+    }
+
+    if (typeof this.lumia?.updateActionFieldOptions !== "function") {
+      return;
+    }
+
+    const previewSettings = {
+      ...(this.settings && typeof this.settings === "object"
+        ? this.settings
+        : {}),
+      ...(values && typeof values === "object" ? values : {}),
+    };
+
+    await this.lumia.updateActionFieldOptions({
+      actionType,
+      fieldKey: "input",
+      options: this._feedVariationOptions(previewSettings),
+    });
+  }
+
+  async _refreshFeeds({ reason } = {}) {
+    if (this._refreshPromise) {
+      return this._refreshPromise;
+    }
+
+    this._refreshPromise = (async () => {
+      const feeds = this._configuredFeeds();
+      if (!feeds.length) {
+        await this._updateConnectionState(false);
+        return;
+      }
+
+      this._pruneStateForFeeds(feeds);
+
+      const results = await Promise.allSettled(
+        feeds.map((feed) => this._fetchAndParseFeed(feed))
+      );
+
+      let successCount = 0;
+
+      for (let index = 0; index < results.length; index += 1) {
+        const feed = feeds[index];
+        const result = results[index];
+
+        if (result.status !== "fulfilled") {
+          await this._log(
+            `Failed to refresh ${feed.name}: ${this._errorMessage(result.reason)}`
+          );
+          continue;
+        }
+
+        successCount += 1;
+        const feedResult = result.value;
+        const feedState = this._ensureFeedState(feed);
+        const baselineOnly = !feedState.initialized;
+        const normalizedItems = feedResult.items
+          .slice(0, this._itemWindow())
+          .map((item, itemIndex) =>
+            this._normalizeItem(feed, feedResult.feedTitle, item, itemIndex)
+          )
+          .filter((item) => item);
+
+        const seenIds = new Set(
+          Array.isArray(feedState.seenIds) ? feedState.seenIds : []
+        );
+        const queuedIds = new Set(
+          this._state.pendingAlerts.map((entry) => entry.alertId)
+        );
+
+        for (const item of normalizedItems) {
+          if (seenIds.has(item.id)) {
+            continue;
+          }
+
+          seenIds.add(item.id);
+          if (baselineOnly) {
+            continue;
+          }
+
+          const pendingAlert = this._buildPendingAlert(item);
+          if (!queuedIds.has(pendingAlert.alertId)) {
+            this._state.pendingAlerts.push(pendingAlert);
+            queuedIds.add(pendingAlert.alertId);
+          }
+        }
+
+        feedState.initialized = true;
+        feedState.url = feed.url;
+        feedState.name = feed.name;
+        feedState.feedTitle = feedResult.feedTitle || feed.name;
+        feedState.updatedAt = Date.now();
+        feedState.seenIds = this._trimSeenIds([
+          ...normalizedItems.map((item) => item.id),
+          ...Array.from(seenIds),
+        ]);
+      }
+
+      this._state.pendingAlerts = this._sortPendingAlerts(
+        this._state.pendingAlerts
+      );
+      await this._saveStateToDisk();
+
+      if (successCount > 0) {
+        await this._updateConnectionState(true);
+      } else {
+        await this._updateConnectionState(false);
+        await this._log(
+          `All feed requests failed during ${reason || "refresh"} cycle.`
+        );
+      }
+
+      await this._drainPendingAlerts();
+    })().finally(() => {
+      this._refreshPromise = null;
+    });
+
+    return this._refreshPromise;
+  }
+
+  async _drainPendingAlerts() {
+    if (this._drainPromise) {
+      return this._drainPromise;
+    }
+
+    this._drainPromise = (async () => {
+      this._state.pendingAlerts = this._sortPendingAlerts(
+        this._state.pendingAlerts
+      );
+
+      while (this._state.pendingAlerts.length) {
+        const next = this._state.pendingAlerts[0];
+
+        try {
+          const dynamic = this._alertDynamic(next);
+          await this.lumia.triggerAlert({
+            alert: ALERT_KEYS.itemChanged,
+            dynamic,
+            extraSettings: this._alertVariables(next),
+          });
+          this._state.pendingAlerts.shift();
+          await this._saveStateToDisk();
+        } catch (error) {
+          await this._log(
+            `Failed to trigger RSS alert: ${this._errorMessage(error)}`
+          );
+          break;
+        }
+      }
+
+    })().finally(() => {
+      this._drainPromise = null;
+    });
+
+    return this._drainPromise;
+  }
+
+  _schedulePolling() {
+    this._clearPolling();
+    const intervalMs = this._pollInterval() * 1000;
+    this._pollTimer = setTimeout(async () => {
+      try {
+        await this._refreshFeeds({ reason: "poll" });
+      } finally {
+        this._schedulePolling();
+      }
+    }, intervalMs);
+  }
+
+  _clearPolling() {
+    if (this._pollTimer) {
+      clearTimeout(this._pollTimer);
+      this._pollTimer = null;
+    }
+  }
+
+  async _fetchAndParseFeed(feed) {
+    const { text: xml } = await this._fetchWithTimeout(feed.url);
+
+    const parsed = this._parseFeedXml(xml, feed);
+    if (!parsed.items.length) {
+      throw new Error("The feed did not contain any parsable items.");
+    }
+
+    return parsed;
+  }
+
+  async _fetchWithTimeout(url) {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      DEFAULTS.requestTimeoutMs
+    );
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Accept:
+            "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+          "User-Agent": DEFAULTS.userAgent,
+        },
+        signal: controller.signal,
+      });
+
+      const text = await response.text();
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`
+        );
+      }
+
+      return { response, text };
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        throw new Error("Feed request timed out.");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  _parseFeedXml(xml, feed) {
+    const source = String(xml || "");
+    if (/<feed\b/i.test(source) && /<entry\b/i.test(source)) {
+      return this._parseAtomFeed(source, feed);
+    }
+    return this._parseRssFeed(source, feed);
+  }
+
+  _parseRssFeed(xml, feed) {
+    const channelBlock = this._extractFirstBlock(xml, "channel") || xml;
+    const feedTitle =
+      this._cleanText(this._extractTagText(channelBlock, "title")) ||
+      feed.name ||
+      this._deriveFeedName(feed.url);
+    const itemBlocks = this._extractBlocks(channelBlock, "item");
+
+    return {
+      feedTitle,
+      items: itemBlocks.map((block) => ({
+        title: this._extractTagText(block, "title"),
+        link:
+          this._extractTagText(block, "link") ||
+          this._extractLinkHref(block, "link"),
+        guid:
+          this._extractTagText(block, "guid") ||
+          this._extractTagText(block, "id"),
+        publishedAt:
+          this._extractTagText(block, "pubDate") ||
+          this._extractTagText(block, "published") ||
+          this._extractTagText(block, "updated"),
+        summary:
+          this._extractTagText(block, "description") ||
+          this._extractTagText(block, "content:encoded") ||
+          this._extractTagText(block, "summary") ||
+          this._extractTagText(block, "content"),
+        author:
+          this._extractTagText(block, "author") ||
+          this._extractTagText(block, "dc:creator"),
+      })),
+    };
+  }
+
+  _parseAtomFeed(xml, feed) {
+    const feedBlock = this._extractFirstBlock(xml, "feed") || xml;
+    const feedTitle =
+      this._cleanText(this._extractTagText(feedBlock, "title")) ||
+      feed.name ||
+      this._deriveFeedName(feed.url);
+    const entryBlocks = this._extractBlocks(feedBlock, "entry");
+
+    return {
+      feedTitle,
+      items: entryBlocks.map((block) => {
+        const authorBlock = this._extractFirstBlock(block, "author");
+        return {
+          title: this._extractTagText(block, "title"),
+          link: this._extractAtomLink(block),
+          guid: this._extractTagText(block, "id"),
+          publishedAt:
+            this._extractTagText(block, "published") ||
+            this._extractTagText(block, "updated"),
+          summary:
+            this._extractTagText(block, "summary") ||
+            this._extractTagText(block, "content"),
+          author:
+            this._extractTagText(authorBlock, "name") ||
+            this._extractTagText(block, "author"),
+        };
+      }),
+    };
+  }
+
+  _normalizeItem(feed, feedTitle, item = {}, sourceIndex = 0) {
+    const title = this._cleanText(item.title) || "Untitled item";
+    const url = this._normalizeUrlCandidate(item.link);
+    const guid = this._cleanText(item.guid, { stripHtml: false });
+    const published = this._normalizeTimestamp(item.publishedAt);
+    const summary = this._cleanText(item.summary);
+    const author = this._cleanText(item.author);
+    const identitySource =
+      guid || url || `${title}|${published.display}|${summary}|${author}`;
+
+    if (!identitySource) {
+      return null;
+    }
+
+    return {
+      id: this._hash(`${feed.key}|${identitySource}`),
+      feedKey: feed.key,
+      feedName: feedTitle || feed.name,
+      feedUrl: feed.url,
+      title,
+      url,
+      guid: guid || "",
+      publishedAt: published.display,
+      publishedAtMs: published.ms,
+      summary,
+      author,
+      sourceIndex,
+    };
+  }
+
+  _buildPendingAlert(item) {
+    return {
+      alertId: this._hash(`alert|${item.feedKey}|${item.id}`),
+      createdAt: Date.now(),
+      feed_key: item.feedKey,
+      feed_name: item.feedName || "",
+      feed_url: item.feedUrl || "",
+      item_title: item.title || "",
+      item_url: item.url || "",
+      item_published: item.publishedAt || "",
+      item_summary: item.summary || "",
+      item_guid: item.guid || "",
+      item_id: item.id || "",
+      item_author: item.author || "",
+      publishedAtMs: item.publishedAtMs || 0,
+    };
+  }
+
+  _alertVariables(alert = {}) {
+    const feedName = alert.feed_name || alert.latest_feed_name || "";
+    const feedUrl = alert.feed_url || alert.latest_feed_url || "";
+    const itemTitle = alert.item_title || alert.latest_item_title || "";
+    const itemUrl = alert.item_url || alert.latest_item_url || "";
+    const itemPublished =
+      alert.item_published || alert.latest_item_published || "";
+    const itemSummary = alert.item_summary || alert.latest_item_summary || "";
+    const itemGuid = alert.item_guid || alert.latest_item_guid || "";
+    const itemId = alert.item_id || alert.latest_item_id || "";
+    const itemAuthor = alert.item_author || alert.latest_item_author || "";
+
+    return {
+      feed_name: feedName,
+      feed_url: feedUrl,
+      item_title: itemTitle,
+      item_url: itemUrl,
+      item_published: itemPublished,
+      item_summary: itemSummary,
+      item_guid: itemGuid,
+      item_id: itemId,
+      item_author: itemAuthor,
+      latest_feed_name: feedName,
+      latest_feed_url: feedUrl,
+      latest_item_title: itemTitle,
+      latest_item_url: itemUrl,
+      latest_item_published: itemPublished,
+      latest_item_summary: itemSummary,
+      latest_item_guid: itemGuid,
+      latest_item_id: itemId,
+      latest_item_author: itemAuthor,
+    };
+  }
+
+  _alertDynamic(alert = {}) {
+    return {
+      value: String(alert.feed_name || alert.latest_feed_name || "").trim(),
+    };
+  }
+
+  _configuredFeeds(settings = this.settings) {
+    const raw = settings?.feeds;
+    const feeds = [];
+    const seen = new Set();
+
+    for (const parsedLine of this._coerceFeedEntries(raw)) {
+      if (!parsedLine?.url) {
+        continue;
+      }
+
+      try {
+        const normalizedUrl = new URL(parsedLine.url);
+        if (!/^https?:$/i.test(normalizedUrl.protocol)) {
+          continue;
+        }
+
+        const finalUrl = normalizedUrl.toString();
+        const key = this._hash(finalUrl);
+        if (seen.has(key)) {
+          continue;
+        }
+
+        seen.add(key);
+        feeds.push({
+          key,
+          url: finalUrl,
+          name: parsedLine.name || this._deriveFeedName(finalUrl),
+        });
+      } catch (_error) {}
+    }
+
+    return feeds;
+  }
+
+  _coerceFeedEntries(raw) {
+    if (typeof raw === "string") {
+      return raw
+        .split(/\r\n|\n|\r/)
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("#"))
+        .map((line) => this._parseFeedLine(line))
+        .filter(Boolean);
+    }
+
+    if (Array.isArray(raw)) {
+      return raw
+        .map((entry) => {
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+            return null;
+          }
+          return {
+            name: String(entry.name ?? entry.key ?? "").trim(),
+            url: String(entry.value ?? entry.url ?? "").trim(),
+          };
+        })
+        .filter((entry) => entry && entry.url);
+    }
+
+    if (raw && typeof raw === "object") {
+      return Object.entries(raw)
+        .map(([name, value]) => ({
+          name: String(name || "").trim(),
+          url: String(value ?? "").trim(),
+        }))
+        .filter((entry) => entry.url);
+    }
+
+    return [];
+  }
+
+  _parseFeedLine(line) {
+    const trimmed = String(line || "").trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    if (/^https?:\/\//i.test(trimmed)) {
+      return { name: "", url: trimmed };
+    }
+
+    const pipeIndex = trimmed.indexOf("|");
+    if (pipeIndex > 0) {
+      return {
+        name: trimmed.slice(0, pipeIndex).trim(),
+        url: trimmed.slice(pipeIndex + 1).trim(),
+      };
+    }
+
+    const equalsMatch = trimmed.match(/^(.+?)\s*=\s*(https?:\/\/.+)$/i);
+    if (equalsMatch) {
+      return {
+        name: equalsMatch[1].trim(),
+        url: equalsMatch[2].trim(),
+      };
+    }
+
+    return null;
+  }
+
+  _feedsSignature(settings = this.settings) {
+    return JSON.stringify(
+      this._configuredFeeds(settings).map((feed) => [feed.key, feed.name, feed.url])
+    );
+  }
+
+  _feedVariationOptions(settings = this.settings) {
+    return this._configuredFeeds(settings).map((feed) => ({
+      label: feed.name,
+      value: feed.name,
+    }));
+  }
+
+  _pollInterval(settings = this.settings) {
+    return this._clampNumber(settings?.pollInterval, DEFAULTS.pollInterval, 30, 86400);
+  }
+
+  _itemWindow(settings = this.settings) {
+    return this._clampNumber(settings?.itemWindow, DEFAULTS.itemWindow, 5, 100);
+  }
+
+  _deriveFeedName(urlText = "") {
+    try {
+      const parsed = new URL(urlText);
+      const pathName = parsed.pathname.replace(/\/$/, "");
+      return pathName ? `${parsed.host}${pathName}` : parsed.host;
+    } catch (_error) {
+      return "RSS Feed";
+    }
+  }
+
+  _normalizeUrlCandidate(value) {
+    const trimmed = this._cleanText(value, { stripHtml: false });
+    if (!trimmed) {
+      return "";
+    }
+
+    try {
+      const parsed = new URL(trimmed);
+      return parsed.toString();
+    } catch (_error) {
+      return trimmed;
+    }
+  }
+
+  _normalizeTimestamp(value) {
+    const raw = this._cleanText(value, { stripHtml: false });
+    if (!raw) {
+      return { display: "", ms: 0 };
+    }
+
+    const ms = Date.parse(raw);
+    if (Number.isFinite(ms)) {
+      return { display: new Date(ms).toISOString(), ms };
+    }
+
+    return { display: raw, ms: 0 };
+  }
+
+  _sortPendingAlerts(alerts = []) {
+    return [...alerts].sort((a, b) => {
+      const timeDiff = (a?.publishedAtMs || 0) - (b?.publishedAtMs || 0);
+      if (timeDiff !== 0) {
+        return timeDiff;
+      }
+      return (a?.createdAt || 0) - (b?.createdAt || 0);
+    });
+  }
+
+  _trimSeenIds(ids = []) {
+    const unique = [];
+    const seen = new Set();
+
+    for (const value of ids) {
+      const key = String(value || "").trim();
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      unique.push(key);
+      if (unique.length >= DEFAULTS.maxSeenIdsPerFeed) {
+        break;
+      }
+    }
+
+    return unique;
+  }
+
+  _emptyState() {
+    return {
+      version: 1,
+      feeds: {},
+      pendingAlerts: [],
+    };
+  }
+
+  _ensureFeedState(feed) {
+    if (!this._state.feeds[feed.key]) {
+      this._state.feeds[feed.key] = {
+        initialized: false,
+        url: feed.url,
+        name: feed.name,
+        feedTitle: feed.name,
+        seenIds: [],
+        updatedAt: 0,
+      };
+    }
+
+    return this._state.feeds[feed.key];
+  }
+
+  _pruneStateForFeeds(feeds = []) {
+    const allowed = new Set(feeds.map((feed) => feed.key));
+    const nextFeeds = {};
+
+    for (const [key, value] of Object.entries(this._state.feeds || {})) {
+      if (allowed.has(key)) {
+        nextFeeds[key] = value;
+      }
+    }
+
+    this._state.feeds = nextFeeds;
+    this._state.pendingAlerts = this._state.pendingAlerts.filter((entry) =>
+      allowed.has(String(entry?.feed_key || ""))
+    );
+  }
+
+  _stateFilePath() {
+    const home = String(process.env.HOME || "").trim();
+    if (!home) {
+      return path.join(__dirname, ".rss_feed_monitor_state.json");
+    }
+
+    return path.join(
+      home,
+      "Library",
+      "Application Support",
+      "LumiaStream",
+      "plugin-cache",
+      "rss_feed_monitor",
+      "state.json"
+    );
+  }
+
+  async _loadStateFromDisk() {
+    const filePath = this._stateFilePath();
+
+    try {
+      const raw = await fs.readFile(filePath, "utf8");
+      const parsed = JSON.parse(raw);
+      this._state = {
+        version: 1,
+        feeds:
+          parsed && typeof parsed.feeds === "object" && parsed.feeds
+            ? parsed.feeds
+            : {},
+        pendingAlerts: Array.isArray(parsed?.pendingAlerts)
+          ? parsed.pendingAlerts
+          : [],
+      };
+      this._state.pendingAlerts = this._sortPendingAlerts(this._state.pendingAlerts);
+    } catch (_error) {
+      this._state = this._emptyState();
+    }
+  }
+
+  async _saveStateToDisk() {
+    const filePath = this._stateFilePath();
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify(this._state, null, 2), "utf8");
+  }
+
+  _extractBlocks(source, tagName) {
+    const escaped = this._escapeRegex(tagName);
+    const regex = new RegExp(
+      `<${escaped}(?:\\s[^>]*)?>[\\s\\S]*?<\\/${escaped}>`,
+      "gi"
+    );
+    return String(source || "").match(regex) || [];
+  }
+
+  _extractFirstBlock(source, tagName) {
+    return this._extractBlocks(source, tagName)[0] || "";
+  }
+
+  _extractTagText(source, tagName) {
+    const escaped = this._escapeRegex(tagName);
+    const regex = new RegExp(
+      `<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`,
+      "i"
+    );
+    const match = String(source || "").match(regex);
+    return match ? match[1] : "";
+  }
+
+  _extractLinkHref(source, tagName) {
+    const escaped = this._escapeRegex(tagName);
+    const regex = new RegExp(`<${escaped}\\b([^>]*)\\/?>`, "i");
+    const match = String(source || "").match(regex);
+    if (!match) {
+      return "";
+    }
+    const attributes = this._parseAttributes(match[1]);
+    return attributes.href || "";
+  }
+
+  _extractAtomLink(source) {
+    const regex = /<link\b([^>]*)\/?>/gi;
+    let match = null;
+    let fallbackHref = "";
+
+    while ((match = regex.exec(String(source || "")))) {
+      const attributes = this._parseAttributes(match[1]);
+      const href = attributes.href || "";
+      if (!href) {
+        continue;
+      }
+      if (!fallbackHref) {
+        fallbackHref = href;
+      }
+      const rel = String(attributes.rel || "").toLowerCase();
+      if (!rel || rel === "alternate") {
+        return href;
+      }
+    }
+
+    return fallbackHref;
+  }
+
+  _parseAttributes(source) {
+    const attributes = {};
+    const regex = /([A-Za-z_:][\w:.-]*)\s*=\s*(['"])(.*?)\2/g;
+    let match = null;
+
+    while ((match = regex.exec(String(source || "")))) {
+      attributes[match[1]] = match[3];
+    }
+
+    return attributes;
+  }
+
+  _cleanText(value, options = {}) {
+    const stripHtml = options.stripHtml !== false;
+    let result = String(value || "");
+
+    result = result.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+    result = result.replace(/<!--[\s\S]*?-->/g, "");
+    result = this._decodeXmlEntities(result);
+
+    if (stripHtml) {
+      result = result.replace(/<[^>]+>/g, " ");
+    }
+
+    return result.replace(/\s+/g, " ").trim();
+  }
+
+  _decodeXmlEntities(value) {
+    return String(value || "").replace(
+      /&(#x?[0-9a-fA-F]+|amp|lt|gt|quot|apos);/g,
+      (match, entity) => {
+        switch (entity) {
+          case "amp":
+            return "&";
+          case "lt":
+            return "<";
+          case "gt":
+            return ">";
+          case "quot":
+            return '"';
+          case "apos":
+            return "'";
+          default:
+            if (entity.startsWith("#x")) {
+              return String.fromCodePoint(parseInt(entity.slice(2), 16));
+            }
+            if (entity.startsWith("#")) {
+              return String.fromCodePoint(parseInt(entity.slice(1), 10));
+            }
+            return match;
+        }
+      }
+    );
+  }
+
+  _clampNumber(value, fallback, min, max) {
+    const parsed = Number(value);
+    const resolved = Number.isFinite(parsed) ? parsed : fallback;
+    return Math.min(max, Math.max(min, Math.round(resolved)));
+  }
+
+  _hash(value) {
+    return crypto.createHash("sha1").update(String(value || "")).digest("hex");
+  }
+
+  _escapeRegex(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  async _updateConnectionState(state) {
+    if (this._lastConnectionState === state) {
+      return;
+    }
+
+    this._lastConnectionState = state;
+
+    try {
+      await this.lumia.updateConnection(state);
+    } catch (error) {
+      await this._log(
+        `Failed to update connection state: ${this._errorMessage(error)}`
+      );
+    }
+  }
+
+  async _log(message) {
+    await this.lumia.log(`[RSS Feed Monitor] ${message}`);
+  }
+
+  _errorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+module.exports = RssFeedMonitorPlugin;
+
+```
+
+## rss_feed_monitor/manifest.json
+
+```
+{
+	"id": "rss_feed_monitor",
+	"name": "RSS Feed Monitor",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Monitor multiple RSS or Atom feeds, persist unseen items, and trigger Lumia alerts for each new entry even after Lumia has been offline.",
+	"license": "MIT",
+	"main": "main.js",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"keywords": "rss, atom, feeds, alerts, news, monitor",
+	"icon": "rss_feed_monitor.jpg",
+	"config": {
+		"settings": [
+			{
+				"key": "feeds",
+				"label": "Feeds",
+				"type": "named_map",
+				"required": true,
+				"valueType": "text",
+				"valueLabel": "Feed URL",
+				"valuePlaceholder": "https://example.com/rss.xml",
+				"valueField": {
+					"type": "text",
+					"required": true,
+					"placeholder": "https://example.com/rss.xml"
+				},
+				"outputMode": "map",
+				"objectValueMode": "value",
+				"defaultValue": {
+					"Lumia Blog": "https://example.com/rss.xml"
+				},
+				"helperText": "Add one named feed per row. The row name is the feed label and the value is the feed URL."
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 300,
+				"required": true,
+				"helperText": "How often the plugin checks the configured feeds.",
+				"validation": {
+					"min": 30,
+					"max": 86400
+				}
+			},
+			{
+				"key": "itemWindow",
+				"label": "Recent Items Per Feed",
+				"type": "number",
+				"defaultValue": 25,
+				"required": true,
+				"helperText": "How many recent entries to track per feed for offline catch-up and duplicate prevention.",
+				"validation": {
+					"min": 5,
+					"max": 100
+				}
+			}
+		],
+		"settings_tutorial": "---\n### Feed Format\nAdd one named row per feed.\n- **Name**: label shown in Lumia variables and alerts\n- **Feed URL**: RSS or Atom URL to poll\n\n### Offline Catch-up\nThe plugin stores seen items on disk. If Lumia is offline for a while, the next startup will replay alerts for any newly discovered entries still present in each feed's recent item window.\n\n### Tuning\n- **Poll Interval** controls how often feeds are checked.\n- **Recent Items Per Feed** increases how much backlog the plugin can catch after downtime.\n---",
+		"actions": [],
+		"alerts": [
+			{
+				"title": "Feed Item Changed",
+				"key": "rss_feed_item_changed",
+				"defaultMessage": "{{feed_name}}: {{item_title}}\n{{item_summary}}",
+				"acceptedVariables": [
+					"feed_name",
+					"feed_url",
+					"item_title",
+					"item_url",
+					"item_published",
+					"item_summary",
+					"item_guid",
+					"item_id",
+					"item_author"
+				],
+				"variationConditions": [
+					{
+						"type": "EQUAL_SELECTION",
+						"description": "Feed name (compares against dynamic.value).",
+						"dynamicOptions": true
+					}
+				]
+			}
+		],
+		"actions_tutorial": "---\n### Actions\nThis plugin runs on a polling loop and does not expose actions.\n---"
+	}
+}
+
+```
+
+## rss_feed_monitor/package.json
+
+```
+{
+  "name": "lumia_plugin-rss-feed-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lumia Stream plugin that monitors RSS and Atom feeds with persisted backlog alerts.",
+  "main": "main.js",
+  "scripts": {},
+  "dependencies": {
+    "@lumiastream/plugin": "^0.3.2"
+  }
+}
+
+```
+
 ## rumble/actions_tutorial.md
 
 ```
@@ -16992,14 +18069,14 @@ module.exports = SettingsFieldShowcasePlugin;
 						{
 							"key": "includeSnapshot",
 							"label": "Include Snapshot",
-							"type": "switch",
+							"type": "toggle",
 							"defaultValue": true,
 							"helperText": "When enabled, returns a compact JSON snapshot in settings_showcase_action_snapshot."
 						},
 						{
 							"key": "stopChain",
 							"label": "Stop Remaining Actions",
-							"type": "switch",
+							"type": "toggle",
 							"defaultValue": false,
 							"helperText": "When enabled, actions() also returns shouldStop: true."
 						}
@@ -17041,7 +18118,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.1"
+		"@lumiastream/plugin": "^0.7.2"
 	}
 }
 
@@ -23549,6 +24626,929 @@ module.exports = TrovoPlugin;
 
 ```
 
+## tts_monster/actions_tutorial.md
+
+```
+---
+### Speak Action
+1. Enter the **Message** you want spoken.
+2. Pick a **Voice** from the loaded options, or type either a voice name or voice ID manually.
+3. Set **Volume** if you want to change playback volume.
+4. Enable **Log Character Usage** if you want the API to return the latest usage count after generation.
+---
+
+```
+
+## tts_monster/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+const fs = require("fs/promises");
+const os = require("os");
+const path = require("path");
+const crypto = require("crypto");
+
+const API_BASE = "https://api.console.tts.monster";
+const TEMP_DIR_NAME = "lumia-tts-monster";
+
+const DEFAULTS = {
+	defaultVolume: 100,
+	waitForAudioToStop: true,
+	returnUsage: false,
+	requestTimeoutMs: 20000,
+	voiceCacheTtlMs: 5 * 60 * 1000,
+	maxMessageChars: 500,
+	tempFileCleanupDelayMs: 10 * 60 * 1000,
+};
+
+const trimString = (value, fallback = "") => {
+	if (typeof value !== "string") {
+		return fallback;
+	}
+	const trimmed = value.trim();
+	return trimmed.length ? trimmed : fallback;
+};
+
+const toNumber = (value, fallback) => {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return parsed;
+		}
+	}
+	return fallback;
+};
+
+const toBoolean = (value, fallback) => {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (["true", "1", "yes", "on"].includes(normalized)) {
+			return true;
+		}
+		if (["false", "0", "no", "off"].includes(normalized)) {
+			return false;
+		}
+	}
+	return fallback;
+};
+
+const clamp = (value, min, max) => {
+	if (!Number.isFinite(value)) {
+		return min;
+	}
+	return Math.min(max, Math.max(min, value));
+};
+
+const truncateText = (text, limit) => {
+	if (typeof text !== "string" || !limit || text.length <= limit) {
+		return { text, truncated: false };
+	}
+	return {
+		text: text.slice(0, limit),
+		truncated: true,
+	};
+};
+
+const normalizeVoiceSearchValue = (value) =>
+	trimString(value, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, " ")
+		.trim();
+
+class TTSMonsterPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._voiceCache = { list: [], fetchedAt: 0, apiKey: "" };
+		this._voiceFetchPromise = null;
+		this._lastVoiceFetchError = "";
+		this._tempFileCleanupTimers = new Set();
+	}
+
+	async onload() {
+		await this._validateConnection({ silent: true });
+		void this._refreshVoiceCache({ silent: true });
+		void this.refreshActionOptions({ actionType: "speak" });
+	}
+
+	async onsettingsupdate(settings, previous = {}) {
+		const apiKeyChanged = this._apiKey(settings) !== this._apiKey(previous);
+		if (apiKeyChanged) {
+			await this._validateConnection({ silent: true, settings });
+			void this._refreshVoiceCache({ force: true, silent: true, settings });
+		}
+		void this.refreshActionOptions({ actionType: "speak", settings });
+	}
+
+	async validateAuth(data = {}) {
+		return this._validateConnection({ silent: true, data });
+	}
+
+	async refreshActionOptions({ actionType, values, settings } = {}) {
+		if (actionType && actionType !== "speak") {
+			return;
+		}
+		if (typeof this.lumia?.updateActionFieldOptions !== "function") {
+			return;
+		}
+
+		const previewSettings = this._mergeSettings(settings);
+		const voices = await this._refreshVoiceCache({
+			force: true,
+			silent: true,
+			settings: previewSettings,
+		});
+		const selectedValue = trimString(values?.voice, "");
+		const options = this._buildVoiceOptions({
+			voices,
+			selectedValue,
+			apiKey: this._apiKey(previewSettings),
+		});
+
+		await this.lumia.updateActionFieldOptions({
+			actionType: "speak",
+			fieldKey: "voice",
+			options,
+		});
+	}
+
+	async actions(config = {}) {
+		const actions = Array.isArray(config.actions) ? config.actions : [];
+		for (const action of actions) {
+			try {
+				if (action?.type === "speak") {
+					await this._handleSpeak(action?.value ?? {});
+				}
+			} catch (error) {
+				await this._log(
+					`Action failed: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
+		}
+	}
+
+	async _handleSpeak(data = {}) {
+		const settings = this._settingsSnapshot();
+		if (!settings.apiKey) {
+			await this._log("Missing API key.");
+			return;
+		}
+
+		let message = trimString(data.message ?? data.text, "");
+		if (!message) {
+			await this._log("Missing message text.");
+			return;
+		}
+
+		const voiceInput = trimString(data.voice, "");
+		if (!voiceInput) {
+			await this._log("Missing voice.");
+			return;
+		}
+		if (voiceInput.startsWith("__")) {
+			await this._log("Voice is not loaded yet. Type a valid voice name or voice ID, or refresh the action.");
+			return;
+		}
+		let voiceId = "";
+		try {
+			voiceId = await this._resolveVoiceId(voiceInput, settings);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : String(error);
+			await this._log(message);
+			await this._showToast(`TTS Monster: ${message}`);
+			return;
+		}
+
+		const truncated = truncateText(message, DEFAULTS.maxMessageChars);
+		message = truncated.text;
+		if (truncated.truncated) {
+			await this._log(
+				`Message exceeded ${DEFAULTS.maxMessageChars} characters and was truncated.`,
+			);
+		}
+
+		const volume = clamp(
+			toNumber(data.volume, DEFAULTS.defaultVolume),
+			0,
+			100,
+		);
+		const waitForAudioToStop = toBoolean(
+			data.waitForAudioToStop,
+			DEFAULTS.waitForAudioToStop,
+		);
+		const returnUsage = settings.returnUsage;
+		if (returnUsage) {
+			await this._showToast("TTS Monster: generating speech...");
+		}
+
+		const response = await this._request("/generate", {
+			method: "POST",
+			body: {
+				voice_id: voiceId,
+				message,
+				...(returnUsage ? { return_usage: true } : {}),
+			},
+			settings,
+		});
+
+		const audioUrl = trimString(response?.url, "");
+		if (!audioUrl) {
+			throw new Error("TTS Monster did not return an audio URL.");
+		}
+		const playback = await this._preparePlaybackPath(audioUrl);
+		try {
+			await this.lumia.playAudio({
+				path: playback.path,
+				volume,
+				waitForAudioToStop,
+			});
+		} finally {
+			await this._cleanupPlaybackFile(playback, { waitForAudioToStop });
+		}
+
+		const usage = toNumber(
+			response?.characterUsage ?? response?.character_usage,
+			NaN,
+		);
+		if (returnUsage && Number.isFinite(usage)) {
+			await this._log(`Character usage: ${Math.trunc(usage)}.`);
+		}
+		if (returnUsage) {
+			const usageLabel = Number.isFinite(usage)
+				? ` Quota used: ${Math.trunc(usage)} characters.`
+				: "";
+			await this._showToast(`TTS Monster: speech played.${usageLabel}`);
+		}
+	}
+
+	async _validateConnection({ silent = false, data = {}, settings } = {}) {
+		const apiKey = trimString(
+			data?.apiKey,
+			this._apiKey(settings ?? this.settings),
+		);
+		if (!apiKey) {
+			return { ok: false, message: "API key is required." };
+		}
+
+		try {
+			const user = await this._request("/user", {
+				method: "POST",
+				apiKey,
+				settings,
+			});
+			const usage = toNumber(user?.character_usage, NaN);
+			const allowance = toNumber(user?.character_allowance, NaN);
+			if (Number.isFinite(usage) && Number.isFinite(allowance)) {
+				return {
+					ok: true,
+					message: `Validated. Usage ${Math.trunc(usage)}/${Math.trunc(allowance)} characters.`,
+				};
+			}
+			return { ok: true };
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Validation failed.";
+			if (!silent) {
+				await this._log(`Validation failed: ${message}`);
+			}
+			return { ok: false, message };
+		}
+	}
+
+	async _refreshVoiceCache({ force = false, silent = false, settings } = {}) {
+		const apiKey = this._apiKey(settings ?? this.settings);
+		if (!apiKey) {
+			this._voiceCache = { list: [], fetchedAt: 0, apiKey: "" };
+			this._lastVoiceFetchError = "Enter your API token in plugin settings first.";
+			return [];
+		}
+
+		const now = Date.now();
+		const isFresh =
+			!force &&
+			this._voiceCache.apiKey === apiKey &&
+			now - this._voiceCache.fetchedAt < DEFAULTS.voiceCacheTtlMs;
+		if (isFresh) {
+			return this._voiceCache.list;
+		}
+
+		if (this._voiceFetchPromise) {
+			try {
+				return await this._voiceFetchPromise;
+			} catch (_error) {
+				return this._voiceCache.list;
+			}
+		}
+
+		this._voiceFetchPromise = (async () => {
+			const payload = await this._request("/voices", {
+				method: "POST",
+				apiKey,
+				settings,
+			});
+			const list = this._normalizeVoices(payload);
+			this._voiceCache = {
+				list,
+				fetchedAt: Date.now(),
+				apiKey,
+			};
+			this._lastVoiceFetchError = "";
+			return list;
+		})().finally(() => {
+			this._voiceFetchPromise = null;
+		});
+
+		try {
+			return await this._voiceFetchPromise;
+		} catch (error) {
+			if (this._voiceCache.apiKey !== apiKey) {
+				this._voiceCache = { list: [], fetchedAt: 0, apiKey: "" };
+			}
+			this._lastVoiceFetchError =
+				error instanceof Error ? error.message : String(error);
+			if (!silent) {
+				await this._log(
+					`Failed to load voices: ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
+			return this._voiceCache.list;
+		}
+	}
+
+	_normalizeVoices(payload) {
+		const publicVoices = Array.isArray(payload?.voices) ? payload.voices : [];
+		const customVoices = Array.isArray(payload?.customVoices)
+			? payload.customVoices
+			: [];
+
+		const normalizeVoice = (voice, isCustom) => {
+			const id = trimString(voice?.voice_id, "");
+			if (!id) {
+				return null;
+			}
+			return {
+				id,
+				name: trimString(voice?.name, id),
+				sample: trimString(voice?.sample, ""),
+				metadata: trimString(voice?.metadata, ""),
+				language: trimString(voice?.language, ""),
+				isCustom,
+			};
+		};
+
+		return [...customVoices.map((voice) => normalizeVoice(voice, true)), ...publicVoices.map((voice) => normalizeVoice(voice, false))]
+			.filter(Boolean)
+			.sort((left, right) => {
+				if (left.isCustom !== right.isCustom) {
+					return left.isCustom ? -1 : 1;
+				}
+				return left.name.localeCompare(right.name);
+			});
+	}
+
+	_buildVoiceOptions({ voices, selectedValue, blankLabel, apiKey }) {
+		const options = [];
+		const seen = new Set();
+
+		const pushOption = (label, value) => {
+			if (seen.has(value)) {
+				return;
+			}
+			seen.add(value);
+			options.push({ label, value });
+		};
+
+		if (typeof blankLabel === "string") {
+			pushOption(blankLabel, "");
+		}
+
+		if (!trimString(apiKey, "")) {
+			pushOption("Set API token first", "__missing_api_token__");
+			return options;
+		}
+
+		if (!Array.isArray(voices) || voices.length === 0) {
+			const fallbackLabel = this._lastVoiceFetchError
+				? `No voices loaded: ${this._lastVoiceFetchError}`
+				: "No voices loaded yet. Type a voice name or voice ID manually.";
+			pushOption(fallbackLabel, "__no_loaded_voices__");
+			return options;
+		}
+
+		const selected = trimString(selectedValue, "");
+		const hasSelectedVoice =
+			selected &&
+			voices.some(
+				(voice) => voice.name === selected || voice.id === selected,
+			);
+		if (selected && !hasSelectedVoice) {
+			pushOption(`Current value: ${selected}`, selected);
+		}
+
+		for (const voice of voices) {
+			const suffixParts = [];
+			if (voice.isCustom) {
+				suffixParts.push("Custom");
+			}
+			if (voice.metadata) {
+				suffixParts.push(voice.metadata);
+			} else if (voice.language) {
+				suffixParts.push(voice.language);
+			}
+			const suffix = suffixParts.length ? ` (${suffixParts.join(" | ")})` : "";
+			pushOption(`${voice.name}${suffix}`, voice.name);
+		}
+
+		return options;
+	}
+
+	async _resolveVoiceId(input, settings) {
+		const normalizedInput = trimString(input, "");
+		if (!normalizedInput) {
+			throw new Error("Voice is required.");
+		}
+		if (normalizedInput.startsWith("__")) {
+			throw new Error("Voice is not loaded yet.");
+		}
+
+		const voices = await this._refreshVoiceCache({ silent: true, settings });
+		const exactIdMatch = voices.find((voice) => voice.id === normalizedInput);
+		if (exactIdMatch) {
+			return exactIdMatch.id;
+		}
+
+		const foldedInput = normalizedInput.toLowerCase();
+		const caseInsensitiveIdMatch = voices.find(
+			(voice) => voice.id.toLowerCase() === foldedInput,
+		);
+		if (caseInsensitiveIdMatch) {
+			return caseInsensitiveIdMatch.id;
+		}
+
+		const exactNameMatch = voices.find((voice) => voice.name === normalizedInput);
+		if (exactNameMatch) {
+			return exactNameMatch.id;
+		}
+
+		const caseInsensitiveNameMatches = voices.filter(
+			(voice) => voice.name.toLowerCase() === foldedInput,
+		);
+		if (caseInsensitiveNameMatches.length === 1) {
+			return caseInsensitiveNameMatches[0].id;
+		}
+		if (caseInsensitiveNameMatches.length > 1) {
+			throw new Error(
+				`Voice name "${normalizedInput}" matches multiple voices. Use the voice ID instead.`,
+			);
+		}
+
+		const fuzzyMatch = this._findBestFuzzyVoiceMatch(voices, normalizedInput);
+		if (fuzzyMatch?.voice?.id) {
+			return fuzzyMatch.voice.id;
+		}
+
+		if (voices.length > 0) {
+			throw new Error(`No voice can be found for "${normalizedInput}".`);
+		}
+
+		return normalizedInput;
+	}
+
+	_findBestFuzzyVoiceMatch(voices, input) {
+		const normalizedInput = normalizeVoiceSearchValue(input);
+		if (!normalizedInput) {
+			return null;
+		}
+
+		const scored = voices
+			.map((voice) => ({
+				voice,
+				score: this._scoreVoiceMatch(voice, normalizedInput),
+			}))
+			.filter((entry) => entry.score > 0)
+			.sort((left, right) => right.score - left.score);
+
+		if (!scored.length) {
+			return null;
+		}
+
+		const best = scored[0];
+		const next = scored[1];
+		if (!best || best.score < 4) {
+			return null;
+		}
+		if (next && next.score === best.score) {
+			throw new Error(
+				`Voice "${input}" matches multiple voices. Be more specific or use the voice ID instead.`,
+			);
+		}
+
+		return best;
+	}
+
+	_scoreVoiceMatch(voice, normalizedInput) {
+		const normalizedName = normalizeVoiceSearchValue(voice?.name);
+		const normalizedId = normalizeVoiceSearchValue(voice?.id);
+		const metadata = normalizeVoiceSearchValue(voice?.metadata);
+		const parts = normalizedName ? normalizedName.split(" ") : [];
+
+		if (!normalizedInput) {
+			return 0;
+		}
+		if (normalizedName && normalizedName === normalizedInput) {
+			return 100;
+		}
+		if (normalizedId && normalizedId === normalizedInput) {
+			return 95;
+		}
+		if (normalizedName && normalizedName.startsWith(normalizedInput)) {
+			return 80;
+		}
+		if (parts.some((part) => part.startsWith(normalizedInput))) {
+			return 70;
+		}
+		if (normalizedName && normalizedName.includes(normalizedInput)) {
+			return 60;
+		}
+		if (this._isSubsequenceMatch(normalizedName, normalizedInput)) {
+			return 45;
+		}
+		if (metadata && metadata.includes(normalizedInput)) {
+			return 20;
+		}
+		if (normalizedId && normalizedId.includes(normalizedInput)) {
+			return 15;
+		}
+
+		return 0;
+	}
+
+	_isSubsequenceMatch(candidate, search) {
+		if (!candidate || !search) {
+			return false;
+		}
+
+		const compactCandidate = candidate.replace(/\s+/g, "");
+		const compactSearch = search.replace(/\s+/g, "");
+		if (!compactCandidate || !compactSearch) {
+			return false;
+		}
+
+		let searchIndex = 0;
+		for (const char of compactCandidate) {
+			if (char === compactSearch[searchIndex]) {
+				searchIndex += 1;
+				if (searchIndex === compactSearch.length) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	async _preparePlaybackPath(audioUrl) {
+		if (typeof fetch !== "function") {
+			return { path: audioUrl, tempFilePath: "" };
+		}
+
+		try {
+			const response = await fetch(audioUrl);
+			if (!response.ok) {
+				return { path: audioUrl, tempFilePath: "" };
+			}
+
+			const audioBuffer = await response.arrayBuffer();
+			const contentType = trimString(
+				response.headers.get("content-type"),
+				"audio/wav",
+			);
+			const tempFilePath = await this._writeTempAudioFile({
+				audioBuffer,
+				contentType,
+				sourceUrl: audioUrl,
+			});
+			return { path: tempFilePath, tempFilePath };
+		} catch (_error) {
+			return { path: audioUrl, tempFilePath: "" };
+		}
+	}
+
+	async _writeTempAudioFile({ audioBuffer, contentType, sourceUrl }) {
+		const tempRoot = path.join(os.tmpdir(), TEMP_DIR_NAME);
+		await fs.mkdir(tempRoot, { recursive: true });
+		const extension = this._resolveAudioExtension({ contentType, sourceUrl });
+		const filename = `tts-monster-${Date.now()}-${crypto.randomUUID()}.${extension}`;
+		const filePath = path.join(tempRoot, filename);
+		await fs.writeFile(filePath, Buffer.from(audioBuffer));
+		return filePath;
+	}
+
+	_resolveAudioExtension({ contentType, sourceUrl }) {
+		const normalizedType = trimString(contentType, "").toLowerCase();
+		if (normalizedType.includes("mpeg") || normalizedType.includes("mp3")) {
+			return "mp3";
+		}
+		if (normalizedType.includes("ogg")) {
+			return "ogg";
+		}
+		if (normalizedType.includes("flac")) {
+			return "flac";
+		}
+		if (normalizedType.includes("aac")) {
+			return "aac";
+		}
+		if (normalizedType.includes("wav") || normalizedType.includes("wave")) {
+			return "wav";
+		}
+
+		const pathname = trimString(sourceUrl, "").toLowerCase();
+		if (pathname.endsWith(".mp3")) return "mp3";
+		if (pathname.endsWith(".ogg")) return "ogg";
+		if (pathname.endsWith(".flac")) return "flac";
+		if (pathname.endsWith(".aac")) return "aac";
+		if (pathname.endsWith(".wav")) return "wav";
+		return "wav";
+	}
+
+	async _cleanupPlaybackFile(playback, { waitForAudioToStop } = {}) {
+		const tempFilePath = trimString(playback?.tempFilePath, "");
+		if (!tempFilePath) {
+			return;
+		}
+
+		const removeFile = async () => {
+			try {
+				await fs.unlink(tempFilePath);
+			} catch (_error) {
+				// ignore cleanup failures
+			}
+		};
+
+		if (waitForAudioToStop) {
+			await removeFile();
+			return;
+		}
+
+		const timer = setTimeout(async () => {
+			this._tempFileCleanupTimers.delete(timer);
+			await removeFile();
+		}, DEFAULTS.tempFileCleanupDelayMs);
+		this._tempFileCleanupTimers.add(timer);
+	}
+
+	async _request(
+		path,
+		{ method = "POST", body, settings, apiKey: explicitApiKey } = {},
+	) {
+		const apiKey = trimString(
+			explicitApiKey,
+			this._apiKey(settings ?? this.settings),
+		);
+		if (!apiKey) {
+			throw new Error("API key is required.");
+		}
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime.");
+		}
+
+		const controller =
+			typeof AbortController === "function" ? new AbortController() : null;
+		const timeoutMs = this._requestTimeoutMs(settings ?? this.settings);
+		const timeoutId =
+			controller && timeoutMs > 0
+				? setTimeout(() => controller.abort(), timeoutMs)
+				: null;
+
+		try {
+			const response = await fetch(`${API_BASE}${path}`, {
+				method,
+				headers: {
+					Authorization: apiKey,
+					...(body ? { "Content-Type": "application/json" } : {}),
+				},
+				body: body ? JSON.stringify(body) : undefined,
+				signal: controller?.signal,
+			});
+
+			const raw = await response.text();
+			const payload = raw ? this._safeJsonParse(raw) : null;
+			if (!response.ok) {
+				const errorMessage =
+					trimString(payload?.error, "") ||
+					trimString(raw, "") ||
+					response.statusText ||
+					"Request failed.";
+				throw new Error(`TTS Monster error ${response.status}: ${errorMessage}`);
+			}
+			return payload;
+		} catch (error) {
+			if (error?.name === "AbortError") {
+				throw new Error("Request timed out.");
+			}
+			throw error;
+		} finally {
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+			}
+		}
+	}
+
+	_safeJsonParse(value) {
+		try {
+			return JSON.parse(value);
+		} catch (_error) {
+			return null;
+		}
+	}
+
+	_mergeSettings(settings, values) {
+		return {
+			...(this.settings && typeof this.settings === "object" ? this.settings : {}),
+			...(settings && typeof settings === "object" ? settings : {}),
+			...(values && typeof values === "object" ? values : {}),
+		};
+	}
+
+	_settingsSnapshot(settings = this.settings) {
+		return {
+			apiKey: this._apiKey(settings),
+			returnUsage: toBoolean(settings?.returnUsage, DEFAULTS.returnUsage),
+			requestTimeoutMs: this._requestTimeoutMs(settings),
+		};
+	}
+
+	_apiKey(settings = this.settings) {
+		return trimString(settings?.apiKey, "");
+	}
+
+	_requestTimeoutMs(settings = this.settings) {
+		return clamp(
+			toNumber(settings?.requestTimeoutMs, DEFAULTS.requestTimeoutMs),
+			0,
+			300000,
+		);
+	}
+
+	async _log(message) {
+		if (typeof this.lumia?.log === "function") {
+			await this.lumia.log(`[TTSMonster] ${message}`);
+		}
+	}
+
+	async _showToast(message, time = 4000) {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({ message, time });
+		} catch (_error) {
+			// ignore toast errors
+		}
+	}
+
+	async onunload() {
+		for (const timer of this._tempFileCleanupTimers) {
+			clearTimeout(timer);
+		}
+		this._tempFileCleanupTimers.clear();
+	}
+}
+
+module.exports = TTSMonsterPlugin;
+
+```
+
+## tts_monster/manifest.json
+
+```
+{
+	"id": "tts_monster",
+	"name": "TTS Monster",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://tts.monster",
+	"description": "Generate TTS Monster speech audio and play it through Lumia Stream.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "audio",
+	"keywords": "tts monster, tts.monster, tts, text-to-speech, voice, audio",
+	"icon": "tts_monster.jpg",
+	"config": {
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "API Token",
+				"type": "password",
+				"helperText": "Create or copy your API token from the TTS Monster developer dashboard.",
+				"required": true,
+				"refreshOnChange": true
+			},
+			{
+				"key": "returnUsage",
+				"label": "Log Character Usage",
+				"type": "toggle",
+				"defaultValue": true,
+				"helperText": "Requests `return_usage` on generate calls, logs the current usage after playback, and shows start/result toasts for Speak actions."
+			},
+			{
+				"key": "requestTimeoutMs",
+				"label": "Request Timeout (ms)",
+				"type": "number",
+				"defaultValue": 0,
+				"min": 0,
+				"max": 300000,
+				"helperText": "How long to wait for TTS Monster API responses. Set to 0 to disable the timeout."
+			}
+		],
+		"actions": [
+			{
+				"type": "speak",
+				"label": "Speak",
+				"description": "Generate speech with TTS Monster and play it in Lumia.",
+				"refreshOnChange": true,
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "textarea",
+						"defaultValue": "Hello from Lumia!",
+						"helperText": "Text to synthesize. TTS Monster currently uses only the first 500 characters.",
+						"allowVariables": true
+					},
+					{
+						"key": "voice",
+						"label": "Voice",
+						"type": "select",
+						"options": [],
+						"dynamicOptions": true,
+						"allowTyping": true,
+						"allowVariables": true,
+						"required": true,
+						"helperText": "Choose a cached voice, or type either a voice name or voice ID. You can copy voice IDs from https://console.tts.monster/voices"
+					},
+					{
+						"key": "volume",
+						"label": "Volume",
+						"type": "number",
+						"defaultValue": 100,
+						"min": 0,
+						"max": 100,
+						"helperText": "Playback volume in Lumia (0-100)."
+					},
+					{
+						"key": "waitForAudioToStop",
+						"label": "Wait For Playback To Finish",
+						"type": "switch",
+						"defaultValue": true,
+						"helperText": "If enabled, the action waits for the generated speech to finish before continuing."
+					}
+				]
+			}
+		]
+	}
+}
+
+```
+
+## tts_monster/package.json
+
+```
+{
+	"name": "lumia-tts-monster",
+	"version": "1.0.0",
+	"private": true,
+	"description": "TTS Monster plugin for Lumia Stream.",
+	"main": "main.js",
+	"dependencies": {
+		"@lumiastream/plugin": "^0.4.1"
+	}
+}
+
+```
+
+## tts_monster/settings_tutorial.md
+
+```
+---
+### 1) Create A TTS.Monster API Token
+1. Open the [TTS.Monster Console](https://console.tts.monster/).
+2. Log in and click through to create or copy your API token.
+3. Paste that token into this plugin's **API Token** setting.
+
+![TTS.Monster API token](./monster_tut1.png)
+---
+
+```
+
 ## typescript_plugin/README.md
 
 ```
@@ -23707,7 +25707,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.1"
+		"@lumiastream/plugin": "^0.7.2"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",

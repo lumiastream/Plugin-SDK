@@ -29,7 +29,7 @@ Plugin Creation Guardrails:
 - Simplify code whenever possible.
 - Treat every manifest `type` value as a strict Lumia field enum, not a JSON Schema type.
 - Never output `"type": "string"` for fields. Use `"type": "text"` for single-line text input and `"type": "textarea"` for multi-line text.
-- Only use these field types when generating `config.settings` or `config.actions[].fields`: `text`, `email`, `url`, `password`, `textarea`, `number`, `slider`, `select`, `checkbox`, `toggle`, `switch`, `color`, `file`, `json`, `roi`.
+- Only use these field types when generating `config.settings` or `config.actions[].fields`: `text`, `email`, `url`, `password`, `textarea`, `number`, `slider`, `select`, `checkbox`, `toggle`, `color`, `file`, `json`, `roi`.
 - Use canonical Lumia field property names only for `config.settings[]` and `config.actions[].fields[]`:
   - Use `key` (not `id`) for the field identifier.
   - Use `label` (not `name`) for UI text.
@@ -40,8 +40,8 @@ Plugin Creation Guardrails:
   - `name` is valid for top-level plugin metadata (for example plugin `name`) and variable definitions that explicitly use `name`.
   - `description` is valid for top-level plugin metadata and action objects (`config.actions[]`), but not for field objects.
 - Enforce context rules for field types:
-  - Settings: use `toggle` (not `switch`); `password`, `json`, and `roi` are allowed.
-  - Actions: use `switch` (not `toggle`); do not use `password`, `json`, or `roi`.
+  - Settings: use `toggle`; `password`, `json`, and `roi` are allowed.
+  - Actions: use `toggle`; do not use `password`, `json`, or `roi`.
   - For multi-value selection, use `type: "select"` with `multiple: true`.
 - Before finalizing any manifest or field snippet, run a strict type check in your response draft:
   - Replace any invalid type names (especially `string`) with a valid Lumia field type.
@@ -49,7 +49,7 @@ Plugin Creation Guardrails:
   - Confirm canonical field keys are used (`key`, `label`, `defaultValue`, `helperText`) and replace alias keys (`id`, `name`, `default`, `description`) in field objects.
   - Confirm each `defaultValue` matches the field type:
     - `number`/`slider` => number
-    - `checkbox`/`toggle`/`switch` => boolean
+    - `checkbox`/`toggle` => boolean
     - `json` => JSON object or array
     - `roi` => object with numeric `x`, `y`, `width`, `height`, and `unit` of `ratio` or `pixels`
     - `select` => scalar unless `multiple: true`, then array

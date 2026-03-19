@@ -1,0 +1,91 @@
+{
+	"id": "rss_feed_monitor",
+	"name": "RSS Feed Monitor",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Monitor multiple RSS or Atom feeds, persist unseen items, and trigger Lumia alerts for each new entry even after Lumia has been offline.",
+	"license": "MIT",
+	"main": "main.js",
+	"lumiaVersion": "^9.0.0",
+	"category": "utilities",
+	"keywords": "rss, atom, feeds, alerts, news, monitor",
+	"icon": "rss_feed_monitor.jpg",
+	"config": {
+		"settings": [
+			{
+				"key": "feeds",
+				"label": "Feeds",
+				"type": "named_map",
+				"required": true,
+				"valueType": "text",
+				"valueLabel": "Feed URL",
+				"valuePlaceholder": "https://example.com/rss.xml",
+				"valueField": {
+					"type": "text",
+					"required": true,
+					"placeholder": "https://example.com/rss.xml"
+				},
+				"outputMode": "map",
+				"objectValueMode": "value",
+				"defaultValue": {
+					"Lumia Blog": "https://example.com/rss.xml"
+				},
+				"helperText": "Add one named feed per row. The row name is the feed label and the value is the feed URL."
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 300,
+				"required": true,
+				"helperText": "How often the plugin checks the configured feeds.",
+				"validation": {
+					"min": 30,
+					"max": 86400
+				}
+			},
+			{
+				"key": "itemWindow",
+				"label": "Recent Items Per Feed",
+				"type": "number",
+				"defaultValue": 25,
+				"required": true,
+				"helperText": "How many recent entries to track per feed for offline catch-up and duplicate prevention.",
+				"validation": {
+					"min": 5,
+					"max": 100
+				}
+			}
+		],
+		"settings_tutorial": "---\n### Feed Format\nAdd one named row per feed.\n- **Name**: label shown in Lumia variables and alerts\n- **Feed URL**: RSS or Atom URL to poll\n\n### Offline Catch-up\nThe plugin stores seen items on disk. If Lumia is offline for a while, the next startup will replay alerts for any newly discovered entries still present in each feed's recent item window.\n\n### Tuning\n- **Poll Interval** controls how often feeds are checked.\n- **Recent Items Per Feed** increases how much backlog the plugin can catch after downtime.\n---",
+		"actions": [],
+		"alerts": [
+			{
+				"title": "Feed Item Changed",
+				"key": "rss_feed_item_changed",
+				"defaultMessage": "{{feed_name}}: {{item_title}}\n{{item_summary}}",
+				"acceptedVariables": [
+					"feed_name",
+					"feed_url",
+					"item_title",
+					"item_url",
+					"item_published",
+					"item_summary",
+					"item_guid",
+					"item_id",
+					"item_author"
+				],
+				"variationConditions": [
+					{
+						"type": "EQUAL_SELECTION",
+						"description": "Feed name (compares against dynamic.value).",
+						"dynamicOptions": true
+					}
+				]
+			}
+		],
+		"actions_tutorial": "---\n### Actions\nThis plugin runs on a polling loop and does not expose actions.\n---"
+	}
+}
