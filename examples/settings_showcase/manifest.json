@@ -528,14 +528,14 @@
 						{
 							"key": "includeSnapshot",
 							"label": "Include Snapshot",
-							"type": "switch",
+							"type": "toggle",
 							"defaultValue": true,
 							"helperText": "When enabled, returns a compact JSON snapshot in settings_showcase_action_snapshot."
 						},
 						{
 							"key": "stopChain",
 							"label": "Stop Remaining Actions",
-							"type": "switch",
+							"type": "toggle",
 							"defaultValue": false,
 							"helperText": "When enabled, actions() also returns shouldStop: true."
 						}

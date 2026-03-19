@@ -1,0 +1,89 @@
+{
+	"id": "tts_monster",
+	"name": "TTS Monster",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://tts.monster",
+	"description": "Generate TTS Monster speech audio and play it through Lumia Stream.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "audio",
+	"keywords": "tts monster, tts.monster, tts, text-to-speech, voice, audio",
+	"icon": "tts_monster.jpg",
+	"config": {
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
+		"settings": [
+			{
+				"key": "apiKey",
+				"label": "API Token",
+				"type": "password",
+				"helperText": "Create or copy your API token from the TTS Monster developer dashboard.",
+				"required": true,
+				"refreshOnChange": true
+			},
+			{
+				"key": "returnUsage",
+				"label": "Log Character Usage",
+				"type": "toggle",
+				"defaultValue": true,
+				"helperText": "Requests `return_usage` on generate calls, logs the current usage after playback, and shows start/result toasts for Speak actions."
+			},
+			{
+				"key": "requestTimeoutMs",
+				"label": "Request Timeout (ms)",
+				"type": "number",
+				"defaultValue": 0,
+				"min": 0,
+				"max": 300000,
+				"helperText": "How long to wait for TTS Monster API responses. Set to 0 to disable the timeout."
+			}
+		],
+		"actions": [
+			{
+				"type": "speak",
+				"label": "Speak",
+				"description": "Generate speech with TTS Monster and play it in Lumia.",
+				"refreshOnChange": true,
+				"fields": [
+					{
+						"key": "message",
+						"label": "Message",
+						"type": "textarea",
+						"defaultValue": "Hello from Lumia!",
+						"helperText": "Text to synthesize. TTS Monster currently uses only the first 500 characters.",
+						"allowVariables": true
+					},
+					{
+						"key": "voice",
+						"label": "Voice",
+						"type": "select",
+						"options": [],
+						"dynamicOptions": true,
+						"allowTyping": true,
+						"allowVariables": true,
+						"required": true,
+						"helperText": "Choose a cached voice, or type either a voice name or voice ID. You can copy voice IDs from https://console.tts.monster/voices"
+					},
+					{
+						"key": "volume",
+						"label": "Volume",
+						"type": "number",
+						"defaultValue": 100,
+						"min": 0,
+						"max": 100,
+						"helperText": "Playback volume in Lumia (0-100)."
+					},
+					{
+						"key": "waitForAudioToStop",
+						"label": "Wait For Playback To Finish",
+						"type": "switch",
+						"defaultValue": true,
+						"helperText": "If enabled, the action waits for the generated speech to finish before continuing."
+					}
+				]
+			}
+		]
+	}
+}

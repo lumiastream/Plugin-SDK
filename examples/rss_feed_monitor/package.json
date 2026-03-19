@@ -1,0 +1,11 @@
+{
+  "name": "lumia_plugin-rss-feed-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lumia Stream plugin that monitors RSS and Atom feeds with persisted backlog alerts.",
+  "main": "main.js",
+  "scripts": {},
+  "dependencies": {
+    "@lumiastream/plugin": "^0.3.2"
+  }
+}

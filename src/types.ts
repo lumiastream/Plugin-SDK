@@ -127,14 +127,38 @@ export interface PluginBundleConfig {
 
 export type PluginNamedMapFieldType = "named_map";
 
+export type PluginBooleanFieldType = "switch" | "toggle";
+
+export type PluginCommonFieldType =
+	| "text"
+	| "datetime"
+	| "number"
+	| "select"
+	| "checkbox"
+	| PluginBooleanFieldType
+	| "slider"
+	| "file"
+	| "email"
+	| "url"
+	| "textarea"
+	| "color";
+
+export type PluginSettingFieldType =
+	| PluginCommonFieldType
+	| "password"
+	| "json"
+	| "roi"
+	| PluginNamedMapFieldType;
+
+export type PluginActionFieldType = PluginCommonFieldType;
+
 export type PluginNamedMapValueType =
 	| "text"
 	| "datetime"
 	| "number"
 	| "select"
 	| "checkbox"
-	| "switch"
-	| "toggle"
+	| PluginBooleanFieldType
 	| "file"
 	| "json";
 
@@ -149,23 +173,7 @@ export interface PluginNamedMapOption {
 }
 
 export interface PluginNamedMapValueFieldConfig {
-	type?:
-		| "text"
-		| "datetime"
-		| "number"
-		| "select"
-		| "checkbox"
-		| "switch"
-		| "slider"
-		| "file"
-		| "password"
-		| "toggle"
-		| "textarea"
-		| "email"
-		| "url"
-		| "color"
-		| "json"
-		| "roi";
+	type?: Exclude<PluginSettingFieldType, PluginNamedMapFieldType>;
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
@@ -185,23 +193,7 @@ export interface PluginNamedMapValueFieldConfig {
 export interface PluginSetting {
 	key: string;
 	label: string;
-	type:
-		| "text"
-		| "datetime"
-		| "number"
-		| "select"
-		| "checkbox"
-		| "slider"
-		| "file"
-		| "password"
-		| "toggle"
-		| "textarea"
-		| "email"
-		| "url"
-		| "color"
-		| "json"
-		| "roi"
-		| PluginNamedMapFieldType;
+	type: PluginSettingFieldType;
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
@@ -292,20 +284,7 @@ export interface PluginSettingGroupConfig {
 export interface PluginActionField {
 	key: string;
 	label: string;
-	type:
-		| "text"
-		| "datetime"
-		| "number"
-		| "select"
-		| "checkbox"
-		| "switch"
-		| "slider"
-		| "file"
-		| "email"
-		| "url"
-		| "password"
-		| "textarea"
-		| "color";
+	type: PluginActionFieldType;
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
@@ -994,23 +973,7 @@ export interface PluginRuntime {
 export interface PluginFormField {
 	key: string;
 	label: string;
-	type:
-		| "text"
-		| "datetime"
-		| "password"
-		| "number"
-		| "email"
-		| "url"
-		| "textarea"
-		| "select"
-		| "checkbox"
-		| "toggle"
-		| "color"
-		| "slider"
-		| "file"
-		| "json"
-		| "roi"
-		| PluginNamedMapFieldType;
+	type: PluginSettingFieldType;
 	placeholder?: string;
 	helperText?: string;
 	required?: boolean;
