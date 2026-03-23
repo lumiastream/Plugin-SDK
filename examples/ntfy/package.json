@@ -1,6 +1,6 @@
 {
 	"name": "lumia-ntfy",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"private": true,
 	"description": "Lumia Stream plugin that subscribes to ntfy topics and triggers alerts on incoming messages.",
 	"main": "main.js",

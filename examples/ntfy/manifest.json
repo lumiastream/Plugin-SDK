@@ -1,7 +1,7 @@
 {
 	"id": "ntfy",
 	"name": "ntfy",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -94,6 +94,16 @@
 				"type": "text",
 				"placeholder": "error|warning",
 				"helperText": "Optional regex filter applied to title + message (case-insensitive)."
+			},
+			{
+				"key": "debugLogs",
+				"label": "Enable Debug Logs",
+				"type": "checkbox",
+				"section": "Advanced",
+				"sectionOrder": 2,
+				"defaultValue": false,
+				"refreshOnChange": true,
+				"helperText": "Writes detailed ntfy diagnostics to Lumia logs for troubleshooting."
 			}
 		],
 		"settings_tutorial": "./settings_tutorial.md",

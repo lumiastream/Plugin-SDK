@@ -1,7 +1,7 @@
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.9",
+	"version": "1.0.10",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -37,10 +37,10 @@
 				"type": "number",
 				"section": "General",
 				"sectionOrder": 1,
-				"defaultValue": 15,
-				"min": 15,
+				"defaultValue": 30,
+				"min": 30,
 				"max": 900,
-				"helperText": "How often to refresh current status/game and current-game achievements (15-900 seconds). Owned games refresh less frequently automatically."
+				"helperText": "How often to refresh current status/game and current-game achievements (30-900 seconds). Owned games refresh less frequently automatically."
 			},
 			{
 				"key": "debugLogs",

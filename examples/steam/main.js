@@ -2,13 +2,13 @@ const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULTS = {
 	pollInterval: 120,
-	minPollInterval: 15,
+	minPollInterval: 30,
 	maxPollInterval: 900,
 	requestTimeoutMs: 15000,
 	stuckRefreshMs: 60000,
 	ownedGamesRefreshSeconds: 600,
 	userAgent: "LumiaStream Steam Plugin/1.0.0",
-	logThrottleMs: 5 * 60 * 1000,
+	achievementSchemaCacheMaxEntries: 1,
 	matchThreshold: 0.7,
 };
 
@@ -55,7 +55,6 @@ class SteamPlugin extends Plugin {
 		this._refreshStartedAt = 0;
 		this._lastConnectionState = null;
 		this._lastVariables = new Map();
-		this._logTimestamps = new Map();
 		this._globalBackoffUntil = 0;
 		this._authFailure = false;
 		this._resolvedSteamId = "";
@@ -193,37 +192,12 @@ class SteamPlugin extends Plugin {
 		await this.lumia.log(decorated);
 	}
 
-	async _logThrottled(
-		key,
-		message,
-		severity = "info",
-		intervalMs = DEFAULTS.logThrottleMs,
-	) {
-		const now = Date.now();
-		const last = this._logTimestamps.get(key) ?? 0;
-		if (now - last < intervalMs) {
-			return;
-		}
-		this._logTimestamps.set(key, now);
-		await this._log(message, severity);
-	}
-
-	async _tempDebug(message, { throttleKey = "", intervalMs = 30 * 1000 } = {}) {
+	async _tempDebug(message) {
 		if (!this._debugEnabled()) {
 			return;
 		}
 
 		const prefixed = `[TEMP DEBUG] ${message}`;
-		if (throttleKey) {
-			await this._logThrottled(
-				`temp-debug:${throttleKey}`,
-				prefixed,
-				"info",
-				intervalMs,
-			);
-			return;
-		}
-
 		await this._log(prefixed, "info");
 	}
 
@@ -247,11 +221,6 @@ class SteamPlugin extends Plugin {
 			if (elapsed <= DEFAULTS.stuckRefreshMs) {
 				return this._refreshPromise;
 			}
-			await this._logThrottled(
-				"refresh-stuck",
-				`Steam refresh appears stuck for ${Math.round(elapsed / 1000)}s; restarting refresh loop.`,
-				"warn",
-			);
 			this._refreshPromise = null;
 			this._refreshStartedAt = 0;
 		}
@@ -315,12 +284,6 @@ class SteamPlugin extends Plugin {
 				);
 				await this._tempDebug(
 					`refresh reason=${reason ?? "unknown"} steamId=${steamId} game='${currentGameName || "none"}' appId=${achievementAppId || 0} summaryOk=${summaryResult.ok} ownedFetched=${shouldFetchOwned} ownedOk=${ownedResult.ok} achievementsFetched=${shouldFetchAchievements} achievementsOk=${shouldFetchAchievements ? achievementsResult.ok : "skipped"} unlocked=${unlockedCount}/${achievementCount} achievements='${achievementSnapshot || "none"}'`,
-					{
-						throttleKey: `refresh:${achievementAppId || 0}:${
-							currentGameName || "none"
-						}:${unlockedCount}/${achievementCount}`,
-						intervalMs: 15 * 1000,
-					},
 				);
 
 				await this._applySummary(summaryResult.data, steamId);
@@ -344,13 +307,7 @@ class SteamPlugin extends Plugin {
 					(shouldFetchAchievements && achievementsResult.ok);
 
 				await this._updateConnectionState(hadSuccessfulRefresh);
-			} catch (error) {
-				const message = this._errorMessage(error);
-				await this._logThrottled(
-					"refresh-failure",
-					`Failed to refresh Steam data: ${message}`,
-					"warn",
-				);
+			} catch {
 				await this._updateConnectionState(false);
 			} finally {
 				this._refreshPromise = null;
@@ -831,8 +788,12 @@ class SteamPlugin extends Plugin {
 			return null;
 		}
 
-		if (this._achievementSchemaCache.has(targetAppId)) {
-			return this._achievementSchemaCache.get(targetAppId);
+		const cached = this._achievementSchemaCache.get(targetAppId);
+		if (cached && typeof cached === "object") {
+			// Move hit to the end to preserve LRU order.
+			this._achievementSchemaCache.delete(targetAppId);
+			this._achievementSchemaCache.set(targetAppId, cached);
+			return cached.value ?? null;
 		}
 
 		const schemaResult = await this._safeFetch("achievement schema", () =>
@@ -858,7 +819,10 @@ class SteamPlugin extends Plugin {
 			});
 		}
 
-		this._achievementSchemaCache.set(targetAppId, schemaMap);
+		this._achievementSchemaCache.set(targetAppId, {
+			value: schemaMap,
+		});
+		this._pruneAchievementSchemaCache();
 		return schemaMap;
 	}
 
@@ -1277,17 +1241,25 @@ class SteamPlugin extends Plugin {
 		}
 	}
 
-	async _safeFetch(label, fn) {
+	async _safeFetch(_label, fn) {
 		try {
 			return { ok: true, data: await fn() };
-		} catch (error) {
-			const message = this._errorMessage(error);
-			await this._logThrottled(
-				`fetch:${label}:${message}`,
-				`${label} fetch failed: ${message}`,
-				"warn",
-			);
+		} catch {
 			return { ok: false, data: null };
+		}
+	}
+
+	_pruneAchievementSchemaCache() {
+		const maxEntries = Math.max(
+			1,
+			this._coerceNumber(DEFAULTS.achievementSchemaCacheMaxEntries, 1),
+		);
+		while (this._achievementSchemaCache.size > maxEntries) {
+			const oldestKey = this._achievementSchemaCache.keys().next().value;
+			if (oldestKey === undefined) {
+				return;
+			}
+			this._achievementSchemaCache.delete(oldestKey);
 		}
 	}
 

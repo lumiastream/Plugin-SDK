@@ -1,6 +1,6 @@
 {
 	"name": "lumia-example-steam",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"private": true,
 	"description": "Example Lumia Stream plugin that pulls Steam data from the Steam Web API.",
 	"main": "main.js",

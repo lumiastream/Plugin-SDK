@@ -1,7 +1,7 @@
 {
 	"id": "retro_achievements",
 	"name": "RetroAchievements",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -38,9 +38,9 @@
 				"section": "General",
 				"sectionOrder": 1,
 				"defaultValue": 30,
-				"min": 15,
+				"min": 30,
 				"max": 900,
-				"helperText": "How often to refresh profile/game data (15-900 seconds)."
+				"helperText": "How often to refresh profile/game data (30-900 seconds)."
 			},
 			{
 				"key": "debugLogs",

@@ -35,7 +35,6 @@ class NtfyPlugin extends Plugin {
 		this.isManuallyDisconnected = false;
 		this.reconnectTimeoutId = null;
 		this._lastConnectionState = null;
-		this._logTimestamps = new Map();
 		this._currentReconnectInterval = DEFAULTS.reconnectInterval;
 		this._cachedTagFilter = [];
 		this._cachedRegex = null;
@@ -158,17 +157,14 @@ class NtfyPlugin extends Plugin {
 	}
 
 	async _logThrottled(
-		key,
+		_key,
 		message,
 		severity = "warn",
-		intervalMs = DEFAULTS.logThrottleMs,
+		_intervalMs = DEFAULTS.logThrottleMs,
 	) {
-		const now = Date.now();
-		const last = this._logTimestamps.get(key) ?? 0;
-		if (now - last < intervalMs) {
+		if (!this.settings?.debugLogs) {
 			return;
 		}
-		this._logTimestamps.set(key, now);
 		await this._log(message, severity);
 	}
 

@@ -2,7 +2,7 @@ const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULTS = {
 	pollInterval: 30,
-	minPollInterval: 15,
+	minPollInterval: 30,
 	maxPollInterval: 900,
 	requestTimeoutMs: 15000,
 	stuckRefreshMs: 60000,
@@ -61,7 +61,6 @@ class RetroAchievementsPlugin extends Plugin {
 		this._refreshPromise = null;
 		this._lastConnectionState = null;
 		this._lastVariables = new Map();
-		this._logTimestamps = new Map();
 		this._hasInitialSync = false;
 		this._refreshStartedAt = 0;
 		this._lastGameId = null;
@@ -181,17 +180,14 @@ class RetroAchievementsPlugin extends Plugin {
 	}
 
 	async _logThrottled(
-		key,
+		_key,
 		message,
 		severity = "info",
-		intervalMs = DEFAULTS.logThrottleMs,
+		_intervalMs = DEFAULTS.logThrottleMs,
 	) {
-		const now = Date.now();
-		const last = this._logTimestamps.get(key) ?? 0;
-		if (now - last < intervalMs) {
+		if (!this._debugEnabled()) {
 			return;
 		}
-		this._logTimestamps.set(key, now);
 		await this._log(message, severity);
 	}
 
