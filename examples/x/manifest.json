@@ -1,0 +1,402 @@
+{
+	"id": "x",
+	"name": "X",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"description": "Create and delete X posts with your own developer tokens, sync account variables, and trigger polling-based alerts for mentions and follower growth.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "platforms",
+	"keywords": "x, twitter, social, posts, mentions, followers",
+	"icon": "x.png",
+	"config": {
+		"settings_tutorial": "./settings_tutorial.md",
+		"actions_tutorial": "./actions_tutorial.md",
+		"settings": [
+			{
+				"key": "consumerKey",
+				"label": "Consumer Key",
+				"type": "password",
+				"helperText": "From your X app's Keys and tokens page.",
+				"required": true,
+				"refreshOnChange": true,
+				"section": "Authentication",
+				"sectionOrder": 1
+			},
+			{
+				"key": "consumerSecret",
+				"label": "Consumer Secret",
+				"type": "password",
+				"helperText": "From your X app's Keys and tokens page.",
+				"required": true,
+				"refreshOnChange": true,
+				"section": "Authentication",
+				"sectionOrder": 1
+			},
+			{
+				"key": "accessToken",
+				"label": "Access Token",
+				"type": "password",
+				"helperText": "User access token generated for your X app.",
+				"required": true,
+				"refreshOnChange": true,
+				"section": "Authentication",
+				"sectionOrder": 1
+			},
+			{
+				"key": "accessTokenSecret",
+				"label": "Access Token Secret",
+				"type": "password",
+				"helperText": "User access token secret generated for your X app.",
+				"required": true,
+				"refreshOnChange": true,
+				"section": "Authentication",
+				"sectionOrder": 1
+			},
+			{
+				"key": "username",
+				"label": "Expected Username",
+				"type": "text",
+				"placeholder": "optional_handle",
+				"helperText": "Optional safety check. If set, Lumia will warn when the token belongs to a different account.",
+				"refreshOnChange": true,
+				"section": "Authentication",
+				"sectionOrder": 1
+			},
+			{
+				"key": "enableAlerts",
+				"label": "Enable Alerts",
+				"type": "checkbox",
+				"defaultValue": false,
+				"helperText": "Master switch for all background X alert polling. Leave this off to avoid background read usage.",
+				"refreshOnChange": true,
+				"section": "Alerts",
+				"sectionOrder": 2
+			},
+			{
+				"key": "pollInterval",
+				"label": "Poll Interval (seconds)",
+				"type": "number",
+				"defaultValue": 300,
+				"min": 15,
+				"max": 900,
+				"helperText": "How often to refresh profile, mentions, and follower totals when alerts are enabled.",
+				"refreshOnChange": true,
+				"section": "Alerts",
+				"sectionOrder": 2,
+				"visibleIf": {
+					"key": "enableAlerts",
+					"equals": true
+				}
+			},
+			{
+				"key": "trackFollowerAlerts",
+				"label": "Follower Alerts",
+				"type": "checkbox",
+				"defaultValue": false,
+				"helperText": "Trigger Lumia alerts when follower count increases. Disabled by default to avoid background read usage.",
+				"refreshOnChange": true,
+				"section": "Alerts",
+				"sectionOrder": 2,
+				"visibleIf": {
+					"key": "enableAlerts",
+					"equals": true
+				}
+			},
+			{
+				"key": "trackMentionAlerts",
+				"label": "Mention Alerts",
+				"type": "checkbox",
+				"defaultValue": false,
+				"helperText": "Trigger Lumia alerts for new mentions and replies found in the mention timeline. Disabled by default to avoid background read usage.",
+				"refreshOnChange": true,
+				"section": "Alerts",
+				"sectionOrder": 2,
+				"visibleIf": {
+					"key": "enableAlerts",
+					"equals": true
+				}
+			},
+			{
+				"key": "latestPostMode",
+				"label": "Latest Post Timeline",
+				"type": "select",
+				"defaultValue": "posts_only",
+				"options": [
+					{
+						"label": "Posts Only",
+						"value": "posts_only"
+					},
+					{
+						"label": "Include Replies",
+						"value": "include_replies"
+					}
+				],
+				"helperText": "Choose whether the latest-post variables should ignore replies.",
+				"refreshOnChange": true,
+				"section": "Alerts",
+				"sectionOrder": 2,
+				"visibleIf": {
+					"key": "enableAlerts",
+					"equals": true
+				}
+			},
+			{
+				"key": "debugLogs",
+				"label": "Debug Logs",
+				"type": "checkbox",
+				"defaultValue": false,
+				"helperText": "Writes extra X API diagnostics to the Lumia plugin log.",
+				"refreshOnChange": true,
+				"section": "Advanced",
+				"sectionOrder": 3
+			}
+		],
+		"actions": [
+			{
+				"type": "create_post",
+				"label": "Create Post",
+				"description": "Create a text, reply, quote, image, or video post on X.",
+				"fields": [
+					{
+						"key": "text",
+						"label": "Text",
+						"type": "textarea",
+						"required": true,
+						"rows": 5,
+						"allowVariables": true
+					},
+					{
+						"key": "replyToPostId",
+						"label": "Reply To Post ID",
+						"type": "text",
+						"allowVariables": true
+					},
+					{
+						"key": "quotePostId",
+						"label": "Quote Post ID",
+						"type": "text",
+						"allowVariables": true
+					},
+					{
+						"key": "media",
+						"label": "Media",
+						"type": "media",
+						"allowVariables": true,
+						"helperText": "Optional. Choose one local file or enter one https URL. Images and mp4/webm/mov video are supported."
+					}
+				]
+			},
+			{
+				"type": "delete_post",
+				"label": "Delete Post",
+				"description": "Delete a specific X post by ID.",
+				"fields": [
+					{
+						"key": "postId",
+						"label": "Post ID",
+						"type": "text",
+						"required": true,
+						"allowVariables": true
+					}
+				]
+			},
+			{
+				"type": "delete_latest_post",
+				"label": "Delete Latest Created Post",
+				"description": "Delete the last post created by this plugin session, or the latest saved post if available.",
+				"fields": []
+			},
+			{
+				"type": "like_post",
+				"label": "Like Post",
+				"description": "Like a post on behalf of the authenticated user.",
+				"fields": [
+					{
+						"key": "postId",
+						"label": "Post ID",
+						"type": "text",
+						"required": true,
+						"allowVariables": true
+					}
+				]
+			},
+			{
+				"type": "repost_post",
+				"label": "Repost Post",
+				"description": "Repost a post on behalf of the authenticated user.",
+				"fields": [
+					{
+						"key": "postId",
+						"label": "Post ID",
+						"type": "text",
+						"required": true,
+						"allowVariables": true
+					}
+				]
+			},
+			{
+				"type": "follow_user",
+				"label": "Follow User",
+				"description": "Follow a user by handle or numeric user ID.",
+				"fields": [
+					{
+						"key": "user",
+						"label": "Handle Or User ID",
+						"type": "text",
+						"required": true,
+						"allowVariables": true
+					}
+				]
+			}
+		],
+		"variables": [
+			{
+				"name": "user_id",
+				"description": "Authenticated X user ID.",
+				"value": ""
+			},
+			{
+				"name": "username",
+				"description": "Authenticated X handle without @.",
+				"value": ""
+			},
+			{
+				"name": "display_name",
+				"description": "Authenticated X display name.",
+				"value": ""
+			},
+			{
+				"name": "bio",
+				"description": "Current account bio/description.",
+				"value": ""
+			},
+			{
+				"name": "verified",
+				"description": "Whether the authenticated account is verified.",
+				"value": false
+			},
+			{
+				"name": "followers_count",
+				"description": "Current follower count from X public metrics.",
+				"value": 0
+			},
+			{
+				"name": "following_count",
+				"description": "Current following count from X public metrics.",
+				"value": 0
+			},
+			{
+				"name": "listed_count",
+				"description": "Current listed count from X public metrics.",
+				"value": 0
+			},
+			{
+				"name": "post_count",
+				"description": "Current post count from X public metrics.",
+				"value": 0
+			},
+			{
+				"name": "latest_post_id",
+				"description": "Most recent authored post ID seen by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "latest_post_text",
+				"description": "Text of the most recent authored post seen by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "latest_post_url",
+				"description": "URL of the most recent authored post seen by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "latest_post_created_at",
+				"description": "ISO timestamp of the most recent authored post seen by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "last_created_post_id",
+				"description": "Most recent post ID created by the plugin via an action.",
+				"value": ""
+			},
+			{
+				"name": "latest_mention_id",
+				"description": "Most recent mention ID seen by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "latest_mention_text",
+				"description": "Text of the most recent mention seen by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "latest_mention_author",
+				"description": "Author handle of the most recent mention seen by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "latest_mention_url",
+				"description": "URL of the most recent mention seen by the plugin.",
+				"value": ""
+			},
+			{
+				"name": "follower_delta",
+				"description": "Follower increase detected during the last polling cycle.",
+				"value": 0
+			},
+			{
+				"name": "last_action_status",
+				"description": "Short success status from the last executed action.",
+				"value": ""
+			},
+			{
+				"name": "last_action_error",
+				"description": "Last action error message, if any.",
+				"value": ""
+			}
+		],
+		"alerts": [
+			{
+				"title": "Post Created",
+				"key": "post_created",
+				"acceptedVariables": [
+					"username",
+					"display_name",
+					"latest_post_id",
+					"latest_post_text",
+					"latest_post_url",
+					"last_created_post_id"
+				],
+				"defaultMessage": "{{display_name}} posted on X: {{latest_post_text}}"
+			},
+			{
+				"title": "Mention",
+				"key": "mention",
+				"acceptedVariables": [
+					"username",
+					"display_name",
+					"latest_mention_id",
+					"latest_mention_text",
+					"latest_mention_author",
+					"latest_mention_url"
+				],
+				"defaultMessage": "@{{latest_mention_author}} mentioned {{display_name}} on X."
+			},
+			{
+				"title": "Follower Gain",
+				"key": "follower_gain",
+				"acceptedVariables": [
+					"username",
+					"display_name",
+					"followers_count",
+					"follower_delta"
+				],
+				"defaultMessage": "{{display_name}} gained {{follower_delta}} follower(s) on X. Total: {{followers_count}}"
+			}
+		]
+	}
+}

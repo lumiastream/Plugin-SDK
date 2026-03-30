@@ -145,12 +145,13 @@ export type PluginCommonFieldType =
 
 export type PluginSettingFieldType =
 	| PluginCommonFieldType
+	| "media"
 	| "password"
 	| "json"
 	| "roi"
 	| PluginNamedMapFieldType;
 
-export type PluginActionFieldType = PluginCommonFieldType;
+export type PluginActionFieldType = PluginCommonFieldType | "media";
 
 export type PluginNamedMapValueType =
 	| "text"

@@ -1,0 +1,11 @@
+{
+	"name": "lumia-x",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Lumia Stream plugin for X that posts with user-supplied developer tokens and exposes polling-based variables and alerts.",
+	"main": "main.js",
+	"scripts": {},
+	"dependencies": {
+		"@lumiastream/plugin": "^0.7.2"
+	}
+}
