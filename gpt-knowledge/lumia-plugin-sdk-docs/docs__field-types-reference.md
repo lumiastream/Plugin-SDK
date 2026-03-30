@@ -326,7 +326,7 @@ File path input with file browser dialog.
 
 ---
 
-#### `media` (actions only)
+#### `media`
 Media path input with a picker dialog for local files or remote URLs.
 
 ```json
@@ -441,7 +441,7 @@ Structured region-of-interest editor for screen detection coordinates.
 | `toggle` | ✅ | ✅ | ❌ | - | Boolean toggle control |
 | `color` | ✅ | ✅ | ❌ | - | Color picker |
 | `file` | ✅ | ✅ | With `allowVariables` | - | File browser |
-| `media` | ❌ | ✅ | With `allowVariables` | - | Media picker (local file or URL) |
+| `media` | ✅ | ✅ | With `allowVariables` on actions | - | Media picker (local file or URL) |
 | `named_map` | ✅ | ❌ | ❌ | Row-level required checks + duplicate-name checks | Name-to-value map |
 | `json` | ✅ | ❌ | ❌ | JSON parse | Structured object/array editor |
 | `roi` | ✅ | ❌ | ❌ | ROI shape + numeric bounds | Region-of-interest editor |

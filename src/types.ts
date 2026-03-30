@@ -145,6 +145,7 @@ export type PluginCommonFieldType =
 
 export type PluginSettingFieldType =
 	| PluginCommonFieldType
+	| "media"
 	| "password"
 	| "json"
 	| "roi"

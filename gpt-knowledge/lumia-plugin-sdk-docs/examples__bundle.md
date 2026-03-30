@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.3"
+		"@lumiastream/plugin": "^0.7.4"
 	}
 }
 
@@ -18120,7 +18120,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.3"
+		"@lumiastream/plugin": "^0.7.4"
 	}
 }
 
@@ -25681,7 +25681,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.3"
+		"@lumiastream/plugin": "^0.7.4"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
