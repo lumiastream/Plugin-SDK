@@ -5,6 +5,8 @@ const DEFAULTS = {
 	minPollInterval: 30,
 	maxPollInterval: 900,
 	requestTimeoutMs: 15000,
+	validationTimeoutMs: 20000,
+	lumiaCallTimeoutMs: 1000,
 	stuckRefreshMs: 60000,
 	ownedGamesRefreshSeconds: 600,
 	userAgent: "LumiaStream Steam Plugin/1.0.0",
@@ -31,6 +33,8 @@ const VARIABLE_NAMES = {
 	avatar: "avatar",
 	currentGameName: "current_game_name",
 	currentGameAppId: "current_game_appid",
+	currentGameGraphicsUrl: "current_game_graphics_url",
+	currentGamePlaytimeMinutes: "current_game_playtime_minutes",
 	gameCount: "game_count",
 	currentGameAchievementCount: "current_game_achievement_count",
 	currentGameAchievementUnlocked: "current_game_achievement_unlocked_count",
@@ -42,6 +46,8 @@ const ACTION_VARIABLE_NAMES = {
 	requestedGameInput: "steam_requested_game_input",
 	requestedGameAppId: "steam_requested_game_appid",
 	requestedGameName: "steam_requested_game_name",
+	requestedGameGraphicsUrl: "steam_requested_game_graphics_url",
+	requestedGamePlaytimeMinutes: "steam_requested_game_playtime_minutes",
 	requestedGameAchievementCount: "steam_requested_game_achievement_count",
 	requestedGameAchievementUnlocked: "steam_requested_game_achievement_unlocked",
 	requestedGameAchievements: "steam_requested_game_achievements",
@@ -67,6 +73,7 @@ class SteamPlugin extends Plugin {
 		this._lastAchievementUnlockedKeys = null;
 		this._achievementSchemaCache = new Map();
 		this._lastOwnedFetchAt = 0;
+		this._ownedGamesByAppId = new Map();
 	}
 
 	async onload() {
@@ -76,7 +83,7 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 
-		await this._refreshData({ reason: "startup" });
+		void this._refreshData({ reason: "startup" });
 		this._schedulePolling();
 	}
 
@@ -109,6 +116,7 @@ class SteamPlugin extends Plugin {
 			this._lastAchievementUnlockedKeys = null;
 			this._achievementSchemaCache.clear();
 			this._lastOwnedFetchAt = 0;
+			this._ownedGamesByAppId.clear();
 		}
 
 		await this._refreshData({ reason: "settings-update" });
@@ -157,8 +165,11 @@ class SteamPlugin extends Plugin {
 		}
 	}
 
-	async validateAuth() {
-		if (!this._hasRequiredSettings()) {
+	async validateAuth(data = {}) {
+		const settings = this._settingsWith(data);
+		if (!this._hasRequiredSettings(settings)) {
+			await this._log("Steam validation failed: missing API key or Steam ID.", "warn");
+			await this._updateConnectionState(false);
 			return {
 				ok: false,
 				message: "Missing Steam API key or Steam ID.",
@@ -166,12 +177,25 @@ class SteamPlugin extends Plugin {
 		}
 
 		try {
-			const steamId = await this._resolveSteamId();
-			await this._fetchPlayerSummary(steamId);
+			await this._log("Validating Steam connection.");
+			const steamId = await this._withTimeout(
+				(async () => {
+					const resolvedSteamId = await this._resolveSteamId(settings, {
+						cache: false,
+					});
+					await this._fetchPlayerSummary(resolvedSteamId, settings);
+					return resolvedSteamId;
+				})(),
+				DEFAULTS.validationTimeoutMs,
+				"Steam validation timed out.",
+			);
+			await this._updateConnectionState(true);
+			await this._log(`Steam validation succeeded for SteamID64 ${steamId}.`);
 			return { ok: true };
 		} catch (error) {
 			const message = this._errorMessage(error);
 			await this._log(`Steam validation failed: ${message}`, "error");
+			await this._updateConnectionState(false);
 			return { ok: false, message };
 		}
 	}
@@ -184,12 +208,32 @@ class SteamPlugin extends Plugin {
 		const prefix = this._tag();
 		const decorated =
 			severity === "warn"
-				? `${prefix} ⚠️ ${message}`
+				? `${prefix} WARN ${message}`
 				: severity === "error"
-					? `${prefix} ❌ ${message}`
+					? `${prefix} ERROR ${message}`
 					: `${prefix} ${message}`;
 
-		await this.lumia.log(decorated);
+		if (severity === "warn") {
+			console.warn(decorated);
+		} else if (severity === "error") {
+			console.error(decorated);
+		} else if (this._debugEnabled()) {
+			console.log(decorated);
+		}
+
+		if (typeof this.lumia?.log !== "function") {
+			return;
+		}
+
+		try {
+			await this._withTimeout(
+				Promise.resolve(this.lumia.log(decorated)),
+				DEFAULTS.lumiaCallTimeoutMs,
+				"Lumia log timed out.",
+			);
+		} catch {
+			// Keep plugin flow alive when logging transport is unavailable.
+		}
 	}
 
 	async _tempDebug(message) {
@@ -239,11 +283,20 @@ class SteamPlugin extends Plugin {
 					this._fetchPlayerSummary(steamId),
 				);
 				const achievementAppId = this._determineAchievementAppId(summaryResult.data);
+				const currentGameAppId = this._coerceNumber(
+					summaryResult?.data?.gameid,
+					0,
+				);
 
 				const shouldFetchOwned =
 					forceFullRefresh ||
 					!this._lastOwnedFetchAt ||
-					now - this._lastOwnedFetchAt >= this._ownedGamesRefreshMs();
+					now - this._lastOwnedFetchAt >= this._ownedGamesRefreshMs() ||
+					Boolean(
+						currentGameAppId &&
+							currentGameAppId !== this._lastCurrentGameAppId &&
+							!this._ownedGamesByAppId.has(currentGameAppId),
+					);
 				let ownedResult = { ok: false, data: null };
 				if (shouldFetchOwned) {
 					ownedResult = await this._safeFetch("owned games", () =>
@@ -290,6 +343,9 @@ class SteamPlugin extends Plugin {
 				if (shouldFetchOwned) {
 					await this._applyOwnedGames(ownedResult.data);
 				}
+				if (summaryResult.data) {
+					await this._applyCurrentGameDetails(currentGameAppId);
+				}
 				if (shouldFetchAchievements) {
 					await this._applyAchievements(achievementsResult.data);
 				} else {
@@ -307,7 +363,11 @@ class SteamPlugin extends Plugin {
 					(shouldFetchAchievements && achievementsResult.ok);
 
 				await this._updateConnectionState(hadSuccessfulRefresh);
-			} catch {
+			} catch (error) {
+				await this._log(
+					`Steam refresh failed: ${this._errorMessage(error)}`,
+					"error",
+				);
 				await this._updateConnectionState(false);
 			} finally {
 				this._refreshPromise = null;
@@ -318,30 +378,34 @@ class SteamPlugin extends Plugin {
 		return this._refreshPromise;
 	}
 
-	async _resolveSteamId() {
-		if (this._resolvedSteamId) {
+	async _resolveSteamId(settings = this.settings, { cache = true } = {}) {
+		if (cache && this._resolvedSteamId) {
 			return this._resolvedSteamId;
 		}
 
 		const input = this._normalizeSteamIdentifier(
-			this._coerceString(this.settings?.steamIdOrVanity, "").trim(),
+			this._coerceString(settings?.steamIdOrVanity, "").trim(),
 		);
 		if (!input) {
 			throw new Error("Missing Steam ID or vanity name.");
 		}
 
 		if (/^\d{17}$/.test(input)) {
-			this._resolvedSteamId = input;
+			if (cache) {
+				this._resolvedSteamId = input;
+			}
 			return input;
 		}
 
-		const resolved = await this._fetchResolveVanity(input);
+		const resolved = await this._fetchResolveVanity(input, settings);
 		const steamId = this._coerceString(resolved?.steamid, "");
 		if (!steamId) {
 			throw new Error("Could not resolve vanity URL.");
 		}
 
-		this._resolvedSteamId = steamId;
+		if (cache) {
+			this._resolvedSteamId = steamId;
+		}
 		return steamId;
 	}
 
@@ -364,56 +428,56 @@ class SteamPlugin extends Plugin {
 		return raw;
 	}
 
-	async _fetchResolveVanity(vanity) {
+	async _fetchResolveVanity(vanity, settings = this.settings) {
 		const url = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v1/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&vanityurl=${encodeURIComponent(vanity)}&url_type=1`;
 		const response = await this._fetchJson(url);
 		return response?.response ?? null;
 	}
 
-	async _fetchPlayerSummary(steamId) {
+	async _fetchPlayerSummary(steamId, settings = this.settings) {
 		const url = `${STEAM_API_BASE}/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&steamids=${encodeURIComponent(steamId)}`;
 		const response = await this._fetchJson(url);
 		return response?.response?.players?.[0] ?? null;
 	}
 
-	async _fetchOwnedGames(steamId) {
+	async _fetchOwnedGames(steamId, settings = this.settings) {
 		const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=0&include_played_free_games=1`;
 		return this._fetchJson(url);
 	}
 
-	async _fetchAchievements(steamId, appId) {
+	async _fetchAchievements(steamId, appId, settings = this.settings) {
 		const targetAppId = this._coerceNumber(appId, 0);
 		if (!targetAppId) {
 			return null;
 		}
 
 		const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&steamid=${encodeURIComponent(steamId)}&appid=${targetAppId}&l=en&_=${Date.now()}`;
 		return this._fetchJson(url);
 	}
 
-	async _fetchAchievementSchema(appId) {
+	async _fetchAchievementSchema(appId, settings = this.settings) {
 		const targetAppId = this._coerceNumber(appId, 0);
 		if (!targetAppId) {
 			return null;
 		}
 
 		const url = `${STEAM_API_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&appid=${targetAppId}&l=en`;
 		return this._fetchJson(url);
 	}
 
-	async _fetchOwnedGamesWithInfo(steamId) {
+	async _fetchOwnedGamesWithInfo(steamId, settings = this.settings) {
 		const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=1&include_played_free_games=1`;
 		return this._fetchJson(url);
 	}
@@ -555,9 +619,50 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 
+		this._cacheOwnedGames(owned);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.gameCount,
 			this._coerceNumber(owned?.response?.game_count, 0),
+		);
+	}
+
+	_cacheOwnedGames(owned) {
+		const games = Array.isArray(owned?.response?.games)
+			? owned.response.games
+			: [];
+		this._ownedGamesByAppId.clear();
+		if (!games.length) {
+			return;
+		}
+
+		for (const game of games) {
+			const appId = this._gameAppId(game);
+			if (!appId) {
+				continue;
+			}
+			this._ownedGamesByAppId.set(appId, game);
+		}
+	}
+
+	async _applyCurrentGameDetails(appId) {
+		const currentGameAppId = this._coerceNumber(appId, 0);
+		if (!currentGameAppId) {
+			await this._setVariableIfChanged(VARIABLE_NAMES.currentGameGraphicsUrl, "");
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.currentGamePlaytimeMinutes,
+				0,
+			);
+			return;
+		}
+
+		const game = this._ownedGamesByAppId.get(currentGameAppId);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.currentGameGraphicsUrl,
+			this._gameGraphicsUrl(currentGameAppId),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.currentGamePlaytimeMinutes,
+			this._gamePlaytimeMinutes(game),
 		);
 	}
 
@@ -872,6 +977,7 @@ class SteamPlugin extends Plugin {
 		);
 		let appId = null;
 		let gameName = "";
+		let resolvedGame = null;
 
 		const numericOnly = gameInput.match(/^\d+$/);
 		if (numericOnly) {
@@ -911,11 +1017,13 @@ class SteamPlugin extends Plugin {
 				}
 				appId = match.appid;
 				gameName = match.name;
+				resolvedGame = match.game;
 			} else {
 				const found = games.find(
 					(game) => String(game?.appid) === String(appId),
 				);
 				gameName = this._coerceString(found?.name, "");
+				resolvedGame = found ?? null;
 			}
 
 			// No search results variable exposed.
@@ -955,6 +1063,10 @@ class SteamPlugin extends Plugin {
 			[ACTION_VARIABLE_NAMES.requestedGameInput]: gameInput,
 			[ACTION_VARIABLE_NAMES.requestedGameAppId]: appId,
 			[ACTION_VARIABLE_NAMES.requestedGameName]: resolvedGameName,
+			[ACTION_VARIABLE_NAMES.requestedGameGraphicsUrl]:
+				this._gameGraphicsUrl(appId),
+			[ACTION_VARIABLE_NAMES.requestedGamePlaytimeMinutes]:
+				this._gamePlaytimeMinutes(resolvedGame),
 			[ACTION_VARIABLE_NAMES.requestedGameAchievementCount]: list.length,
 			[ACTION_VARIABLE_NAMES.requestedGameAchievementUnlocked]: unlocked,
 			[ACTION_VARIABLE_NAMES.requestedGameAchievements]: JSON.stringify(
@@ -995,12 +1107,29 @@ class SteamPlugin extends Plugin {
 			results.push({
 				appid: game.appid,
 				name,
+				game,
 				score: Number(score.toFixed(3)),
 			});
 		}
 
 		results.sort((a, b) => b.score - a.score);
 		return results.slice(0, 10);
+	}
+
+	_gameAppId(game) {
+		return this._coerceNumber(game?.appid, 0);
+	}
+
+	_gameGraphicsUrl(appId) {
+		const targetAppId = this._coerceNumber(appId, 0);
+		if (!targetAppId) {
+			return "";
+		}
+		return `https://cdn.akamai.steamstatic.com/steam/apps/${targetAppId}/header.jpg`;
+	}
+
+	_gamePlaytimeMinutes(game) {
+		return this._coerceNumber(game?.playtime_forever, 0);
 	}
 
 	_scoreMatch(name, normalizedInput) {
@@ -1066,11 +1195,15 @@ class SteamPlugin extends Plugin {
 		achievementName = "",
 		achievementDescription = "",
 	}) {
+		const currentGameAppId = this._coerceNumber(summary?.gameid, 0);
+		const currentGame = this._ownedGamesByAppId.get(currentGameAppId);
 		return {
 			persona_username: this._coerceString(summary?.personaname, ""),
 			online_status: this._coerceString(onlineStatus, ""),
 			current_game_name: this._coerceString(summary?.gameextrainfo, ""),
-			current_game_appid: this._coerceNumber(summary?.gameid, 0),
+			current_game_appid: currentGameAppId,
+			current_game_graphics_url: this._gameGraphicsUrl(currentGameAppId),
+			current_game_playtime_minutes: this._gamePlaytimeMinutes(currentGame),
 			current_game_achievement_unlocked_count: this._coerceNumber(
 				achievementUnlocked,
 				0,
@@ -1138,10 +1271,17 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 		try {
-			await this.lumia.showToast({
-				message: "Invalid Steam API key. Update the plugin settings.",
-				time: 6,
-			});
+			await this._withTimeout(
+				Promise.resolve(
+					this.lumia.showToast({
+						message: "Invalid Steam API key. Update the plugin settings.",
+						time: 6,
+						type: "error",
+					}),
+				),
+				DEFAULTS.lumiaCallTimeoutMs,
+				"Lumia toast timed out.",
+			);
 		} catch (error) {
 			return;
 		}
@@ -1152,11 +1292,17 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 		try {
-			await this.lumia.showToast({
-				message,
-				time: 4,
-				type,
-			});
+			await this._withTimeout(
+				Promise.resolve(
+					this.lumia.showToast({
+						message,
+						time: 4,
+						type,
+					}),
+				),
+				DEFAULTS.lumiaCallTimeoutMs,
+				"Lumia toast timed out.",
+			);
 		} catch (error) {
 			return;
 		}
@@ -1182,16 +1328,23 @@ class SteamPlugin extends Plugin {
 		}
 	}
 
-	_hasRequiredSettings() {
-		return Boolean(this._apiKey() && this._steamIdInput());
+	_settingsWith(data = {}) {
+		return {
+			...(this.settings && typeof this.settings === "object" ? this.settings : {}),
+			...(data && typeof data === "object" ? data : {}),
+		};
 	}
 
-	_apiKey() {
-		return this._coerceString(this.settings?.apiKey, "");
+	_hasRequiredSettings(settings = this.settings) {
+		return Boolean(this._apiKey(settings) && this._steamIdInput(settings));
 	}
 
-	_steamIdInput() {
-		return this._coerceString(this.settings?.steamIdOrVanity, "");
+	_apiKey(settings = this.settings) {
+		return this._coerceString(settings?.apiKey, "");
+	}
+
+	_steamIdInput(settings = this.settings) {
+		return this._coerceString(settings?.steamIdOrVanity, "");
 	}
 
 	_pollInterval(settings = this.settings) {
@@ -1226,25 +1379,44 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 
+		const previousState = this._lastConnectionState;
 		this._lastConnectionState = state;
 
-		if (typeof this.lumia.updateConnection === "function") {
-			try {
-				await this.lumia.updateConnection(state);
-			} catch (error) {
-				const message = this._errorMessage(error);
+		if (typeof this.lumia?.updateConnection !== "function") {
+			return;
+		}
+
+		try {
+			await this._withTimeout(
+				Promise.resolve(this.lumia.updateConnection(state)),
+				DEFAULTS.lumiaCallTimeoutMs,
+				"Lumia connection update timed out.",
+			);
+			if (!state) {
 				await this._log(
-					`Failed to update connection state: ${message}`,
+					"Steam connection is down; check the API key, Steam ID, and Steam profile privacy.",
 					"warn",
 				);
+			} else if (previousState === false) {
+				await this._log("Steam connection restored.");
 			}
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(
+				`Failed to update Steam connection state: ${message}`,
+				"warn",
+			);
 		}
 	}
 
-	async _safeFetch(_label, fn) {
+	async _safeFetch(label, fn) {
 		try {
 			return { ok: true, data: await fn() };
-		} catch {
+		} catch (error) {
+			await this._log(
+				`Steam ${label || "request"} failed: ${this._errorMessage(error)}`,
+				"warn",
+			);
 			return { ok: false, data: null };
 		}
 	}
@@ -1298,6 +1470,26 @@ class SteamPlugin extends Plugin {
 
 	_valuesEqual(a, b) {
 		return a === b;
+	}
+
+	_withTimeout(promise, timeoutMs, message) {
+		const ms = Math.max(1, this._coerceNumber(timeoutMs, 1000));
+		return new Promise((resolve, reject) => {
+			const timeoutId = setTimeout(() => {
+				reject(new Error(message || `Operation timed out after ${ms}ms.`));
+			}, ms);
+
+			Promise.resolve(promise).then(
+				(value) => {
+					clearTimeout(timeoutId);
+					resolve(value);
+				},
+				(error) => {
+					clearTimeout(timeoutId);
+					reject(error);
+				},
+			);
+		});
 	}
 
 	_errorMessage(error) {

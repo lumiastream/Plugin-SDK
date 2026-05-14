@@ -133,6 +133,30 @@ function coerceNumber(value, fallback = 0) {
 	return fallback;
 }
 
+function coerceOptionalNumber(value) {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : undefined;
+	}
+	if (typeof value === "boolean") {
+		return value ? 1 : 0;
+	}
+	return undefined;
+}
+
+function pickFirstNumber(source, paths = [], fallback = 0) {
+	for (const path of paths) {
+		const parsed = coerceOptionalNumber(resolvePath(source, path));
+		if (parsed !== undefined) {
+			return parsed;
+		}
+	}
+	return fallback;
+}
+
 function coerceBoolean(value, fallback = false) {
 	// Accept booleans, stringified booleans, or numeric 0/1 style responses.
 	if (typeof value === "boolean") {
@@ -563,12 +587,49 @@ function parseChatTimestamp(value) {
 	return parsed ? parsed.getTime() : 0;
 }
 
+function extractChatMessageId(message) {
+	return coerceString(
+		message?.id ||
+			message?.message_id ||
+			message?.messageId ||
+			message?.chat_message_id ||
+			message?.chatMessageId,
+		"",
+	).trim();
+}
+
+function hashChatMessage(value) {
+	let hash = 0;
+	for (let index = 0; index < value.length; index += 1) {
+		hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+	}
+	return hash.toString(36);
+}
+
+function getChatMessageKey(message) {
+	if (message.messageId) {
+		return `id:${message.messageId}`;
+	}
+	return `fallback:${message.timestamp}:${message.username}:${message.text}`;
+}
+
+function getDisplayChatMessageId(message) {
+	if (message.messageId) {
+		return `rumble-${message.messageId}`;
+	}
+
+	return `rumble-${message.timestamp || "no-time"}-${hashChatMessage(
+		`${message.username}:${message.text}`,
+	)}`;
+}
+
 // Top-level plugin that polls the API, tracks session state, and surfaces events to Lumia.
 class RumblePlugin extends Plugin {
 	constructor(manifest, context) {
 		super(manifest, context);
 
 		this.pollIntervalId = null;
+		this.pollInFlight = false;
 		this.lastKnownState = this.createEmptyState();
 		this.sessionData = this.createEmptySession();
 		this.hasBaseline = false;
@@ -777,6 +838,11 @@ class RumblePlugin extends Plugin {
 
 	// Poll the Rumble endpoint once, then delegate processing to the diff logic.
 	async pollAPI() {
+		if (this.pollInFlight) {
+			return;
+		}
+
+		this.pollInFlight = true;
 		try {
 			if (this.offline) {
 				return;
@@ -805,6 +871,8 @@ class RumblePlugin extends Plugin {
 			}
 			await this.lumia.log(`[Rumble] Error polling API: ${message}`);
 			await this.updateConnectionState(false);
+		} finally {
+			this.pollInFlight = false;
 		}
 	}
 
@@ -819,6 +887,7 @@ class RumblePlugin extends Plugin {
 	buildStateFromData(data = {}) {
 		// Flatten the API payload into a canonical structure with sensible defaults.
 		const state = this.createEmptyState();
+		const previousState = this.lastKnownState || {};
 
 		state.live = coerceBoolean(pickFirst(data, FIELD_PATHS.live), false);
 		state.viewers = coerceNumber(pickFirst(data, FIELD_PATHS.viewers));
@@ -827,17 +896,46 @@ class RumblePlugin extends Plugin {
 		state.thumbnail = coerceString(pickFirst(data, FIELD_PATHS.thumbnail), "");
 		state.streamUrl = coerceString(pickFirst(data, FIELD_PATHS.streamUrl), "");
 		state.videoId = coerceString(pickFirst(data, FIELD_PATHS.videoId), "");
-		state.rumbles = coerceNumber(pickFirst(data, FIELD_PATHS.rumbles));
-		state.rants = coerceNumber(pickFirst(data, FIELD_PATHS.rants));
-		state.rantAmount = coerceNumber(pickFirst(data, FIELD_PATHS.rantAmount), 0);
-		state.followers = coerceNumber(
-			pickFirst(data, FIELD_PATHS.followers),
-			this.lastKnownState.followers || 0,
+		state.rumbles = pickFirstNumber(
+			data,
+			FIELD_PATHS.rumbles,
+			previousState.rumbles || 0,
 		);
-		state.likes = coerceNumber(pickFirst(data, FIELD_PATHS.likes));
-		state.dislikes = coerceNumber(pickFirst(data, FIELD_PATHS.dislikes));
-		state.subs = coerceNumber(pickFirst(data, FIELD_PATHS.subs));
-		state.subGifts = coerceNumber(pickFirst(data, FIELD_PATHS.subGifts));
+		state.rants = pickFirstNumber(
+			data,
+			FIELD_PATHS.rants,
+			previousState.rants || 0,
+		);
+		state.rantAmount = pickFirstNumber(
+			data,
+			FIELD_PATHS.rantAmount,
+			previousState.rantAmount || 0,
+		);
+		state.followers = pickFirstNumber(
+			data,
+			FIELD_PATHS.followers,
+			previousState.followers || 0,
+		);
+		state.likes = pickFirstNumber(
+			data,
+			FIELD_PATHS.likes,
+			previousState.likes || 0,
+		);
+		state.dislikes = pickFirstNumber(
+			data,
+			FIELD_PATHS.dislikes,
+			previousState.dislikes || 0,
+		);
+		state.subs = pickFirstNumber(
+			data,
+			FIELD_PATHS.subs,
+			previousState.subs || 0,
+		);
+		state.subGifts = pickFirstNumber(
+			data,
+			FIELD_PATHS.subGifts,
+			previousState.subGifts || 0,
+		);
 		state.chatMembers = coerceNumber(
 			pickFirst(data, FIELD_PATHS.chatMembers),
 			0,
@@ -1187,6 +1285,7 @@ class RumblePlugin extends Plugin {
 					message?.created_on ?? message?.created_at,
 				);
 				return {
+					messageId: extractChatMessageId(message),
 					username,
 					text,
 					timestamp,
@@ -1199,10 +1298,23 @@ class RumblePlugin extends Plugin {
 			.filter((message) => message.username && message.text);
 
 		normalized.sort((a, b) => a.timestamp - b.timestamp);
-		return normalized;
+
+		const seenInPayload = new Set();
+		return normalized.filter((message) => {
+			const key = getChatMessageKey(message);
+			if (seenInPayload.has(key)) {
+				return false;
+			}
+			seenInPayload.add(key);
+			return true;
+		});
 	}
 
 	cacheChatKey(key) {
+		if (this.chatState.seenKeys.has(key)) {
+			return;
+		}
+
 		this.chatState.seenKeys.add(key);
 		this.chatState.seenOrder.push(key);
 		const maxCacheSize = 200;
@@ -1216,12 +1328,13 @@ class RumblePlugin extends Plugin {
 	async processChatMessages(rawData = {}) {
 		const messages = this.extractChatMessages(rawData);
 		if (!messages.length) {
+			this.chatHasBaseline = true;
 			return;
 		}
 
 		if (!this.chatHasBaseline) {
 			messages.forEach((message) => {
-				const key = `${message.timestamp}:${message.username}:${message.text}`;
+				const key = getChatMessageKey(message);
 				this.cacheChatKey(key);
 				this.chatState.lastTimestamp = Math.max(
 					this.chatState.lastTimestamp,
@@ -1233,7 +1346,7 @@ class RumblePlugin extends Plugin {
 		}
 
 		for (const message of messages) {
-			const key = `${message.timestamp}:${message.username}:${message.text}`;
+			const key = getChatMessageKey(message);
 			if (this.chatState.seenKeys.has(key)) {
 				continue;
 			}
@@ -1257,7 +1370,7 @@ class RumblePlugin extends Plugin {
 				displayname: message.username,
 				message: message.text,
 				avatar: message.avatar || undefined,
-				messageId: `rumble-${message.timestamp}-${message.username}`,
+				messageId: getDisplayChatMessageId(message),
 				badges: message.badges?.length ? message.badges : undefined,
 				userId: message.userId || undefined,
 				userLevels: message.userLevels,

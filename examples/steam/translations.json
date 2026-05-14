@@ -8,6 +8,8 @@
 		"avatar": "Avatar URL.",
 		"current_game_name": "Current in-game name (if playing).",
 		"current_game_appid": "Current in-game app ID (if playing).",
+		"current_game_graphics_url": "Current game's Steam header image URL.",
+		"current_game_playtime_minutes": "Total Steam playtime for the current game, in minutes.",
 		"game_count": "Owned games count.",
 		"current_game_achievement_count": "Total achievements for the current/last played game.",
 		"current_game_achievement_unlocked_count": "Unlocked achievements for the current/last played game.",

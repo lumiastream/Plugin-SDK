@@ -1,7 +1,7 @@
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.10",
+	"version": "1.1.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -64,6 +64,8 @@
 					"steam_requested_game_input",
 					"steam_requested_game_appid",
 					"steam_requested_game_name",
+					"steam_requested_game_graphics_url",
+					"steam_requested_game_playtime_minutes",
 					"steam_requested_game_achievement_count",
 					"steam_requested_game_achievement_unlocked",
 					"steam_requested_game_achievements"
@@ -119,6 +121,16 @@
 			{
 				"name": "current_game_appid",
 				"description": "Current in-game app ID (if playing).",
+				"value": 0
+			},
+			{
+				"name": "current_game_graphics_url",
+				"description": "Current game's Steam header image URL.",
+				"value": ""
+			},
+			{
+				"name": "current_game_playtime_minutes",
+				"description": "Total Steam playtime for the current game, in minutes.",
 				"value": 0
 			},
 			{
@@ -211,7 +223,12 @@
 			{
 				"title": "Game Changed",
 				"key": "current_game_changed",
-				"acceptedVariables": ["current_game_name", "current_game_appid"],
+				"acceptedVariables": [
+					"current_game_name",
+					"current_game_appid",
+					"current_game_graphics_url",
+					"current_game_playtime_minutes"
+				],
 				"defaultMessage": "Now playing {{current_game_name}}.",
 				"variationConditions": [
 					{
