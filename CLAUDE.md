@@ -4,6 +4,15 @@ description: Build, debug, validate, and package Lumia Stream plugins. Use when 
 
 # Lumia Plugin Development
 
+## ⚠️ Code comments: strict no-comment default
+
+Do **not** add comments to code by default. The bar is very high:
+- **Never** comment routine code (assignments, imports, obvious calls, standard patterns).
+- **Never** write multi-line comment blocks, JSDoc/TSDoc, or section dividers.
+- **Only allowed:** a single one-line comment, and only for genuinely non-obvious WHY (hidden constraint, subtle invariant, bug workaround).
+- **Do not** explain WHAT the code does, and **do not** reference the task / PR / caller.
+- When in doubt: delete the comment.
+
 ## Overview
 
 Develop Lumia plugins with fast feedback loops: scaffold from the best-fit example, implement hooks that match `manifest.json`, and run validation before packaging.

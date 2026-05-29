@@ -1,7 +1,7 @@
 {
 	"id": "tts_monster",
 	"name": "TTS Monster",
-	"version": "1.0.0",
+	"version": "1.2.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://tts.monster",
@@ -16,11 +16,31 @@
 		"actions_tutorial": "./actions_tutorial.md",
 		"settings": [
 			{
+				"key": "authMethod",
+				"label": "Connection Method",
+				"type": "select",
+				"defaultValue": "overlayUrl",
+				"options": [
+					{ "label": "Overlay URL", "value": "overlayUrl" },
+					{ "label": "Developer API Token", "value": "developerApi" }
+				],
+				"helperText": "Choose Developer API Token for the official console API, or Overlay URL if you only have your TTS Monster overlay link.",
+				"refreshOnChange": true
+			},
+			{
 				"key": "apiKey",
 				"label": "API Token",
 				"type": "password",
-				"helperText": "Create or copy your API token from the TTS Monster developer dashboard.",
-				"required": true,
+				"helperText": "Used when Connection Method is Developer API Token. Create or copy your API token from the TTS Monster developer dashboard.",
+				"visibleIf": { "key": "authMethod", "equals": "developerApi" },
+				"refreshOnChange": true
+			},
+			{
+				"key": "overlayUrl",
+				"label": "Overlay URL",
+				"type": "password",
+				"helperText": "Used when Connection Method is Overlay URL. Paste your full overlay URL, for example https://tts.monster/overlay/3hoZh83Uigewkx0Upw66imx2ASj1/059e9e17a7c64a42b38b6bbf7b40bee3",
+				"visibleIf": { "key": "authMethod", "equals": "overlayUrl" },
 				"refreshOnChange": true
 			},
 			{
@@ -28,7 +48,7 @@
 				"label": "Log Character Usage",
 				"type": "toggle",
 				"defaultValue": true,
-				"helperText": "Requests `return_usage` on generate calls, logs the current usage after playback, and shows start/result toasts for Speak actions."
+				"helperText": "For Developer API Token, requests `return_usage` on generate calls and logs current usage. For Overlay URL, shows start/result toasts."
 			},
 			{
 				"key": "requestTimeoutMs",
@@ -64,7 +84,7 @@
 						"allowTyping": true,
 						"allowVariables": true,
 						"required": true,
-						"helperText": "Choose a cached voice, or type either a voice name or voice ID. You can copy voice IDs from https://console.tts.monster/voices"
+						"helperText": "Choose a cached voice, or type either a voice name or voice ID. Developer API voice IDs are available at https://console.tts.monster/voices; Overlay URL voices use the names from the overlay account."
 					},
 					{
 						"key": "volume",
