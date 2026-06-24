@@ -1,8 +1,8 @@
 # GEMINI.md
 
 <!-- GENERATED: scripts/sync-gemini-md.js -->
-- sdk_version: 0.7.4
-- generated_at_utc: 2026-03-30T18:15:57.079Z
+- sdk_version: 0.8.0
+- generated_at_utc: 2026-06-24T17:47:46.723Z
 
 Use this file as project guidance for Gemini CLI sessions working on Lumia Stream plugins.
 
