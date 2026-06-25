@@ -371,7 +371,10 @@ class OllamaPlugin extends Plugin {
 	}
 
 	_systemMessage(data = {}) {
-		return this._trim(data?.systemMessage) || this._defaultSystemMessage();
+		const base = this._trim(data?.systemMessage) || this._defaultSystemMessage();
+		const maxChars = Number(data?.maxChars);
+		const lengthRule = Number.isFinite(maxChars) && maxChars > 0 ? `Keep your entire response under ${maxChars} characters.` : "";
+		return [base, lengthRule].filter(Boolean).join(" ").trim();
 	}
 
 	_clearHistory(input, allVariables) {

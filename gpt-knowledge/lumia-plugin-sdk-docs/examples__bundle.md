@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.4"
+		"@lumiastream/plugin": "^0.8.0"
 	}
 }
 
@@ -8124,7 +8124,10 @@ class OllamaPlugin extends Plugin {
 	}
 
 	_systemMessage(data = {}) {
-		return this._trim(data?.systemMessage) || this._defaultSystemMessage();
+		const base = this._trim(data?.systemMessage) || this._defaultSystemMessage();
+		const maxChars = Number(data?.maxChars);
+		const lengthRule = Number.isFinite(maxChars) && maxChars > 0 ? `Keep your entire response under ${maxChars} characters.` : "";
+		return [base, lengthRule].filter(Boolean).join(" ").trim();
 	}
 
 	_clearHistory(input, allVariables) {
@@ -9405,7 +9408,10 @@ class OpenClawPlugin extends Plugin {
 	}
 
 	_systemMessage(data = {}) {
-		return this._trim(data?.systemMessage) || this._defaultSystemMessage();
+		const base = this._trim(data?.systemMessage) || this._defaultSystemMessage();
+		const maxChars = Number(data?.maxChars);
+		const lengthRule = Number.isFinite(maxChars) && maxChars > 0 ? `Keep your entire response under ${maxChars} characters.` : "";
+		return [base, lengthRule].filter(Boolean).join(" ").trim();
 	}
 
 	_agentId(data = {}, settings = this.settings) {
@@ -15415,6 +15421,30 @@ function coerceNumber(value, fallback = 0) {
 	return fallback;
 }
 
+function coerceOptionalNumber(value) {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : undefined;
+	}
+	if (typeof value === "boolean") {
+		return value ? 1 : 0;
+	}
+	return undefined;
+}
+
+function pickFirstNumber(source, paths = [], fallback = 0) {
+	for (const path of paths) {
+		const parsed = coerceOptionalNumber(resolvePath(source, path));
+		if (parsed !== undefined) {
+			return parsed;
+		}
+	}
+	return fallback;
+}
+
 function coerceBoolean(value, fallback = false) {
 	// Accept booleans, stringified booleans, or numeric 0/1 style responses.
 	if (typeof value === "boolean") {
@@ -15845,12 +15875,49 @@ function parseChatTimestamp(value) {
 	return parsed ? parsed.getTime() : 0;
 }
 
+function extractChatMessageId(message) {
+	return coerceString(
+		message?.id ||
+			message?.message_id ||
+			message?.messageId ||
+			message?.chat_message_id ||
+			message?.chatMessageId,
+		"",
+	).trim();
+}
+
+function hashChatMessage(value) {
+	let hash = 0;
+	for (let index = 0; index < value.length; index += 1) {
+		hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+	}
+	return hash.toString(36);
+}
+
+function getChatMessageKey(message) {
+	if (message.messageId) {
+		return `id:${message.messageId}`;
+	}
+	return `fallback:${message.timestamp}:${message.username}:${message.text}`;
+}
+
+function getDisplayChatMessageId(message) {
+	if (message.messageId) {
+		return `rumble-${message.messageId}`;
+	}
+
+	return `rumble-${message.timestamp || "no-time"}-${hashChatMessage(
+		`${message.username}:${message.text}`,
+	)}`;
+}
+
 // Top-level plugin that polls the API, tracks session state, and surfaces events to Lumia.
 class RumblePlugin extends Plugin {
 	constructor(manifest, context) {
 		super(manifest, context);
 
 		this.pollIntervalId = null;
+		this.pollInFlight = false;
 		this.lastKnownState = this.createEmptyState();
 		this.sessionData = this.createEmptySession();
 		this.hasBaseline = false;
@@ -16059,6 +16126,11 @@ class RumblePlugin extends Plugin {
 
 	// Poll the Rumble endpoint once, then delegate processing to the diff logic.
 	async pollAPI() {
+		if (this.pollInFlight) {
+			return;
+		}
+
+		this.pollInFlight = true;
 		try {
 			if (this.offline) {
 				return;
@@ -16087,6 +16159,8 @@ class RumblePlugin extends Plugin {
 			}
 			await this.lumia.log(`[Rumble] Error polling API: ${message}`);
 			await this.updateConnectionState(false);
+		} finally {
+			this.pollInFlight = false;
 		}
 	}
 
@@ -16101,6 +16175,7 @@ class RumblePlugin extends Plugin {
 	buildStateFromData(data = {}) {
 		// Flatten the API payload into a canonical structure with sensible defaults.
 		const state = this.createEmptyState();
+		const previousState = this.lastKnownState || {};
 
 		state.live = coerceBoolean(pickFirst(data, FIELD_PATHS.live), false);
 		state.viewers = coerceNumber(pickFirst(data, FIELD_PATHS.viewers));
@@ -16109,17 +16184,46 @@ class RumblePlugin extends Plugin {
 		state.thumbnail = coerceString(pickFirst(data, FIELD_PATHS.thumbnail), "");
 		state.streamUrl = coerceString(pickFirst(data, FIELD_PATHS.streamUrl), "");
 		state.videoId = coerceString(pickFirst(data, FIELD_PATHS.videoId), "");
-		state.rumbles = coerceNumber(pickFirst(data, FIELD_PATHS.rumbles));
-		state.rants = coerceNumber(pickFirst(data, FIELD_PATHS.rants));
-		state.rantAmount = coerceNumber(pickFirst(data, FIELD_PATHS.rantAmount), 0);
-		state.followers = coerceNumber(
-			pickFirst(data, FIELD_PATHS.followers),
-			this.lastKnownState.followers || 0,
+		state.rumbles = pickFirstNumber(
+			data,
+			FIELD_PATHS.rumbles,
+			previousState.rumbles || 0,
 		);
-		state.likes = coerceNumber(pickFirst(data, FIELD_PATHS.likes));
-		state.dislikes = coerceNumber(pickFirst(data, FIELD_PATHS.dislikes));
-		state.subs = coerceNumber(pickFirst(data, FIELD_PATHS.subs));
-		state.subGifts = coerceNumber(pickFirst(data, FIELD_PATHS.subGifts));
+		state.rants = pickFirstNumber(
+			data,
+			FIELD_PATHS.rants,
+			previousState.rants || 0,
+		);
+		state.rantAmount = pickFirstNumber(
+			data,
+			FIELD_PATHS.rantAmount,
+			previousState.rantAmount || 0,
+		);
+		state.followers = pickFirstNumber(
+			data,
+			FIELD_PATHS.followers,
+			previousState.followers || 0,
+		);
+		state.likes = pickFirstNumber(
+			data,
+			FIELD_PATHS.likes,
+			previousState.likes || 0,
+		);
+		state.dislikes = pickFirstNumber(
+			data,
+			FIELD_PATHS.dislikes,
+			previousState.dislikes || 0,
+		);
+		state.subs = pickFirstNumber(
+			data,
+			FIELD_PATHS.subs,
+			previousState.subs || 0,
+		);
+		state.subGifts = pickFirstNumber(
+			data,
+			FIELD_PATHS.subGifts,
+			previousState.subGifts || 0,
+		);
 		state.chatMembers = coerceNumber(
 			pickFirst(data, FIELD_PATHS.chatMembers),
 			0,
@@ -16469,6 +16573,7 @@ class RumblePlugin extends Plugin {
 					message?.created_on ?? message?.created_at,
 				);
 				return {
+					messageId: extractChatMessageId(message),
 					username,
 					text,
 					timestamp,
@@ -16481,10 +16586,23 @@ class RumblePlugin extends Plugin {
 			.filter((message) => message.username && message.text);
 
 		normalized.sort((a, b) => a.timestamp - b.timestamp);
-		return normalized;
+
+		const seenInPayload = new Set();
+		return normalized.filter((message) => {
+			const key = getChatMessageKey(message);
+			if (seenInPayload.has(key)) {
+				return false;
+			}
+			seenInPayload.add(key);
+			return true;
+		});
 	}
 
 	cacheChatKey(key) {
+		if (this.chatState.seenKeys.has(key)) {
+			return;
+		}
+
 		this.chatState.seenKeys.add(key);
 		this.chatState.seenOrder.push(key);
 		const maxCacheSize = 200;
@@ -16498,12 +16616,13 @@ class RumblePlugin extends Plugin {
 	async processChatMessages(rawData = {}) {
 		const messages = this.extractChatMessages(rawData);
 		if (!messages.length) {
+			this.chatHasBaseline = true;
 			return;
 		}
 
 		if (!this.chatHasBaseline) {
 			messages.forEach((message) => {
-				const key = `${message.timestamp}:${message.username}:${message.text}`;
+				const key = getChatMessageKey(message);
 				this.cacheChatKey(key);
 				this.chatState.lastTimestamp = Math.max(
 					this.chatState.lastTimestamp,
@@ -16515,7 +16634,7 @@ class RumblePlugin extends Plugin {
 		}
 
 		for (const message of messages) {
-			const key = `${message.timestamp}:${message.username}:${message.text}`;
+			const key = getChatMessageKey(message);
 			if (this.chatState.seenKeys.has(key)) {
 				continue;
 			}
@@ -16539,7 +16658,7 @@ class RumblePlugin extends Plugin {
 				displayname: message.username,
 				message: message.text,
 				avatar: message.avatar || undefined,
-				messageId: `rumble-${message.timestamp}-${message.username}`,
+				messageId: getDisplayChatMessageId(message),
 				badges: message.badges?.length ? message.badges : undefined,
 				userId: message.userId || undefined,
 				userLevels: message.userLevels,
@@ -16606,7 +16725,7 @@ module.exports = RumblePlugin;
 {
 	"id": "rumble",
 	"name": "Rumble",
-	"version": "1.0.3",
+	"version": "1.1.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -16810,11 +16929,7 @@ module.exports = RumblePlugin;
 			{
 				"title": "Follower",
 				"key": "follower",
-				"acceptedVariables": [
-					"followers",
-					"stream_url",
-					"title"
-				],
+				"acceptedVariables": ["followers", "stream_url", "title"],
 				"defaultMessage": "New followers! Total is now {{followers}}.",
 				"variationConditions": [
 					{
@@ -16830,12 +16945,7 @@ module.exports = RumblePlugin;
 			{
 				"title": "Rant",
 				"key": "rant",
-				"acceptedVariables": [
-					"rants",
-					"rant_amount",
-					"viewers",
-					"title"
-				],
+				"acceptedVariables": ["rants", "rant_amount", "viewers", "title"],
 				"defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
 				"variationConditions": [
 					{
@@ -16851,11 +16961,7 @@ module.exports = RumblePlugin;
 			{
 				"title": "Like",
 				"key": "like",
-				"acceptedVariables": [
-					"likes",
-					"stream_url",
-					"title"
-				],
+				"acceptedVariables": ["likes", "stream_url", "title"],
 				"defaultMessage": "Another thumbs-up! Likes: {{likes}}",
 				"variationConditions": [
 					{
@@ -16871,11 +16977,7 @@ module.exports = RumblePlugin;
 			{
 				"title": "Dislike",
 				"key": "dislike",
-				"acceptedVariables": [
-					"dislikes",
-					"stream_url",
-					"title"
-				],
+				"acceptedVariables": ["dislikes", "stream_url", "title"],
 				"defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
 				"variationConditions": [
 					{
@@ -16891,11 +16993,7 @@ module.exports = RumblePlugin;
 			{
 				"title": "Subscriber",
 				"key": "sub",
-				"acceptedVariables": [
-					"subs",
-					"stream_url",
-					"title"
-				],
+				"acceptedVariables": ["subs", "stream_url", "title"],
 				"defaultMessage": "New subscription! Subs total: {{subs}}",
 				"variationConditions": [
 					{
@@ -16911,11 +17009,7 @@ module.exports = RumblePlugin;
 			{
 				"title": "Gift Subscription",
 				"key": "subGift",
-				"acceptedVariables": [
-					"sub_gifts",
-					"stream_url",
-					"title"
-				],
+				"acceptedVariables": ["sub_gifts", "stream_url", "title"],
 				"defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
 				"variationConditions": [
 					{
@@ -18120,7 +18214,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.4"
+		"@lumiastream/plugin": "^0.8.0"
 	}
 }
 
@@ -18276,7 +18370,8 @@ YouTube fallback link: https://www.youtube.com/watch?v=VCd0kYWLvMQ
 ---
 ### Fetch Game Achievements
 Use **Fetch Achievements For Game** to query a specific game by name or App ID.
-The results are returned from the action through its accepted variables.
+The results are returned from the action through its accepted variables, including
+the resolved App ID, Steam graphics URL, playtime in minutes, and achievement data.
 ---
 
 ```
@@ -18291,6 +18386,8 @@ const DEFAULTS = {
 	minPollInterval: 30,
 	maxPollInterval: 900,
 	requestTimeoutMs: 15000,
+	validationTimeoutMs: 20000,
+	lumiaCallTimeoutMs: 1000,
 	stuckRefreshMs: 60000,
 	ownedGamesRefreshSeconds: 600,
 	userAgent: "LumiaStream Steam Plugin/1.0.0",
@@ -18317,6 +18414,8 @@ const VARIABLE_NAMES = {
 	avatar: "avatar",
 	currentGameName: "current_game_name",
 	currentGameAppId: "current_game_appid",
+	currentGameGraphicsUrl: "current_game_graphics_url",
+	currentGamePlaytimeMinutes: "current_game_playtime_minutes",
 	gameCount: "game_count",
 	currentGameAchievementCount: "current_game_achievement_count",
 	currentGameAchievementUnlocked: "current_game_achievement_unlocked_count",
@@ -18328,6 +18427,8 @@ const ACTION_VARIABLE_NAMES = {
 	requestedGameInput: "steam_requested_game_input",
 	requestedGameAppId: "steam_requested_game_appid",
 	requestedGameName: "steam_requested_game_name",
+	requestedGameGraphicsUrl: "steam_requested_game_graphics_url",
+	requestedGamePlaytimeMinutes: "steam_requested_game_playtime_minutes",
 	requestedGameAchievementCount: "steam_requested_game_achievement_count",
 	requestedGameAchievementUnlocked: "steam_requested_game_achievement_unlocked",
 	requestedGameAchievements: "steam_requested_game_achievements",
@@ -18353,6 +18454,7 @@ class SteamPlugin extends Plugin {
 		this._lastAchievementUnlockedKeys = null;
 		this._achievementSchemaCache = new Map();
 		this._lastOwnedFetchAt = 0;
+		this._ownedGamesByAppId = new Map();
 	}
 
 	async onload() {
@@ -18362,7 +18464,7 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 
-		await this._refreshData({ reason: "startup" });
+		void this._refreshData({ reason: "startup" });
 		this._schedulePolling();
 	}
 
@@ -18395,6 +18497,7 @@ class SteamPlugin extends Plugin {
 			this._lastAchievementUnlockedKeys = null;
 			this._achievementSchemaCache.clear();
 			this._lastOwnedFetchAt = 0;
+			this._ownedGamesByAppId.clear();
 		}
 
 		await this._refreshData({ reason: "settings-update" });
@@ -18443,8 +18546,11 @@ class SteamPlugin extends Plugin {
 		}
 	}
 
-	async validateAuth() {
-		if (!this._hasRequiredSettings()) {
+	async validateAuth(data = {}) {
+		const settings = this._settingsWith(data);
+		if (!this._hasRequiredSettings(settings)) {
+			await this._log("Steam validation failed: missing API key or Steam ID.", "warn");
+			await this._updateConnectionState(false);
 			return {
 				ok: false,
 				message: "Missing Steam API key or Steam ID.",
@@ -18452,12 +18558,25 @@ class SteamPlugin extends Plugin {
 		}
 
 		try {
-			const steamId = await this._resolveSteamId();
-			await this._fetchPlayerSummary(steamId);
+			await this._log("Validating Steam connection.");
+			const steamId = await this._withTimeout(
+				(async () => {
+					const resolvedSteamId = await this._resolveSteamId(settings, {
+						cache: false,
+					});
+					await this._fetchPlayerSummary(resolvedSteamId, settings);
+					return resolvedSteamId;
+				})(),
+				DEFAULTS.validationTimeoutMs,
+				"Steam validation timed out.",
+			);
+			await this._updateConnectionState(true);
+			await this._log(`Steam validation succeeded for SteamID64 ${steamId}.`);
 			return { ok: true };
 		} catch (error) {
 			const message = this._errorMessage(error);
 			await this._log(`Steam validation failed: ${message}`, "error");
+			await this._updateConnectionState(false);
 			return { ok: false, message };
 		}
 	}
@@ -18470,12 +18589,32 @@ class SteamPlugin extends Plugin {
 		const prefix = this._tag();
 		const decorated =
 			severity === "warn"
-				? `${prefix} ⚠️ ${message}`
+				? `${prefix} WARN ${message}`
 				: severity === "error"
-					? `${prefix} ❌ ${message}`
+					? `${prefix} ERROR ${message}`
 					: `${prefix} ${message}`;
 
-		await this.lumia.log(decorated);
+		if (severity === "warn") {
+			console.warn(decorated);
+		} else if (severity === "error") {
+			console.error(decorated);
+		} else if (this._debugEnabled()) {
+			console.log(decorated);
+		}
+
+		if (typeof this.lumia?.log !== "function") {
+			return;
+		}
+
+		try {
+			await this._withTimeout(
+				Promise.resolve(this.lumia.log(decorated)),
+				DEFAULTS.lumiaCallTimeoutMs,
+				"Lumia log timed out.",
+			);
+		} catch {
+			// Keep plugin flow alive when logging transport is unavailable.
+		}
 	}
 
 	async _tempDebug(message) {
@@ -18525,11 +18664,20 @@ class SteamPlugin extends Plugin {
 					this._fetchPlayerSummary(steamId),
 				);
 				const achievementAppId = this._determineAchievementAppId(summaryResult.data);
+				const currentGameAppId = this._coerceNumber(
+					summaryResult?.data?.gameid,
+					0,
+				);
 
 				const shouldFetchOwned =
 					forceFullRefresh ||
 					!this._lastOwnedFetchAt ||
-					now - this._lastOwnedFetchAt >= this._ownedGamesRefreshMs();
+					now - this._lastOwnedFetchAt >= this._ownedGamesRefreshMs() ||
+					Boolean(
+						currentGameAppId &&
+							currentGameAppId !== this._lastCurrentGameAppId &&
+							!this._ownedGamesByAppId.has(currentGameAppId),
+					);
 				let ownedResult = { ok: false, data: null };
 				if (shouldFetchOwned) {
 					ownedResult = await this._safeFetch("owned games", () =>
@@ -18576,6 +18724,9 @@ class SteamPlugin extends Plugin {
 				if (shouldFetchOwned) {
 					await this._applyOwnedGames(ownedResult.data);
 				}
+				if (summaryResult.data) {
+					await this._applyCurrentGameDetails(currentGameAppId);
+				}
 				if (shouldFetchAchievements) {
 					await this._applyAchievements(achievementsResult.data);
 				} else {
@@ -18593,7 +18744,11 @@ class SteamPlugin extends Plugin {
 					(shouldFetchAchievements && achievementsResult.ok);
 
 				await this._updateConnectionState(hadSuccessfulRefresh);
-			} catch {
+			} catch (error) {
+				await this._log(
+					`Steam refresh failed: ${this._errorMessage(error)}`,
+					"error",
+				);
 				await this._updateConnectionState(false);
 			} finally {
 				this._refreshPromise = null;
@@ -18604,30 +18759,34 @@ class SteamPlugin extends Plugin {
 		return this._refreshPromise;
 	}
 
-	async _resolveSteamId() {
-		if (this._resolvedSteamId) {
+	async _resolveSteamId(settings = this.settings, { cache = true } = {}) {
+		if (cache && this._resolvedSteamId) {
 			return this._resolvedSteamId;
 		}
 
 		const input = this._normalizeSteamIdentifier(
-			this._coerceString(this.settings?.steamIdOrVanity, "").trim(),
+			this._coerceString(settings?.steamIdOrVanity, "").trim(),
 		);
 		if (!input) {
 			throw new Error("Missing Steam ID or vanity name.");
 		}
 
 		if (/^\d{17}$/.test(input)) {
-			this._resolvedSteamId = input;
+			if (cache) {
+				this._resolvedSteamId = input;
+			}
 			return input;
 		}
 
-		const resolved = await this._fetchResolveVanity(input);
+		const resolved = await this._fetchResolveVanity(input, settings);
 		const steamId = this._coerceString(resolved?.steamid, "");
 		if (!steamId) {
 			throw new Error("Could not resolve vanity URL.");
 		}
 
-		this._resolvedSteamId = steamId;
+		if (cache) {
+			this._resolvedSteamId = steamId;
+		}
 		return steamId;
 	}
 
@@ -18650,56 +18809,56 @@ class SteamPlugin extends Plugin {
 		return raw;
 	}
 
-	async _fetchResolveVanity(vanity) {
+	async _fetchResolveVanity(vanity, settings = this.settings) {
 		const url = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v1/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&vanityurl=${encodeURIComponent(vanity)}&url_type=1`;
 		const response = await this._fetchJson(url);
 		return response?.response ?? null;
 	}
 
-	async _fetchPlayerSummary(steamId) {
+	async _fetchPlayerSummary(steamId, settings = this.settings) {
 		const url = `${STEAM_API_BASE}/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&steamids=${encodeURIComponent(steamId)}`;
 		const response = await this._fetchJson(url);
 		return response?.response?.players?.[0] ?? null;
 	}
 
-	async _fetchOwnedGames(steamId) {
+	async _fetchOwnedGames(steamId, settings = this.settings) {
 		const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=0&include_played_free_games=1`;
 		return this._fetchJson(url);
 	}
 
-	async _fetchAchievements(steamId, appId) {
+	async _fetchAchievements(steamId, appId, settings = this.settings) {
 		const targetAppId = this._coerceNumber(appId, 0);
 		if (!targetAppId) {
 			return null;
 		}
 
 		const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&steamid=${encodeURIComponent(steamId)}&appid=${targetAppId}&l=en&_=${Date.now()}`;
 		return this._fetchJson(url);
 	}
 
-	async _fetchAchievementSchema(appId) {
+	async _fetchAchievementSchema(appId, settings = this.settings) {
 		const targetAppId = this._coerceNumber(appId, 0);
 		if (!targetAppId) {
 			return null;
 		}
 
 		const url = `${STEAM_API_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&appid=${targetAppId}&l=en`;
 		return this._fetchJson(url);
 	}
 
-	async _fetchOwnedGamesWithInfo(steamId) {
+	async _fetchOwnedGamesWithInfo(steamId, settings = this.settings) {
 		const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
-			this._apiKey(),
+			this._apiKey(settings),
 		)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=1&include_played_free_games=1`;
 		return this._fetchJson(url);
 	}
@@ -18841,9 +19000,50 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 
+		this._cacheOwnedGames(owned);
 		await this._setVariableIfChanged(
 			VARIABLE_NAMES.gameCount,
 			this._coerceNumber(owned?.response?.game_count, 0),
+		);
+	}
+
+	_cacheOwnedGames(owned) {
+		const games = Array.isArray(owned?.response?.games)
+			? owned.response.games
+			: [];
+		this._ownedGamesByAppId.clear();
+		if (!games.length) {
+			return;
+		}
+
+		for (const game of games) {
+			const appId = this._gameAppId(game);
+			if (!appId) {
+				continue;
+			}
+			this._ownedGamesByAppId.set(appId, game);
+		}
+	}
+
+	async _applyCurrentGameDetails(appId) {
+		const currentGameAppId = this._coerceNumber(appId, 0);
+		if (!currentGameAppId) {
+			await this._setVariableIfChanged(VARIABLE_NAMES.currentGameGraphicsUrl, "");
+			await this._setVariableIfChanged(
+				VARIABLE_NAMES.currentGamePlaytimeMinutes,
+				0,
+			);
+			return;
+		}
+
+		const game = this._ownedGamesByAppId.get(currentGameAppId);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.currentGameGraphicsUrl,
+			this._gameGraphicsUrl(currentGameAppId),
+		);
+		await this._setVariableIfChanged(
+			VARIABLE_NAMES.currentGamePlaytimeMinutes,
+			this._gamePlaytimeMinutes(game),
 		);
 	}
 
@@ -19158,6 +19358,7 @@ class SteamPlugin extends Plugin {
 		);
 		let appId = null;
 		let gameName = "";
+		let resolvedGame = null;
 
 		const numericOnly = gameInput.match(/^\d+$/);
 		if (numericOnly) {
@@ -19197,11 +19398,13 @@ class SteamPlugin extends Plugin {
 				}
 				appId = match.appid;
 				gameName = match.name;
+				resolvedGame = match.game;
 			} else {
 				const found = games.find(
 					(game) => String(game?.appid) === String(appId),
 				);
 				gameName = this._coerceString(found?.name, "");
+				resolvedGame = found ?? null;
 			}
 
 			// No search results variable exposed.
@@ -19241,6 +19444,10 @@ class SteamPlugin extends Plugin {
 			[ACTION_VARIABLE_NAMES.requestedGameInput]: gameInput,
 			[ACTION_VARIABLE_NAMES.requestedGameAppId]: appId,
 			[ACTION_VARIABLE_NAMES.requestedGameName]: resolvedGameName,
+			[ACTION_VARIABLE_NAMES.requestedGameGraphicsUrl]:
+				this._gameGraphicsUrl(appId),
+			[ACTION_VARIABLE_NAMES.requestedGamePlaytimeMinutes]:
+				this._gamePlaytimeMinutes(resolvedGame),
 			[ACTION_VARIABLE_NAMES.requestedGameAchievementCount]: list.length,
 			[ACTION_VARIABLE_NAMES.requestedGameAchievementUnlocked]: unlocked,
 			[ACTION_VARIABLE_NAMES.requestedGameAchievements]: JSON.stringify(
@@ -19281,12 +19488,29 @@ class SteamPlugin extends Plugin {
 			results.push({
 				appid: game.appid,
 				name,
+				game,
 				score: Number(score.toFixed(3)),
 			});
 		}
 
 		results.sort((a, b) => b.score - a.score);
 		return results.slice(0, 10);
+	}
+
+	_gameAppId(game) {
+		return this._coerceNumber(game?.appid, 0);
+	}
+
+	_gameGraphicsUrl(appId) {
+		const targetAppId = this._coerceNumber(appId, 0);
+		if (!targetAppId) {
+			return "";
+		}
+		return `https://cdn.akamai.steamstatic.com/steam/apps/${targetAppId}/header.jpg`;
+	}
+
+	_gamePlaytimeMinutes(game) {
+		return this._coerceNumber(game?.playtime_forever, 0);
 	}
 
 	_scoreMatch(name, normalizedInput) {
@@ -19352,11 +19576,15 @@ class SteamPlugin extends Plugin {
 		achievementName = "",
 		achievementDescription = "",
 	}) {
+		const currentGameAppId = this._coerceNumber(summary?.gameid, 0);
+		const currentGame = this._ownedGamesByAppId.get(currentGameAppId);
 		return {
 			persona_username: this._coerceString(summary?.personaname, ""),
 			online_status: this._coerceString(onlineStatus, ""),
 			current_game_name: this._coerceString(summary?.gameextrainfo, ""),
-			current_game_appid: this._coerceNumber(summary?.gameid, 0),
+			current_game_appid: currentGameAppId,
+			current_game_graphics_url: this._gameGraphicsUrl(currentGameAppId),
+			current_game_playtime_minutes: this._gamePlaytimeMinutes(currentGame),
 			current_game_achievement_unlocked_count: this._coerceNumber(
 				achievementUnlocked,
 				0,
@@ -19424,10 +19652,17 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 		try {
-			await this.lumia.showToast({
-				message: "Invalid Steam API key. Update the plugin settings.",
-				time: 6,
-			});
+			await this._withTimeout(
+				Promise.resolve(
+					this.lumia.showToast({
+						message: "Invalid Steam API key. Update the plugin settings.",
+						time: 6,
+						type: "error",
+					}),
+				),
+				DEFAULTS.lumiaCallTimeoutMs,
+				"Lumia toast timed out.",
+			);
 		} catch (error) {
 			return;
 		}
@@ -19438,11 +19673,17 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 		try {
-			await this.lumia.showToast({
-				message,
-				time: 4,
-				type,
-			});
+			await this._withTimeout(
+				Promise.resolve(
+					this.lumia.showToast({
+						message,
+						time: 4,
+						type,
+					}),
+				),
+				DEFAULTS.lumiaCallTimeoutMs,
+				"Lumia toast timed out.",
+			);
 		} catch (error) {
 			return;
 		}
@@ -19468,16 +19709,23 @@ class SteamPlugin extends Plugin {
 		}
 	}
 
-	_hasRequiredSettings() {
-		return Boolean(this._apiKey() && this._steamIdInput());
+	_settingsWith(data = {}) {
+		return {
+			...(this.settings && typeof this.settings === "object" ? this.settings : {}),
+			...(data && typeof data === "object" ? data : {}),
+		};
 	}
 
-	_apiKey() {
-		return this._coerceString(this.settings?.apiKey, "");
+	_hasRequiredSettings(settings = this.settings) {
+		return Boolean(this._apiKey(settings) && this._steamIdInput(settings));
 	}
 
-	_steamIdInput() {
-		return this._coerceString(this.settings?.steamIdOrVanity, "");
+	_apiKey(settings = this.settings) {
+		return this._coerceString(settings?.apiKey, "");
+	}
+
+	_steamIdInput(settings = this.settings) {
+		return this._coerceString(settings?.steamIdOrVanity, "");
 	}
 
 	_pollInterval(settings = this.settings) {
@@ -19512,25 +19760,44 @@ class SteamPlugin extends Plugin {
 			return;
 		}
 
+		const previousState = this._lastConnectionState;
 		this._lastConnectionState = state;
 
-		if (typeof this.lumia.updateConnection === "function") {
-			try {
-				await this.lumia.updateConnection(state);
-			} catch (error) {
-				const message = this._errorMessage(error);
+		if (typeof this.lumia?.updateConnection !== "function") {
+			return;
+		}
+
+		try {
+			await this._withTimeout(
+				Promise.resolve(this.lumia.updateConnection(state)),
+				DEFAULTS.lumiaCallTimeoutMs,
+				"Lumia connection update timed out.",
+			);
+			if (!state) {
 				await this._log(
-					`Failed to update connection state: ${message}`,
+					"Steam connection is down; check the API key, Steam ID, and Steam profile privacy.",
 					"warn",
 				);
+			} else if (previousState === false) {
+				await this._log("Steam connection restored.");
 			}
+		} catch (error) {
+			const message = this._errorMessage(error);
+			await this._log(
+				`Failed to update Steam connection state: ${message}`,
+				"warn",
+			);
 		}
 	}
 
-	async _safeFetch(_label, fn) {
+	async _safeFetch(label, fn) {
 		try {
 			return { ok: true, data: await fn() };
-		} catch {
+		} catch (error) {
+			await this._log(
+				`Steam ${label || "request"} failed: ${this._errorMessage(error)}`,
+				"warn",
+			);
 			return { ok: false, data: null };
 		}
 	}
@@ -19586,6 +19853,26 @@ class SteamPlugin extends Plugin {
 		return a === b;
 	}
 
+	_withTimeout(promise, timeoutMs, message) {
+		const ms = Math.max(1, this._coerceNumber(timeoutMs, 1000));
+		return new Promise((resolve, reject) => {
+			const timeoutId = setTimeout(() => {
+				reject(new Error(message || `Operation timed out after ${ms}ms.`));
+			}, ms);
+
+			Promise.resolve(promise).then(
+				(value) => {
+					clearTimeout(timeoutId);
+					resolve(value);
+				},
+				(error) => {
+					clearTimeout(timeoutId);
+					reject(error);
+				},
+			);
+		});
+	}
+
 	_errorMessage(error) {
 		if (!error) {
 			return "Unknown error";
@@ -19630,7 +19917,7 @@ module.exports = SteamPlugin;
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.0.10",
+	"version": "1.1.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -19693,6 +19980,8 @@ module.exports = SteamPlugin;
 					"steam_requested_game_input",
 					"steam_requested_game_appid",
 					"steam_requested_game_name",
+					"steam_requested_game_graphics_url",
+					"steam_requested_game_playtime_minutes",
 					"steam_requested_game_achievement_count",
 					"steam_requested_game_achievement_unlocked",
 					"steam_requested_game_achievements"
@@ -19748,6 +20037,16 @@ module.exports = SteamPlugin;
 			{
 				"name": "current_game_appid",
 				"description": "Current in-game app ID (if playing).",
+				"value": 0
+			},
+			{
+				"name": "current_game_graphics_url",
+				"description": "Current game's Steam header image URL.",
+				"value": ""
+			},
+			{
+				"name": "current_game_playtime_minutes",
+				"description": "Total Steam playtime for the current game, in minutes.",
 				"value": 0
 			},
 			{
@@ -19840,7 +20139,12 @@ module.exports = SteamPlugin;
 			{
 				"title": "Game Changed",
 				"key": "current_game_changed",
-				"acceptedVariables": ["current_game_name", "current_game_appid"],
+				"acceptedVariables": [
+					"current_game_name",
+					"current_game_appid",
+					"current_game_graphics_url",
+					"current_game_playtime_minutes"
+				],
 				"defaultMessage": "Now playing {{current_game_name}}.",
 				"variationConditions": [
 					{
@@ -19921,6 +20225,8 @@ Achievement stats are pulled automatically from your **current** game while you 
 		"avatar": "Avatar URL.",
 		"current_game_name": "Current in-game name (if playing).",
 		"current_game_appid": "Current in-game app ID (if playing).",
+		"current_game_graphics_url": "Current game's Steam header image URL.",
+		"current_game_playtime_minutes": "Total Steam playtime for the current game, in minutes.",
 		"game_count": "Owned games count.",
 		"current_game_achievement_count": "Total achievements for the current/last played game.",
 		"current_game_achievement_unlocked_count": "Unlocked achievements for the current/last played game.",
@@ -24606,9 +24912,9 @@ module.exports = TrovoPlugin;
 ---
 ### Speak Action
 1. Enter the **Message** you want spoken.
-2. Pick a **Voice** from the loaded options, or type either a voice name or voice ID manually.
+2. Pick a **Voice** from the loaded options, or type either a voice name or voice ID manually. Overlay URL voices use the names from the overlay account.
 3. Set **Volume** if you want to change playback volume.
-4. Enable **Log Character Usage** if you want the API to return the latest usage count after generation.
+4. Enable **Log Character Usage** for Developer API usage counts, or status toasts when using Overlay URL.
 ---
 
 ```
@@ -24623,13 +24929,22 @@ const path = require("path");
 const crypto = require("crypto");
 
 const API_BASE = "https://api.console.tts.monster";
+const OVERLAY_VOICES_URL = "https://wutface.tts.monster/";
+const OVERLAY_GENERATE_URL =
+	"https://us-central1-tts-monster.cloudfunctions.net/generateTTS";
 const TEMP_DIR_NAME = "lumia-tts-monster";
 
+const AUTH_METHODS = {
+	DEVELOPER_API: "developerApi",
+	OVERLAY_URL: "overlayUrl",
+};
+
 const DEFAULTS = {
+	authMethod: AUTH_METHODS.OVERLAY_URL,
 	defaultVolume: 100,
 	waitForAudioToStop: true,
-	returnUsage: false,
-	requestTimeoutMs: 20000,
+	returnUsage: true,
+	requestTimeoutMs: 0,
 	voiceCacheTtlMs: 5 * 60 * 1000,
 	maxMessageChars: 500,
 	tempFileCleanupDelayMs: 10 * 60 * 1000,
@@ -24695,10 +25010,71 @@ const normalizeVoiceSearchValue = (value) =>
 		.replace(/[^a-z0-9]+/g, " ")
 		.trim();
 
+const normalizeApiToken = (value) =>
+	trimString(value, "")
+		.replace(/^Authorization:\s*/i, "")
+		.replace(/^Bearer\s+/i, "")
+		.replace(/^["']|["']$/g, "")
+		.trim();
+
+const parseOverlayUrl = (value) => {
+	const raw = trimString(value, "");
+	if (!raw) {
+		return {
+			ok: false,
+			userId: "",
+			apiKey: "",
+			message: "Overlay URL is required.",
+		};
+	}
+
+	let url;
+	try {
+		url = new URL(raw);
+	} catch (_error) {
+		try {
+			url = new URL(`https://${raw}`);
+		} catch (_fallbackError) {
+			return {
+				ok: false,
+				userId: "",
+				apiKey: "",
+				message: "Overlay URL must be a valid TTS Monster overlay URL.",
+			};
+		}
+	}
+
+	const parts = url.pathname.split("/").filter(Boolean);
+	const overlayIndex = parts.findIndex(
+		(part) => part.toLowerCase() === "overlay",
+	);
+	const userId = trimString(
+		overlayIndex >= 0
+			? decodeURIComponent(parts[overlayIndex + 1] ?? "")
+			: "",
+	);
+	const apiKey = trimString(
+		overlayIndex >= 0
+			? decodeURIComponent(parts[overlayIndex + 2] ?? "")
+			: "",
+	);
+	if (!userId || !apiKey) {
+		return {
+			ok: false,
+			userId: "",
+			apiKey: "",
+			message:
+				"Overlay URL must look like https://tts.monster/overlay/{userId}/{token}.",
+		};
+	}
+
+	return { ok: true, userId, apiKey, message: "" };
+};
+
 class TTSMonsterPlugin extends Plugin {
 	constructor(manifest, context) {
 		super(manifest, context);
-		this._voiceCache = { list: [], fetchedAt: 0, apiKey: "" };
+		this._voiceCache = { list: [], fetchedAt: 0, cacheKey: "" };
 		this._voiceFetchPromise = null;
 		this._lastVoiceFetchError = "";
 		this._tempFileCleanupTimers = new Set();
@@ -24711,8 +25087,10 @@ class TTSMonsterPlugin extends Plugin {
 	}
 
 	async onsettingsupdate(settings, previous = {}) {
-		const apiKeyChanged = this._apiKey(settings) !== this._apiKey(previous);
-		if (apiKeyChanged) {
+		const credentialsChanged =
+			this._settingsAuthFingerprint(settings) !==
+			this._settingsAuthFingerprint(previous);
+		if (credentialsChanged) {
 			await this._validateConnection({ silent: true, settings });
 			void this._refreshVoiceCache({ force: true, silent: true, settings });
 		}
@@ -24741,7 +25119,7 @@ class TTSMonsterPlugin extends Plugin {
 		const options = this._buildVoiceOptions({
 			voices,
 			selectedValue,
-			apiKey: this._apiKey(previewSettings),
+			credentials: this._credentials(previewSettings),
 		});
 
 		await this.lumia.updateActionFieldOptions({
@@ -24768,8 +25146,9 @@ class TTSMonsterPlugin extends Plugin {
 
 	async _handleSpeak(data = {}) {
 		const settings = this._settingsSnapshot();
-		if (!settings.apiKey) {
-			await this._log("Missing API key.");
+		const credentials = this._credentials(settings);
+		if (!credentials.ok) {
+			await this._log(credentials.message);
 			return;
 		}
 
@@ -24785,7 +25164,9 @@ class TTSMonsterPlugin extends Plugin {
 			return;
 		}
 		if (voiceInput.startsWith("__")) {
-			await this._log("Voice is not loaded yet. Type a valid voice name or voice ID, or refresh the action.");
+			await this._log(
+				"Voice is not loaded yet. Type a valid voice name or voice ID, or refresh the action.",
+			);
 			return;
 		}
 		let voiceId = "";
@@ -24821,17 +25202,25 @@ class TTSMonsterPlugin extends Plugin {
 			await this._showToast("TTS Monster: generating speech...");
 		}
 
-		const response = await this._request("/generate", {
-			method: "POST",
-			body: {
-				voice_id: voiceId,
-				message,
-				...(returnUsage ? { return_usage: true } : {}),
-			},
-			settings,
-		});
+		const response =
+			credentials.authMethod === AUTH_METHODS.OVERLAY_URL
+				? await this._generateOverlayTts({
+					credentials,
+					voiceId,
+					message,
+					settings,
+				})
+				: await this._generateDeveloperApiTts({
+					voiceId,
+					message,
+					returnUsage,
+					settings,
+				});
 
-		const audioUrl = trimString(response?.url, "");
+		const audioUrl = trimString(
+			response?.url ?? response?.link ?? response?.data?.link,
+			"",
+		);
 		if (!audioUrl) {
 			throw new Error("TTS Monster did not return an audio URL.");
 		}
@@ -24861,20 +25250,74 @@ class TTSMonsterPlugin extends Plugin {
 		}
 	}
 
+	async _generateDeveloperApiTts({ voiceId, message, returnUsage, settings }) {
+		const response = await this._request("/generate", {
+			method: "POST",
+			body: {
+				voice_id: voiceId,
+				message,
+				...(returnUsage ? { return_usage: true } : {}),
+			},
+			settings,
+		});
+		this._assertTtsMonsterStatus(response, "TTS Monster generation");
+		return response;
+	}
+
+	async _generateOverlayTts({ credentials, voiceId, message, settings }) {
+		const response = await this._overlayRequest({
+			url: OVERLAY_GENERATE_URL,
+			settings,
+			body: {
+				data: {
+					userId: credentials.userId,
+					key: credentials.apiKey,
+					message: `${voiceId}: ${message}`,
+					ai: true,
+					details: {
+						provider: "",
+						test: false,
+						event: "test",
+						viewerId: null,
+						raw: null,
+					},
+				},
+			},
+		});
+		this._assertTtsMonsterStatus(response, "TTS Monster overlay generation");
+		return response;
+	}
+
 	async _validateConnection({ silent = false, data = {}, settings } = {}) {
-		const apiKey = trimString(
-			data?.apiKey,
-			this._apiKey(settings ?? this.settings),
-		);
-		if (!apiKey) {
-			return { ok: false, message: "API key is required." };
+		const previewSettings = this._mergeSettings(settings, data);
+		const credentials = this._credentials(previewSettings);
+		if (!credentials.ok) {
+			return { ok: false, message: credentials.message };
 		}
 
 		try {
+			if (credentials.authMethod === AUTH_METHODS.OVERLAY_URL) {
+				const payload = await this._fetchOverlayVoicePayload({
+					credentials,
+					settings: previewSettings,
+				});
+				const user = payload?.message;
+				const voiceCount =
+					(Array.isArray(user?.voices) ? user.voices.length : 0) +
+					(Array.isArray(user?.customVoices) ? user.customVoices.length : 0);
+				const username = trimString(user?.username, "");
+				return {
+					ok: true,
+					message: username
+						? `Validated overlay for ${username}. Loaded ${voiceCount} voices.`
+						: `Validated overlay. Loaded ${voiceCount} voices.`,
+				};
+			}
+
 			const user = await this._request("/user", {
 				method: "POST",
-				apiKey,
-				settings,
+				apiKey: credentials.apiKey,
+				settings: previewSettings,
 			});
 			const usage = toNumber(user?.character_usage, NaN);
 			const allowance = toNumber(user?.character_allowance, NaN);
@@ -24896,53 +25339,69 @@ class TTSMonsterPlugin extends Plugin {
 	}
 
 	async _refreshVoiceCache({ force = false, silent = false, settings } = {}) {
-		const apiKey = this._apiKey(settings ?? this.settings);
-		if (!apiKey) {
-			this._voiceCache = { list: [], fetchedAt: 0, apiKey: "" };
-			this._lastVoiceFetchError = "Enter your API token in plugin settings first.";
+		const requestSettings = settings ?? this.settings;
+		const credentials = this._credentials(requestSettings);
+		if (!credentials.ok) {
+			this._voiceCache = { list: [], fetchedAt: 0, cacheKey: "" };
+			this._lastVoiceFetchError = credentials.message;
 			return [];
 		}
 
 		const now = Date.now();
 		const isFresh =
 			!force &&
-			this._voiceCache.apiKey === apiKey &&
+			this._voiceCache.cacheKey === credentials.cacheKey &&
 			now - this._voiceCache.fetchedAt < DEFAULTS.voiceCacheTtlMs;
 		if (isFresh) {
 			return this._voiceCache.list;
 		}
 
-		if (this._voiceFetchPromise) {
+		if (
+			this._voiceFetchPromise &&
+			this._voiceFetchPromise.cacheKey === credentials.cacheKey
+		) {
 			try {
-				return await this._voiceFetchPromise;
+				return await this._voiceFetchPromise.promise;
 			} catch (_error) {
 				return this._voiceCache.list;
 			}
 		}
 
-		this._voiceFetchPromise = (async () => {
-			const payload = await this._request("/voices", {
-				method: "POST",
-				apiKey,
-				settings,
-			});
+		const promise = (async () => {
+			const payload =
+				credentials.authMethod === AUTH_METHODS.OVERLAY_URL
+					? await this._fetchOverlayVoicePayload({
+						credentials,
+						settings: requestSettings,
+					})
+					: await this._request("/voices", {
+						method: "POST",
+						apiKey: credentials.apiKey,
+						settings: requestSettings,
+					});
 			const list = this._normalizeVoices(payload);
 			this._voiceCache = {
 				list,
 				fetchedAt: Date.now(),
-				apiKey,
+				cacheKey: credentials.cacheKey,
 			};
 			this._lastVoiceFetchError = "";
 			return list;
 		})().finally(() => {
-			this._voiceFetchPromise = null;
+			if (this._voiceFetchPromise?.promise === promise) {
+				this._voiceFetchPromise = null;
+			}
 		});
+		this._voiceFetchPromise = {
+			cacheKey: credentials.cacheKey,
+			promise,
+		};
 
 		try {
-			return await this._voiceFetchPromise;
+			return await promise;
 		} catch (error) {
-			if (this._voiceCache.apiKey !== apiKey) {
-				this._voiceCache = { list: [], fetchedAt: 0, apiKey: "" };
+			if (this._voiceCache.cacheKey !== credentials.cacheKey) {
+				this._voiceCache = { list: [], fetchedAt: 0, cacheKey: "" };
 			}
 			this._lastVoiceFetchError =
 				error instanceof Error ? error.message : String(error);
@@ -24955,14 +25414,53 @@ class TTSMonsterPlugin extends Plugin {
 		}
 	}
 
+	async _fetchOverlayVoicePayload({ credentials, settings }) {
+		const payload = await this._overlayRequest({
+			url: OVERLAY_VOICES_URL,
+			settings,
+			body: {
+				userId: credentials.userId,
+				apiKey: credentials.apiKey,
+				includeProviderToken: true,
+			},
+		});
+		this._assertTtsMonsterStatus(payload, "TTS Monster overlay voice list");
+		return payload;
+	}
+
 	_normalizeVoices(payload) {
-		const publicVoices = Array.isArray(payload?.voices) ? payload.voices : [];
-		const customVoices = Array.isArray(payload?.customVoices)
-			? payload.customVoices
+		const root =
+			payload?.message && typeof payload.message === "object"
+				? payload.message
+				: payload;
+		const publicVoices = Array.isArray(root?.voices) ? root.voices : [];
+		const customVoices = Array.isArray(root?.customVoices)
+			? root.customVoices
 			: [];
 
 		const normalizeVoice = (voice, isCustom) => {
-			const id = trimString(voice?.voice_id, "");
+			if (typeof voice === "string") {
+				const id = trimString(voice, "");
+				return id
+					? {
+						id,
+						name: id,
+						sample: "",
+						metadata: "",
+						language: "",
+						isCustom,
+					}
+					: null;
+			}
+
+			const fallbackId = trimString(
+				voice?.id,
+				trimString(voice?.value, trimString(voice?.name, "")),
+			);
+			const id = trimString(
+				voice?.voice_id,
+				fallbackId,
+			);
 			if (!id) {
 				return null;
 			}
@@ -24976,7 +25474,10 @@ class TTSMonsterPlugin extends Plugin {
 			};
 		};
 
-		return [...customVoices.map((voice) => normalizeVoice(voice, true)), ...publicVoices.map((voice) => normalizeVoice(voice, false))]
+		return [
+			...customVoices.map((voice) => normalizeVoice(voice, true)),
+			...publicVoices.map((voice) => normalizeVoice(voice, false)),
+		]
 			.filter(Boolean)
 			.sort((left, right) => {
 				if (left.isCustom !== right.isCustom) {
@@ -24986,7 +25487,7 @@ class TTSMonsterPlugin extends Plugin {
 			});
 	}
 
-	_buildVoiceOptions({ voices, selectedValue, blankLabel, apiKey }) {
+	_buildVoiceOptions({ voices, selectedValue, blankLabel, credentials }) {
 		const options = [];
 		const seen = new Set();
 
@@ -25002,8 +25503,11 @@ class TTSMonsterPlugin extends Plugin {
 			pushOption(blankLabel, "");
 		}
 
-		if (!trimString(apiKey, "")) {
-			pushOption("Set API token first", "__missing_api_token__");
+		if (!credentials?.ok) {
+			pushOption(
+				credentials?.message ?? "Set credentials first",
+				"__missing_auth__",
+			);
 			return options;
 		}
 
@@ -25280,10 +25784,10 @@ class TTSMonsterPlugin extends Plugin {
 		path,
 		{ method = "POST", body, settings, apiKey: explicitApiKey } = {},
 	) {
-		const apiKey = trimString(
-			explicitApiKey,
-			this._apiKey(settings ?? this.settings),
-		);
+		const apiKey =
+			explicitApiKey === undefined
+				? this._apiKey(settings ?? this.settings)
+				: normalizeApiToken(explicitApiKey);
 		if (!apiKey) {
 			throw new Error("API key is required.");
 		}
@@ -25333,6 +25837,77 @@ class TTSMonsterPlugin extends Plugin {
 		}
 	}
 
+	async _overlayRequest({ url, body, settings }) {
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime.");
+		}
+
+		const controller =
+			typeof AbortController === "function" ? new AbortController() : null;
+		const timeoutMs = this._requestTimeoutMs(settings ?? this.settings);
+		const timeoutId =
+			controller && timeoutMs > 0
+				? setTimeout(() => controller.abort(), timeoutMs)
+				: null;
+
+		try {
+			const response = await fetch(url, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(body ?? {}),
+				signal: controller?.signal,
+			});
+
+			const raw = await response.text();
+			const payload = raw ? this._safeJsonParse(raw) : null;
+			if (!response.ok) {
+				const errorMessage =
+					this._payloadMessage(payload) ||
+					trimString(raw, "") ||
+					response.statusText ||
+					"Request failed.";
+				throw new Error(`TTS Monster error ${response.status}: ${errorMessage}`);
+			}
+			return payload;
+		} catch (error) {
+			if (error?.name === "AbortError") {
+				throw new Error("Request timed out.");
+			}
+			throw error;
+		} finally {
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+			}
+		}
+	}
+
+	_assertTtsMonsterStatus(payload, context) {
+		const status = payload?.status;
+		if (status === undefined || status === null) {
+			return;
+		}
+		if (String(status) === "200") {
+			return;
+		}
+		throw new Error(
+			`${context} failed with status ${status}: ${
+				this._payloadMessage(payload) || "Request failed."
+			}`,
+		);
+	}
+
+	_payloadMessage(payload) {
+		return (
+			trimString(payload?.error, "") ||
+			(typeof payload?.message === "string"
+				? trimString(payload.message, "")
+				: "") ||
+			trimString(payload?.warning, "")
+		);
+	}
+
 	_safeJsonParse(value) {
 		try {
 			return JSON.parse(value);
@@ -25351,14 +25926,80 @@ class TTSMonsterPlugin extends Plugin {
 
 	_settingsSnapshot(settings = this.settings) {
 		return {
+			authMethod: this._authMethod(settings),
 			apiKey: this._apiKey(settings),
+			overlayUrl: this._overlayUrl(settings),
 			returnUsage: toBoolean(settings?.returnUsage, DEFAULTS.returnUsage),
 			requestTimeoutMs: this._requestTimeoutMs(settings),
 		};
 	}
 
+	_credentials(settings = this.settings) {
+		const authMethod = this._authMethod(settings);
+		if (authMethod === AUTH_METHODS.OVERLAY_URL) {
+			const overlay = parseOverlayUrl(this._overlayUrl(settings));
+			if (!overlay.ok) {
+				return {
+					ok: false,
+					authMethod,
+					cacheKey: "",
+					message: overlay.message,
+				};
+			}
+			return {
+				ok: true,
+				authMethod,
+				userId: overlay.userId,
+				apiKey: overlay.apiKey,
+				cacheKey: `${authMethod}:${overlay.userId}:${overlay.apiKey}`,
+				message: "",
+			};
+		}
+
+		const apiKey = this._apiKey(settings);
+		if (!apiKey) {
+			return {
+				ok: false,
+				authMethod,
+				cacheKey: "",
+				message: "API token is required.",
+			};
+		}
+		return {
+			ok: true,
+			authMethod,
+			apiKey,
+			cacheKey: `${authMethod}:${apiKey}`,
+			message: "",
+		};
+	}
+
+	_authMethod(settings = this.settings) {
+		const value = trimString(settings?.authMethod, "");
+		if (!value && this._apiKey(settings) && !this._overlayUrl(settings)) {
+			return AUTH_METHODS.DEVELOPER_API;
+		}
+		return value === AUTH_METHODS.OVERLAY_URL
+			? AUTH_METHODS.OVERLAY_URL
+			: value === AUTH_METHODS.DEVELOPER_API
+				? AUTH_METHODS.DEVELOPER_API
+				: DEFAULTS.authMethod;
+	}
+
 	_apiKey(settings = this.settings) {
-		return trimString(settings?.apiKey, "");
+		return normalizeApiToken(settings?.apiKey);
+	}
+
+	_overlayUrl(settings = this.settings) {
+		return trimString(settings?.overlayUrl, "");
+	}
+
+	_settingsAuthFingerprint(settings = this.settings) {
+		return [
+			this._authMethod(settings),
+			this._apiKey(settings),
+			this._overlayUrl(settings),
+		].join(":");
 	}
 
 	_requestTimeoutMs(settings = this.settings) {
@@ -25404,7 +26045,7 @@ module.exports = TTSMonsterPlugin;
 {
 	"id": "tts_monster",
 	"name": "TTS Monster",
-	"version": "1.0.0",
+	"version": "1.2.3",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://tts.monster",
@@ -25419,11 +26060,31 @@ module.exports = TTSMonsterPlugin;
 		"actions_tutorial": "./actions_tutorial.md",
 		"settings": [
 			{
+				"key": "authMethod",
+				"label": "Connection Method",
+				"type": "select",
+				"defaultValue": "overlayUrl",
+				"options": [
+					{ "label": "Overlay URL", "value": "overlayUrl" },
+					{ "label": "Developer API Token", "value": "developerApi" }
+				],
+				"helperText": "Choose Developer API Token for the official console API, or Overlay URL if you only have your TTS Monster overlay link.",
+				"refreshOnChange": true
+			},
+			{
 				"key": "apiKey",
 				"label": "API Token",
 				"type": "password",
-				"helperText": "Create or copy your API token from the TTS Monster developer dashboard.",
-				"required": true,
+				"helperText": "Used when Connection Method is Developer API Token. Create or copy your API token from the TTS Monster developer dashboard.",
+				"visibleIf": { "key": "authMethod", "equals": "developerApi" },
+				"refreshOnChange": true
+			},
+			{
+				"key": "overlayUrl",
+				"label": "Overlay URL",
+				"type": "password",
+				"helperText": "Used when Connection Method is Overlay URL. Paste your full overlay URL, for example https://tts.monster/overlay/3hoZh83Uigewkx0Upw66imx2ASj1/059e9e17a7c64a42b38b6bbf7b40bee3",
+				"visibleIf": { "key": "authMethod", "equals": "overlayUrl" },
 				"refreshOnChange": true
 			},
 			{
@@ -25431,7 +26092,7 @@ module.exports = TTSMonsterPlugin;
 				"label": "Log Character Usage",
 				"type": "toggle",
 				"defaultValue": true,
-				"helperText": "Requests `return_usage` on generate calls, logs the current usage after playback, and shows start/result toasts for Speak actions."
+				"helperText": "For Developer API Token, requests `return_usage` on generate calls and logs current usage. For Overlay URL, shows start/result toasts."
 			},
 			{
 				"key": "requestTimeoutMs",
@@ -25467,7 +26128,7 @@ module.exports = TTSMonsterPlugin;
 						"allowTyping": true,
 						"allowVariables": true,
 						"required": true,
-						"helperText": "Choose a cached voice, or type either a voice name or voice ID. You can copy voice IDs from https://console.tts.monster/voices"
+						"helperText": "Choose a cached voice, or type either a voice name or voice ID. Developer API voice IDs are available at https://console.tts.monster/voices; Overlay URL voices use the names from the overlay account."
 					},
 					{
 						"key": "volume",
@@ -25513,10 +26174,24 @@ module.exports = TTSMonsterPlugin;
 
 ```
 ---
-### 1) Create A TTS.Monster API Token
-1. Open the [TTS.Monster Console](https://console.tts.monster/).
-2. Log in and click through to create or copy your API token.
-3. Paste that token into this plugin's **API Token** setting.
+### Connect TTS.Monster
+
+#### Overlay URL
+1. Set **Connection Method** to **Overlay URL**.
+2. Open the [TTS.Monster dashboard](https://tts.monster/dashboard/app).
+3. Copy your full **Overlay URL**.
+4. Paste it into this plugin's **Overlay URL** setting.
+
+![TTS.Monster overlay URL](./overlay_url_tutorial.png)
+
+Example overlay URL:
+`https://tts.monster/overlay/3hoZh83Uigewkx0Upw66imx2ASj1/059e9e17a7c64a42b38b6bbf7b40bee3`
+
+#### Developer API Token
+1. Set **Connection Method** to **Developer API Token**.
+2. Open the [TTS.Monster Console](https://console.tts.monster/).
+3. Log in and click through to create or copy your API token.
+4. Paste that token into this plugin's **API Token** setting.
 
 ![TTS.Monster API token](./monster_tut1.png)
 ---
@@ -25681,7 +26356,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.7.4"
+		"@lumiastream/plugin": "^0.8.0"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",

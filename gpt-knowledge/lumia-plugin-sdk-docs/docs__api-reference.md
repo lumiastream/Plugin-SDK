@@ -145,6 +145,10 @@ By default, `acquireSharedNoble` uses the host key `bluetooth.runtime.noble.mana
 - **`setVariable(name: string, value: any): Promise<void>`** – store a variable that other Lumia features can consume.
 - **`getVariable(name: string): Promise<any>`** – read a stored variable value (await the result).
 
+### Heart Rate
+
+- **`updateHeartRate(bpm: number): Promise<void>`** – push a live heart-rate reading (beats per minute) into Lumia's shared heart-rate system. This makes your plugin a first-class heart-rate source, exactly like the built-in HypeRate and Pulsoid integrations: the value drives the `{{heart_rate}}` overlay variable, the Pulse heart-rate **zone** alerts, calorie tracking, and Studio heart-rate light reactions. Call it every time a new reading arrives. Pair it with `"hasHeartrate": true` in your manifest `config` (see the [Manifest Guide](./manifest-guide.md)) so Lumia also shows the heart-rate zone Alerts UI for your plugin.
+
 ### Commands
 
 - **`callCommand(name: string, variableValues?: any): Promise<any>`** – execute another Lumia command and optionally pass variable values.

@@ -502,6 +502,7 @@ export interface PluginIntegrationConfig {
 	custom_auth_display?: PluginCustomAuthDisplayConfig;
 	hasAI?: boolean;
 	hasChatbot?: boolean;
+	hasHeartrate?: boolean;
 	modcommandOptions?: PluginModCommandOption[];
 	[key: string]: any;
 }
@@ -790,6 +791,7 @@ export interface ILumiaAPI {
 	}) => Promise<boolean>;
 	setVariable: (name: string, value: any) => Promise<void>;
 	getVariable: (name: string) => Promise<any>;
+	updateHeartRate: (bpm: number) => Promise<void>;
 	callCommand: (name: string, variableValues?: any) => Promise<any>;
 	triggerAlert: (params: PluginTriggerAlertOptions) => Promise<boolean>;
 	displayChat: (params: PluginDisplayChatOptions) => void;
