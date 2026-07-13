@@ -355,11 +355,50 @@ For complete behavior details (including `visibleIf`, fallback rules, and shorth
 
 Avoid adding settings that exist only for testing or debugging. Keep settings user-facing and essential.
 
+### Tutorials (`settings_tutorial` & `actions_tutorial`)
+
 If you provide `settings_tutorial` (markdown or a relative `.md` file path), it renders as a setup guide in the auth screen.
 
 To provide a tutorial that is specific to actions, use `actions_tutorial` (markdown or a relative `.md` file path). When present, it renders in the Actions editor.
 
-Populate both tutorials with clear, step-by-step instructions that a first-time user can follow without guesswork.
+Populate both tutorials with clear, step-by-step instructions that a first-time user can follow without guesswork. Prefer the relative-file form (`"settings_tutorial": "./settings_tutorial.md"`) for anything longer than a few paragraphs — the file ships inside your plugin package and keeps `manifest.json` readable.
+
+From Lumia Stream 9.2, tutorials render in a full reader: users can open the tutorial in its own window (pinnable on top of other apps), switch between dark and light reading backgrounds, resize text, toggle line wrapping and line numbers in code, and navigate long guides from an auto-generated table of contents. Do not compress a guide to fit a sidebar — complete, detailed, step-by-step tutorials are encouraged, including full source files inline.
+
+#### Headings become navigation
+
+`##` and `###` headings build the table of contents in the tutorial window, and scrolling highlights the current section. Structure long tutorials as a short intro followed by numbered step headings:
+
+```md
+## Set up your device
+
+### 1. Install the firmware
+### 2. Join it to Wi-Fi
+### 3. Add it in Lumia
+```
+
+#### Code blocks
+
+Fenced code blocks render as cards with an automatic **Copy** button and syntax highlighting. Set the fence language to enable highlighting. Supported languages: `ini`, `cpp`, `c`, `bash`, `javascript`, `typescript`, `json`, `yaml`, `xml`/`html`, `css`, `python`, plus aliases (`arduino` → `cpp`, `toml`/`conf` → `ini`, `sh`/`zsh` → `bash`).
+
+Name a file by adding `title="relative/path.ext"` to the fence info string:
+
+````md
+```ini title="platformio.ini"
+[env:esp32dev]
+platform = espressif32
+```
+````
+
+- The value **must be wrapped in double quotes** — `title=platformio.ini` without quotes is silently ignored.
+- Titled blocks show a filename chip in the card header and get a per-file **Download** button.
+- When a tutorial contains titled blocks, the reader adds a **Download project files** button that zips every titled block using its path (`title="src/main.cpp"` creates a `src/` folder in the zip). Give each file of a multi-file project a titled fence with its real relative path and users can download a ready-to-open project.
+
+This makes "flash this firmware" or "run this script" plugins practical: embed the complete, buildable source files in the tutorial and users copy or download them without leaving Lumia. Long listings (a few hundred lines) are fine — code cards scroll internally instead of stretching the page.
+
+#### Section separator caveat
+
+Lines consisting of `---` are treated as tutorial section separators wherever they appear — **including inside code fences**. Do not put `---` lines in code samples (YAML document markers, ini dividers); restructure the sample instead.
 
 Tutorials can include local images bundled with the plugin. Reference them with a relative path and they will resolve from the plugin root at runtime:
 
@@ -1272,7 +1311,7 @@ The SDK includes manifest validation. Common validation errors:
 5. **Validation**: Use validation rules to prevent user errors
 6. **Documentation**: Include comprehensive descriptions and examples
 7. **Testing**: Test your manifest with the validation tools
-8. **Tutorials**: Provide clear `settings_tutorial` and `actions_tutorial` steps
+8. **Tutorials**: Provide detailed `settings_tutorial` and `actions_tutorial` guides — structured headings for the table of contents, language-tagged code fences, and `title="path"` fences for downloadable files (see the Tutorials section)
 9. **No Test Controls**: Avoid test-only settings and actions
 10. **Retry Discipline**: Implement a disconnect flow, use exponential backoff with a retry cap, mark the plugin disconnected when retries are exhausted, and pause polling until an explicit reconnect trigger
 11. **Minimal Logs**: Log errors and explicit user actions only

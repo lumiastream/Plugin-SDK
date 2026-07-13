@@ -19,7 +19,12 @@ Plugin Creation Guardrails:
 - Keep logging minimal. Log errors or explicit user actions only, and avoid custom log wrappers unless truly necessary.
 - Do not use `AbortController`/`AbortSignal` with `fetch` in plugins. The runtime does not support it and will throw `Failed to construct 'Request': member signal is not of type AbortSignal.` Use a timeout wrapper (Promise.race) instead.
 - Do not add test-only actions (for example "test connection" or "refetch") or testing toggles in settings.
-- Always include clear `settings_tutorial` and `actions_tutorial` content to guide users through setup and actions.
+- Always include clear `settings_tutorial` and `actions_tutorial` content to guide users through setup and actions. Tutorials render in a rich reader (pop-out window, table of contents, syntax-highlighted code cards with copy/download buttons), so write complete step-by-step guides rather than short summaries:
+  - Prefer a relative file (`"settings_tutorial": "./settings_tutorial.md"`) over long inline strings and ship the `.md` in the plugin package.
+  - Structure with `##`/`###` step headings; they become the reader's table of contents.
+  - Tag code fences with a language (`ini`, `cpp`, `bash`, `javascript`, `typescript`, `json`, `yaml`, `xml`, `css`, `python`) for syntax highlighting.
+  - Add `title="relative/path.ext"` (double quotes required; unquoted is ignored) to fences that represent real files. Users get a per-file Download button plus a "Download project files" zip that preserves folder paths — so include complete, buildable source files when the plugin pairs with external code (firmware, scripts, configs).
+  - Never place `---` lines inside code fences; they are parsed as tutorial section separators.
 - `triggerAlert` payload rules:
   - `dynamic` is for alert variation matching only.
   - `extraSettings` can contain any key/value payload and is passed through for templates, overlays, and runtime consumers.

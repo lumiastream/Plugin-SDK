@@ -322,7 +322,7 @@ Use `skipCommandProcessing` (top-level) to show a message in chat without runnin
 
 `PluginIntegrationConfig` supports `actions_tutorial` (markdown) to display a guide alongside the Actions editor. It also supports `oauth` for Lumia-managed OAuth configuration (see the manifest guide for details).
 
-For media embeds inside tutorials (`iframe`, `video`, `audio`, `source`) and URL safety rules, see `docs/manifest-guide.md` under **Tutorial Media Embeds**.
+Tutorials render in a rich reader (pop-out window, table of contents from headings, syntax-highlighted code cards with copy/download, and downloadable project zips from `title="path"` fences). For authoring guidance, media embeds (`iframe`, `video`, `audio`, `source`), and URL safety rules, see `docs/manifest-guide.md` under **Tutorials**.
 
 `PluginIntegrationConfig` also supports `custom_auth_display` for custom setup UI embedded in PluginAuth:
 
