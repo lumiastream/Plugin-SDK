@@ -472,6 +472,110 @@ export type PluginTranslationLanguageMap = Record<string, PluginTranslationDicti
 
 export type PluginTranslations = PluginTranslationLanguageMap | string;
 
+/**
+ * A resolved track as understood by your plugin's music source. Return it from
+ * `resolveSongRequest`, and report it back through `songRequestNowPlaying` /
+ * `updateSongRequestQueue`. Lumia treats `id` as an opaque match key.
+ */
+export interface PluginSongRequestTrack {
+	id: string;
+	title: string;
+	artist?: string;
+	thumbnailUrl?: string;
+	url?: string;
+	durationSeconds?: number;
+	requesterUsername?: string;
+}
+
+/** What Lumia hands your `resolveSongRequest` hook when a viewer requests a song. */
+export interface PluginSongRequestResolveRequest {
+	query: string;
+	requesterUsername?: string;
+	requesterPlatform?: string;
+}
+
+/** Submit a song request into Lumia's queue from your plugin (`lumia.addSongRequest`). */
+export interface PluginAddSongRequestOptions {
+	query: string;
+	requesterUsername?: string;
+}
+
+export interface PluginAddSongRequestResult {
+	accepted: boolean;
+	/** Rejection reason when `accepted` is false (queue full, disabled source, throttled, …). */
+	reason?: string;
+}
+
+/**
+ * Declares your plugin as a song-request source/player. Presence of this object
+ * (or `hasSongRequests: true`) makes the plugin selectable as the song-request
+ * mode. Capability flags let Lumia hide controls your source can't honor.
+ */
+export interface PluginSongRequestSourceConfig {
+	/** Label in the song-request mode picker. Defaults to the plugin name. */
+	label?: string;
+	/** Set false if your source only accepts URLs it recognizes, not free-text search. */
+	supportsSearch?: boolean;
+	supportsSkip?: boolean;
+	supportsPause?: boolean;
+	supportsVolume?: boolean;
+	/** True when your app owns the queue (Lumia hands off every request); false when Lumia drives one track at a time. */
+	supportsQueue?: boolean;
+}
+
+/** A voice your plugin can synthesize, surfaced in Lumia's native TTS voice picker. */
+export interface PluginTtsVoice {
+	/** Stable id passed back to your `synthesizeTts` hook as `voiceId`. Keep it stable across restarts. */
+	id: string;
+	/** Display name shown in the voice picker. */
+	name: string;
+	/** Optional BCP-47-style language tag (e.g. "en_US"). */
+	language?: string;
+	/** Optional preview-clip URL shown in the picker. */
+	previewUrl?: string;
+	/** Optional avatar/thumbnail URL shown next to the voice. */
+	imageUrl?: string;
+}
+
+/** What Lumia passes your `ttsVoices` hook. `refresh` is true when the user explicitly asked to re-pull. */
+export interface PluginTtsVoicesRequestOptions {
+	refresh?: boolean;
+}
+
+/** What Lumia hands your `synthesizeTts` hook when one of your voices is chosen. */
+export interface PluginTtsSynthesizeRequest {
+	/** The `id` of the `PluginTtsVoice` the user selected. */
+	voiceId: string;
+	/** Text to speak — already variable-resolved, emote/URL-stripped and length-capped by Lumia. */
+	message: string;
+	/** Requested output volume 0-100 (advisory; Lumia also applies its own playback gain). */
+	volume?: number;
+}
+
+/**
+ * Audio your `synthesizeTts` hook returns for Lumia to play. Provide either raw
+ * `audio` bytes (base64) with an optional `mime`, or a ready-to-play `audioUrl`
+ * (`data:` / `file://` / `https:`). Returning a bare string is treated as `audio`
+ * when it is base64, or as `audioUrl` when it looks like a URL.
+ */
+export interface PluginTtsSynthesizeResult {
+	audio?: string;
+	audioUrl?: string;
+	mime?: string;
+}
+
+/**
+ * Declares your plugin as a TTS voice provider. Presence of this object (or
+ * `hasTtsVoices: true`) makes the voices returned by your `ttsVoices` hook appear
+ * in Lumia's native TTS voice picker, so they work anywhere native TTS runs —
+ * alerts, chatbox/event-list read-aloud, the `!tts` command, and TTS actions.
+ * Lumia calls your `synthesizeTts` hook to render audio when a viewer triggers one.
+ */
+export interface PluginTtsVoiceSourceConfig {
+	/** Group label shown before your voices in the picker. Defaults to the plugin name. */
+	label?: string;
+}
+
 export interface PluginIntegrationConfig {
 	settings?: PluginSetting[];
 	/**
@@ -503,6 +607,12 @@ export interface PluginIntegrationConfig {
 	hasAI?: boolean;
 	hasChatbot?: boolean;
 	hasHeartrate?: boolean;
+	/** Declare the plugin as a song-request source. Prefer `songRequest` for capability details. */
+	hasSongRequests?: boolean;
+	songRequest?: PluginSongRequestSourceConfig;
+	/** Declare the plugin as a TTS voice provider. Prefer `ttsVoiceSource` for details. */
+	hasTtsVoices?: boolean;
+	ttsVoiceSource?: PluginTtsVoiceSourceConfig;
 	modcommandOptions?: PluginModCommandOption[];
 	[key: string]: any;
 }
@@ -792,6 +902,16 @@ export interface ILumiaAPI {
 	setVariable: (name: string, value: any) => Promise<void>;
 	getVariable: (name: string) => Promise<any>;
 	updateHeartRate: (bpm: number) => Promise<void>;
+	/** Submit a song request into Lumia's queue from your plugin. */
+	addSongRequest: (params: PluginAddSongRequestOptions) => Promise<PluginAddSongRequestResult>;
+	/** Report the track your source just started playing, so Lumia's now-playing + variables update. */
+	songRequestNowPlaying: (track: PluginSongRequestTrack) => Promise<void>;
+	/** Report that a track finished playing. Lumia clears its now-playing and, when it drives your player track-by-track (`supportsQueue: false`), hands you the next queued track via `playSongRequest`. Pass the track id when known. */
+	songRequestEnded: (trackId?: string) => Promise<void>;
+	/** Report your source's current upcoming queue, so Lumia reconciles its own list. */
+	updateSongRequestQueue: (tracks: PluginSongRequestTrack[]) => Promise<void>;
+	/** Nudge Lumia to re-pull your `ttsVoices()` list — call after the user sets an API key or your voice list changes. */
+	refreshTtsVoices: () => Promise<void>;
 	callCommand: (name: string, variableValues?: any) => Promise<any>;
 	triggerAlert: (params: PluginTriggerAlertOptions) => Promise<boolean>;
 	displayChat: (params: PluginDisplayChatOptions) => void;
@@ -963,6 +1083,24 @@ export interface PluginRuntime {
 		state?: boolean;
 		rawConfig?: any;
 	}): Promise<void>;
+	resolveSongRequest?(request: PluginSongRequestResolveRequest): Promise<PluginSongRequestTrack | null | void> | PluginSongRequestTrack | null | void;
+	enqueueSongRequest?(track: PluginSongRequestTrack): Promise<void> | void;
+	playSongRequest?(track: PluginSongRequestTrack): Promise<void> | void;
+	skipSongRequest?(): Promise<void> | void;
+	pauseSongRequest?(): Promise<void> | void;
+	resumeSongRequest?(): Promise<void> | void;
+	setSongRequestVolume?(volume: number): Promise<void> | void;
+	clearSongRequestQueue?(): Promise<void> | void;
+	ttsVoices?(
+		config?: PluginTtsVoicesRequestOptions,
+	):
+		| Promise<PluginTtsVoice[] | { voices?: PluginTtsVoice[] } | void>
+		| PluginTtsVoice[]
+		| { voices?: PluginTtsVoice[] }
+		| void;
+	synthesizeTts?(
+		request: PluginTtsSynthesizeRequest,
+	): Promise<PluginTtsSynthesizeResult | string | void> | PluginTtsSynthesizeResult | string | void;
 	settings: Record<string, any>;
 	onsettingsupdate?(
 		settings: Record<string, any>,

@@ -214,6 +214,18 @@ export function validatePluginManifest(manifest: PartialManifest | null | undefi
     if (config.hasAI !== undefined && typeof config.hasAI !== "boolean") {
       errors.push("config.hasAI must be a boolean when provided");
     }
+    if (config.hasSongRequests !== undefined && typeof config.hasSongRequests !== "boolean") {
+      errors.push("config.hasSongRequests must be a boolean when provided");
+    }
+    if (config.songRequest !== undefined && !isPlainObject(config.songRequest)) {
+      errors.push("config.songRequest must be an object when provided");
+    }
+    if (config.hasTtsVoices !== undefined && typeof config.hasTtsVoices !== "boolean") {
+      errors.push("config.hasTtsVoices must be a boolean when provided");
+    }
+    if (config.ttsVoiceSource !== undefined && !isPlainObject(config.ttsVoiceSource)) {
+      errors.push("config.ttsVoiceSource must be an object when provided");
+    }
     if (config.chatbot !== undefined) {
       errors.push("config.chatbot is no longer supported. Use config.hasChatbot (boolean).");
     }

@@ -1,0 +1,25 @@
+{
+	"id": "song_request_source",
+	"name": "Demo Song Source",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Example song-request source plugin: resolves viewer requests to fake tracks and simulates playback so you can test the full song-request round trip.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "audio",
+	"keywords": "song request, music, example, demo",
+	"config": {
+		"hasSongRequests": true,
+		"songRequest": {
+			"label": "Demo Source",
+			"supportsSearch": true,
+			"supportsSkip": true,
+			"supportsPause": true,
+			"supportsVolume": true,
+			"supportsQueue": false
+		}
+	}
+}

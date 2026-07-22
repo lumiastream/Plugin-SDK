@@ -163,6 +163,89 @@ class ElevenLabsTTSPlugin extends Plugin {
 		};
 	}
 
+	async onsettingsupdate(settings = {}, previousSettings = {}) {
+		const next = trimString(settings.apiKey, "");
+		const prev = trimString(previousSettings.apiKey, "");
+		if (next !== prev && typeof this.lumia.refreshTtsVoices === "function") {
+			await this.lumia.refreshTtsVoices();
+		}
+	}
+
+	async ttsVoices() {
+		const apiKey = this.getSettingsSnapshot().apiKey;
+		if (!apiKey || typeof fetch !== "function") {
+			return [];
+		}
+		// Throw (don't return []) on failure so Lumia keeps the previously-listed voices instead of clearing them.
+		const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+			headers: { "xi-api-key": apiKey },
+		});
+		if (!response.ok) {
+			throw new Error(`ElevenLabs voice list failed: ${response.status}`);
+		}
+		const data = await response.json();
+		const voices = Array.isArray(data?.voices) ? data.voices : [];
+		return voices
+			.map((voice) => ({
+				id: trimString(voice?.voice_id, ""),
+				name: trimString(voice?.name, voice?.voice_id || "ElevenLabs voice"),
+				language: trimString(voice?.labels?.language, ""),
+				previewUrl: trimString(voice?.preview_url, ""),
+				imageUrl: trimString(voice?.image_url, ""),
+			}))
+			.filter((voice) => voice.id);
+	}
+
+	async synthesizeTts(request = {}) {
+		const apiKey = this.getSettingsSnapshot().apiKey;
+		if (!apiKey) {
+			throw new Error("Missing ElevenLabs API key");
+		}
+		const voiceId = trimString(request.voiceId, "");
+		if (!voiceId) {
+			throw new Error("Missing ElevenLabs voice id");
+		}
+		const message = trimString(request.message, "");
+		if (!message) {
+			throw new Error("Missing message text");
+		}
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime");
+		}
+
+		const modelId = DEFAULTS.modelId;
+		const text = truncateText(message, getCharLimitForModel(modelId)).text;
+		const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream`;
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"xi-api-key": apiKey,
+			},
+			body: JSON.stringify({
+				text,
+				model_id: modelId,
+				voice_settings: buildVoiceSettings({
+					stability: DEFAULTS.stability,
+					similarityBoost: DEFAULTS.similarityBoost,
+					style: DEFAULTS.style,
+					speakerBoost: DEFAULTS.speakerBoost,
+				}),
+			}),
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(
+				`ElevenLabs error ${response.status}: ${errorText || response.statusText}`,
+			);
+		}
+		const audioBuffer = await response.arrayBuffer();
+		return {
+			audio: Buffer.from(audioBuffer).toString("base64"),
+			mime: "audio/mpeg",
+		};
+	}
+
 	async actions(config) {
 		for (const action of config.actions) {
 			try {
