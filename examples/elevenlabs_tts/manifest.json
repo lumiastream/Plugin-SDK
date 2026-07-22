@@ -1,7 +1,7 @@
 {
 	"id": "elevenlabs_tts",
 	"name": "ElevenLabs TTS",
-	"version": "1.1.0",
+	"version": "1.1.8",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
@@ -52,11 +52,14 @@
 					},
 					{
 						"key": "voiceId",
-						"label": "Voice ID",
-						"type": "text",
+						"label": "Voice",
+						"type": "select",
 						"defaultValue": "JBFqnCBsd6RMkjVDRZzb",
-						"helperText": "Find this in ElevenLabs Voice Lab or your Voices page.",
-						"allowVariables": true
+						"helperText": "Choose a voice from your ElevenLabs account, or type a Voice ID.",
+						"allowVariables": true,
+						"options": [],
+						"dynamicOptions": true,
+						"allowTyping": true
 					},
 					{
 						"key": "modelId",
@@ -64,37 +67,9 @@
 						"type": "select",
 						"allowTyping": true,
 						"defaultValue": "eleven_multilingual_v2",
-						"helperText": "Choose a speech model or type a custom model ID.",
-						"options": [
-							{
-								"label": "Eleven v3",
-								"value": "eleven_v3"
-							},
-							{
-								"label": "Multilingual v2",
-								"value": "eleven_multilingual_v2"
-							},
-							{
-								"label": "Multilingual v1",
-								"value": "eleven_multilingual_v1"
-							},
-							{
-								"label": "Turbo v2.5",
-								"value": "eleven_turbo_v2_5"
-							},
-							{
-								"label": "Turbo v2",
-								"value": "eleven_turbo_v2"
-							},
-							{
-								"label": "Flash v2.5",
-								"value": "eleven_flash_v2_5"
-							},
-							{
-								"label": "Flash v2",
-								"value": "eleven_flash_v2"
-							}
-						]
+						"helperText": "Choose a speech model from your ElevenLabs account, or type a model ID.",
+						"options": [],
+						"dynamicOptions": true
 					},
 					{
 						"key": "stability",
@@ -132,7 +107,8 @@
 						"min": 0,
 						"max": 100
 					}
-				]
+				],
+				"refreshOnChange": true
 			},
 			{
 				"type": "stream_music",

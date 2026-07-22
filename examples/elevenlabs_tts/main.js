@@ -13,6 +13,9 @@ const DEFAULTS = {
 	volume: 100,
 };
 
+const ELEVENLABS_LOGO_DATA_URI =
+	"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjI0IiBmaWxsPSIjMDAwMDAwIi8+PHJlY3QgeD0iMzUiIHk9IjI3IiB3aWR0aD0iMTEiIGhlaWdodD0iNDYiIHJ4PSI1LjUiIGZpbGw9IiNmZmZmZmYiLz48cmVjdCB4PSI1NCIgeT0iMjciIHdpZHRoPSIxMSIgaGVpZ2h0PSI0NiIgcng9IjUuNSIgZmlsbD0iI2ZmZmZmZiIvPjwvc3ZnPgo=";
+
 const MODEL_CHAR_LIMITS = {
 	eleven_v3: 5000,
 	eleven_flash_v2_5: 40000,
@@ -163,12 +166,80 @@ class ElevenLabsTTSPlugin extends Plugin {
 		};
 	}
 
+	async onload() {
+		void this.refreshActionOptions({ actionType: "speak" });
+	}
+
 	async onsettingsupdate(settings = {}, previousSettings = {}) {
 		const next = trimString(settings.apiKey, "");
 		const prev = trimString(previousSettings.apiKey, "");
-		if (next !== prev && typeof this.lumia.refreshTtsVoices === "function") {
-			await this.lumia.refreshTtsVoices();
+		if (next !== prev) {
+			if (typeof this.lumia.refreshTtsVoices === "function") {
+				await this.lumia.refreshTtsVoices();
+			}
+			void this.refreshActionOptions({ actionType: "speak" });
 		}
+	}
+
+	async _fetchRawVoices(apiKey) {
+		const collected = [];
+		let pageToken = "";
+		// /v2/voices (not legacy /v1/voices): page 0 includes ElevenLabs' default voices, and it paginates past 500.
+		for (let page = 0; page < 25; page++) {
+			const query = `page_size=100${pageToken ? `&next_page_token=${encodeURIComponent(pageToken)}` : ""}`;
+			// Throw (don't return []) on failure so Lumia keeps the previously-listed voices instead of clearing them.
+			const response = await fetch(`https://api.elevenlabs.io/v2/voices?${query}`, {
+				headers: { "xi-api-key": apiKey },
+			});
+			if (!response.ok) {
+				const detail = await response.text().catch(() => "");
+				throw new Error(
+					`ElevenLabs voice list failed: ${response.status}${detail ? ` — ${detail}` : ""}`,
+				);
+			}
+			const data = await response.json();
+			const voices = Array.isArray(data?.voices) ? data.voices : [];
+			collected.push(...voices);
+			if (!data?.has_more || !data?.next_page_token) {
+				break;
+			}
+			pageToken = data.next_page_token;
+		}
+		return collected;
+	}
+
+	async _fetchModels(apiKey) {
+		const response = await fetch("https://api.elevenlabs.io/v1/models", {
+			headers: { "xi-api-key": apiKey },
+		});
+		if (!response.ok) {
+			const detail = await response.text().catch(() => "");
+			throw new Error(
+				`ElevenLabs model list failed: ${response.status}${detail ? ` — ${detail}` : ""}`,
+			);
+		}
+		const data = await response.json();
+		const models = Array.isArray(data) ? data : [];
+		return models
+			.filter((model) => model?.can_do_text_to_speech === true)
+			.map((model) => ({ id: trimString(model?.model_id, ""), name: trimString(model?.name, model?.model_id) }))
+			.filter((model) => model.id);
+	}
+
+	_buildOptions(items, selectedValue) {
+		const options = [];
+		const seen = new Set();
+		for (const item of items) {
+			const value = trimString(item?.value, "");
+			if (!value || seen.has(value)) continue;
+			seen.add(value);
+			options.push({ label: trimString(item?.label, value), value });
+		}
+		const selected = trimString(selectedValue, "");
+		if (selected && !seen.has(selected)) {
+			options.unshift({ label: selected, value: selected });
+		}
+		return options;
 	}
 
 	async ttsVoices() {
@@ -176,24 +247,58 @@ class ElevenLabsTTSPlugin extends Plugin {
 		if (!apiKey || typeof fetch !== "function") {
 			return [];
 		}
-		// Throw (don't return []) on failure so Lumia keeps the previously-listed voices instead of clearing them.
-		const response = await fetch("https://api.elevenlabs.io/v1/voices", {
-			headers: { "xi-api-key": apiKey },
-		});
-		if (!response.ok) {
-			throw new Error(`ElevenLabs voice list failed: ${response.status}`);
-		}
-		const data = await response.json();
-		const voices = Array.isArray(data?.voices) ? data.voices : [];
-		return voices
-			.map((voice) => ({
-				id: trimString(voice?.voice_id, ""),
-				name: trimString(voice?.name, voice?.voice_id || "ElevenLabs voice"),
+		const raw = await this._fetchRawVoices(apiKey);
+		const voices = [];
+		for (const voice of raw) {
+			const id = trimString(voice?.voice_id, "");
+			if (!id) continue;
+			voices.push({
+				id,
+				name: trimString(voice?.name, id),
 				language: trimString(voice?.labels?.language, ""),
 				previewUrl: trimString(voice?.preview_url, ""),
-				imageUrl: trimString(voice?.image_url, ""),
-			}))
-			.filter((voice) => voice.id);
+				// ElevenLabs exposes the voice image under `sharing` (only for shared voices); fall back to the ElevenLabs mark.
+				imageUrl: trimString(voice?.sharing?.image_url ?? voice?.image_url, "") || ELEVENLABS_LOGO_DATA_URI,
+			});
+		}
+		return voices;
+	}
+
+	async refreshActionOptions({ actionType, values } = {}) {
+		if (actionType && actionType !== "speak") {
+			return;
+		}
+		if (typeof this.lumia?.updateActionFieldOptions !== "function" || typeof fetch !== "function") {
+			return;
+		}
+		const apiKey = this.getSettingsSnapshot().apiKey;
+		if (!apiKey) {
+			return;
+		}
+
+		try {
+			const raw = await this._fetchRawVoices(apiKey);
+			const voiceItems = raw.map((voice) => ({ label: trimString(voice?.name, voice?.voice_id), value: trimString(voice?.voice_id, "") }));
+			await this.lumia.updateActionFieldOptions({
+				actionType: "speak",
+				fieldKey: "voiceId",
+				options: this._buildOptions(voiceItems, values?.voiceId),
+			});
+		} catch (error) {
+			await this.lumia.log(`[ElevenLabs] Voice options failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
+
+		try {
+			const models = await this._fetchModels(apiKey);
+			const modelItems = models.map((model) => ({ label: model.name, value: model.id }));
+			await this.lumia.updateActionFieldOptions({
+				actionType: "speak",
+				fieldKey: "modelId",
+				options: this._buildOptions(modelItems, values?.modelId || DEFAULTS.modelId),
+			});
+		} catch (error) {
+			await this.lumia.log(`[ElevenLabs] Model options failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
 	}
 
 	async synthesizeTts(request = {}) {
@@ -234,10 +339,18 @@ class ElevenLabsTTSPlugin extends Plugin {
 			}),
 		});
 		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(
-				`ElevenLabs error ${response.status}: ${errorText || response.statusText}`,
-			);
+			const errorText = await response.text().catch(() => "");
+			// Surface ElevenLabs' human-readable reason (e.g. plan/permission errors) instead of a raw status code.
+			let detail = "";
+			try {
+				const parsed = JSON.parse(errorText);
+				detail =
+					parsed?.detail?.message ||
+					(typeof parsed?.detail === "string" ? parsed.detail : "") ||
+					parsed?.message ||
+					"";
+			} catch (_err) {}
+			throw new Error(detail || `request failed (${response.status} ${response.statusText})`);
 		}
 		const audioBuffer = await response.arrayBuffer();
 		return {

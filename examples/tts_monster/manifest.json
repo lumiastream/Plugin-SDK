@@ -1,7 +1,7 @@
 {
 	"id": "tts_monster",
 	"name": "TTS Monster",
-	"version": "1.2.3",
+	"version": "1.3.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://tts.monster",
@@ -21,8 +21,14 @@
 				"type": "select",
 				"defaultValue": "overlayUrl",
 				"options": [
-					{ "label": "Overlay URL", "value": "overlayUrl" },
-					{ "label": "Developer API Token", "value": "developerApi" }
+					{
+						"label": "Overlay URL",
+						"value": "overlayUrl"
+					},
+					{
+						"label": "Developer API Token",
+						"value": "developerApi"
+					}
 				],
 				"helperText": "Choose Developer API Token for the official console API, or Overlay URL if you only have your TTS Monster overlay link.",
 				"refreshOnChange": true
@@ -32,7 +38,10 @@
 				"label": "API Token",
 				"type": "password",
 				"helperText": "Used when Connection Method is Developer API Token. Create or copy your API token from the TTS Monster developer dashboard.",
-				"visibleIf": { "key": "authMethod", "equals": "developerApi" },
+				"visibleIf": {
+					"key": "authMethod",
+					"equals": "developerApi"
+				},
 				"refreshOnChange": true
 			},
 			{
@@ -40,7 +49,10 @@
 				"label": "Overlay URL",
 				"type": "password",
 				"helperText": "Used when Connection Method is Overlay URL. Paste your full overlay URL, for example https://tts.monster/overlay/3hoZh83Uigewkx0Upw66imx2ASj1/059e9e17a7c64a42b38b6bbf7b40bee3",
-				"visibleIf": { "key": "authMethod", "equals": "overlayUrl" },
+				"visibleIf": {
+					"key": "authMethod",
+					"equals": "overlayUrl"
+				},
 				"refreshOnChange": true
 			},
 			{
@@ -104,6 +116,10 @@
 					}
 				]
 			}
-		]
+		],
+		"hasTtsVoices": true,
+		"ttsVoiceSource": {
+			"label": "TTS Monster"
+		}
 	}
 }

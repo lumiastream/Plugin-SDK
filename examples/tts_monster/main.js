@@ -26,6 +26,9 @@ const DEFAULTS = {
 	tempFileCleanupDelayMs: 10 * 60 * 1000,
 };
 
+const TTSMONSTER_LOGO_DATA_URI =
+	"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjI0IiBmaWxsPSIjNmQyOGQ5Ii8+PGNpcmNsZSBjeD0iMzciIGN5PSI0MyIgcj0iOSIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjYzIiBjeT0iNDMiIHI9IjkiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzNyIgY3k9IjQ1IiByPSI0IiBmaWxsPSIjMWUxYjRiIi8+PGNpcmNsZSBjeD0iNjMiIGN5PSI0NSIgcj0iNCIgZmlsbD0iIzFlMWI0YiIvPjxwYXRoIGQ9Ik0zMiA2NCBxMTggMTYgMzYgMCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjYiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPgo=";
+
 const trimString = (value, fallback = "") => {
 	if (typeof value !== "string") {
 		return fallback;
@@ -169,6 +172,9 @@ class TTSMonsterPlugin extends Plugin {
 		if (credentialsChanged) {
 			await this._validateConnection({ silent: true, settings });
 			void this._refreshVoiceCache({ force: true, silent: true, settings });
+			if (typeof this.lumia.refreshTtsVoices === "function") {
+				void this.lumia.refreshTtsVoices();
+			}
 		}
 		void this.refreshActionOptions({ actionType: "speak", settings });
 	}
@@ -203,6 +209,51 @@ class TTSMonsterPlugin extends Plugin {
 			fieldKey: "voice",
 			options,
 		});
+	}
+
+	async ttsVoices() {
+		const settings = this._settingsSnapshot();
+		const credentials = this._credentials(settings);
+		if (!credentials.ok) {
+			return [];
+		}
+		const voices = await this._refreshVoiceCache({ force: true, silent: true, settings });
+		return (Array.isArray(voices) ? voices : [])
+			.map((voice) => ({
+				id: trimString(voice?.id, ""),
+				name: trimString(voice?.name, voice?.id),
+				language: trimString(voice?.language, ""),
+				imageUrl: TTSMONSTER_LOGO_DATA_URI,
+			}))
+			.filter((voice) => voice.id);
+	}
+
+	async synthesizeTts(request = {}) {
+		const settings = this._settingsSnapshot();
+		const credentials = this._credentials(settings);
+		if (!credentials.ok) {
+			throw new Error(credentials.message);
+		}
+		const voiceId = trimString(request.voiceId, "");
+		if (!voiceId) {
+			throw new Error("Missing voice id");
+		}
+		let message = trimString(request.message, "");
+		if (!message) {
+			throw new Error("Missing message text");
+		}
+		message = truncateText(message, DEFAULTS.maxMessageChars).text;
+
+		const response =
+			credentials.authMethod === AUTH_METHODS.OVERLAY_URL
+				? await this._generateOverlayTts({ credentials, voiceId, message, settings })
+				: await this._generateDeveloperApiTts({ voiceId, message, returnUsage: false, settings });
+
+		const audioUrl = trimString(response?.url ?? response?.link ?? response?.data?.link, "");
+		if (!audioUrl) {
+			throw new Error("TTS Monster did not return an audio URL.");
+		}
+		return { audioUrl };
 	}
 
 	async actions(config = {}) {
