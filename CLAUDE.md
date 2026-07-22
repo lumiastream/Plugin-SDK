@@ -71,6 +71,7 @@ Treat this table as the minimum contract between `manifest.json` and runtime hoo
 | `config.actions` has entries | `actions(config)` | `onsettingsupdate(settings, previousSettings)` | Action types and field keys in runtime should match manifest definitions. |
 | `config.hasAI: true` | `aiPrompt(config)` | `aiModels(config?)` | `aiModels` improves model picker UX. |
 | `config.hasChatbot: true` | `chatbot(config)` | None | Route native chatbot calls through this hook. |
+| `config.hasSongRequests: true` or `config.songRequest` exists | `resolveSongRequest(request)` | `playSongRequest(track)`, `enqueueSongRequest(track)`, `skipSongRequest()` | Report playback state back via `lumia.songRequestNowPlaying` / `songRequestEnded` / `updateSongRequestQueue`. |
 | `config.modcommandOptions` has entries | `modCommand(type, value)` | None | Handle each declared moderation option defensively. |
 | `config.lights` exists | `onLightChange(config)` | `searchLights(config)`, `addLight(config)` | Discovery/manual-add is optional, but usually expected for onboarding. |
 | `config.themeConfig` exists | `onLightChange(config)` | `searchThemes(config)` | Theme runs provide selected value in `config.rawConfig.theme`. |
@@ -105,6 +106,8 @@ const KNOWN_HOOKS = [
 	"actions","aiPrompt","aiModels","chatbot","modCommand",
 	"searchLights","addLight","searchThemes","onLightChange",
 	"searchPlugs","addPlug","onPlugChange",
+	"resolveSongRequest","enqueueSongRequest","playSongRequest","skipSongRequest",
+	"pauseSongRequest","resumeSongRequest","setSongRequestVolume","clearSongRequestQueue",
 ];
 
 function hasMethod(source, name) {
@@ -131,6 +134,7 @@ function run() {
 	if (Array.isArray(config.actions) && config.actions.length) rules.push({ reason: "config.actions has entries", required: ["actions"], recommended: ["onsettingsupdate"] });
 	if (config.hasAI === true) rules.push({ reason: "config.hasAI is true", required: ["aiPrompt"], recommended: ["aiModels"] });
 	if (config.hasChatbot === true) rules.push({ reason: "config.hasChatbot is true", required: ["chatbot"], recommended: [] });
+	if (config.hasSongRequests === true || (config.songRequest && typeof config.songRequest === "object")) rules.push({ reason: "config.hasSongRequests/songRequest declared", required: ["resolveSongRequest"], recommended: ["playSongRequest","enqueueSongRequest","skipSongRequest"] });
 	if (Array.isArray(config.modcommandOptions) && config.modcommandOptions.length) rules.push({ reason: "config.modcommandOptions has entries", required: ["modCommand"], recommended: [] });
 	if (config.lights && typeof config.lights === "object") rules.push({ reason: "config.lights exists", required: ["onLightChange"], recommended: ["searchLights","addLight"] });
 	if (config.themeConfig && typeof config.themeConfig === "object") rules.push({ reason: "config.themeConfig exists", required: ["onLightChange"], recommended: ["searchThemes"] });

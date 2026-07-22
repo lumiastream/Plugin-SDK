@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.8.0"
+		"@lumiastream/plugin": "^0.9.0"
 	}
 }
 
@@ -2345,6 +2345,89 @@ class ElevenLabsTTSPlugin extends Plugin {
 		};
 	}
 
+	async onsettingsupdate(settings = {}, previousSettings = {}) {
+		const next = trimString(settings.apiKey, "");
+		const prev = trimString(previousSettings.apiKey, "");
+		if (next !== prev && typeof this.lumia.refreshTtsVoices === "function") {
+			await this.lumia.refreshTtsVoices();
+		}
+	}
+
+	async ttsVoices() {
+		const apiKey = this.getSettingsSnapshot().apiKey;
+		if (!apiKey || typeof fetch !== "function") {
+			return [];
+		}
+		// Throw (don't return []) on failure so Lumia keeps the previously-listed voices instead of clearing them.
+		const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+			headers: { "xi-api-key": apiKey },
+		});
+		if (!response.ok) {
+			throw new Error(`ElevenLabs voice list failed: ${response.status}`);
+		}
+		const data = await response.json();
+		const voices = Array.isArray(data?.voices) ? data.voices : [];
+		return voices
+			.map((voice) => ({
+				id: trimString(voice?.voice_id, ""),
+				name: trimString(voice?.name, voice?.voice_id || "ElevenLabs voice"),
+				language: trimString(voice?.labels?.language, ""),
+				previewUrl: trimString(voice?.preview_url, ""),
+				imageUrl: trimString(voice?.image_url, ""),
+			}))
+			.filter((voice) => voice.id);
+	}
+
+	async synthesizeTts(request = {}) {
+		const apiKey = this.getSettingsSnapshot().apiKey;
+		if (!apiKey) {
+			throw new Error("Missing ElevenLabs API key");
+		}
+		const voiceId = trimString(request.voiceId, "");
+		if (!voiceId) {
+			throw new Error("Missing ElevenLabs voice id");
+		}
+		const message = trimString(request.message, "");
+		if (!message) {
+			throw new Error("Missing message text");
+		}
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime");
+		}
+
+		const modelId = DEFAULTS.modelId;
+		const text = truncateText(message, getCharLimitForModel(modelId)).text;
+		const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream`;
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"xi-api-key": apiKey,
+			},
+			body: JSON.stringify({
+				text,
+				model_id: modelId,
+				voice_settings: buildVoiceSettings({
+					stability: DEFAULTS.stability,
+					similarityBoost: DEFAULTS.similarityBoost,
+					style: DEFAULTS.style,
+					speakerBoost: DEFAULTS.speakerBoost,
+				}),
+			}),
+		});
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(
+				`ElevenLabs error ${response.status}: ${errorText || response.statusText}`,
+			);
+		}
+		const audioBuffer = await response.arrayBuffer();
+		return {
+			audio: Buffer.from(audioBuffer).toString("base64"),
+			mime: "audio/mpeg",
+		};
+	}
+
 	async actions(config) {
 		for (const action of config.actions) {
 			try {
@@ -2576,7 +2659,7 @@ module.exports = ElevenLabsTTSPlugin;
 {
 	"id": "elevenlabs_tts",
 	"name": "ElevenLabs TTS",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
@@ -2588,6 +2671,10 @@ module.exports = ElevenLabsTTSPlugin;
 	"keywords": "elevenlabs, tts, text-to-speech, voice, audio",
 	"icon": "elevenlabs_icon.jpg",
 	"config": {
+		"hasTtsVoices": true,
+		"ttsVoiceSource": {
+			"label": "ElevenLabs"
+		},
 		"settings": [
 			{
 				"key": "apiKey",
@@ -2809,6 +2896,9 @@ module.exports = ElevenLabsTTSPlugin;
 ---
 ### 🔐 Get Your ElevenLabs API Key
 1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key. Then copy the Key ID and paste it here.
+---
+### 🎙️ Using ElevenLabs voices in Lumia's TTS
+Once your API key is saved, your ElevenLabs voices show up in Lumia's native **Text to Speech** voice picker (alerts, chatbox/event-list read-aloud, the `!tts` command, and TTS actions) — no need to wire the Speak action manually. Pick one anywhere Lumia asks for a TTS voice.
 ---
 ### 🎛️ Voice Tuning (used in Actions)
 - **Stability**: Higher values make speech more consistent/predictable; lower values sound more dynamic.
@@ -18214,7 +18304,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.8.0"
+		"@lumiastream/plugin": "^0.9.0"
 	}
 }
 
@@ -18358,6 +18448,144 @@ YouTube fallback link: https://www.youtube.com/watch?v=VCd0kYWLvMQ
 		"settings_showcase_action_status": "Status returned from the passVariablesExample action.",
 		"settings_showcase_action_save_count": "Current save counter returned by the passVariablesExample action.",
 		"settings_showcase_action_snapshot": "Compact JSON snapshot returned by the passVariablesExample action."
+	}
+}
+
+```
+
+## song_request_source/main.js
+
+```
+const { Plugin } = require("@lumiastream/plugin");
+
+const TRACK_SECONDS = 20;
+
+class DemoSongSource extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this.current = null;
+		this.timer = null;
+		this.remainingMs = 0;
+		this.startedAt = 0;
+	}
+
+	async onload() {
+		await this.lumia.updateConnection(true);
+		this.lumia.log("Demo song source ready");
+	}
+
+	async onunload() {
+		this.clearTimer();
+		this.current = null;
+		await this.lumia.updateConnection(false);
+	}
+
+	async resolveSongRequest({ query, requesterUsername }) {
+		const trimmed = String(query ?? "").trim();
+		if (!trimmed || trimmed.toLowerCase().includes("unfindable")) {
+			return null;
+		}
+		return {
+			id: `demo-${Buffer.from(trimmed.toLowerCase()).toString("base64url")}`,
+			title: trimmed.replace(/\b\w/g, (c) => c.toUpperCase()),
+			artist: "Demo Artist",
+			thumbnailUrl: "https://storage.lumiastream.com/logo/lumia-icon.png",
+			url: `https://example.com/track/${encodeURIComponent(trimmed)}`,
+			durationSeconds: TRACK_SECONDS,
+			requesterUsername,
+		};
+	}
+
+	async playSongRequest(track) {
+		this.clearTimer();
+		this.current = track;
+		this.remainingMs = (track.durationSeconds ?? TRACK_SECONDS) * 1000;
+		this.lumia.log(`Playing: ${track.title} (requested by ${track.requesterUsername ?? "unknown"})`);
+		await this.lumia.songRequestNowPlaying(track);
+		this.armEndTimer();
+	}
+
+	async skipSongRequest() {
+		if (!this.current) return;
+		this.lumia.log(`Skipping: ${this.current.title}`);
+		await this.finishTrack();
+	}
+
+	async pauseSongRequest() {
+		if (!this.current || !this.timer) return;
+		this.remainingMs = Math.max(0, this.remainingMs - (Date.now() - this.startedAt));
+		this.clearTimer();
+		this.lumia.log(`Paused: ${this.current.title}`);
+	}
+
+	async resumeSongRequest() {
+		if (!this.current || this.timer) return;
+		this.lumia.log(`Resumed: ${this.current.title}`);
+		this.armEndTimer();
+	}
+
+	async setSongRequestVolume(volume) {
+		this.lumia.log(`Volume set to ${volume}%`);
+	}
+
+	async clearSongRequestQueue() {
+		this.lumia.log("Queue cleared by Lumia");
+	}
+
+	armEndTimer() {
+		this.startedAt = Date.now();
+		this.timer = setTimeout(() => {
+			void this.finishTrack();
+		}, this.remainingMs);
+	}
+
+	async finishTrack() {
+		const ended = this.current;
+		this.clearTimer();
+		this.current = null;
+		if (ended) {
+			await this.lumia.songRequestEnded(ended.id);
+		}
+	}
+
+	clearTimer() {
+		if (this.timer) {
+			clearTimeout(this.timer);
+			this.timer = null;
+		}
+	}
+}
+
+module.exports = DemoSongSource;
+
+```
+
+## song_request_source/manifest.json
+
+```
+{
+	"id": "song_request_source",
+	"name": "Demo Song Source",
+	"version": "1.0.0",
+	"author": "Lumia Stream",
+	"email": "dev@lumiastream.com",
+	"website": "https://lumiastream.com",
+	"repository": "",
+	"description": "Example song-request source plugin: resolves viewer requests to fake tracks and simulates playback so you can test the full song-request round trip.",
+	"license": "MIT",
+	"lumiaVersion": "^9.0.0",
+	"category": "audio",
+	"keywords": "song request, music, example, demo",
+	"config": {
+		"hasSongRequests": true,
+		"songRequest": {
+			"label": "Demo Source",
+			"supportsSearch": true,
+			"supportsSkip": true,
+			"supportsPause": true,
+			"supportsVolume": true,
+			"supportsQueue": false
+		}
 	}
 }
 
@@ -26356,7 +26584,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.8.0"
+		"@lumiastream/plugin": "^0.9.0"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
