@@ -2195,6 +2195,9 @@ const DEFAULTS = {
 	volume: 100,
 };
 
+const ELEVENLABS_LOGO_DATA_URI =
+	"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjI0IiBmaWxsPSIjMDAwMDAwIi8+PHJlY3QgeD0iMzUiIHk9IjI3IiB3aWR0aD0iMTEiIGhlaWdodD0iNDYiIHJ4PSI1LjUiIGZpbGw9IiNmZmZmZmYiLz48cmVjdCB4PSI1NCIgeT0iMjciIHdpZHRoPSIxMSIgaGVpZ2h0PSI0NiIgcng9IjUuNSIgZmlsbD0iI2ZmZmZmZiIvPjwvc3ZnPgo=";
+
 const MODEL_CHAR_LIMITS = {
 	eleven_v3: 5000,
 	eleven_flash_v2_5: 40000,
@@ -2345,12 +2348,80 @@ class ElevenLabsTTSPlugin extends Plugin {
 		};
 	}
 
+	async onload() {
+		void this.refreshActionOptions({ actionType: "speak" });
+	}
+
 	async onsettingsupdate(settings = {}, previousSettings = {}) {
 		const next = trimString(settings.apiKey, "");
 		const prev = trimString(previousSettings.apiKey, "");
-		if (next !== prev && typeof this.lumia.refreshTtsVoices === "function") {
-			await this.lumia.refreshTtsVoices();
+		if (next !== prev) {
+			if (typeof this.lumia.refreshTtsVoices === "function") {
+				await this.lumia.refreshTtsVoices();
+			}
+			void this.refreshActionOptions({ actionType: "speak" });
 		}
+	}
+
+	async _fetchRawVoices(apiKey) {
+		const collected = [];
+		let pageToken = "";
+		// /v2/voices (not legacy /v1/voices): page 0 includes ElevenLabs' default voices, and it paginates past 500.
+		for (let page = 0; page < 25; page++) {
+			const query = `page_size=100${pageToken ? `&next_page_token=${encodeURIComponent(pageToken)}` : ""}`;
+			// Throw (don't return []) on failure so Lumia keeps the previously-listed voices instead of clearing them.
+			const response = await fetch(`https://api.elevenlabs.io/v2/voices?${query}`, {
+				headers: { "xi-api-key": apiKey },
+			});
+			if (!response.ok) {
+				const detail = await response.text().catch(() => "");
+				throw new Error(
+					`ElevenLabs voice list failed: ${response.status}${detail ? ` — ${detail}` : ""}`,
+				);
+			}
+			const data = await response.json();
+			const voices = Array.isArray(data?.voices) ? data.voices : [];
+			collected.push(...voices);
+			if (!data?.has_more || !data?.next_page_token) {
+				break;
+			}
+			pageToken = data.next_page_token;
+		}
+		return collected;
+	}
+
+	async _fetchModels(apiKey) {
+		const response = await fetch("https://api.elevenlabs.io/v1/models", {
+			headers: { "xi-api-key": apiKey },
+		});
+		if (!response.ok) {
+			const detail = await response.text().catch(() => "");
+			throw new Error(
+				`ElevenLabs model list failed: ${response.status}${detail ? ` — ${detail}` : ""}`,
+			);
+		}
+		const data = await response.json();
+		const models = Array.isArray(data) ? data : [];
+		return models
+			.filter((model) => model?.can_do_text_to_speech === true)
+			.map((model) => ({ id: trimString(model?.model_id, ""), name: trimString(model?.name, model?.model_id) }))
+			.filter((model) => model.id);
+	}
+
+	_buildOptions(items, selectedValue) {
+		const options = [];
+		const seen = new Set();
+		for (const item of items) {
+			const value = trimString(item?.value, "");
+			if (!value || seen.has(value)) continue;
+			seen.add(value);
+			options.push({ label: trimString(item?.label, value), value });
+		}
+		const selected = trimString(selectedValue, "");
+		if (selected && !seen.has(selected)) {
+			options.unshift({ label: selected, value: selected });
+		}
+		return options;
 	}
 
 	async ttsVoices() {
@@ -2358,24 +2429,58 @@ class ElevenLabsTTSPlugin extends Plugin {
 		if (!apiKey || typeof fetch !== "function") {
 			return [];
 		}
-		// Throw (don't return []) on failure so Lumia keeps the previously-listed voices instead of clearing them.
-		const response = await fetch("https://api.elevenlabs.io/v1/voices", {
-			headers: { "xi-api-key": apiKey },
-		});
-		if (!response.ok) {
-			throw new Error(`ElevenLabs voice list failed: ${response.status}`);
-		}
-		const data = await response.json();
-		const voices = Array.isArray(data?.voices) ? data.voices : [];
-		return voices
-			.map((voice) => ({
-				id: trimString(voice?.voice_id, ""),
-				name: trimString(voice?.name, voice?.voice_id || "ElevenLabs voice"),
+		const raw = await this._fetchRawVoices(apiKey);
+		const voices = [];
+		for (const voice of raw) {
+			const id = trimString(voice?.voice_id, "");
+			if (!id) continue;
+			voices.push({
+				id,
+				name: trimString(voice?.name, id),
 				language: trimString(voice?.labels?.language, ""),
 				previewUrl: trimString(voice?.preview_url, ""),
-				imageUrl: trimString(voice?.image_url, ""),
-			}))
-			.filter((voice) => voice.id);
+				// ElevenLabs exposes the voice image under `sharing` (only for shared voices); fall back to the ElevenLabs mark.
+				imageUrl: trimString(voice?.sharing?.image_url ?? voice?.image_url, "") || ELEVENLABS_LOGO_DATA_URI,
+			});
+		}
+		return voices;
+	}
+
+	async refreshActionOptions({ actionType, values } = {}) {
+		if (actionType && actionType !== "speak") {
+			return;
+		}
+		if (typeof this.lumia?.updateActionFieldOptions !== "function" || typeof fetch !== "function") {
+			return;
+		}
+		const apiKey = this.getSettingsSnapshot().apiKey;
+		if (!apiKey) {
+			return;
+		}
+
+		try {
+			const raw = await this._fetchRawVoices(apiKey);
+			const voiceItems = raw.map((voice) => ({ label: trimString(voice?.name, voice?.voice_id), value: trimString(voice?.voice_id, "") }));
+			await this.lumia.updateActionFieldOptions({
+				actionType: "speak",
+				fieldKey: "voiceId",
+				options: this._buildOptions(voiceItems, values?.voiceId),
+			});
+		} catch (error) {
+			await this.lumia.log(`[ElevenLabs] Voice options failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
+
+		try {
+			const models = await this._fetchModels(apiKey);
+			const modelItems = models.map((model) => ({ label: model.name, value: model.id }));
+			await this.lumia.updateActionFieldOptions({
+				actionType: "speak",
+				fieldKey: "modelId",
+				options: this._buildOptions(modelItems, values?.modelId || DEFAULTS.modelId),
+			});
+		} catch (error) {
+			await this.lumia.log(`[ElevenLabs] Model options failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
 	}
 
 	async synthesizeTts(request = {}) {
@@ -2416,10 +2521,18 @@ class ElevenLabsTTSPlugin extends Plugin {
 			}),
 		});
 		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(
-				`ElevenLabs error ${response.status}: ${errorText || response.statusText}`,
-			);
+			const errorText = await response.text().catch(() => "");
+			// Surface ElevenLabs' human-readable reason (e.g. plan/permission errors) instead of a raw status code.
+			let detail = "";
+			try {
+				const parsed = JSON.parse(errorText);
+				detail =
+					parsed?.detail?.message ||
+					(typeof parsed?.detail === "string" ? parsed.detail : "") ||
+					parsed?.message ||
+					"";
+			} catch (_err) {}
+			throw new Error(detail || `request failed (${response.status} ${response.statusText})`);
 		}
 		const audioBuffer = await response.arrayBuffer();
 		return {
@@ -2659,7 +2772,7 @@ module.exports = ElevenLabsTTSPlugin;
 {
 	"id": "elevenlabs_tts",
 	"name": "ElevenLabs TTS",
-	"version": "1.1.0",
+	"version": "1.1.8",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
@@ -2710,11 +2823,14 @@ module.exports = ElevenLabsTTSPlugin;
 					},
 					{
 						"key": "voiceId",
-						"label": "Voice ID",
-						"type": "text",
+						"label": "Voice",
+						"type": "select",
 						"defaultValue": "JBFqnCBsd6RMkjVDRZzb",
-						"helperText": "Find this in ElevenLabs Voice Lab or your Voices page.",
-						"allowVariables": true
+						"helperText": "Choose a voice from your ElevenLabs account, or type a Voice ID.",
+						"allowVariables": true,
+						"options": [],
+						"dynamicOptions": true,
+						"allowTyping": true
 					},
 					{
 						"key": "modelId",
@@ -2722,37 +2838,9 @@ module.exports = ElevenLabsTTSPlugin;
 						"type": "select",
 						"allowTyping": true,
 						"defaultValue": "eleven_multilingual_v2",
-						"helperText": "Choose a speech model or type a custom model ID.",
-						"options": [
-							{
-								"label": "Eleven v3",
-								"value": "eleven_v3"
-							},
-							{
-								"label": "Multilingual v2",
-								"value": "eleven_multilingual_v2"
-							},
-							{
-								"label": "Multilingual v1",
-								"value": "eleven_multilingual_v1"
-							},
-							{
-								"label": "Turbo v2.5",
-								"value": "eleven_turbo_v2_5"
-							},
-							{
-								"label": "Turbo v2",
-								"value": "eleven_turbo_v2"
-							},
-							{
-								"label": "Flash v2.5",
-								"value": "eleven_flash_v2_5"
-							},
-							{
-								"label": "Flash v2",
-								"value": "eleven_flash_v2"
-							}
-						]
+						"helperText": "Choose a speech model from your ElevenLabs account, or type a model ID.",
+						"options": [],
+						"dynamicOptions": true
 					},
 					{
 						"key": "stability",
@@ -2790,7 +2878,8 @@ module.exports = ElevenLabsTTSPlugin;
 						"min": 0,
 						"max": 100
 					}
-				]
+				],
+				"refreshOnChange": true
 			},
 			{
 				"type": "stream_music",
@@ -2894,8 +2983,23 @@ module.exports = ElevenLabsTTSPlugin;
 
 ```
 ---
+### 💳 Cloned Voices Need a Paid ElevenLabs Plan
+ElevenLabs' **premade voices work on any plan**, including Free. Using your own **instantly-cloned voices requires a paid ElevenLabs plan (Starter or higher)** — otherwise synthesis fails with a "subscription required" error and Lumia falls back to the default voice.
+---
 ### 🔐 Get Your ElevenLabs API Key
-1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key. Then copy the Key ID and paste it here.
+1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key.
+2) Copy the key and paste it into the **Key ID (API Key)** field here.
+---
+### 🔑 Give the Key the Right Permissions
+If you turn on **Restrict Key**, you must grant these endpoints — otherwise Lumia can't load your voices (you'll get a `401` when it lists them):
+
+- **Text to Speech** → **Access**
+- **Sound Effects** → **Access**
+- **Voices** → **Read**
+
+Leaving **Restrict Key** off also works — the key then has full access.
+
+![Required ElevenLabs API key permissions: Text to Speech Access, Sound Effects Access, Voices Read](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MDAgNDMwIiBmb250LWZhbWlseT0iLWFwcGxlLXN5c3RlbSxTZWdvZSBVSSxSb2JvdG8sSGVsdmV0aWNhLEFyaWFsLHNhbnMtc2VyaWYiPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSI2OTgiIGhlaWdodD0iNDI4IiByeD0iMTgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2U1ZTdlYiIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgPHRleHQgeD0iMzQiIHk9IjUyIiBmb250LXNpemU9IjI0IiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjMTExODI3Ij5FZGl0IEFQSSBLZXkg4oCUIHJlcXVpcmVkIGFjY2VzczwvdGV4dD4KICA8bGluZSB4MT0iMzQiIHkxPSI3NCIgeDI9IjY2NiIgeTI9Ijc0IiBzdHJva2U9IiNlZWYwZjMiIHN0cm9rZS13aWR0aD0iMiIvPgoKICA8dGV4dCB4PSIzNCIgeT0iMTE4IiBmb250LXNpemU9IjIwIiBmb250LXdlaWdodD0iNjAwIiBmaWxsPSIjMTExODI3Ij5SZXN0cmljdCBLZXk8L3RleHQ+CiAgPGc+CiAgICA8cmVjdCB4PSI1OTYiIHk9IjEwMCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjMwIiByeD0iMTUiIGZpbGw9IiMxMTE4MjciLz4KICAgIDxjaXJjbGUgY3g9IjY1MSIgY3k9IjExNSIgcj0iMTEiIGZpbGw9IiNmZmZmZmYiLz4KICA8L2c+CgogIDx0ZXh0IHg9IjM0IiB5PSIxNjgiIGZvbnQtc2l6ZT0iMTUiIGZvbnQtd2VpZ2h0PSI2MDAiIGZpbGw9IiM5Y2EzYWYiIGxldHRlci1zcGFjaW5nPSIwLjUiPkVORFBPSU5UUzwvdGV4dD4KCiAgPCEtLSBUZXh0IHRvIFNwZWVjaCAtLT4KICA8dGV4dCB4PSIzNCIgeT0iMjEyIiBmb250LXNpemU9IjE5IiBmaWxsPSIjMTExODI3Ij5UZXh0IHRvIFNwZWVjaDwvdGV4dD4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg0NjgsMTkyKSI+CiAgICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTk4IiBoZWlnaHQ9IjQwIiByeD0iMTAiIGZpbGw9IiNlZWYwZjMiLz4KICAgIDxyZWN0IHg9Ijk5IiB5PSI0IiB3aWR0aD0iOTUiIGhlaWdodD0iMzIiIHJ4PSI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNlNWU3ZWIiLz4KICAgIDx0ZXh0IHg9IjUwIiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gQWNjZXNzPC90ZXh0PgogICAgPHRleHQgeD0iMTQ2IiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iIzExMTgyNyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QWNjZXNzPC90ZXh0PgogIDwvZz4KCiAgPCEtLSBTb3VuZCBFZmZlY3RzIC0tPgogIDx0ZXh0IHg9IjM0IiB5PSIyNjQiIGZvbnQtc2l6ZT0iMTkiIGZpbGw9IiMxMTE4MjciPlNvdW5kIEVmZmVjdHM8L3RleHQ+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDY4LDI0NCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjE5OCIgaGVpZ2h0PSI0MCIgcng9IjEwIiBmaWxsPSIjZWVmMGYzIi8+CiAgICA8cmVjdCB4PSI5OSIgeT0iNCIgd2lkdGg9Ijk1IiBoZWlnaHQ9IjMyIiByeD0iOCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZTVlN2ViIi8+CiAgICA8dGV4dCB4PSI1MCIgeT0iMjUiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiM2YjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIEFjY2VzczwvdGV4dD4KICAgIDx0ZXh0IHg9IjE0NiIgeT0iMjUiIGZvbnQtc2l6ZT0iMTUiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMxMTE4MjciIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFjY2VzczwvdGV4dD4KICA8L2c+CgogIDwhLS0gVm9pY2VzIC0tPgogIDx0ZXh0IHg9IjM0IiB5PSIzMTYiIGZvbnQtc2l6ZT0iMTkiIGZpbGw9IiMxMTE4MjciPlZvaWNlczwvdGV4dD4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzODgsMjk2KSI+CiAgICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMjc4IiBoZWlnaHQ9IjQwIiByeD0iMTAiIGZpbGw9IiNlZWYwZjMiLz4KICAgIDxyZWN0IHg9Ijk0IiB5PSI0IiB3aWR0aD0iOTAiIGhlaWdodD0iMzIiIHJ4PSI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNlNWU3ZWIiLz4KICAgIDx0ZXh0IHg9IjQ3IiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gQWNjZXNzPC90ZXh0PgogICAgPHRleHQgeD0iMTM5IiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iIzExMTgyNyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+UmVhZDwvdGV4dD4KICAgIDx0ZXh0IHg9IjIzMSIgeT0iMjUiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiM2YjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPldyaXRlPC90ZXh0PgogIDwvZz4KCiAgPGxpbmUgeDE9IjM0IiB5MT0iMzUyIiB4Mj0iNjY2IiB5Mj0iMzUyIiBzdHJva2U9IiNlZWYwZjMiIHN0cm9rZS13aWR0aD0iMiIvPgogIDx0ZXh0IHg9IjM0IiB5PSIzOTAiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiMwNTk2NjkiIGZvbnQtd2VpZ2h0PSI2MDAiPuKckyBUZXh0IHRvIFNwZWVjaDogQWNjZXNzPC90ZXh0PgogIDx0ZXh0IHg9IjI1NiIgeT0iMzkwIiBmb250LXNpemU9IjE1IiBmaWxsPSIjMDU5NjY5IiBmb250LXdlaWdodD0iNjAwIj7inJMgU291bmQgRWZmZWN0czogQWNjZXNzPC90ZXh0PgogIDx0ZXh0IHg9IjQ4NiIgeT0iMzkwIiBmb250LXNpemU9IjE1IiBmaWxsPSIjMDU5NjY5IiBmb250LXdlaWdodD0iNjAwIj7inJMgVm9pY2VzOiBSZWFkPC90ZXh0Pgo8L3N2Zz4K)
 ---
 ### 🎙️ Using ElevenLabs voices in Lumia's TTS
 Once your API key is saved, your ElevenLabs voices show up in Lumia's native **Text to Speech** voice picker (alerts, chatbox/event-list read-aloud, the `!tts` command, and TTS actions) — no need to wire the Speak action manually. Pick one anywhere Lumia asks for a TTS voice.
@@ -25178,6 +25282,9 @@ const DEFAULTS = {
 	tempFileCleanupDelayMs: 10 * 60 * 1000,
 };
 
+const TTSMONSTER_LOGO_DATA_URI =
+	"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjI0IiBmaWxsPSIjNmQyOGQ5Ii8+PGNpcmNsZSBjeD0iMzciIGN5PSI0MyIgcj0iOSIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjYzIiBjeT0iNDMiIHI9IjkiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzNyIgY3k9IjQ1IiByPSI0IiBmaWxsPSIjMWUxYjRiIi8+PGNpcmNsZSBjeD0iNjMiIGN5PSI0NSIgcj0iNCIgZmlsbD0iIzFlMWI0YiIvPjxwYXRoIGQ9Ik0zMiA2NCBxMTggMTYgMzYgMCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjYiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPgo=";
+
 const trimString = (value, fallback = "") => {
 	if (typeof value !== "string") {
 		return fallback;
@@ -25321,6 +25428,9 @@ class TTSMonsterPlugin extends Plugin {
 		if (credentialsChanged) {
 			await this._validateConnection({ silent: true, settings });
 			void this._refreshVoiceCache({ force: true, silent: true, settings });
+			if (typeof this.lumia.refreshTtsVoices === "function") {
+				void this.lumia.refreshTtsVoices();
+			}
 		}
 		void this.refreshActionOptions({ actionType: "speak", settings });
 	}
@@ -25355,6 +25465,51 @@ class TTSMonsterPlugin extends Plugin {
 			fieldKey: "voice",
 			options,
 		});
+	}
+
+	async ttsVoices() {
+		const settings = this._settingsSnapshot();
+		const credentials = this._credentials(settings);
+		if (!credentials.ok) {
+			return [];
+		}
+		const voices = await this._refreshVoiceCache({ force: true, silent: true, settings });
+		return (Array.isArray(voices) ? voices : [])
+			.map((voice) => ({
+				id: trimString(voice?.id, ""),
+				name: trimString(voice?.name, voice?.id),
+				language: trimString(voice?.language, ""),
+				imageUrl: TTSMONSTER_LOGO_DATA_URI,
+			}))
+			.filter((voice) => voice.id);
+	}
+
+	async synthesizeTts(request = {}) {
+		const settings = this._settingsSnapshot();
+		const credentials = this._credentials(settings);
+		if (!credentials.ok) {
+			throw new Error(credentials.message);
+		}
+		const voiceId = trimString(request.voiceId, "");
+		if (!voiceId) {
+			throw new Error("Missing voice id");
+		}
+		let message = trimString(request.message, "");
+		if (!message) {
+			throw new Error("Missing message text");
+		}
+		message = truncateText(message, DEFAULTS.maxMessageChars).text;
+
+		const response =
+			credentials.authMethod === AUTH_METHODS.OVERLAY_URL
+				? await this._generateOverlayTts({ credentials, voiceId, message, settings })
+				: await this._generateDeveloperApiTts({ voiceId, message, returnUsage: false, settings });
+
+		const audioUrl = trimString(response?.url ?? response?.link ?? response?.data?.link, "");
+		if (!audioUrl) {
+			throw new Error("TTS Monster did not return an audio URL.");
+		}
+		return { audioUrl };
 	}
 
 	async actions(config = {}) {
@@ -26273,7 +26428,7 @@ module.exports = TTSMonsterPlugin;
 {
 	"id": "tts_monster",
 	"name": "TTS Monster",
-	"version": "1.2.3",
+	"version": "1.3.0",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://tts.monster",
@@ -26293,8 +26448,14 @@ module.exports = TTSMonsterPlugin;
 				"type": "select",
 				"defaultValue": "overlayUrl",
 				"options": [
-					{ "label": "Overlay URL", "value": "overlayUrl" },
-					{ "label": "Developer API Token", "value": "developerApi" }
+					{
+						"label": "Overlay URL",
+						"value": "overlayUrl"
+					},
+					{
+						"label": "Developer API Token",
+						"value": "developerApi"
+					}
 				],
 				"helperText": "Choose Developer API Token for the official console API, or Overlay URL if you only have your TTS Monster overlay link.",
 				"refreshOnChange": true
@@ -26304,7 +26465,10 @@ module.exports = TTSMonsterPlugin;
 				"label": "API Token",
 				"type": "password",
 				"helperText": "Used when Connection Method is Developer API Token. Create or copy your API token from the TTS Monster developer dashboard.",
-				"visibleIf": { "key": "authMethod", "equals": "developerApi" },
+				"visibleIf": {
+					"key": "authMethod",
+					"equals": "developerApi"
+				},
 				"refreshOnChange": true
 			},
 			{
@@ -26312,7 +26476,10 @@ module.exports = TTSMonsterPlugin;
 				"label": "Overlay URL",
 				"type": "password",
 				"helperText": "Used when Connection Method is Overlay URL. Paste your full overlay URL, for example https://tts.monster/overlay/3hoZh83Uigewkx0Upw66imx2ASj1/059e9e17a7c64a42b38b6bbf7b40bee3",
-				"visibleIf": { "key": "authMethod", "equals": "overlayUrl" },
+				"visibleIf": {
+					"key": "authMethod",
+					"equals": "overlayUrl"
+				},
 				"refreshOnChange": true
 			},
 			{
@@ -26376,7 +26543,11 @@ module.exports = TTSMonsterPlugin;
 					}
 				]
 			}
-		]
+		],
+		"hasTtsVoices": true,
+		"ttsVoiceSource": {
+			"label": "TTS Monster"
+		}
 	}
 }
 
