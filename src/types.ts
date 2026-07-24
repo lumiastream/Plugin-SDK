@@ -1085,6 +1085,7 @@ export interface PluginRuntime {
 	}): Promise<void>;
 	resolveSongRequest?(request: PluginSongRequestResolveRequest): Promise<PluginSongRequestTrack | null | void> | PluginSongRequestTrack | null | void;
 	enqueueSongRequest?(track: PluginSongRequestTrack): Promise<void> | void;
+	removeSongRequest?(track: PluginSongRequestTrack): Promise<void> | void;
 	playSongRequest?(track: PluginSongRequestTrack): Promise<void> | void;
 	skipSongRequest?(): Promise<void> | void;
 	pauseSongRequest?(): Promise<void> | void;
