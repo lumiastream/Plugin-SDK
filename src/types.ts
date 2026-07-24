@@ -485,6 +485,9 @@ export interface PluginSongRequestTrack {
 	url?: string;
 	durationSeconds?: number;
 	requesterUsername?: string;
+	requesterPlatform?: string;
+	/** When the request entered the queue (epoch ms). Set by Lumia on hand-off. */
+	requestedAt?: number;
 }
 
 /** What Lumia hands your `resolveSongRequest` hook when a viewer requests a song. */
@@ -908,6 +911,8 @@ export interface ILumiaAPI {
 	songRequestNowPlaying: (track: PluginSongRequestTrack) => Promise<void>;
 	/** Report that a track finished playing. Lumia clears its now-playing and, when it drives your player track-by-track (`supportsQueue: false`), hands you the next queued track via `playSongRequest`. Pass the track id when known. */
 	songRequestEnded: (trackId?: string) => Promise<void>;
+	/** Report that a single request was removed on your side (denied/withdrawn in your app), so Lumia drops it from its queue too. `requesterUsername` disambiguates duplicate requests for the same track. */
+	songRequestRemoved: (params: { trackId: string; requesterUsername?: string }) => Promise<void>;
 	/** Report your source's current upcoming queue, so Lumia reconciles its own list. */
 	updateSongRequestQueue: (tracks: PluginSongRequestTrack[]) => Promise<void>;
 	/** Nudge Lumia to re-pull your `ttsVoices()` list — call after the user sets an API key or your voice list changes. */

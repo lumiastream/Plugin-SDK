@@ -22,7 +22,7 @@ class DemoSongSource extends Plugin {
 		await this.lumia.updateConnection(false);
 	}
 
-	async resolveSongRequest({ query, requesterUsername }) {
+	async resolveSongRequest({ query, requesterUsername, requesterPlatform }) {
 		const trimmed = String(query ?? "").trim();
 		if (!trimmed || trimmed.toLowerCase().includes("unfindable")) {
 			return null;
@@ -35,6 +35,7 @@ class DemoSongSource extends Plugin {
 			url: `https://example.com/track/${encodeURIComponent(trimmed)}`,
 			durationSeconds: TRACK_SECONDS,
 			requesterUsername,
+			requesterPlatform,
 		};
 	}
 
