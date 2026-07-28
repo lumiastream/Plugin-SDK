@@ -490,6 +490,18 @@ export interface PluginSongRequestTrack {
 	requestedAt?: number;
 }
 
+/**
+ * Explicit resolve outcome for `resolveSongRequest`. You may also return a bare
+ * `PluginSongRequestTrack` (shorthand for resolved) or `null` (reject).
+ * `resolved: false` queues the request anyway, unresolved — for sources with
+ * partial or no search coverage (cloud catalogs, no search API). Optional
+ * `track` fields are metadata hints that override Lumia's own lookup.
+ */
+export interface PluginSongRequestResolveResult {
+	resolved: boolean;
+	track?: Partial<PluginSongRequestTrack>;
+}
+
 /** What Lumia hands your `resolveSongRequest` hook when a viewer requests a song. */
 export interface PluginSongRequestResolveRequest {
 	query: string;
@@ -1088,7 +1100,9 @@ export interface PluginRuntime {
 		state?: boolean;
 		rawConfig?: any;
 	}): Promise<void>;
-	resolveSongRequest?(request: PluginSongRequestResolveRequest): Promise<PluginSongRequestTrack | null | void> | PluginSongRequestTrack | null | void;
+	resolveSongRequest?(
+		request: PluginSongRequestResolveRequest,
+	): Promise<PluginSongRequestTrack | PluginSongRequestResolveResult | null | void> | PluginSongRequestTrack | PluginSongRequestResolveResult | null | void;
 	enqueueSongRequest?(track: PluginSongRequestTrack): Promise<void> | void;
 	removeSongRequest?(track: PluginSongRequestTrack): Promise<void> | void;
 	playSongRequest?(track: PluginSongRequestTrack): Promise<void> | void;

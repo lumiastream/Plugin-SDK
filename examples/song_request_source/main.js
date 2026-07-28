@@ -27,6 +27,9 @@ class DemoSongSource extends Plugin {
 		if (!trimmed || trimmed.toLowerCase().includes("unfindable")) {
 			return null;
 		}
+		if (trimmed.toLowerCase().includes("unresolved")) {
+			return { resolved: false, track: { artist: "Unknown Artist" } };
+		}
 		return {
 			id: `demo-${Buffer.from(trimmed.toLowerCase()).toString("base64url")}`,
 			title: trimmed.replace(/\b\w/g, (c) => c.toUpperCase()),

@@ -57,6 +57,7 @@ export type {
   PluginModCommandPayload,
   PluginSongRequestTrack,
   PluginSongRequestResolveRequest,
+  PluginSongRequestResolveResult,
   PluginSongRequestSourceConfig,
   PluginAddSongRequestOptions,
   PluginAddSongRequestResult,
