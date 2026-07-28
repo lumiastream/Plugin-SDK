@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.9.2"
+		"@lumiastream/plugin": "^0.9.3"
 	}
 }
 
@@ -18408,7 +18408,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.9.2"
+		"@lumiastream/plugin": "^0.9.3"
 	}
 }
 
@@ -18588,6 +18588,9 @@ class DemoSongSource extends Plugin {
 		const trimmed = String(query ?? "").trim();
 		if (!trimmed || trimmed.toLowerCase().includes("unfindable")) {
 			return null;
+		}
+		if (trimmed.toLowerCase().includes("unresolved")) {
+			return { resolved: false, track: { artist: "Unknown Artist" } };
 		}
 		return {
 			id: `demo-${Buffer.from(trimmed.toLowerCase()).toString("base64url")}`,
@@ -26756,7 +26759,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.9.2"
+		"@lumiastream/plugin": "^0.9.3"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
