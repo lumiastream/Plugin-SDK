@@ -878,6 +878,14 @@ export interface PluginSharedNobleClient {
 export interface ILumiaAPI {
 	updateConnection: (state: boolean) => Promise<void>;
 	getConnectionState: () => boolean;
+	/**
+	 * Whether the user currently has a Lumia Stream Premium subscription.
+	 *
+	 * Informational only — Lumia does not block plugin API calls on this. Use it to tailor what your
+	 * plugin offers (hide a feature that depends on a premium-only Lumia capability, warn in your
+	 * settings UI, pick a different default) rather than assuming every host can do everything.
+	 */
+	isPremium: () => Promise<boolean>;
 	getSettings: () => Record<string, any>;
 	setSettings: (newSettings: Record<string, any>) => void;
 	updateSettings: (updates: Record<string, any>) => void;

@@ -17,7 +17,9 @@ This template demonstrates a minimal, production-friendly Lumia Stream plugin wo
 Use the CLI to copy and customize the template:
 
 ```
+
 npx lumia-plugin create my_plugin
+
 ```
 
 After scaffolding you can tailor the manifest, code, and README to match your idea.
@@ -277,7 +279,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.9.4"
+		"@lumiastream/plugin": "^0.9.5"
 	}
 }
 
@@ -977,7 +979,9 @@ There are **2 commands** that will be downloaded to use with Chat Summarizer:
 You can use `{{chat_summarizer_summary_buckets}}` as a starting point for your AI chat and display something different. For example:
 
 ```
+
 {{ai_prompt={{chat_summarizer_summary_buckets}}}}
+
 ```
 
 This passes the summary buckets into your AI prompt so it can analyze the chat and respond based on the categorized messages.
@@ -7944,7 +7948,7 @@ module.exports = NtfyPlugin;
 
 ## ollama/main.js
 
-```
+````
 const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULTS = {
@@ -8758,7 +8762,7 @@ class OllamaPlugin extends Plugin {
 
 module.exports = OllamaPlugin;
 
-```
+````
 
 ## ollama/manifest.json
 
@@ -9118,7 +9122,7 @@ Both normalize to the same route for requests.
 
 ## openclaw/main.js
 
-```
+````
 const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULTS = {
@@ -10284,7 +10288,7 @@ class OpenClawPlugin extends Plugin {
 
 module.exports = OpenClawPlugin;
 
-```
+````
 
 ## openclaw/manifest.json
 
@@ -14392,7 +14396,7 @@ module.exports = RetroAchievementsPlugin;
 
 ## rss_feed_monitor/README.md
 
-```
+````
 # RSS Feed Monitor
 
 Monitor multiple RSS or Atom feeds and trigger a Lumia alert for each newly discovered item. This plugin is alert-only and does not publish Lumia variables.
@@ -14416,7 +14420,7 @@ Seen item state and pending alerts are stored in:
 
 ```text
 ~/Library/Application Support/LumiaStream/plugin-cache/rss_feed_monitor/state.json
-```
+````
 
 That lets the plugin replay missed alerts after Lumia has been offline.
 
@@ -14425,42 +14429,43 @@ That lets the plugin replay missed alerts after Lumia has been offline.
 ## rss_feed_monitor/main.js
 
 ```
+
 const { Plugin } = require("@lumiastream/plugin");
 const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
 const DEFAULTS = {
-  pollInterval: 300,
-  itemWindow: 25,
-  requestTimeoutMs: 15000,
-  userAgent: "Lumia Stream RSS Feed Monitor/1.0.0",
-  maxSeenIdsPerFeed: 500,
+pollInterval: 300,
+itemWindow: 25,
+requestTimeoutMs: 15000,
+userAgent: "Lumia Stream RSS Feed Monitor/1.0.0",
+maxSeenIdsPerFeed: 500,
 };
 
 const ALERT_KEYS = {
-  itemChanged: "rss_feed_item_changed",
+itemChanged: "rss_feed_item_changed",
 };
 
 const VARIATION_SELECTION_ACTION_TYPES = new Set([
-  "active_input",
-  "preview_input",
-  "transition_input",
+"active_input",
+"preview_input",
+"transition_input",
 ]);
 
 class RssFeedMonitorPlugin extends Plugin {
-  constructor(manifest, context) {
-    super(manifest, context);
-    this._pollTimer = null;
-    this._refreshPromise = null;
-    this._drainPromise = null;
-    this._lastConnectionState = null;
-    this._state = this._emptyState();
-  }
+constructor(manifest, context) {
+super(manifest, context);
+this.\_pollTimer = null;
+this.\_refreshPromise = null;
+this.\_drainPromise = null;
+this.\_lastConnectionState = null;
+this.\_state = this.\_emptyState();
+}
 
-  async onload() {
-    await this._loadStateFromDisk();
-    await this._drainPendingAlerts();
+async onload() {
+await this.\_loadStateFromDisk();
+await this.\_drainPendingAlerts();
 
     const feeds = this._configuredFeeds();
     if (!feeds.length) {
@@ -14473,20 +14478,21 @@ class RssFeedMonitorPlugin extends Plugin {
 
     await this._refreshFeeds({ reason: "startup" });
     this._schedulePolling();
-  }
 
-  async onunload() {
-    this._clearPolling();
-    await this._updateConnectionState(false);
-  }
+}
 
-  async onsettingsupdate(settings, previous = {}) {
-    const pollChanged =
-      this._pollInterval(settings) !== this._pollInterval(previous);
-    const itemWindowChanged =
-      this._itemWindow(settings) !== this._itemWindow(previous);
-    const feedsChanged =
-      this._feedsSignature(settings) !== this._feedsSignature(previous);
+async onunload() {
+this.\_clearPolling();
+await this.\_updateConnectionState(false);
+}
+
+async onsettingsupdate(settings, previous = {}) {
+const pollChanged =
+this.\_pollInterval(settings) !== this.\_pollInterval(previous);
+const itemWindowChanged =
+this.\_itemWindow(settings) !== this.\_itemWindow(previous);
+const feedsChanged =
+this.\_feedsSignature(settings) !== this.\_feedsSignature(previous);
 
     if (pollChanged) {
       this._schedulePolling();
@@ -14514,16 +14520,17 @@ class RssFeedMonitorPlugin extends Plugin {
     if (feedsChanged || itemWindowChanged) {
       await this._refreshFeeds({ reason: "settings-update" });
     }
-  }
 
-  async validateAuth(data = {}) {
-    const feeds = this._configuredFeeds(data);
-    if (!feeds.length) {
-      return {
-        ok: false,
-        message: "Add at least one valid RSS or Atom feed URL.",
-      };
-    }
+}
+
+async validateAuth(data = {}) {
+const feeds = this.\_configuredFeeds(data);
+if (!feeds.length) {
+return {
+ok: false,
+message: "Add at least one valid RSS or Atom feed URL.",
+};
+}
 
     try {
       const result = await this._fetchAndParseFeed(feeds[0]);
@@ -14540,12 +14547,13 @@ class RssFeedMonitorPlugin extends Plugin {
         message: `Feed validation failed: ${this._errorMessage(error)}`,
       };
     }
-  }
 
-  async refreshActionOptions({ actionType, values } = {}) {
-    if (!VARIATION_SELECTION_ACTION_TYPES.has(String(actionType || ""))) {
-      return;
-    }
+}
+
+async refreshActionOptions({ actionType, values } = {}) {
+if (!VARIATION_SELECTION_ACTION_TYPES.has(String(actionType || ""))) {
+return;
+}
 
     if (typeof this.lumia?.updateActionFieldOptions !== "function") {
       return;
@@ -14563,12 +14571,13 @@ class RssFeedMonitorPlugin extends Plugin {
       fieldKey: "input",
       options: this._feedVariationOptions(previewSettings),
     });
-  }
 
-  async _refreshFeeds({ reason } = {}) {
-    if (this._refreshPromise) {
-      return this._refreshPromise;
-    }
+}
+
+async \_refreshFeeds({ reason } = {}) {
+if (this.\_refreshPromise) {
+return this.\_refreshPromise;
+}
 
     this._refreshPromise = (async () => {
       const feeds = this._configuredFeeds();
@@ -14662,12 +14671,13 @@ class RssFeedMonitorPlugin extends Plugin {
     });
 
     return this._refreshPromise;
-  }
 
-  async _drainPendingAlerts() {
-    if (this._drainPromise) {
-      return this._drainPromise;
-    }
+}
+
+async \_drainPendingAlerts() {
+if (this.\_drainPromise) {
+return this.\_drainPromise;
+}
 
     this._drainPromise = (async () => {
       this._state.pendingAlerts = this._sortPendingAlerts(
@@ -14699,29 +14709,30 @@ class RssFeedMonitorPlugin extends Plugin {
     });
 
     return this._drainPromise;
-  }
 
-  _schedulePolling() {
-    this._clearPolling();
-    const intervalMs = this._pollInterval() * 1000;
-    this._pollTimer = setTimeout(async () => {
-      try {
-        await this._refreshFeeds({ reason: "poll" });
-      } finally {
-        this._schedulePolling();
-      }
-    }, intervalMs);
-  }
+}
 
-  _clearPolling() {
-    if (this._pollTimer) {
-      clearTimeout(this._pollTimer);
-      this._pollTimer = null;
-    }
-  }
+\_schedulePolling() {
+this.\_clearPolling();
+const intervalMs = this.\_pollInterval() \* 1000;
+this.\_pollTimer = setTimeout(async () => {
+try {
+await this.\_refreshFeeds({ reason: "poll" });
+} finally {
+this.\_schedulePolling();
+}
+}, intervalMs);
+}
 
-  async _fetchAndParseFeed(feed) {
-    const { text: xml } = await this._fetchWithTimeout(feed.url);
+\_clearPolling() {
+if (this.\_pollTimer) {
+clearTimeout(this.\_pollTimer);
+this.\_pollTimer = null;
+}
+}
+
+async \_fetchAndParseFeed(feed) {
+const { text: xml } = await this.\_fetchWithTimeout(feed.url);
 
     const parsed = this._parseFeedXml(xml, feed);
     if (!parsed.items.length) {
@@ -14729,14 +14740,15 @@ class RssFeedMonitorPlugin extends Plugin {
     }
 
     return parsed;
-  }
 
-  async _fetchWithTimeout(url) {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      DEFAULTS.requestTimeoutMs
-    );
+}
+
+async \_fetchWithTimeout(url) {
+const controller = new AbortController();
+const timeout = setTimeout(
+() => controller.abort(),
+DEFAULTS.requestTimeoutMs
+);
 
     try {
       const response = await fetch(url, {
@@ -14765,23 +14777,24 @@ class RssFeedMonitorPlugin extends Plugin {
     } finally {
       clearTimeout(timeout);
     }
-  }
 
-  _parseFeedXml(xml, feed) {
-    const source = String(xml || "");
-    if (/<feed\b/i.test(source) && /<entry\b/i.test(source)) {
-      return this._parseAtomFeed(source, feed);
-    }
-    return this._parseRssFeed(source, feed);
-  }
+}
 
-  _parseRssFeed(xml, feed) {
-    const channelBlock = this._extractFirstBlock(xml, "channel") || xml;
-    const feedTitle =
-      this._cleanText(this._extractTagText(channelBlock, "title")) ||
-      feed.name ||
-      this._deriveFeedName(feed.url);
-    const itemBlocks = this._extractBlocks(channelBlock, "item");
+\_parseFeedXml(xml, feed) {
+const source = String(xml || "");
+if (/<feed\b/i.test(source) && /<entry\b/i.test(source)) {
+return this.\_parseAtomFeed(source, feed);
+}
+return this.\_parseRssFeed(source, feed);
+}
+
+\_parseRssFeed(xml, feed) {
+const channelBlock = this.\_extractFirstBlock(xml, "channel") || xml;
+const feedTitle =
+this.\_cleanText(this.\_extractTagText(channelBlock, "title")) ||
+feed.name ||
+this.\_deriveFeedName(feed.url);
+const itemBlocks = this.\_extractBlocks(channelBlock, "item");
 
     return {
       feedTitle,
@@ -14807,15 +14820,16 @@ class RssFeedMonitorPlugin extends Plugin {
           this._extractTagText(block, "dc:creator"),
       })),
     };
-  }
 
-  _parseAtomFeed(xml, feed) {
-    const feedBlock = this._extractFirstBlock(xml, "feed") || xml;
-    const feedTitle =
-      this._cleanText(this._extractTagText(feedBlock, "title")) ||
-      feed.name ||
-      this._deriveFeedName(feed.url);
-    const entryBlocks = this._extractBlocks(feedBlock, "entry");
+}
+
+\_parseAtomFeed(xml, feed) {
+const feedBlock = this.\_extractFirstBlock(xml, "feed") || xml;
+const feedTitle =
+this.\_cleanText(this.\_extractTagText(feedBlock, "title")) ||
+feed.name ||
+this.\_deriveFeedName(feed.url);
+const entryBlocks = this.\_extractBlocks(feedBlock, "entry");
 
     return {
       feedTitle,
@@ -14837,17 +14851,18 @@ class RssFeedMonitorPlugin extends Plugin {
         };
       }),
     };
-  }
 
-  _normalizeItem(feed, feedTitle, item = {}, sourceIndex = 0) {
-    const title = this._cleanText(item.title) || "Untitled item";
-    const url = this._normalizeUrlCandidate(item.link);
-    const guid = this._cleanText(item.guid, { stripHtml: false });
-    const published = this._normalizeTimestamp(item.publishedAt);
-    const summary = this._cleanText(item.summary);
-    const author = this._cleanText(item.author);
-    const identitySource =
-      guid || url || `${title}|${published.display}|${summary}|${author}`;
+}
+
+\_normalizeItem(feed, feedTitle, item = {}, sourceIndex = 0) {
+const title = this.\_cleanText(item.title) || "Untitled item";
+const url = this.\_normalizeUrlCandidate(item.link);
+const guid = this.\_cleanText(item.guid, { stripHtml: false });
+const published = this.\_normalizeTimestamp(item.publishedAt);
+const summary = this.\_cleanText(item.summary);
+const author = this.\_cleanText(item.author);
+const identitySource =
+guid || url || `${title}|${published.display}|${summary}|${author}`;
 
     if (!identitySource) {
       return null;
@@ -14867,37 +14882,38 @@ class RssFeedMonitorPlugin extends Plugin {
       author,
       sourceIndex,
     };
-  }
 
-  _buildPendingAlert(item) {
-    return {
-      alertId: this._hash(`alert|${item.feedKey}|${item.id}`),
-      createdAt: Date.now(),
-      feed_key: item.feedKey,
-      feed_name: item.feedName || "",
-      feed_url: item.feedUrl || "",
-      item_title: item.title || "",
-      item_url: item.url || "",
-      item_published: item.publishedAt || "",
-      item_summary: item.summary || "",
-      item_guid: item.guid || "",
-      item_id: item.id || "",
-      item_author: item.author || "",
-      publishedAtMs: item.publishedAtMs || 0,
-    };
-  }
+}
 
-  _alertVariables(alert = {}) {
-    const feedName = alert.feed_name || alert.latest_feed_name || "";
-    const feedUrl = alert.feed_url || alert.latest_feed_url || "";
-    const itemTitle = alert.item_title || alert.latest_item_title || "";
-    const itemUrl = alert.item_url || alert.latest_item_url || "";
-    const itemPublished =
-      alert.item_published || alert.latest_item_published || "";
-    const itemSummary = alert.item_summary || alert.latest_item_summary || "";
-    const itemGuid = alert.item_guid || alert.latest_item_guid || "";
-    const itemId = alert.item_id || alert.latest_item_id || "";
-    const itemAuthor = alert.item_author || alert.latest_item_author || "";
+\_buildPendingAlert(item) {
+return {
+alertId: this.\_hash(`alert|${item.feedKey}|${item.id}`),
+createdAt: Date.now(),
+feed_key: item.feedKey,
+feed_name: item.feedName || "",
+feed_url: item.feedUrl || "",
+item_title: item.title || "",
+item_url: item.url || "",
+item_published: item.publishedAt || "",
+item_summary: item.summary || "",
+item_guid: item.guid || "",
+item_id: item.id || "",
+item_author: item.author || "",
+publishedAtMs: item.publishedAtMs || 0,
+};
+}
+
+\_alertVariables(alert = {}) {
+const feedName = alert.feed_name || alert.latest_feed_name || "";
+const feedUrl = alert.feed_url || alert.latest_feed_url || "";
+const itemTitle = alert.item_title || alert.latest_item_title || "";
+const itemUrl = alert.item_url || alert.latest_item_url || "";
+const itemPublished =
+alert.item_published || alert.latest_item_published || "";
+const itemSummary = alert.item_summary || alert.latest_item_summary || "";
+const itemGuid = alert.item_guid || alert.latest_item_guid || "";
+const itemId = alert.item_id || alert.latest_item_id || "";
+const itemAuthor = alert.item_author || alert.latest_item_author || "";
 
     return {
       feed_name: feedName,
@@ -14919,18 +14935,19 @@ class RssFeedMonitorPlugin extends Plugin {
       latest_item_id: itemId,
       latest_item_author: itemAuthor,
     };
-  }
 
-  _alertDynamic(alert = {}) {
-    return {
-      value: String(alert.feed_name || alert.latest_feed_name || "").trim(),
-    };
-  }
+}
 
-  _configuredFeeds(settings = this.settings) {
-    const raw = settings?.feeds;
-    const feeds = [];
-    const seen = new Set();
+\_alertDynamic(alert = {}) {
+return {
+value: String(alert.feed_name || alert.latest_feed_name || "").trim(),
+};
+}
+
+\_configuredFeeds(settings = this.settings) {
+const raw = settings?.feeds;
+const feeds = [];
+const seen = new Set();
 
     for (const parsedLine of this._coerceFeedEntries(raw)) {
       if (!parsedLine?.url) {
@@ -14959,17 +14976,18 @@ class RssFeedMonitorPlugin extends Plugin {
     }
 
     return feeds;
-  }
 
-  _coerceFeedEntries(raw) {
-    if (typeof raw === "string") {
-      return raw
-        .split(/\r\n|\n|\r/)
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith("#"))
-        .map((line) => this._parseFeedLine(line))
-        .filter(Boolean);
-    }
+}
+
+\_coerceFeedEntries(raw) {
+if (typeof raw === "string") {
+return raw
+.split(/\r\n|\n|\r/)
+.map((line) => line.trim())
+.filter((line) => line && !line.startsWith("#"))
+.map((line) => this.\_parseFeedLine(line))
+.filter(Boolean);
+}
 
     if (Array.isArray(raw)) {
       return raw
@@ -14995,13 +15013,14 @@ class RssFeedMonitorPlugin extends Plugin {
     }
 
     return [];
-  }
 
-  _parseFeedLine(line) {
-    const trimmed = String(line || "").trim();
-    if (!trimmed) {
-      return null;
-    }
+}
+
+\_parseFeedLine(line) {
+const trimmed = String(line || "").trim();
+if (!trimmed) {
+return null;
+}
 
     if (/^https?:\/\//i.test(trimmed)) {
       return { name: "", url: trimmed };
@@ -15024,44 +15043,45 @@ class RssFeedMonitorPlugin extends Plugin {
     }
 
     return null;
-  }
 
-  _feedsSignature(settings = this.settings) {
-    return JSON.stringify(
-      this._configuredFeeds(settings).map((feed) => [feed.key, feed.name, feed.url])
-    );
-  }
+}
 
-  _feedVariationOptions(settings = this.settings) {
-    return this._configuredFeeds(settings).map((feed) => ({
-      label: feed.name,
-      value: feed.name,
-    }));
-  }
+\_feedsSignature(settings = this.settings) {
+return JSON.stringify(
+this.\_configuredFeeds(settings).map((feed) => [feed.key, feed.name, feed.url])
+);
+}
 
-  _pollInterval(settings = this.settings) {
-    return this._clampNumber(settings?.pollInterval, DEFAULTS.pollInterval, 30, 86400);
-  }
+\_feedVariationOptions(settings = this.settings) {
+return this.\_configuredFeeds(settings).map((feed) => ({
+label: feed.name,
+value: feed.name,
+}));
+}
 
-  _itemWindow(settings = this.settings) {
-    return this._clampNumber(settings?.itemWindow, DEFAULTS.itemWindow, 5, 100);
-  }
+\_pollInterval(settings = this.settings) {
+return this.\_clampNumber(settings?.pollInterval, DEFAULTS.pollInterval, 30, 86400);
+}
 
-  _deriveFeedName(urlText = "") {
-    try {
-      const parsed = new URL(urlText);
-      const pathName = parsed.pathname.replace(/\/$/, "");
+\_itemWindow(settings = this.settings) {
+return this.\_clampNumber(settings?.itemWindow, DEFAULTS.itemWindow, 5, 100);
+}
+
+\_deriveFeedName(urlText = "") {
+try {
+const parsed = new URL(urlText);
+const pathName = parsed.pathname.replace(/\/$/, "");
       return pathName ? `${parsed.host}${pathName}` : parsed.host;
-    } catch (_error) {
-      return "RSS Feed";
-    }
-  }
+} catch (\_error) {
+return "RSS Feed";
+}
+}
 
-  _normalizeUrlCandidate(value) {
-    const trimmed = this._cleanText(value, { stripHtml: false });
-    if (!trimmed) {
-      return "";
-    }
+\_normalizeUrlCandidate(value) {
+const trimmed = this.\_cleanText(value, { stripHtml: false });
+if (!trimmed) {
+return "";
+}
 
     try {
       const parsed = new URL(trimmed);
@@ -15069,13 +15089,14 @@ class RssFeedMonitorPlugin extends Plugin {
     } catch (_error) {
       return trimmed;
     }
-  }
 
-  _normalizeTimestamp(value) {
-    const raw = this._cleanText(value, { stripHtml: false });
-    if (!raw) {
-      return { display: "", ms: 0 };
-    }
+}
+
+\_normalizeTimestamp(value) {
+const raw = this.\_cleanText(value, { stripHtml: false });
+if (!raw) {
+return { display: "", ms: 0 };
+}
 
     const ms = Date.parse(raw);
     if (Number.isFinite(ms)) {
@@ -15083,21 +15104,22 @@ class RssFeedMonitorPlugin extends Plugin {
     }
 
     return { display: raw, ms: 0 };
-  }
 
-  _sortPendingAlerts(alerts = []) {
-    return [...alerts].sort((a, b) => {
-      const timeDiff = (a?.publishedAtMs || 0) - (b?.publishedAtMs || 0);
-      if (timeDiff !== 0) {
-        return timeDiff;
-      }
-      return (a?.createdAt || 0) - (b?.createdAt || 0);
-    });
-  }
+}
 
-  _trimSeenIds(ids = []) {
-    const unique = [];
-    const seen = new Set();
+\_sortPendingAlerts(alerts = []) {
+return [...alerts].sort((a, b) => {
+const timeDiff = (a?.publishedAtMs || 0) - (b?.publishedAtMs || 0);
+if (timeDiff !== 0) {
+return timeDiff;
+}
+return (a?.createdAt || 0) - (b?.createdAt || 0);
+});
+}
+
+\_trimSeenIds(ids = []) {
+const unique = [];
+const seen = new Set();
 
     for (const value of ids) {
       const key = String(value || "").trim();
@@ -15112,34 +15134,36 @@ class RssFeedMonitorPlugin extends Plugin {
     }
 
     return unique;
-  }
 
-  _emptyState() {
-    return {
-      version: 1,
-      feeds: {},
-      pendingAlerts: [],
-    };
-  }
+}
 
-  _ensureFeedState(feed) {
-    if (!this._state.feeds[feed.key]) {
-      this._state.feeds[feed.key] = {
-        initialized: false,
-        url: feed.url,
-        name: feed.name,
-        feedTitle: feed.name,
-        seenIds: [],
-        updatedAt: 0,
-      };
-    }
+\_emptyState() {
+return {
+version: 1,
+feeds: {},
+pendingAlerts: [],
+};
+}
+
+\_ensureFeedState(feed) {
+if (!this.\_state.feeds[feed.key]) {
+this.\_state.feeds[feed.key] = {
+initialized: false,
+url: feed.url,
+name: feed.name,
+feedTitle: feed.name,
+seenIds: [],
+updatedAt: 0,
+};
+}
 
     return this._state.feeds[feed.key];
-  }
 
-  _pruneStateForFeeds(feeds = []) {
-    const allowed = new Set(feeds.map((feed) => feed.key));
-    const nextFeeds = {};
+}
+
+\_pruneStateForFeeds(feeds = []) {
+const allowed = new Set(feeds.map((feed) => feed.key));
+const nextFeeds = {};
 
     for (const [key, value] of Object.entries(this._state.feeds || {})) {
       if (allowed.has(key)) {
@@ -15151,13 +15175,14 @@ class RssFeedMonitorPlugin extends Plugin {
     this._state.pendingAlerts = this._state.pendingAlerts.filter((entry) =>
       allowed.has(String(entry?.feed_key || ""))
     );
-  }
 
-  _stateFilePath() {
-    const home = String(process.env.HOME || "").trim();
-    if (!home) {
-      return path.join(__dirname, ".rss_feed_monitor_state.json");
-    }
+}
+
+\_stateFilePath() {
+const home = String(process.env.HOME || "").trim();
+if (!home) {
+return path.join(\_\_dirname, ".rss_feed_monitor_state.json");
+}
 
     return path.join(
       home,
@@ -15168,10 +15193,11 @@ class RssFeedMonitorPlugin extends Plugin {
       "rss_feed_monitor",
       "state.json"
     );
-  }
 
-  async _loadStateFromDisk() {
-    const filePath = this._stateFilePath();
+}
+
+async \_loadStateFromDisk() {
+const filePath = this.\_stateFilePath();
 
     try {
       const raw = await fs.readFile(filePath, "utf8");
@@ -15190,52 +15216,53 @@ class RssFeedMonitorPlugin extends Plugin {
     } catch (_error) {
       this._state = this._emptyState();
     }
-  }
 
-  async _saveStateToDisk() {
-    const filePath = this._stateFilePath();
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, JSON.stringify(this._state, null, 2), "utf8");
-  }
+}
 
-  _extractBlocks(source, tagName) {
-    const escaped = this._escapeRegex(tagName);
-    const regex = new RegExp(
-      `<${escaped}(?:\\s[^>]*)?>[\\s\\S]*?<\\/${escaped}>`,
-      "gi"
-    );
-    return String(source || "").match(regex) || [];
-  }
+async \_saveStateToDisk() {
+const filePath = this.\_stateFilePath();
+await fs.mkdir(path.dirname(filePath), { recursive: true });
+await fs.writeFile(filePath, JSON.stringify(this.\_state, null, 2), "utf8");
+}
 
-  _extractFirstBlock(source, tagName) {
-    return this._extractBlocks(source, tagName)[0] || "";
-  }
+\_extractBlocks(source, tagName) {
+const escaped = this.\_escapeRegex(tagName);
+const regex = new RegExp(
+`<${escaped}(?:\\s[^>]*)?>[\\s\\S]*?<\\/${escaped}>`,
+"gi"
+);
+return String(source || "").match(regex) || [];
+}
 
-  _extractTagText(source, tagName) {
-    const escaped = this._escapeRegex(tagName);
-    const regex = new RegExp(
-      `<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`,
-      "i"
-    );
-    const match = String(source || "").match(regex);
-    return match ? match[1] : "";
-  }
+\_extractFirstBlock(source, tagName) {
+return this.\_extractBlocks(source, tagName)[0] || "";
+}
 
-  _extractLinkHref(source, tagName) {
-    const escaped = this._escapeRegex(tagName);
-    const regex = new RegExp(`<${escaped}\\b([^>]*)\\/?>`, "i");
-    const match = String(source || "").match(regex);
-    if (!match) {
-      return "";
-    }
-    const attributes = this._parseAttributes(match[1]);
-    return attributes.href || "";
-  }
+\_extractTagText(source, tagName) {
+const escaped = this.\_escapeRegex(tagName);
+const regex = new RegExp(
+`<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`,
+"i"
+);
+const match = String(source || "").match(regex);
+return match ? match[1] : "";
+}
 
-  _extractAtomLink(source) {
-    const regex = /<link\b([^>]*)\/?>/gi;
-    let match = null;
-    let fallbackHref = "";
+\_extractLinkHref(source, tagName) {
+const escaped = this.\_escapeRegex(tagName);
+const regex = new RegExp(`<${escaped}\\b([^>]*)\\/?>`, "i");
+const match = String(source || "").match(regex);
+if (!match) {
+return "";
+}
+const attributes = this.\_parseAttributes(match[1]);
+return attributes.href || "";
+}
+
+\_extractAtomLink(source) {
+const regex = /<link\b([^>]\*)\/?>/gi;
+let match = null;
+let fallbackHref = "";
 
     while ((match = regex.exec(String(source || "")))) {
       const attributes = this._parseAttributes(match[1]);
@@ -15253,23 +15280,25 @@ class RssFeedMonitorPlugin extends Plugin {
     }
 
     return fallbackHref;
-  }
 
-  _parseAttributes(source) {
-    const attributes = {};
-    const regex = /([A-Za-z_:][\w:.-]*)\s*=\s*(['"])(.*?)\2/g;
-    let match = null;
+}
+
+_parseAttributes(source) {
+const attributes = {};
+const regex = /([A-Za-z_:][\w:.-]_)\s_=\s*(['"])(.*?)\2/g;
+let match = null;
 
     while ((match = regex.exec(String(source || "")))) {
       attributes[match[1]] = match[3];
     }
 
     return attributes;
-  }
 
-  _cleanText(value, options = {}) {
-    const stripHtml = options.stripHtml !== false;
-    let result = String(value || "");
+}
+
+\_cleanText(value, options = {}) {
+const stripHtml = options.stripHtml !== false;
+let result = String(value || "");
 
     result = result.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
     result = result.replace(/<!--[\s\S]*?-->/g, "");
@@ -15280,54 +15309,55 @@ class RssFeedMonitorPlugin extends Plugin {
     }
 
     return result.replace(/\s+/g, " ").trim();
-  }
 
-  _decodeXmlEntities(value) {
-    return String(value || "").replace(
-      /&(#x?[0-9a-fA-F]+|amp|lt|gt|quot|apos);/g,
-      (match, entity) => {
-        switch (entity) {
-          case "amp":
-            return "&";
-          case "lt":
-            return "<";
-          case "gt":
-            return ">";
-          case "quot":
-            return '"';
-          case "apos":
-            return "'";
-          default:
-            if (entity.startsWith("#x")) {
-              return String.fromCodePoint(parseInt(entity.slice(2), 16));
-            }
-            if (entity.startsWith("#")) {
-              return String.fromCodePoint(parseInt(entity.slice(1), 10));
-            }
-            return match;
-        }
-      }
-    );
-  }
+}
 
-  _clampNumber(value, fallback, min, max) {
-    const parsed = Number(value);
-    const resolved = Number.isFinite(parsed) ? parsed : fallback;
-    return Math.min(max, Math.max(min, Math.round(resolved)));
-  }
+\_decodeXmlEntities(value) {
+return String(value || "").replace(
+/&(#x?[0-9a-fA-F]+|amp|lt|gt|quot|apos);/g,
+(match, entity) => {
+switch (entity) {
+case "amp":
+return "&";
+case "lt":
+return "<";
+case "gt":
+return ">";
+case "quot":
+return '"';
+case "apos":
+return "'";
+default:
+if (entity.startsWith("#x")) {
+return String.fromCodePoint(parseInt(entity.slice(2), 16));
+}
+if (entity.startsWith("#")) {
+return String.fromCodePoint(parseInt(entity.slice(1), 10));
+}
+return match;
+}
+}
+);
+}
 
-  _hash(value) {
-    return crypto.createHash("sha1").update(String(value || "")).digest("hex");
-  }
+\_clampNumber(value, fallback, min, max) {
+const parsed = Number(value);
+const resolved = Number.isFinite(parsed) ? parsed : fallback;
+return Math.min(max, Math.max(min, Math.round(resolved)));
+}
 
-  _escapeRegex(value) {
-    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
+\_hash(value) {
+return crypto.createHash("sha1").update(String(value || "")).digest("hex");
+}
 
-  async _updateConnectionState(state) {
-    if (this._lastConnectionState === state) {
-      return;
-    }
+\_escapeRegex(value) {
+return String(value || "").replace(/[.\*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async \_updateConnectionState(state) {
+if (this.\_lastConnectionState === state) {
+return;
+}
 
     this._lastConnectionState = state;
 
@@ -15338,15 +15368,16 @@ class RssFeedMonitorPlugin extends Plugin {
         `Failed to update connection state: ${this._errorMessage(error)}`
       );
     }
-  }
 
-  async _log(message) {
-    await this.lumia.log(`[RSS Feed Monitor] ${message}`);
-  }
+}
 
-  _errorMessage(error) {
-    return error instanceof Error ? error.message : String(error);
-  }
+async \_log(message) {
+await this.lumia.log(`[RSS Feed Monitor] ${message}`);
+}
+
+\_errorMessage(error) {
+return error instanceof Error ? error.message : String(error);
+}
 }
 
 module.exports = RssFeedMonitorPlugin;
@@ -15356,96 +15387,97 @@ module.exports = RssFeedMonitorPlugin;
 ## rss_feed_monitor/manifest.json
 
 ```
+
 {
-	"id": "rss_feed_monitor",
-	"name": "RSS Feed Monitor",
-	"version": "1.0.0",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"description": "Monitor multiple RSS or Atom feeds, persist unseen items, and trigger Lumia alerts for each new entry even after Lumia has been offline.",
-	"license": "MIT",
-	"main": "main.js",
-	"lumiaVersion": "^9.0.0",
-	"category": "utilities",
-	"keywords": "rss, atom, feeds, alerts, news, monitor",
-	"icon": "rss_feed_monitor.jpg",
-	"config": {
-		"settings": [
-			{
-				"key": "feeds",
-				"label": "Feeds",
-				"type": "named_map",
-				"required": true,
-				"valueType": "text",
-				"valueLabel": "Feed URL",
-				"valuePlaceholder": "https://example.com/rss.xml",
-				"valueField": {
-					"type": "text",
-					"required": true,
-					"placeholder": "https://example.com/rss.xml"
-				},
-				"outputMode": "map",
-				"objectValueMode": "value",
-				"defaultValue": {
-					"Lumia Blog": "https://example.com/rss.xml"
-				},
-				"helperText": "Add one named feed per row. The row name is the feed label and the value is the feed URL."
-			},
-			{
-				"key": "pollInterval",
-				"label": "Poll Interval (seconds)",
-				"type": "number",
-				"defaultValue": 300,
-				"required": true,
-				"helperText": "How often the plugin checks the configured feeds.",
-				"validation": {
-					"min": 30,
-					"max": 86400
-				}
-			},
-			{
-				"key": "itemWindow",
-				"label": "Recent Items Per Feed",
-				"type": "number",
-				"defaultValue": 25,
-				"required": true,
-				"helperText": "How many recent entries to track per feed for offline catch-up and duplicate prevention.",
-				"validation": {
-					"min": 5,
-					"max": 100
-				}
-			}
-		],
-		"settings_tutorial": "---\n### Feed Format\nAdd one named row per feed.\n- **Name**: label shown in Lumia variables and alerts\n- **Feed URL**: RSS or Atom URL to poll\n\n### Offline Catch-up\nThe plugin stores seen items on disk. If Lumia is offline for a while, the next startup will replay alerts for any newly discovered entries still present in each feed's recent item window.\n\n### Tuning\n- **Poll Interval** controls how often feeds are checked.\n- **Recent Items Per Feed** increases how much backlog the plugin can catch after downtime.\n---",
-		"actions": [],
-		"alerts": [
-			{
-				"title": "Feed Item Changed",
-				"key": "rss_feed_item_changed",
-				"defaultMessage": "{{feed_name}}: {{item_title}}\n{{item_summary}}",
-				"acceptedVariables": [
-					"feed_name",
-					"feed_url",
-					"item_title",
-					"item_url",
-					"item_published",
-					"item_summary",
-					"item_guid",
-					"item_id",
-					"item_author"
-				],
-				"variationConditions": [
-					{
-						"type": "EQUAL_SELECTION",
-						"description": "Feed name (compares against dynamic.value).",
-						"dynamicOptions": true
-					}
-				]
-			}
-		],
-		"actions_tutorial": "---\n### Actions\nThis plugin runs on a polling loop and does not expose actions.\n---"
-	}
+"id": "rss_feed_monitor",
+"name": "RSS Feed Monitor",
+"version": "1.0.0",
+"author": "Lumia Stream",
+"email": "dev@lumiastream.com",
+"website": "https://lumiastream.com",
+"description": "Monitor multiple RSS or Atom feeds, persist unseen items, and trigger Lumia alerts for each new entry even after Lumia has been offline.",
+"license": "MIT",
+"main": "main.js",
+"lumiaVersion": "^9.0.0",
+"category": "utilities",
+"keywords": "rss, atom, feeds, alerts, news, monitor",
+"icon": "rss_feed_monitor.jpg",
+"config": {
+"settings": [
+{
+"key": "feeds",
+"label": "Feeds",
+"type": "named_map",
+"required": true,
+"valueType": "text",
+"valueLabel": "Feed URL",
+"valuePlaceholder": "https://example.com/rss.xml",
+"valueField": {
+"type": "text",
+"required": true,
+"placeholder": "https://example.com/rss.xml"
+},
+"outputMode": "map",
+"objectValueMode": "value",
+"defaultValue": {
+"Lumia Blog": "https://example.com/rss.xml"
+},
+"helperText": "Add one named feed per row. The row name is the feed label and the value is the feed URL."
+},
+{
+"key": "pollInterval",
+"label": "Poll Interval (seconds)",
+"type": "number",
+"defaultValue": 300,
+"required": true,
+"helperText": "How often the plugin checks the configured feeds.",
+"validation": {
+"min": 30,
+"max": 86400
+}
+},
+{
+"key": "itemWindow",
+"label": "Recent Items Per Feed",
+"type": "number",
+"defaultValue": 25,
+"required": true,
+"helperText": "How many recent entries to track per feed for offline catch-up and duplicate prevention.",
+"validation": {
+"min": 5,
+"max": 100
+}
+}
+],
+"settings_tutorial": "---\n### Feed Format\nAdd one named row per feed.\n- **Name**: label shown in Lumia variables and alerts\n- **Feed URL**: RSS or Atom URL to poll\n\n### Offline Catch-up\nThe plugin stores seen items on disk. If Lumia is offline for a while, the next startup will replay alerts for any newly discovered entries still present in each feed's recent item window.\n\n### Tuning\n- **Poll Interval** controls how often feeds are checked.\n- **Recent Items Per Feed** increases how much backlog the plugin can catch after downtime.\n---",
+"actions": [],
+"alerts": [
+{
+"title": "Feed Item Changed",
+"key": "rss_feed_item_changed",
+"defaultMessage": "{{feed_name}}: {{item_title}}\n{{item_summary}}",
+"acceptedVariables": [
+"feed_name",
+"feed_url",
+"item_title",
+"item_url",
+"item_published",
+"item_summary",
+"item_guid",
+"item_id",
+"item_author"
+],
+"variationConditions": [
+{
+"type": "EQUAL_SELECTION",
+"description": "Feed name (compares against dynamic.value).",
+"dynamicOptions": true
+}
+]
+}
+],
+"actions_tutorial": "---\n### Actions\nThis plugin runs on a polling loop and does not expose actions.\n---"
+}
 }
 
 ```
@@ -15453,16 +15485,17 @@ module.exports = RssFeedMonitorPlugin;
 ## rss_feed_monitor/package.json
 
 ```
+
 {
-  "name": "lumia_plugin-rss-feed-monitor",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Lumia Stream plugin that monitors RSS and Atom feeds with persisted backlog alerts.",
-  "main": "main.js",
-  "scripts": {},
-  "dependencies": {
-    "@lumiastream/plugin": "^0.3.2"
-  }
+"name": "lumia_plugin-rss-feed-monitor",
+"version": "1.0.0",
+"private": true,
+"description": "Lumia Stream plugin that monitors RSS and Atom feeds with persisted backlog alerts.",
+"main": "main.js",
+"scripts": {},
+"dependencies": {
+"@lumiastream/plugin": "^0.3.2"
+}
 }
 
 ```
@@ -15470,16 +15503,19 @@ module.exports = RssFeedMonitorPlugin;
 ## rumble/actions_tutorial.md
 
 ```
+
 ---
+
 ### Actions
-This plugin runs automatically on the poll interval and does not expose actions.
----
+
+## This plugin runs automatically on the poll interval and does not expose actions.
 
 ```
 
 ## rumble/main.js
 
 ```
+
 const { Plugin } = require("@lumiastream/plugin");
 
 // Default polling cadence (seconds) that balances freshness with API limits.
@@ -15492,1421 +15528,1428 @@ const RANT_AMOUNT_EPSILON = 0.01;
 
 // Alert identifiers aligned with Lumia's built-in conventions.
 const ALERT_TYPES = {
-	STREAM_START: "streamStarted",
-	STREAM_END: "streamEnded",
-	FOLLOWER: "follower",
-	RANT: "rant",
-	LIKE: "like",
-	DISLIKE: "dislike",
-	SUB: "sub",
-	SUB_GIFT: "subGift",
+STREAM_START: "streamStarted",
+STREAM_END: "streamEnded",
+FOLLOWER: "follower",
+RANT: "rant",
+LIKE: "like",
+DISLIKE: "dislike",
+SUB: "sub",
+SUB_GIFT: "subGift",
 };
 
 // Rumble payloads have evolved; probe the current `livestreams`/`followers` shape first.
 const FIELD_PATHS = {
-	live: [
-		["livestreams", 0, "is_live"],
-		["livestreams", 0, "live"],
-		["livestreams", 0, "status"],
-	],
-	viewers: [
-		["livestreams", 0, "watching_now"],
-		["livestreams", 0, "num_viewers"],
-		["livestreams", 0, "viewers"],
-	],
-	joined: [
-		["livestreams", 0, "num_viewers_total"],
-		["livestreams", 0, "total_viewers"],
-	],
-	title: [["livestreams", 0, "title"]],
-	thumbnail: [
-		["livestreams", 0, "thumbnail_url"],
-		["livestreams", 0, "thumbnail"],
-		["livestreams", 0, "image_url"],
-	],
-	streamUrl: [
-		["livestreams", 0, "watch_url"],
-		["livestreams", 0, "share_url"],
-	],
-	videoId: [
-		["livestreams", 0, "id"],
-		["livestreams", 0, "video_id"],
-	],
-	rumbles: [
-		["livestreams", 0, "num_rumbles"],
-		["livestreams", 0, "rumbles"],
-	],
-	rants: [
-		["livestreams", 0, "num_rants"],
-		["livestreams", 0, "rants"],
-	],
-	rantAmount: [
-		["livestreams", 0, "total_rant_amount"],
-		["livestreams", 0, "rant_amount_total"],
-	],
-	followers: [
-		["followers", "num_followers"],
-		["followers", "num_followers_total"],
-	],
-	likes: [
-		["livestreams", 0, "num_likes"],
-		["livestreams", 0, "likes"],
-	],
-	dislikes: [
-		["livestreams", 0, "num_dislikes"],
-		["livestreams", 0, "dislikes"],
-	],
-	subs: [["subscribers", "num_subscribers"]],
-	subGifts: [["gifted_subs", "num_gifted_subs"]],
-	chatMembers: [
-		["livestreams", 0, "chat_members"],
-		["livestreams", 0, "num_chatters"],
-	],
-	category: [["livestreams", 0, "category"]],
-	description: [["livestreams", 0, "description"]],
-	language: [["livestreams", 0, "language"]],
-	chatUrl: [["livestreams", 0, "chat_url"]],
-	channelName: [["channel_name"], ["username"]],
-	channelImage: [["channel_image"], ["channel_icon_url"]],
-	startedAt: [
-		["livestreams", 0, "started_on"],
-		["livestreams", 0, "started_at"],
-	],
-	scheduledStart: [
-		["livestreams", 0, "scheduled_start"],
-		["livestreams", 0, "scheduled_on"],
-	],
+live: [
+["livestreams", 0, "is_live"],
+["livestreams", 0, "live"],
+["livestreams", 0, "status"],
+],
+viewers: [
+["livestreams", 0, "watching_now"],
+["livestreams", 0, "num_viewers"],
+["livestreams", 0, "viewers"],
+],
+joined: [
+["livestreams", 0, "num_viewers_total"],
+["livestreams", 0, "total_viewers"],
+],
+title: [["livestreams", 0, "title"]],
+thumbnail: [
+["livestreams", 0, "thumbnail_url"],
+["livestreams", 0, "thumbnail"],
+["livestreams", 0, "image_url"],
+],
+streamUrl: [
+["livestreams", 0, "watch_url"],
+["livestreams", 0, "share_url"],
+],
+videoId: [
+["livestreams", 0, "id"],
+["livestreams", 0, "video_id"],
+],
+rumbles: [
+["livestreams", 0, "num_rumbles"],
+["livestreams", 0, "rumbles"],
+],
+rants: [
+["livestreams", 0, "num_rants"],
+["livestreams", 0, "rants"],
+],
+rantAmount: [
+["livestreams", 0, "total_rant_amount"],
+["livestreams", 0, "rant_amount_total"],
+],
+followers: [
+["followers", "num_followers"],
+["followers", "num_followers_total"],
+],
+likes: [
+["livestreams", 0, "num_likes"],
+["livestreams", 0, "likes"],
+],
+dislikes: [
+["livestreams", 0, "num_dislikes"],
+["livestreams", 0, "dislikes"],
+],
+subs: [["subscribers", "num_subscribers"]],
+subGifts: [["gifted_subs", "num_gifted_subs"]],
+chatMembers: [
+["livestreams", 0, "chat_members"],
+["livestreams", 0, "num_chatters"],
+],
+category: [["livestreams", 0, "category"]],
+description: [["livestreams", 0, "description"]],
+language: [["livestreams", 0, "language"]],
+chatUrl: [["livestreams", 0, "chat_url"]],
+channelName: [["channel_name"], ["username"]],
+channelImage: [["channel_image"], ["channel_icon_url"]],
+startedAt: [
+["livestreams", 0, "started_on"],
+["livestreams", 0, "started_at"],
+],
+scheduledStart: [
+["livestreams", 0, "scheduled_start"],
+["livestreams", 0, "scheduled_on"],
+],
 };
 
 // Simple helpers: resolve nested properties and coerce API values to primitives.
 function resolvePath(source, path) {
-	let current = source;
-	for (const part of path) {
-		if (current == null) {
-			return undefined;
-		}
-		current = current[part];
-	}
-	return current;
+let current = source;
+for (const part of path) {
+if (current == null) {
+return undefined;
+}
+current = current[part];
+}
+return current;
 }
 
 function pickFirst(source, paths = [], fallback) {
-	for (const path of paths) {
-		const value = resolvePath(source, path);
-		if (value !== undefined && value !== null) {
-			return value;
-		}
-	}
-	return fallback;
+for (const path of paths) {
+const value = resolvePath(source, path);
+if (value !== undefined && value !== null) {
+return value;
+}
+}
+return fallback;
 }
 
 function coerceNumber(value, fallback = 0) {
-	// Many counters ship as strings; normalise to a finite numeric value.
-	if (typeof value === "number" && Number.isFinite(value)) {
-		return value;
-	}
-	if (typeof value === "string" && value.trim().length) {
-		const parsed = Number(value);
-		return Number.isFinite(parsed) ? parsed : fallback;
-	}
-	if (typeof value === "boolean") {
-		return value ? 1 : 0;
-	}
-	return fallback;
+// Many counters ship as strings; normalise to a finite numeric value.
+if (typeof value === "number" && Number.isFinite(value)) {
+return value;
+}
+if (typeof value === "string" && value.trim().length) {
+const parsed = Number(value);
+return Number.isFinite(parsed) ? parsed : fallback;
+}
+if (typeof value === "boolean") {
+return value ? 1 : 0;
+}
+return fallback;
 }
 
 function coerceOptionalNumber(value) {
-	if (typeof value === "number" && Number.isFinite(value)) {
-		return value;
-	}
-	if (typeof value === "string" && value.trim().length) {
-		const parsed = Number(value);
-		return Number.isFinite(parsed) ? parsed : undefined;
-	}
-	if (typeof value === "boolean") {
-		return value ? 1 : 0;
-	}
-	return undefined;
+if (typeof value === "number" && Number.isFinite(value)) {
+return value;
+}
+if (typeof value === "string" && value.trim().length) {
+const parsed = Number(value);
+return Number.isFinite(parsed) ? parsed : undefined;
+}
+if (typeof value === "boolean") {
+return value ? 1 : 0;
+}
+return undefined;
 }
 
 function pickFirstNumber(source, paths = [], fallback = 0) {
-	for (const path of paths) {
-		const parsed = coerceOptionalNumber(resolvePath(source, path));
-		if (parsed !== undefined) {
-			return parsed;
-		}
-	}
-	return fallback;
+for (const path of paths) {
+const parsed = coerceOptionalNumber(resolvePath(source, path));
+if (parsed !== undefined) {
+return parsed;
+}
+}
+return fallback;
 }
 
 function coerceBoolean(value, fallback = false) {
-	// Accept booleans, stringified booleans, or numeric 0/1 style responses.
-	if (typeof value === "boolean") {
-		return value;
-	}
-	if (typeof value === "number") {
-		return value !== 0;
-	}
-	if (typeof value === "string") {
-		const normalized = value.trim().toLowerCase();
-		if (
-			normalized === "true" ||
-			normalized === "yes" ||
-			normalized === "on" ||
-			normalized === "live" ||
-			normalized === "online"
-		) {
-			return true;
-		}
-		if (
-			normalized === "false" ||
-			normalized === "no" ||
-			normalized === "off" ||
-			normalized === "offline" ||
-			normalized === "ended"
-		) {
-			return false;
-		}
-		const parsed = Number(value);
-		if (Number.isFinite(parsed)) {
-			return parsed !== 0;
-		}
-	}
-	return fallback;
+// Accept booleans, stringified booleans, or numeric 0/1 style responses.
+if (typeof value === "boolean") {
+return value;
+}
+if (typeof value === "number") {
+return value !== 0;
+}
+if (typeof value === "string") {
+const normalized = value.trim().toLowerCase();
+if (
+normalized === "true" ||
+normalized === "yes" ||
+normalized === "on" ||
+normalized === "live" ||
+normalized === "online"
+) {
+return true;
+}
+if (
+normalized === "false" ||
+normalized === "no" ||
+normalized === "off" ||
+normalized === "offline" ||
+normalized === "ended"
+) {
+return false;
+}
+const parsed = Number(value);
+if (Number.isFinite(parsed)) {
+return parsed !== 0;
+}
+}
+return fallback;
 }
 
 function coerceString(value, fallback = "") {
-	// Provide a string for template usage even if the payload is null/number.
-	if (typeof value === "string") {
-		return value;
-	}
-	if (value === null || value === undefined) {
-		return fallback;
-	}
-	return String(value);
+// Provide a string for template usage even if the payload is null/number.
+if (typeof value === "string") {
+return value;
+}
+if (value === null || value === undefined) {
+return fallback;
+}
+return String(value);
 }
 
 function roundToTwo(value) {
-	// Useful for currency-style outputs (Rumble rants report cents).
-	const numeric = coerceNumber(value, 0);
-	return Math.round(numeric * 100) / 100;
+// Useful for currency-style outputs (Rumble rants report cents).
+const numeric = coerceNumber(value, 0);
+return Math.round(numeric \* 100) / 100;
 }
 
 function parseTimestamp(value) {
-	// Accept ISO strings, seconds, milliseconds, or Date instances.
-	if (value === null || value === undefined) {
-		return null;
-	}
+// Accept ISO strings, seconds, milliseconds, or Date instances.
+if (value === null || value === undefined) {
+return null;
+}
 
-	if (value instanceof Date) {
-		return Number.isNaN(value.getTime()) ? null : value;
-	}
+    if (value instanceof Date) {
+    	return Number.isNaN(value.getTime()) ? null : value;
+    }
 
-	if (typeof value === "number" && Number.isFinite(value)) {
-		const treated = value > 1e12 ? value : value * 1000;
-		const date = new Date(treated);
-		return Number.isNaN(date.getTime()) ? null : date;
-	}
+    if (typeof value === "number" && Number.isFinite(value)) {
+    	const treated = value > 1e12 ? value : value * 1000;
+    	const date = new Date(treated);
+    	return Number.isNaN(date.getTime()) ? null : date;
+    }
 
-	if (typeof value === "string") {
-		const trimmed = value.trim();
-		if (!trimmed.length) {
-			return null;
-		}
+    if (typeof value === "string") {
+    	const trimmed = value.trim();
+    	if (!trimmed.length) {
+    		return null;
+    	}
 
-		const numeric = Number(trimmed);
-		if (Number.isFinite(numeric)) {
-			return parseTimestamp(numeric);
-		}
+    	const numeric = Number(trimmed);
+    	if (Number.isFinite(numeric)) {
+    		return parseTimestamp(numeric);
+    	}
 
-		const date = new Date(trimmed);
-		return Number.isNaN(date.getTime()) ? null : date;
-	}
+    	const date = new Date(trimmed);
+    	return Number.isNaN(date.getTime()) ? null : date;
+    }
 
-	return null;
+    return null;
+
 }
 
 function normalizeBadges(value) {
-	if (Array.isArray(value)) {
-		return value
-			.map((badge) => normalizeBadgeUrl(coerceString(badge, "")))
-			.filter(Boolean);
-	}
+if (Array.isArray(value)) {
+return value
+.map((badge) => normalizeBadgeUrl(coerceString(badge, "")))
+.filter(Boolean);
+}
 
-	if (typeof value === "string") {
-		const trimmed = value.trim();
-		if (!trimmed.length) {
-			return [];
-		}
-		const parts = trimmed.includes(",")
-			? trimmed.split(",").map((badge) => badge.trim())
-			: [trimmed];
-		return parts.map((badge) => normalizeBadgeUrl(badge)).filter(Boolean);
-	}
+    if (typeof value === "string") {
+    	const trimmed = value.trim();
+    	if (!trimmed.length) {
+    		return [];
+    	}
+    	const parts = trimmed.includes(",")
+    		? trimmed.split(",").map((badge) => badge.trim())
+    		: [trimmed];
+    	return parts.map((badge) => normalizeBadgeUrl(badge)).filter(Boolean);
+    }
 
-	if (value && typeof value === "object") {
-		const candidate =
-			coerceString(value.url, "") ||
-			coerceString(value.image, "") ||
-			coerceString(value.icon, "") ||
-			coerceString(value.badge, "") ||
-			coerceString(value.badge_url, "") ||
-			coerceString(value.badgeUrl, "") ||
-			coerceString(value.src, "");
-		const normalized = normalizeBadgeUrl(candidate);
-		return normalized ? [normalized] : [];
-	}
+    if (value && typeof value === "object") {
+    	const candidate =
+    		coerceString(value.url, "") ||
+    		coerceString(value.image, "") ||
+    		coerceString(value.icon, "") ||
+    		coerceString(value.badge, "") ||
+    		coerceString(value.badge_url, "") ||
+    		coerceString(value.badgeUrl, "") ||
+    		coerceString(value.src, "");
+    	const normalized = normalizeBadgeUrl(candidate);
+    	return normalized ? [normalized] : [];
+    }
 
-	return [];
+    return [];
+
 }
 
 function normalizeBadgeUrl(value) {
-	if (!value || typeof value !== "string") {
-		return "";
-	}
-	const trimmed = value.trim();
-	if (!trimmed.length) {
-		return "";
-	}
-	// Rumble chat can send badge names like "admin" without a path.
-	if (!/[/.]/.test(trimmed)) {
-		return `https://rumble.com/i/badges/${trimmed}_48.png`;
-	}
-	if (/^https?:\/\//i.test(trimmed)) {
-		return trimmed;
-	}
-	if (trimmed.startsWith("//")) {
-		return `https:${trimmed}`;
-	}
-	if (trimmed.startsWith("/")) {
-		return `https://rumble.com${trimmed}`;
-	}
-	return `https://rumble.com/${trimmed}`;
+if (!value || typeof value !== "string") {
+return "";
+}
+const trimmed = value.trim();
+if (!trimmed.length) {
+return "";
+}
+// Rumble chat can send badge names like "admin" without a path.
+if (!/[/.]/.test(trimmed)) {
+return `https://rumble.com/i/badges/${trimmed}_48.png`;
+}
+if (/^https?:\/\//i.test(trimmed)) {
+return trimmed;
+}
+if (trimmed.startsWith("//")) {
+return `https:${trimmed}`;
+}
+if (trimmed.startsWith("/")) {
+return `https://rumble.com${trimmed}`;
+}
+return `https://rumble.com/${trimmed}`;
 }
 
 function buildAlertVariables(state) {
-	if (!state) {
-		return {};
-	}
-	return {
-		live: state.live,
-		viewers: state.viewers,
-		title: state.title,
-		stream_url: state.streamUrl,
-		followers: state.followers,
-		likes: state.likes,
-		dislikes: state.dislikes,
-		subs: state.subs,
-		sub_gifts: state.subGifts,
-		rants: state.rants,
-		rant_amount: roundToTwo(state.rantAmount),
-	};
+if (!state) {
+return {};
+}
+return {
+live: state.live,
+viewers: state.viewers,
+title: state.title,
+stream_url: state.streamUrl,
+followers: state.followers,
+likes: state.likes,
+dislikes: state.dislikes,
+subs: state.subs,
+sub_gifts: state.subGifts,
+rants: state.rants,
+rant_amount: roundToTwo(state.rantAmount),
+};
 }
 
 function buildAlertIdentity(state) {
-	const username = coerceString(state?.channelName, "rumble");
-	const displayname = coerceString(state?.channelName, username);
-	const avatar = coerceString(state?.channelImage, "");
-	const userId = coerceString(state?.videoId, "");
-	return {
-		username,
-		displayname,
-		avatar: avatar || undefined,
-		userId: userId || undefined,
-	};
+const username = coerceString(state?.channelName, "rumble");
+const displayname = coerceString(state?.channelName, username);
+const avatar = coerceString(state?.channelImage, "");
+const userId = coerceString(state?.videoId, "");
+return {
+username,
+displayname,
+avatar: avatar || undefined,
+userId: userId || undefined,
+};
 }
 
 function buildAlertPayload(
-	vars,
-	{ state, name, value, extraSettings = {} } = {},
+vars,
+{ state, name, value, extraSettings = {} } = {},
 ) {
-	const identity = buildAlertIdentity(state);
-	const normalizedDynamic = buildAlertDynamic({ name, value });
-	return {
-		dynamic: normalizedDynamic,
-		extraSettings: {
-			...vars,
-			...extraSettings,
-			username: identity.username,
-			displayname: identity.displayname,
-			avatar: identity.avatar,
-			userId: identity.userId,
-			name: normalizedDynamic.name,
-			value: normalizedDynamic.value,
-		},
-	};
+const identity = buildAlertIdentity(state);
+const normalizedDynamic = buildAlertDynamic({ name, value });
+return {
+dynamic: normalizedDynamic,
+extraSettings: {
+...vars,
+...extraSettings,
+username: identity.username,
+displayname: identity.displayname,
+avatar: identity.avatar,
+userId: identity.userId,
+name: normalizedDynamic.name,
+value: normalizedDynamic.value,
+},
+};
 }
 
 function buildAlertDynamic({ name, value } = {}) {
-	const normalizedName = coerceString(name, "");
-	let normalizedValue = value;
-	if (
-		typeof normalizedValue !== "string" &&
-		typeof normalizedValue !== "number" &&
-		typeof normalizedValue !== "boolean"
-	) {
-		normalizedValue = coerceString(normalizedValue, "");
-	}
-	return { name: normalizedName, value: normalizedValue };
+const normalizedName = coerceString(name, "");
+let normalizedValue = value;
+if (
+typeof normalizedValue !== "string" &&
+typeof normalizedValue !== "number" &&
+typeof normalizedValue !== "boolean"
+) {
+normalizedValue = coerceString(normalizedValue, "");
+}
+return { name: normalizedName, value: normalizedValue };
 }
 
 function normalizeAvatar(value) {
-	if (typeof value === "string") {
-		const trimmed = value.trim();
-		return trimmed.length ? trimmed : "";
-	}
+if (typeof value === "string") {
+const trimmed = value.trim();
+return trimmed.length ? trimmed : "";
+}
 
-	if (value && typeof value === "object") {
-		return (
-			coerceString(value.url, "") ||
-			coerceString(value.image, "") ||
-			coerceString(value.avatar, "") ||
-			coerceString(value.src, "")
-		);
-	}
+    if (value && typeof value === "object") {
+    	return (
+    		coerceString(value.url, "") ||
+    		coerceString(value.image, "") ||
+    		coerceString(value.avatar, "") ||
+    		coerceString(value.src, "")
+    	);
+    }
 
-	return "";
+    return "";
+
 }
 
 function extractChatAvatar(message) {
-	if (!message || typeof message !== "object") {
-		return "";
-	}
+if (!message || typeof message !== "object") {
+return "";
+}
 
-	return (
-		normalizeAvatar(message.avatar) ||
-		normalizeAvatar(message.profile_pic_url) ||
-		normalizeAvatar(message.user_image) ||
-		normalizeAvatar(message.user_image_url) ||
-		normalizeAvatar(message.profile_image) ||
-		normalizeAvatar(message.profile_image_url) ||
-		normalizeAvatar(message.image) ||
-		normalizeAvatar(message.thumbnail) ||
-		normalizeAvatar(message.user?.avatar) ||
-		normalizeAvatar(message.user?.image) ||
-		normalizeAvatar(message.user?.profile_image) ||
-		normalizeAvatar(message.user?.profile_image_url)
-	);
+    return (
+    	normalizeAvatar(message.avatar) ||
+    	normalizeAvatar(message.profile_pic_url) ||
+    	normalizeAvatar(message.user_image) ||
+    	normalizeAvatar(message.user_image_url) ||
+    	normalizeAvatar(message.profile_image) ||
+    	normalizeAvatar(message.profile_image_url) ||
+    	normalizeAvatar(message.image) ||
+    	normalizeAvatar(message.thumbnail) ||
+    	normalizeAvatar(message.user?.avatar) ||
+    	normalizeAvatar(message.user?.image) ||
+    	normalizeAvatar(message.user?.profile_image) ||
+    	normalizeAvatar(message.user?.profile_image_url)
+    );
+
 }
 
 function hasTruthyField(message, fields = []) {
-	for (const field of fields) {
-		const value = resolvePath(message, field.split("."));
-		if (coerceBoolean(value, false)) {
-			return true;
-		}
-	}
-	return false;
+for (const field of fields) {
+const value = resolvePath(message, field.split("."));
+if (coerceBoolean(value, false)) {
+return true;
+}
+}
+return false;
 }
 
 function coerceTier(value) {
-	if (typeof value === "number" && Number.isFinite(value)) {
-		return Math.max(0, Math.floor(value));
-	}
-	if (typeof value === "string") {
-		const normalized = value.trim().toLowerCase();
-		if (!normalized) {
-			return 0;
-		}
-		const parsedDirect = Number(normalized);
-		if (Number.isFinite(parsedDirect)) {
-			return Math.max(0, Math.floor(parsedDirect));
-		}
-		const match =
-			normalized.match(/tier[^0-9]*([0-9]+)/) || normalized.match(/([0-9]+)/);
-		if (match?.[1]) {
-			const parsed = Number(match[1]);
-			if (Number.isFinite(parsed)) {
-				return Math.max(0, Math.floor(parsed));
-			}
-		}
-	}
-	return 0;
+if (typeof value === "number" && Number.isFinite(value)) {
+return Math.max(0, Math.floor(value));
+}
+if (typeof value === "string") {
+const normalized = value.trim().toLowerCase();
+if (!normalized) {
+return 0;
+}
+const parsedDirect = Number(normalized);
+if (Number.isFinite(parsedDirect)) {
+return Math.max(0, Math.floor(parsedDirect));
+}
+const match =
+normalized.match(/tier[^0-9]\*([0-9]+)/) || normalized.match(/([0-9]+)/);
+if (match?.[1]) {
+const parsed = Number(match[1]);
+if (Number.isFinite(parsed)) {
+return Math.max(0, Math.floor(parsed));
+}
+}
+}
+return 0;
 }
 
 function extractRoleTokens(message) {
-	const rawValues = [
-		message?.role,
-		message?.user_role,
-		message?.userRole,
-		message?.roles,
-		message?.user_roles,
-		message?.userRoles,
-		message?.badge,
-		message?.badges,
-		message?.user?.role,
-		message?.user?.roles,
-		message?.user?.badge,
-		message?.user?.badges,
-	];
-	const tokens = new Set();
-	for (const value of rawValues) {
-		if (Array.isArray(value)) {
-			for (const entry of value) {
-				const text =
-					typeof entry === "string"
-						? entry
-						: coerceString(entry?.name || entry?.id || entry?.badge, "");
-				const normalized = text.trim().toLowerCase();
-				if (normalized) {
-					tokens.add(normalized);
-				}
-			}
-			continue;
-		}
-		const normalized = coerceString(value, "").trim().toLowerCase();
-		if (normalized) {
-			tokens.add(normalized);
-		}
-	}
-	return tokens;
+const rawValues = [
+message?.role,
+message?.user_role,
+message?.userRole,
+message?.roles,
+message?.user_roles,
+message?.userRoles,
+message?.badge,
+message?.badges,
+message?.user?.role,
+message?.user?.roles,
+message?.user?.badge,
+message?.user?.badges,
+];
+const tokens = new Set();
+for (const value of rawValues) {
+if (Array.isArray(value)) {
+for (const entry of value) {
+const text =
+typeof entry === "string"
+? entry
+: coerceString(entry?.name || entry?.id || entry?.badge, "");
+const normalized = text.trim().toLowerCase();
+if (normalized) {
+tokens.add(normalized);
+}
+}
+continue;
+}
+const normalized = coerceString(value, "").trim().toLowerCase();
+if (normalized) {
+tokens.add(normalized);
+}
+}
+return tokens;
 }
 
 function extractChatBadges(message) {
-	if (!message || typeof message !== "object") {
-		return [];
-	}
-	return normalizeBadges(
-		message.badges ||
-			message.user_badges ||
-			message.badge ||
-			message.user?.badges ||
-			message.user?.badge ||
-			[],
-	);
+if (!message || typeof message !== "object") {
+return [];
+}
+return normalizeBadges(
+message.badges ||
+message.user_badges ||
+message.badge ||
+message.user?.badges ||
+message.user?.badge ||
+[],
+);
 }
 
 function extractChatUserId(message) {
-	if (!message || typeof message !== "object") {
-		return "";
-	}
-	return coerceString(
-		message.user_id ||
-			message.userid ||
-			message.id_user ||
-			message.user?.id ||
-			message.user?.user_id,
-		"",
-	);
+if (!message || typeof message !== "object") {
+return "";
+}
+return coerceString(
+message.user_id ||
+message.userid ||
+message.id_user ||
+message.user?.id ||
+message.user?.user_id,
+"",
+);
 }
 
 function extractChatUserLevels(message) {
-	const tokens = extractRoleTokens(message);
-	const tier = Math.max(
-		coerceTier(message?.subscription_tier),
-		coerceTier(message?.sub_tier),
-		coerceTier(message?.tier),
-		coerceTier(message?.user?.subscription_tier),
-		coerceTier(message?.user?.sub_tier),
-		coerceTier(message?.user?.tier),
-	);
+const tokens = extractRoleTokens(message);
+const tier = Math.max(
+coerceTier(message?.subscription_tier),
+coerceTier(message?.sub_tier),
+coerceTier(message?.tier),
+coerceTier(message?.user?.subscription_tier),
+coerceTier(message?.user?.sub_tier),
+coerceTier(message?.user?.tier),
+);
 
-	const isSelf =
-		hasTruthyField(message, [
-			"is_self",
-			"isSelf",
-			"is_broadcaster",
-			"isBroadcaster",
-			"user.is_self",
-			"user.is_broadcaster",
-		]) ||
-		[...tokens].some((token) =>
-			["broadcaster", "streamer", "owner", "creator"].some((word) =>
-				token.includes(word),
-			),
-		);
+    const isSelf =
+    	hasTruthyField(message, [
+    		"is_self",
+    		"isSelf",
+    		"is_broadcaster",
+    		"isBroadcaster",
+    		"user.is_self",
+    		"user.is_broadcaster",
+    	]) ||
+    	[...tokens].some((token) =>
+    		["broadcaster", "streamer", "owner", "creator"].some((word) =>
+    			token.includes(word),
+    		),
+    	);
 
-	const mod =
-		hasTruthyField(message, ["is_mod", "isMod", "user.is_mod"]) ||
-		[...tokens].some((token) => token.includes("moderator") || token === "mod");
+    const mod =
+    	hasTruthyField(message, ["is_mod", "isMod", "user.is_mod"]) ||
+    	[...tokens].some((token) => token.includes("moderator") || token === "mod");
 
-	const vip =
-		hasTruthyField(message, ["is_vip", "isVip", "user.is_vip"]) ||
-		[...tokens].some((token) => token.includes("vip"));
+    const vip =
+    	hasTruthyField(message, ["is_vip", "isVip", "user.is_vip"]) ||
+    	[...tokens].some((token) => token.includes("vip"));
 
-	const tier3 =
-		tier >= 3 ||
-		[...tokens].some(
-			(token) => token.includes("tier3") || token.includes("tier_3"),
-		);
-	const tier2 =
-		tier >= 2 ||
-		tier3 ||
-		[...tokens].some(
-			(token) => token.includes("tier2") || token.includes("tier_2"),
-		);
+    const tier3 =
+    	tier >= 3 ||
+    	[...tokens].some(
+    		(token) => token.includes("tier3") || token.includes("tier_3"),
+    	);
+    const tier2 =
+    	tier >= 2 ||
+    	tier3 ||
+    	[...tokens].some(
+    		(token) => token.includes("tier2") || token.includes("tier_2"),
+    	);
 
-	const subscriber =
-		hasTruthyField(message, [
-			"is_subscriber",
-			"isSubscriber",
-			"is_member",
-			"isMember",
-			"user.is_subscriber",
-			"user.is_member",
-		]) ||
-		tier >= 1 ||
-		tier2 ||
-		tier3 ||
-		[...tokens].some((token) =>
-			["subscriber", "member", "supporter", "founder"].some((word) =>
-				token.includes(word),
-			),
-		);
+    const subscriber =
+    	hasTruthyField(message, [
+    		"is_subscriber",
+    		"isSubscriber",
+    		"is_member",
+    		"isMember",
+    		"user.is_subscriber",
+    		"user.is_member",
+    	]) ||
+    	tier >= 1 ||
+    	tier2 ||
+    	tier3 ||
+    	[...tokens].some((token) =>
+    		["subscriber", "member", "supporter", "founder"].some((word) =>
+    			token.includes(word),
+    		),
+    	);
 
-	const follower =
-		hasTruthyField(message, [
-			"is_follower",
-			"isFollower",
-			"user.is_follower",
-		]) || [...tokens].some((token) => token.includes("follower"));
+    const follower =
+    	hasTruthyField(message, [
+    		"is_follower",
+    		"isFollower",
+    		"user.is_follower",
+    	]) || [...tokens].some((token) => token.includes("follower"));
 
-	return { isSelf, mod, vip, tier3, tier2, subscriber, follower };
+    return { isSelf, mod, vip, tier3, tier2, subscriber, follower };
+
 }
 
 function parseChatTimestamp(value) {
-	const parsed = parseTimestamp(value);
-	return parsed ? parsed.getTime() : 0;
+const parsed = parseTimestamp(value);
+return parsed ? parsed.getTime() : 0;
 }
 
 function extractChatMessageId(message) {
-	return coerceString(
-		message?.id ||
-			message?.message_id ||
-			message?.messageId ||
-			message?.chat_message_id ||
-			message?.chatMessageId,
-		"",
-	).trim();
+return coerceString(
+message?.id ||
+message?.message_id ||
+message?.messageId ||
+message?.chat_message_id ||
+message?.chatMessageId,
+"",
+).trim();
 }
 
 function hashChatMessage(value) {
-	let hash = 0;
-	for (let index = 0; index < value.length; index += 1) {
-		hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-	}
-	return hash.toString(36);
+let hash = 0;
+for (let index = 0; index < value.length; index += 1) {
+hash = (hash \* 31 + value.charCodeAt(index)) >>> 0;
+}
+return hash.toString(36);
 }
 
 function getChatMessageKey(message) {
-	if (message.messageId) {
-		return `id:${message.messageId}`;
-	}
-	return `fallback:${message.timestamp}:${message.username}:${message.text}`;
+if (message.messageId) {
+return `id:${message.messageId}`;
+}
+return `fallback:${message.timestamp}:${message.username}:${message.text}`;
 }
 
 function getDisplayChatMessageId(message) {
-	if (message.messageId) {
-		return `rumble-${message.messageId}`;
-	}
+if (message.messageId) {
+return `rumble-${message.messageId}`;
+}
 
-	return `rumble-${message.timestamp || "no-time"}-${hashChatMessage(
-		`${message.username}:${message.text}`,
-	)}`;
+    return `rumble-${message.timestamp || "no-time"}-${hashChatMessage(
+    	`${message.username}:${message.text}`,
+    )}`;
+
 }
 
 // Top-level plugin that polls the API, tracks session state, and surfaces events to Lumia.
 class RumblePlugin extends Plugin {
-	constructor(manifest, context) {
-		super(manifest, context);
-
-		this.pollIntervalId = null;
-		this.pollInFlight = false;
-		this.lastKnownState = this.createEmptyState();
-		this.sessionData = this.createEmptySession();
-		this.hasBaseline = false;
-		this.streamCounter = 0;
-		this.chatState = this.createEmptyChatState();
-		this.chatHasBaseline = false;
-		this.failureCount = 0;
-		this.backoffMultiplier = 1;
-		this.offline = false;
-		this.lastConnectionState = null;
-	}
-
-	createEmptyState() {
-		// Defaults for every variable we expose so first poll starts populated.
-		return {
-			live: false,
-			viewers: 0,
-			joined: 0,
-			title: "",
-			thumbnail: "",
-			streamUrl: "",
-			videoId: "",
-			rumbles: 0,
-			rants: 0,
-			rantAmount: 0,
-			followers: 0,
-			likes: 0,
-			dislikes: 0,
-			subs: 0,
-			subGifts: 0,
-			chatMembers: 0,
-			category: "",
-			description: "",
-			language: "",
-			chatUrl: "",
-			channelName: "",
-			channelImage: "",
-			startedAt: null,
-			scheduledStart: null,
-		};
-	}
-
-	createEmptyChatState() {
-		return {
-			lastTimestamp: 0,
-			seenKeys: new Set(),
-			seenOrder: [],
-		};
-	}
-
-	createEmptySession() {
-		// Per-stream counters that reset when the broadcast ends.
-		return {
-			streamStartTime: null,
-			lastRantsCount: 0,
-			lastRantAmount: 0,
-		};
-	}
-
-	get currentSettings() {
-		return this.settings || {};
-	}
-
-	get apiKey() {
-		return this.extractApiKey(this.currentSettings.apiKey);
-	}
-
-	async onload() {
-		if (this.apiKey) {
-			await this.startPolling({ showToast: false });
-		}
-	}
-
-	async onunload() {
-		await this.stopPolling(false);
-	}
-
-	async onsettingsupdate(settings, previousSettings) {
-		const next = settings || {};
-		const previous = previousSettings || {};
-
-		const nextApiKey = this.extractApiKey(next.apiKey);
-		const prevApiKey = this.extractApiKey(previous.apiKey);
-
-		const nextInterval = this.normalizePollInterval(next.pollInterval);
-		const prevInterval = this.normalizePollInterval(previous.pollInterval);
-
-		const apiKeyChanged = nextApiKey !== prevApiKey;
-		const intervalChanged = nextInterval !== prevInterval;
-
-		if (!nextApiKey) {
-			await this.stopPolling(false);
-			return;
-		}
-
-		if (!this.pollIntervalId) {
-			await this.startPolling({ showToast: false });
-			return;
-		}
-
-		if (apiKeyChanged || intervalChanged) {
-			this.offline = false;
-			this.failureCount = 0;
-			this.backoffMultiplier = 1;
-			await this.stopPolling(false);
-			await this.startPolling({ showToast: false });
-		}
-	}
-
-	// Lumia runs this during setup to confirm the key is valid before saving it.
-	async validateAuth(data = {}) {
-		try {
-			const apiKey = this.extractApiKey(data.apiKey);
-			if (!apiKey) {
-				return false;
-			}
-
-			await this.fetchStreamData(apiKey);
-			return true;
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			await this.lumia.log(`[Rumble] Auth validation failed: ${message}`);
-			return false;
-		}
-	}
-
-	// Trim whitespace and discard empty strings so settings checks stay clean.
-	extractApiKey(value) {
-		if (typeof value !== "string") {
-			return undefined;
-		}
-		const trimmed = value.trim();
-		if (!trimmed.length) {
-			return undefined;
-		}
-
-		try {
-			const asUrl = new URL(trimmed);
-			const keyParam = asUrl.searchParams.get("key");
-			if (keyParam) {
-				return keyParam.trim() || undefined;
-			}
-		} catch {
-			// Not a URL – fall through to treating it as the raw key
-		}
-
-		return trimmed;
-	}
-
-	// Kick off the polling interval and optionally inform the user via toast.
-	async startPolling(options = {}) {
-		const { showToast = true } = options;
-
-		if (!this.apiKey) {
-			await this.lumia.log("[Rumble] Missing API key, cannot start polling");
-			if (showToast) {
-				await this.lumia.showToast({
-					message: "Rumble API key required to poll",
-				});
-			}
-			return;
-		}
-
-		if (this.offline) {
-			return;
-		}
-
-		if (this.pollIntervalId) {
-			return;
-		}
-
-		const normalizedInterval = this.normalizePollInterval(
-			this.currentSettings.pollInterval,
-		);
-
-		if (normalizedInterval !== this.currentSettings.pollInterval) {
-			// Persist the clamped value so the UI reflects what we are using.
-			this.updateSettings({ pollInterval: normalizedInterval });
-		}
-
-		const intervalSeconds = Math.min(
-			Math.max(
-				Math.round(normalizedInterval * this.backoffMultiplier),
-				MIN_POLL_INTERVAL,
-			),
-			MAX_POLL_INTERVAL * 4,
-		);
-
-		await this.pollAPI();
-
-		this.pollIntervalId = setInterval(() => {
-			// Avoid awaiting the result here so the timer keeps its cadence.
-			void this.pollAPI();
-		}, intervalSeconds * 1000);
-	}
-
-	// Halt polling and let Lumia know the integration is disconnected.
-	async stopPolling(showToast = true) {
-		if (this.pollIntervalId) {
-			clearInterval(this.pollIntervalId);
-			this.pollIntervalId = null;
-		}
-
-		await this.updateConnectionState(false);
-	}
-
-	// Poll the Rumble endpoint once, then delegate processing to the diff logic.
-	async pollAPI() {
-		if (this.pollInFlight) {
-			return;
-		}
-
-		this.pollInFlight = true;
-		try {
-			if (this.offline) {
-				return;
-			}
-
-			const apiKey = this.apiKey;
-			if (!apiKey) {
-				return;
-			}
-
-			const data = await this.fetchStreamData(apiKey);
-			await this.processStreamData(data);
-			this.failureCount = 0;
-			this.backoffMultiplier = 1;
-			await this.updateConnectionState(true);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			this.failureCount += 1;
-			if (this.failureCount >= 3) {
-				this.offline = true;
-				await this.stopPolling(false);
-			} else {
-				this.backoffMultiplier = Math.min(8, 2 ** this.failureCount);
-				await this.stopPolling(false);
-				await this.startPolling({ showToast: false });
-			}
-			await this.lumia.log(`[Rumble] Error polling API: ${message}`);
-			await this.updateConnectionState(false);
-		} finally {
-			this.pollInFlight = false;
-		}
-	}
-
-	async updateConnectionState(nextState) {
-		if (this.lastConnectionState === nextState) {
-			return;
-		}
-		this.lastConnectionState = nextState;
-		await this.lumia.updateConnection(nextState);
-	}
-
-	buildStateFromData(data = {}) {
-		// Flatten the API payload into a canonical structure with sensible defaults.
-		const state = this.createEmptyState();
-		const previousState = this.lastKnownState || {};
-
-		state.live = coerceBoolean(pickFirst(data, FIELD_PATHS.live), false);
-		state.viewers = coerceNumber(pickFirst(data, FIELD_PATHS.viewers));
-		state.joined = coerceNumber(pickFirst(data, FIELD_PATHS.joined));
-		state.title = coerceString(pickFirst(data, FIELD_PATHS.title), "");
-		state.thumbnail = coerceString(pickFirst(data, FIELD_PATHS.thumbnail), "");
-		state.streamUrl = coerceString(pickFirst(data, FIELD_PATHS.streamUrl), "");
-		state.videoId = coerceString(pickFirst(data, FIELD_PATHS.videoId), "");
-		state.rumbles = pickFirstNumber(
-			data,
-			FIELD_PATHS.rumbles,
-			previousState.rumbles || 0,
-		);
-		state.rants = pickFirstNumber(
-			data,
-			FIELD_PATHS.rants,
-			previousState.rants || 0,
-		);
-		state.rantAmount = pickFirstNumber(
-			data,
-			FIELD_PATHS.rantAmount,
-			previousState.rantAmount || 0,
-		);
-		state.followers = pickFirstNumber(
-			data,
-			FIELD_PATHS.followers,
-			previousState.followers || 0,
-		);
-		state.likes = pickFirstNumber(
-			data,
-			FIELD_PATHS.likes,
-			previousState.likes || 0,
-		);
-		state.dislikes = pickFirstNumber(
-			data,
-			FIELD_PATHS.dislikes,
-			previousState.dislikes || 0,
-		);
-		state.subs = pickFirstNumber(
-			data,
-			FIELD_PATHS.subs,
-			previousState.subs || 0,
-		);
-		state.subGifts = pickFirstNumber(
-			data,
-			FIELD_PATHS.subGifts,
-			previousState.subGifts || 0,
-		);
-		state.chatMembers = coerceNumber(
-			pickFirst(data, FIELD_PATHS.chatMembers),
-			0,
-		);
-		state.category = coerceString(pickFirst(data, FIELD_PATHS.category), "");
-		state.description = coerceString(
-			pickFirst(data, FIELD_PATHS.description),
-			"",
-		);
-		state.language = coerceString(pickFirst(data, FIELD_PATHS.language), "");
-		state.chatUrl = coerceString(pickFirst(data, FIELD_PATHS.chatUrl), "");
-		state.channelName = coerceString(
-			pickFirst(data, FIELD_PATHS.channelName),
-			"",
-		);
-		state.channelImage = coerceString(
-			pickFirst(data, FIELD_PATHS.channelImage),
-			"",
-		);
-		state.startedAt = parseTimestamp(pickFirst(data, FIELD_PATHS.startedAt));
-		state.scheduledStart = parseTimestamp(
-			pickFirst(data, FIELD_PATHS.scheduledStart),
-		);
-
-		return state;
-	}
-
-	// Main processing loop: handle lifecycle changes, detect counters, and persist variables.
-	async processStreamData(data = {}) {
-		const state = this.buildStateFromData(data);
-		const previous = this.lastKnownState;
-		const hadBaseline = this.hasBaseline;
-
-		if (state.live && !previous.live) {
-			await this.handleStreamStart(state);
-		} else if (!state.live && previous.live) {
-			await this.handleStreamEnd(state);
-		}
-
-		if (hadBaseline) {
-			await Promise.all([
-				this.checkFollowerChange(state, previous),
-				this.checkLikes(state, previous),
-				this.checkDislikes(state, previous),
-				this.checkSubs(state, previous),
-				this.checkSubGifts(state, previous),
-				this.checkRants(state, previous),
-			]);
-		} else {
-			this.sessionData.lastRantsCount = state.rants;
-			this.sessionData.lastRantAmount = state.rantAmount;
-		}
-
-		await this.updateVariables(state, previous, !hadBaseline);
-		if (state.live) {
-			await this.processChatMessages(data);
-		} else if (this.chatHasBaseline) {
-			this.resetChatState();
-		}
-		this.lastKnownState = state;
-		this.hasBaseline = true;
-	}
-
-	// Push the latest payload values into Lumia variables for automations and overlays.
-	async updateVariables(state, previousState, forceAll = false) {
-		const startedIso = state.startedAt ? state.startedAt.toISOString() : "";
-		const prevStartedIso = previousState?.startedAt
-			? previousState.startedAt.toISOString()
-			: "";
-		const scheduledIso = state.scheduledStart
-			? state.scheduledStart.toISOString()
-			: "";
-		const prevScheduledIso = previousState?.scheduledStart
-			? previousState.scheduledStart.toISOString()
-			: "";
-		const nowIso = new Date().toISOString();
-		const prevRantAmount = previousState
-			? roundToTwo(previousState.rantAmount)
-			: null;
-
-		const updates = [];
-		const setIfChanged = (key, value, previousValue) => {
-			if (forceAll || previousValue !== value) {
-				updates.push(this.lumia.setVariable(key, value));
-			}
-		};
-
-		setIfChanged("live", state.live, previousState?.live);
-		setIfChanged("viewers", state.viewers, previousState?.viewers);
-		setIfChanged("joined", state.joined, previousState?.joined);
-		setIfChanged("title", state.title, previousState?.title);
-		setIfChanged("thumbnail", state.thumbnail, previousState?.thumbnail);
-		setIfChanged("stream_url", state.streamUrl, previousState?.streamUrl);
-		setIfChanged("video_id", state.videoId, previousState?.videoId);
-		setIfChanged("reactions", state.rumbles, previousState?.rumbles);
-		setIfChanged("followers", state.followers, previousState?.followers);
-		setIfChanged("likes", state.likes, previousState?.likes);
-		setIfChanged("dislikes", state.dislikes, previousState?.dislikes);
-		setIfChanged("subs", state.subs, previousState?.subs);
-		setIfChanged("sub_gifts", state.subGifts, previousState?.subGifts);
-		setIfChanged("rants", state.rants, previousState?.rants);
-		setIfChanged("rant_amount", roundToTwo(state.rantAmount), prevRantAmount);
-		setIfChanged("chat_members", state.chatMembers, previousState?.chatMembers);
-		setIfChanged("category", state.category, previousState?.category);
-		setIfChanged("description", state.description, previousState?.description);
-		setIfChanged("language", state.language, previousState?.language);
-		setIfChanged("chat_url", state.chatUrl, previousState?.chatUrl);
-		setIfChanged("channel_name", state.channelName, previousState?.channelName);
-		setIfChanged(
-			"channel_image",
-			state.channelImage,
-			previousState?.channelImage,
-		);
-		setIfChanged("started_at", startedIso, prevStartedIso);
-		setIfChanged("scheduled_start", scheduledIso, prevScheduledIso);
-
-		if (updates.length) {
-			await Promise.all(updates);
-		}
-
-		// Store derived timestamps so we can compare next loop without recomputing.
-		state.lastPolledIso = nowIso;
-	}
-
-	// When a stream flips from offline to live, start a new session and alert.
-	async handleStreamStart(state) {
-		this.resetChatState();
-		this.sessionData = this.createEmptySession();
-		this.sessionData.streamStartTime = new Date();
-		this.sessionData.lastRantsCount = state.rants;
-		this.sessionData.lastRantAmount = state.rantAmount;
-		this.streamCounter += 1;
-
-		const alertVars = buildAlertVariables(state);
-		await this.lumia.triggerAlert({
-			alert: ALERT_TYPES.STREAM_START,
-			...buildAlertPayload(alertVars, {
-				state,
-				name: state.title || state.channelName || "rumble",
-				value: this.streamCounter,
-				extraSettings: {
-					stream_counter: this.streamCounter,
-				},
-			}),
-		});
-	}
-
-	// Stream has gone offline: summarise the session and clean up session state.
-	async handleStreamEnd(state) {
-		const alertVars = buildAlertVariables(state);
-		await this.lumia.triggerAlert({
-			alert: ALERT_TYPES.STREAM_END,
-			...buildAlertPayload(alertVars, {
-				state,
-				name: state.channelName || state.title || "rumble",
-				value: state.viewers,
-				extraSettings: {
-					total: this.streamCounter,
-				},
-			}),
-		});
-
-		this.sessionData.streamStartTime = null;
-		this.resetChatState();
-	}
-
-	// Emit a follower alert whenever the cumulative follower total increases.
-	async checkFollowerChange(state, previous) {
-		const delta = state.followers - (previous.followers || 0);
-		if (delta <= 0) {
-			return;
-		}
-
-		const alertVars = buildAlertVariables(state);
-		await this.lumia.triggerAlert({
-			alert: ALERT_TYPES.FOLLOWER,
-			showInEventList: true,
-			...buildAlertPayload(alertVars, {
-				state,
-				name: state.channelName || "rumble",
-				value: delta,
-				extraSettings: {
-					amount: delta,
-					total: state.followers,
-					followers: state.followers,
-				},
-			}),
-		});
-	}
-
-	// Emit when net likes increase.
-	async checkLikes(state, previous) {
-		const delta = state.likes - (previous.likes || 0);
-		if (delta <= 0) {
-			return;
-		}
-
-		const alertVars = buildAlertVariables(state);
-		await this.lumia.triggerAlert({
-			alert: ALERT_TYPES.LIKE,
-			showInEventList: true,
-			...buildAlertPayload(alertVars, {
-				state,
-				name: state.channelName || "rumble",
-				value: delta,
-				extraSettings: {
-					amount: delta,
-					total: state.likes,
-					likes: state.likes,
-				},
-			}),
-		});
-	}
-
-	// Emit when net dislikes increase.
-	async checkDislikes(state, previous) {
-		const delta = state.dislikes - (previous.dislikes || 0);
-		if (delta <= 0) {
-			return;
-		}
-
-		const alertVars = buildAlertVariables(state);
-		await this.lumia.triggerAlert({
-			alert: ALERT_TYPES.DISLIKE,
-			showInEventList: true,
-			...buildAlertPayload(alertVars, {
-				state,
-				name: state.channelName || "rumble",
-				value: delta,
-				extraSettings: {
-					amount: delta,
-					total: state.dislikes,
-					dislikes: state.dislikes,
-				},
-			}),
-		});
-	}
-
-	// Emit when paid subs/memberships increase.
-	async checkSubs(state, previous) {
-		const delta = state.subs - (previous.subs || 0);
-		if (delta <= 0) {
-			return;
-		}
-
-		const alertVars = buildAlertVariables(state);
-		await this.lumia.triggerAlert({
-			alert: ALERT_TYPES.SUB,
-			showInEventList: true,
-			...buildAlertPayload(alertVars, {
-				state,
-				name: state.channelName || "rumble",
-				value: delta,
-				extraSettings: {
-					amount: delta,
-					total: state.subs,
-					subs: state.subs,
-				},
-			}),
-		});
-	}
-
-	// Emit when gifted subs increase.
-	async checkSubGifts(state, previous) {
-		const delta = state.subGifts - (previous.subGifts || 0);
-		if (delta <= 0) {
-			return;
-		}
-
-		const alertVars = buildAlertVariables(state);
-		await this.lumia.triggerAlert({
-			alert: ALERT_TYPES.SUB_GIFT,
-			showInEventList: true,
-			...buildAlertPayload(alertVars, {
-				state,
-				name: state.channelName || "rumble",
-				value: delta,
-				extraSettings: {
-					amount: delta,
-					total: state.subGifts,
-					sub_gifts: state.subGifts,
-				},
-			}),
-		});
-	}
-
-	// Emit when the stream receives new rants or the total rant amount increases.
-	async checkRants(state, previous) {
-		const previousCount = previous.rants || 0;
-		const previousAmount = previous.rantAmount || 0;
-		const countDelta = state.rants - previousCount;
-		const amountDelta = state.rantAmount - previousAmount;
-
-		if (countDelta <= 0 && amountDelta <= RANT_AMOUNT_EPSILON) {
-			return;
-		}
-
-		this.sessionData.lastRantsCount = state.rants;
-		this.sessionData.lastRantAmount = state.rantAmount;
-
-		const alertVars = buildAlertVariables(state);
-		await this.lumia.triggerAlert({
-			alert: ALERT_TYPES.RANT,
-			showInEventList: true,
-			...buildAlertPayload(alertVars, {
-				state,
-				name: state.channelName || "rumble",
-				value: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
-				extraSettings: {
-					amount: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
-					total: roundToTwo(state.rantAmount),
-					rants: state.rants,
-					rant_amount: roundToTwo(state.rantAmount),
-				},
-			}),
-		});
-	}
-
-	resetChatState() {
-		this.chatState = this.createEmptyChatState();
-		this.chatHasBaseline = false;
-	}
-
-	extractChatMessages(rawData = {}) {
-		const livestream = Array.isArray(rawData.livestreams)
-			? rawData.livestreams[0]
-			: null;
-		const chat = livestream?.chat;
-		if (!chat) {
-			return [];
-		}
-
-		const recentMessages = Array.isArray(chat.recent_messages)
-			? chat.recent_messages
-			: [];
-		const latestMessage = chat.latest_message ? [chat.latest_message] : [];
-		const combined = [...recentMessages, ...latestMessage];
-
-		const normalized = combined
-			.map((message) => {
-				const username = coerceString(
-					message?.username || message?.user?.username || message?.displayname,
-					"",
-				);
-				const text = coerceString(message?.text ?? message?.message, "");
-				const timestamp = parseChatTimestamp(
-					message?.created_on ?? message?.created_at,
-				);
-				return {
-					messageId: extractChatMessageId(message),
-					username,
-					text,
-					timestamp,
-					avatar: extractChatAvatar(message),
-					userId: extractChatUserId(message),
-					badges: extractChatBadges(message),
-					userLevels: extractChatUserLevels(message),
-				};
-			})
-			.filter((message) => message.username && message.text);
-
-		normalized.sort((a, b) => a.timestamp - b.timestamp);
-
-		const seenInPayload = new Set();
-		return normalized.filter((message) => {
-			const key = getChatMessageKey(message);
-			if (seenInPayload.has(key)) {
-				return false;
-			}
-			seenInPayload.add(key);
-			return true;
-		});
-	}
-
-	cacheChatKey(key) {
-		if (this.chatState.seenKeys.has(key)) {
-			return;
-		}
-
-		this.chatState.seenKeys.add(key);
-		this.chatState.seenOrder.push(key);
-		const maxCacheSize = 200;
-		if (this.chatState.seenOrder.length > maxCacheSize) {
-			const overflow = this.chatState.seenOrder.length - maxCacheSize;
-			const removed = this.chatState.seenOrder.splice(0, overflow);
-			removed.forEach((oldKey) => this.chatState.seenKeys.delete(oldKey));
-		}
-	}
-
-	async processChatMessages(rawData = {}) {
-		const messages = this.extractChatMessages(rawData);
-		if (!messages.length) {
-			this.chatHasBaseline = true;
-			return;
-		}
-
-		if (!this.chatHasBaseline) {
-			messages.forEach((message) => {
-				const key = getChatMessageKey(message);
-				this.cacheChatKey(key);
-				this.chatState.lastTimestamp = Math.max(
-					this.chatState.lastTimestamp,
-					message.timestamp,
-				);
-			});
-			this.chatHasBaseline = true;
-			return;
-		}
-
-		for (const message of messages) {
-			const key = getChatMessageKey(message);
-			if (this.chatState.seenKeys.has(key)) {
-				continue;
-			}
-
-			if (
-				message.timestamp &&
-				message.timestamp < this.chatState.lastTimestamp
-			) {
-				this.cacheChatKey(key);
-				continue;
-			}
-
-			this.cacheChatKey(key);
-			this.chatState.lastTimestamp = Math.max(
-				this.chatState.lastTimestamp,
-				message.timestamp,
-			);
-
-			this.lumia.displayChat({
-				username: message.username,
-				displayname: message.username,
-				message: message.text,
-				avatar: message.avatar || undefined,
-				messageId: getDisplayChatMessageId(message),
-				badges: message.badges?.length ? message.badges : undefined,
-				userId: message.userId || undefined,
-				userLevels: message.userLevels,
-			});
-		}
-	}
-
-	// Wraps the fetch call so we can centralise error handling and payload shape.
-	async fetchStreamData(apiKey) {
-		const url = `https://rumble.com/-livestream-api/get-data?key=${encodeURIComponent(
-			apiKey,
-		)}`;
-		const response = await fetch(url);
-
-		if (!response.ok) {
-			throw new Error(
-				`HTTP ${response.status}: ${response.statusText || "Request failed"}`,
-			);
-		}
-
-		const payload = await response.json();
-		if (payload && typeof payload === "object") {
-			if ("data" in payload && payload.data) {
-				return payload.data;
-			}
-			return payload;
-		}
-
-		throw new Error("Invalid response from Rumble API");
-	}
-
-	// Accept strings/numbers for the poll interval and clamp to our allowed window.
-	normalizePollInterval(value) {
-		if (typeof value === "number" && Number.isFinite(value)) {
-			return this.clampInterval(value);
-		}
-
-		const parsed = Number(value);
-		if (Number.isFinite(parsed)) {
-			return this.clampInterval(parsed);
-		}
-
-		return DEFAULT_POLL_INTERVAL;
-	}
-
-	// Convert millisecond inputs to seconds and enforce min/max constraints.
-	clampInterval(value) {
-		const interpreted =
-			value > MAX_POLL_INTERVAL && value >= MIN_POLL_INTERVAL * 1000
-				? value / 1000
-				: value;
-		const rounded = Math.round(interpreted);
-		return Math.min(Math.max(rounded, MIN_POLL_INTERVAL), MAX_POLL_INTERVAL);
-	}
+constructor(manifest, context) {
+super(manifest, context);
+
+    	this.pollIntervalId = null;
+    	this.pollInFlight = false;
+    	this.lastKnownState = this.createEmptyState();
+    	this.sessionData = this.createEmptySession();
+    	this.hasBaseline = false;
+    	this.streamCounter = 0;
+    	this.chatState = this.createEmptyChatState();
+    	this.chatHasBaseline = false;
+    	this.failureCount = 0;
+    	this.backoffMultiplier = 1;
+    	this.offline = false;
+    	this.lastConnectionState = null;
+    }
+
+    createEmptyState() {
+    	// Defaults for every variable we expose so first poll starts populated.
+    	return {
+    		live: false,
+    		viewers: 0,
+    		joined: 0,
+    		title: "",
+    		thumbnail: "",
+    		streamUrl: "",
+    		videoId: "",
+    		rumbles: 0,
+    		rants: 0,
+    		rantAmount: 0,
+    		followers: 0,
+    		likes: 0,
+    		dislikes: 0,
+    		subs: 0,
+    		subGifts: 0,
+    		chatMembers: 0,
+    		category: "",
+    		description: "",
+    		language: "",
+    		chatUrl: "",
+    		channelName: "",
+    		channelImage: "",
+    		startedAt: null,
+    		scheduledStart: null,
+    	};
+    }
+
+    createEmptyChatState() {
+    	return {
+    		lastTimestamp: 0,
+    		seenKeys: new Set(),
+    		seenOrder: [],
+    	};
+    }
+
+    createEmptySession() {
+    	// Per-stream counters that reset when the broadcast ends.
+    	return {
+    		streamStartTime: null,
+    		lastRantsCount: 0,
+    		lastRantAmount: 0,
+    	};
+    }
+
+    get currentSettings() {
+    	return this.settings || {};
+    }
+
+    get apiKey() {
+    	return this.extractApiKey(this.currentSettings.apiKey);
+    }
+
+    async onload() {
+    	if (this.apiKey) {
+    		await this.startPolling({ showToast: false });
+    	}
+    }
+
+    async onunload() {
+    	await this.stopPolling(false);
+    }
+
+    async onsettingsupdate(settings, previousSettings) {
+    	const next = settings || {};
+    	const previous = previousSettings || {};
+
+    	const nextApiKey = this.extractApiKey(next.apiKey);
+    	const prevApiKey = this.extractApiKey(previous.apiKey);
+
+    	const nextInterval = this.normalizePollInterval(next.pollInterval);
+    	const prevInterval = this.normalizePollInterval(previous.pollInterval);
+
+    	const apiKeyChanged = nextApiKey !== prevApiKey;
+    	const intervalChanged = nextInterval !== prevInterval;
+
+    	if (!nextApiKey) {
+    		await this.stopPolling(false);
+    		return;
+    	}
+
+    	if (!this.pollIntervalId) {
+    		await this.startPolling({ showToast: false });
+    		return;
+    	}
+
+    	if (apiKeyChanged || intervalChanged) {
+    		this.offline = false;
+    		this.failureCount = 0;
+    		this.backoffMultiplier = 1;
+    		await this.stopPolling(false);
+    		await this.startPolling({ showToast: false });
+    	}
+    }
+
+    // Lumia runs this during setup to confirm the key is valid before saving it.
+    async validateAuth(data = {}) {
+    	try {
+    		const apiKey = this.extractApiKey(data.apiKey);
+    		if (!apiKey) {
+    			return false;
+    		}
+
+    		await this.fetchStreamData(apiKey);
+    		return true;
+    	} catch (error) {
+    		const message = error instanceof Error ? error.message : String(error);
+    		await this.lumia.log(`[Rumble] Auth validation failed: ${message}`);
+    		return false;
+    	}
+    }
+
+    // Trim whitespace and discard empty strings so settings checks stay clean.
+    extractApiKey(value) {
+    	if (typeof value !== "string") {
+    		return undefined;
+    	}
+    	const trimmed = value.trim();
+    	if (!trimmed.length) {
+    		return undefined;
+    	}
+
+    	try {
+    		const asUrl = new URL(trimmed);
+    		const keyParam = asUrl.searchParams.get("key");
+    		if (keyParam) {
+    			return keyParam.trim() || undefined;
+    		}
+    	} catch {
+    		// Not a URL – fall through to treating it as the raw key
+    	}
+
+    	return trimmed;
+    }
+
+    // Kick off the polling interval and optionally inform the user via toast.
+    async startPolling(options = {}) {
+    	const { showToast = true } = options;
+
+    	if (!this.apiKey) {
+    		await this.lumia.log("[Rumble] Missing API key, cannot start polling");
+    		if (showToast) {
+    			await this.lumia.showToast({
+    				message: "Rumble API key required to poll",
+    			});
+    		}
+    		return;
+    	}
+
+    	if (this.offline) {
+    		return;
+    	}
+
+    	if (this.pollIntervalId) {
+    		return;
+    	}
+
+    	const normalizedInterval = this.normalizePollInterval(
+    		this.currentSettings.pollInterval,
+    	);
+
+    	if (normalizedInterval !== this.currentSettings.pollInterval) {
+    		// Persist the clamped value so the UI reflects what we are using.
+    		this.updateSettings({ pollInterval: normalizedInterval });
+    	}
+
+    	const intervalSeconds = Math.min(
+    		Math.max(
+    			Math.round(normalizedInterval * this.backoffMultiplier),
+    			MIN_POLL_INTERVAL,
+    		),
+    		MAX_POLL_INTERVAL * 4,
+    	);
+
+    	await this.pollAPI();
+
+    	this.pollIntervalId = setInterval(() => {
+    		// Avoid awaiting the result here so the timer keeps its cadence.
+    		void this.pollAPI();
+    	}, intervalSeconds * 1000);
+    }
+
+    // Halt polling and let Lumia know the integration is disconnected.
+    async stopPolling(showToast = true) {
+    	if (this.pollIntervalId) {
+    		clearInterval(this.pollIntervalId);
+    		this.pollIntervalId = null;
+    	}
+
+    	await this.updateConnectionState(false);
+    }
+
+    // Poll the Rumble endpoint once, then delegate processing to the diff logic.
+    async pollAPI() {
+    	if (this.pollInFlight) {
+    		return;
+    	}
+
+    	this.pollInFlight = true;
+    	try {
+    		if (this.offline) {
+    			return;
+    		}
+
+    		const apiKey = this.apiKey;
+    		if (!apiKey) {
+    			return;
+    		}
+
+    		const data = await this.fetchStreamData(apiKey);
+    		await this.processStreamData(data);
+    		this.failureCount = 0;
+    		this.backoffMultiplier = 1;
+    		await this.updateConnectionState(true);
+    	} catch (error) {
+    		const message = error instanceof Error ? error.message : String(error);
+    		this.failureCount += 1;
+    		if (this.failureCount >= 3) {
+    			this.offline = true;
+    			await this.stopPolling(false);
+    		} else {
+    			this.backoffMultiplier = Math.min(8, 2 ** this.failureCount);
+    			await this.stopPolling(false);
+    			await this.startPolling({ showToast: false });
+    		}
+    		await this.lumia.log(`[Rumble] Error polling API: ${message}`);
+    		await this.updateConnectionState(false);
+    	} finally {
+    		this.pollInFlight = false;
+    	}
+    }
+
+    async updateConnectionState(nextState) {
+    	if (this.lastConnectionState === nextState) {
+    		return;
+    	}
+    	this.lastConnectionState = nextState;
+    	await this.lumia.updateConnection(nextState);
+    }
+
+    buildStateFromData(data = {}) {
+    	// Flatten the API payload into a canonical structure with sensible defaults.
+    	const state = this.createEmptyState();
+    	const previousState = this.lastKnownState || {};
+
+    	state.live = coerceBoolean(pickFirst(data, FIELD_PATHS.live), false);
+    	state.viewers = coerceNumber(pickFirst(data, FIELD_PATHS.viewers));
+    	state.joined = coerceNumber(pickFirst(data, FIELD_PATHS.joined));
+    	state.title = coerceString(pickFirst(data, FIELD_PATHS.title), "");
+    	state.thumbnail = coerceString(pickFirst(data, FIELD_PATHS.thumbnail), "");
+    	state.streamUrl = coerceString(pickFirst(data, FIELD_PATHS.streamUrl), "");
+    	state.videoId = coerceString(pickFirst(data, FIELD_PATHS.videoId), "");
+    	state.rumbles = pickFirstNumber(
+    		data,
+    		FIELD_PATHS.rumbles,
+    		previousState.rumbles || 0,
+    	);
+    	state.rants = pickFirstNumber(
+    		data,
+    		FIELD_PATHS.rants,
+    		previousState.rants || 0,
+    	);
+    	state.rantAmount = pickFirstNumber(
+    		data,
+    		FIELD_PATHS.rantAmount,
+    		previousState.rantAmount || 0,
+    	);
+    	state.followers = pickFirstNumber(
+    		data,
+    		FIELD_PATHS.followers,
+    		previousState.followers || 0,
+    	);
+    	state.likes = pickFirstNumber(
+    		data,
+    		FIELD_PATHS.likes,
+    		previousState.likes || 0,
+    	);
+    	state.dislikes = pickFirstNumber(
+    		data,
+    		FIELD_PATHS.dislikes,
+    		previousState.dislikes || 0,
+    	);
+    	state.subs = pickFirstNumber(
+    		data,
+    		FIELD_PATHS.subs,
+    		previousState.subs || 0,
+    	);
+    	state.subGifts = pickFirstNumber(
+    		data,
+    		FIELD_PATHS.subGifts,
+    		previousState.subGifts || 0,
+    	);
+    	state.chatMembers = coerceNumber(
+    		pickFirst(data, FIELD_PATHS.chatMembers),
+    		0,
+    	);
+    	state.category = coerceString(pickFirst(data, FIELD_PATHS.category), "");
+    	state.description = coerceString(
+    		pickFirst(data, FIELD_PATHS.description),
+    		"",
+    	);
+    	state.language = coerceString(pickFirst(data, FIELD_PATHS.language), "");
+    	state.chatUrl = coerceString(pickFirst(data, FIELD_PATHS.chatUrl), "");
+    	state.channelName = coerceString(
+    		pickFirst(data, FIELD_PATHS.channelName),
+    		"",
+    	);
+    	state.channelImage = coerceString(
+    		pickFirst(data, FIELD_PATHS.channelImage),
+    		"",
+    	);
+    	state.startedAt = parseTimestamp(pickFirst(data, FIELD_PATHS.startedAt));
+    	state.scheduledStart = parseTimestamp(
+    		pickFirst(data, FIELD_PATHS.scheduledStart),
+    	);
+
+    	return state;
+    }
+
+    // Main processing loop: handle lifecycle changes, detect counters, and persist variables.
+    async processStreamData(data = {}) {
+    	const state = this.buildStateFromData(data);
+    	const previous = this.lastKnownState;
+    	const hadBaseline = this.hasBaseline;
+
+    	if (state.live && !previous.live) {
+    		await this.handleStreamStart(state);
+    	} else if (!state.live && previous.live) {
+    		await this.handleStreamEnd(state);
+    	}
+
+    	if (hadBaseline) {
+    		await Promise.all([
+    			this.checkFollowerChange(state, previous),
+    			this.checkLikes(state, previous),
+    			this.checkDislikes(state, previous),
+    			this.checkSubs(state, previous),
+    			this.checkSubGifts(state, previous),
+    			this.checkRants(state, previous),
+    		]);
+    	} else {
+    		this.sessionData.lastRantsCount = state.rants;
+    		this.sessionData.lastRantAmount = state.rantAmount;
+    	}
+
+    	await this.updateVariables(state, previous, !hadBaseline);
+    	if (state.live) {
+    		await this.processChatMessages(data);
+    	} else if (this.chatHasBaseline) {
+    		this.resetChatState();
+    	}
+    	this.lastKnownState = state;
+    	this.hasBaseline = true;
+    }
+
+    // Push the latest payload values into Lumia variables for automations and overlays.
+    async updateVariables(state, previousState, forceAll = false) {
+    	const startedIso = state.startedAt ? state.startedAt.toISOString() : "";
+    	const prevStartedIso = previousState?.startedAt
+    		? previousState.startedAt.toISOString()
+    		: "";
+    	const scheduledIso = state.scheduledStart
+    		? state.scheduledStart.toISOString()
+    		: "";
+    	const prevScheduledIso = previousState?.scheduledStart
+    		? previousState.scheduledStart.toISOString()
+    		: "";
+    	const nowIso = new Date().toISOString();
+    	const prevRantAmount = previousState
+    		? roundToTwo(previousState.rantAmount)
+    		: null;
+
+    	const updates = [];
+    	const setIfChanged = (key, value, previousValue) => {
+    		if (forceAll || previousValue !== value) {
+    			updates.push(this.lumia.setVariable(key, value));
+    		}
+    	};
+
+    	setIfChanged("live", state.live, previousState?.live);
+    	setIfChanged("viewers", state.viewers, previousState?.viewers);
+    	setIfChanged("joined", state.joined, previousState?.joined);
+    	setIfChanged("title", state.title, previousState?.title);
+    	setIfChanged("thumbnail", state.thumbnail, previousState?.thumbnail);
+    	setIfChanged("stream_url", state.streamUrl, previousState?.streamUrl);
+    	setIfChanged("video_id", state.videoId, previousState?.videoId);
+    	setIfChanged("reactions", state.rumbles, previousState?.rumbles);
+    	setIfChanged("followers", state.followers, previousState?.followers);
+    	setIfChanged("likes", state.likes, previousState?.likes);
+    	setIfChanged("dislikes", state.dislikes, previousState?.dislikes);
+    	setIfChanged("subs", state.subs, previousState?.subs);
+    	setIfChanged("sub_gifts", state.subGifts, previousState?.subGifts);
+    	setIfChanged("rants", state.rants, previousState?.rants);
+    	setIfChanged("rant_amount", roundToTwo(state.rantAmount), prevRantAmount);
+    	setIfChanged("chat_members", state.chatMembers, previousState?.chatMembers);
+    	setIfChanged("category", state.category, previousState?.category);
+    	setIfChanged("description", state.description, previousState?.description);
+    	setIfChanged("language", state.language, previousState?.language);
+    	setIfChanged("chat_url", state.chatUrl, previousState?.chatUrl);
+    	setIfChanged("channel_name", state.channelName, previousState?.channelName);
+    	setIfChanged(
+    		"channel_image",
+    		state.channelImage,
+    		previousState?.channelImage,
+    	);
+    	setIfChanged("started_at", startedIso, prevStartedIso);
+    	setIfChanged("scheduled_start", scheduledIso, prevScheduledIso);
+
+    	if (updates.length) {
+    		await Promise.all(updates);
+    	}
+
+    	// Store derived timestamps so we can compare next loop without recomputing.
+    	state.lastPolledIso = nowIso;
+    }
+
+    // When a stream flips from offline to live, start a new session and alert.
+    async handleStreamStart(state) {
+    	this.resetChatState();
+    	this.sessionData = this.createEmptySession();
+    	this.sessionData.streamStartTime = new Date();
+    	this.sessionData.lastRantsCount = state.rants;
+    	this.sessionData.lastRantAmount = state.rantAmount;
+    	this.streamCounter += 1;
+
+    	const alertVars = buildAlertVariables(state);
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_TYPES.STREAM_START,
+    		...buildAlertPayload(alertVars, {
+    			state,
+    			name: state.title || state.channelName || "rumble",
+    			value: this.streamCounter,
+    			extraSettings: {
+    				stream_counter: this.streamCounter,
+    			},
+    		}),
+    	});
+    }
+
+    // Stream has gone offline: summarise the session and clean up session state.
+    async handleStreamEnd(state) {
+    	const alertVars = buildAlertVariables(state);
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_TYPES.STREAM_END,
+    		...buildAlertPayload(alertVars, {
+    			state,
+    			name: state.channelName || state.title || "rumble",
+    			value: state.viewers,
+    			extraSettings: {
+    				total: this.streamCounter,
+    			},
+    		}),
+    	});
+
+    	this.sessionData.streamStartTime = null;
+    	this.resetChatState();
+    }
+
+    // Emit a follower alert whenever the cumulative follower total increases.
+    async checkFollowerChange(state, previous) {
+    	const delta = state.followers - (previous.followers || 0);
+    	if (delta <= 0) {
+    		return;
+    	}
+
+    	const alertVars = buildAlertVariables(state);
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_TYPES.FOLLOWER,
+    		showInEventList: true,
+    		...buildAlertPayload(alertVars, {
+    			state,
+    			name: state.channelName || "rumble",
+    			value: delta,
+    			extraSettings: {
+    				amount: delta,
+    				total: state.followers,
+    				followers: state.followers,
+    			},
+    		}),
+    	});
+    }
+
+    // Emit when net likes increase.
+    async checkLikes(state, previous) {
+    	const delta = state.likes - (previous.likes || 0);
+    	if (delta <= 0) {
+    		return;
+    	}
+
+    	const alertVars = buildAlertVariables(state);
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_TYPES.LIKE,
+    		showInEventList: true,
+    		...buildAlertPayload(alertVars, {
+    			state,
+    			name: state.channelName || "rumble",
+    			value: delta,
+    			extraSettings: {
+    				amount: delta,
+    				total: state.likes,
+    				likes: state.likes,
+    			},
+    		}),
+    	});
+    }
+
+    // Emit when net dislikes increase.
+    async checkDislikes(state, previous) {
+    	const delta = state.dislikes - (previous.dislikes || 0);
+    	if (delta <= 0) {
+    		return;
+    	}
+
+    	const alertVars = buildAlertVariables(state);
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_TYPES.DISLIKE,
+    		showInEventList: true,
+    		...buildAlertPayload(alertVars, {
+    			state,
+    			name: state.channelName || "rumble",
+    			value: delta,
+    			extraSettings: {
+    				amount: delta,
+    				total: state.dislikes,
+    				dislikes: state.dislikes,
+    			},
+    		}),
+    	});
+    }
+
+    // Emit when paid subs/memberships increase.
+    async checkSubs(state, previous) {
+    	const delta = state.subs - (previous.subs || 0);
+    	if (delta <= 0) {
+    		return;
+    	}
+
+    	const alertVars = buildAlertVariables(state);
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_TYPES.SUB,
+    		showInEventList: true,
+    		...buildAlertPayload(alertVars, {
+    			state,
+    			name: state.channelName || "rumble",
+    			value: delta,
+    			extraSettings: {
+    				amount: delta,
+    				total: state.subs,
+    				subs: state.subs,
+    			},
+    		}),
+    	});
+    }
+
+    // Emit when gifted subs increase.
+    async checkSubGifts(state, previous) {
+    	const delta = state.subGifts - (previous.subGifts || 0);
+    	if (delta <= 0) {
+    		return;
+    	}
+
+    	const alertVars = buildAlertVariables(state);
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_TYPES.SUB_GIFT,
+    		showInEventList: true,
+    		...buildAlertPayload(alertVars, {
+    			state,
+    			name: state.channelName || "rumble",
+    			value: delta,
+    			extraSettings: {
+    				amount: delta,
+    				total: state.subGifts,
+    				sub_gifts: state.subGifts,
+    			},
+    		}),
+    	});
+    }
+
+    // Emit when the stream receives new rants or the total rant amount increases.
+    async checkRants(state, previous) {
+    	const previousCount = previous.rants || 0;
+    	const previousAmount = previous.rantAmount || 0;
+    	const countDelta = state.rants - previousCount;
+    	const amountDelta = state.rantAmount - previousAmount;
+
+    	if (countDelta <= 0 && amountDelta <= RANT_AMOUNT_EPSILON) {
+    		return;
+    	}
+
+    	this.sessionData.lastRantsCount = state.rants;
+    	this.sessionData.lastRantAmount = state.rantAmount;
+
+    	const alertVars = buildAlertVariables(state);
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_TYPES.RANT,
+    		showInEventList: true,
+    		...buildAlertPayload(alertVars, {
+    			state,
+    			name: state.channelName || "rumble",
+    			value: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
+    			extraSettings: {
+    				amount: roundToTwo(amountDelta > 0 ? amountDelta : countDelta),
+    				total: roundToTwo(state.rantAmount),
+    				rants: state.rants,
+    				rant_amount: roundToTwo(state.rantAmount),
+    			},
+    		}),
+    	});
+    }
+
+    resetChatState() {
+    	this.chatState = this.createEmptyChatState();
+    	this.chatHasBaseline = false;
+    }
+
+    extractChatMessages(rawData = {}) {
+    	const livestream = Array.isArray(rawData.livestreams)
+    		? rawData.livestreams[0]
+    		: null;
+    	const chat = livestream?.chat;
+    	if (!chat) {
+    		return [];
+    	}
+
+    	const recentMessages = Array.isArray(chat.recent_messages)
+    		? chat.recent_messages
+    		: [];
+    	const latestMessage = chat.latest_message ? [chat.latest_message] : [];
+    	const combined = [...recentMessages, ...latestMessage];
+
+    	const normalized = combined
+    		.map((message) => {
+    			const username = coerceString(
+    				message?.username || message?.user?.username || message?.displayname,
+    				"",
+    			);
+    			const text = coerceString(message?.text ?? message?.message, "");
+    			const timestamp = parseChatTimestamp(
+    				message?.created_on ?? message?.created_at,
+    			);
+    			return {
+    				messageId: extractChatMessageId(message),
+    				username,
+    				text,
+    				timestamp,
+    				avatar: extractChatAvatar(message),
+    				userId: extractChatUserId(message),
+    				badges: extractChatBadges(message),
+    				userLevels: extractChatUserLevels(message),
+    			};
+    		})
+    		.filter((message) => message.username && message.text);
+
+    	normalized.sort((a, b) => a.timestamp - b.timestamp);
+
+    	const seenInPayload = new Set();
+    	return normalized.filter((message) => {
+    		const key = getChatMessageKey(message);
+    		if (seenInPayload.has(key)) {
+    			return false;
+    		}
+    		seenInPayload.add(key);
+    		return true;
+    	});
+    }
+
+    cacheChatKey(key) {
+    	if (this.chatState.seenKeys.has(key)) {
+    		return;
+    	}
+
+    	this.chatState.seenKeys.add(key);
+    	this.chatState.seenOrder.push(key);
+    	const maxCacheSize = 200;
+    	if (this.chatState.seenOrder.length > maxCacheSize) {
+    		const overflow = this.chatState.seenOrder.length - maxCacheSize;
+    		const removed = this.chatState.seenOrder.splice(0, overflow);
+    		removed.forEach((oldKey) => this.chatState.seenKeys.delete(oldKey));
+    	}
+    }
+
+    async processChatMessages(rawData = {}) {
+    	const messages = this.extractChatMessages(rawData);
+    	if (!messages.length) {
+    		this.chatHasBaseline = true;
+    		return;
+    	}
+
+    	if (!this.chatHasBaseline) {
+    		messages.forEach((message) => {
+    			const key = getChatMessageKey(message);
+    			this.cacheChatKey(key);
+    			this.chatState.lastTimestamp = Math.max(
+    				this.chatState.lastTimestamp,
+    				message.timestamp,
+    			);
+    		});
+    		this.chatHasBaseline = true;
+    		return;
+    	}
+
+    	for (const message of messages) {
+    		const key = getChatMessageKey(message);
+    		if (this.chatState.seenKeys.has(key)) {
+    			continue;
+    		}
+
+    		if (
+    			message.timestamp &&
+    			message.timestamp < this.chatState.lastTimestamp
+    		) {
+    			this.cacheChatKey(key);
+    			continue;
+    		}
+
+    		this.cacheChatKey(key);
+    		this.chatState.lastTimestamp = Math.max(
+    			this.chatState.lastTimestamp,
+    			message.timestamp,
+    		);
+
+    		this.lumia.displayChat({
+    			username: message.username,
+    			displayname: message.username,
+    			message: message.text,
+    			avatar: message.avatar || undefined,
+    			messageId: getDisplayChatMessageId(message),
+    			badges: message.badges?.length ? message.badges : undefined,
+    			userId: message.userId || undefined,
+    			userLevels: message.userLevels,
+    		});
+    	}
+    }
+
+    // Wraps the fetch call so we can centralise error handling and payload shape.
+    async fetchStreamData(apiKey) {
+    	const url = `https://rumble.com/-livestream-api/get-data?key=${encodeURIComponent(
+    		apiKey,
+    	)}`;
+    	const response = await fetch(url);
+
+    	if (!response.ok) {
+    		throw new Error(
+    			`HTTP ${response.status}: ${response.statusText || "Request failed"}`,
+    		);
+    	}
+
+    	const payload = await response.json();
+    	if (payload && typeof payload === "object") {
+    		if ("data" in payload && payload.data) {
+    			return payload.data;
+    		}
+    		return payload;
+    	}
+
+    	throw new Error("Invalid response from Rumble API");
+    }
+
+    // Accept strings/numbers for the poll interval and clamp to our allowed window.
+    normalizePollInterval(value) {
+    	if (typeof value === "number" && Number.isFinite(value)) {
+    		return this.clampInterval(value);
+    	}
+
+    	const parsed = Number(value);
+    	if (Number.isFinite(parsed)) {
+    		return this.clampInterval(parsed);
+    	}
+
+    	return DEFAULT_POLL_INTERVAL;
+    }
+
+    // Convert millisecond inputs to seconds and enforce min/max constraints.
+    clampInterval(value) {
+    	const interpreted =
+    		value > MAX_POLL_INTERVAL && value >= MIN_POLL_INTERVAL * 1000
+    			? value / 1000
+    			: value;
+    	const rounded = Math.round(interpreted);
+    	return Math.min(Math.max(rounded, MIN_POLL_INTERVAL), MAX_POLL_INTERVAL);
+    }
+
 }
 
 module.exports = RumblePlugin;
@@ -16916,309 +16959,310 @@ module.exports = RumblePlugin;
 ## rumble/manifest.json
 
 ```
+
 {
-	"id": "rumble",
-	"name": "Rumble",
-	"version": "1.1.1",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"description": "Track Rumble livestream state and engagement with alerts, variables, and chat display.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "platforms",
-	"keywords": "rumble, livestream, chat, followers, alerts",
-	"icon": "rumble.png",
-	"config": {
-		"settings": [
-			{
-				"key": "apiKey",
-				"label": "API Key",
-				"type": "text",
-				"placeholder": "Enter your Rumble livestream API key",
-				"helperText": "Copy the key parameter from your Rumble livestream API URL",
-				"required": true
-			},
-			{
-				"key": "pollInterval",
-				"label": "Poll Interval (seconds)",
-				"type": "number",
-				"defaultValue": 10,
-				"helperText": "How often to check for stream updates (10-300 seconds)"
-			}
-		],
-		"settings_tutorial": "./settings_tutorial.md",
-		"actions_tutorial": "./actions_tutorial.md",
-		"actions": [],
-		"variables": [
-			{
-				"name": "live",
-				"description": "Whether the Rumble stream is currently live",
-				"value": false
-			},
-			{
-				"name": "viewers",
-				"description": "Current number of concurrent viewers watching the stream",
-				"value": 0
-			},
-			{
-				"name": "joined",
-				"description": "Total viewers that have joined the stream session",
-				"value": 0
-			},
-			{
-				"name": "title",
-				"description": "Current stream title",
-				"value": ""
-			},
-			{
-				"name": "thumbnail",
-				"description": "Stream thumbnail URL",
-				"value": ""
-			},
-			{
-				"name": "stream_url",
-				"description": "Public URL to the livestream",
-				"value": ""
-			},
-			{
-				"name": "video_id",
-				"description": "Underlying Rumble video ID",
-				"value": ""
-			},
-			{
-				"name": "reactions",
-				"description": "Current reaction count on the stream",
-				"value": 0
-			},
-			{
-				"name": "followers",
-				"description": "Current follower count of the channel",
-				"value": 0
-			},
-			{
-				"name": "likes",
-				"description": "Thumbs-up reactions on the stream",
-				"value": 0
-			},
-			{
-				"name": "dislikes",
-				"description": "Thumbs-down reactions on the stream",
-				"value": 0
-			},
-			{
-				"name": "subs",
-				"description": "Total paid subscriptions/memberships for the channel",
-				"value": 0
-			},
-			{
-				"name": "sub_gifts",
-				"description": "Gifted subscriptions/memberships received during the stream",
-				"value": 0
-			},
-			{
-				"name": "rants",
-				"description": "Number of Rants received this stream",
-				"value": 0
-			},
-			{
-				"name": "rant_amount",
-				"description": "Total value of Rants received this stream",
-				"value": 0
-			},
-			{
-				"name": "chat_members",
-				"description": "Active chat members in the livestream chat",
-				"value": 0
-			},
-			{
-				"name": "category",
-				"description": "Category assigned to the livestream",
-				"value": ""
-			},
-			{
-				"name": "description",
-				"description": "Short description of the livestream",
-				"value": ""
-			},
-			{
-				"name": "language",
-				"description": "Language reported by Rumble for the stream",
-				"value": ""
-			},
-			{
-				"name": "chat_url",
-				"description": "Direct URL to the livestream chat",
-				"value": ""
-			},
-			{
-				"name": "channel_name",
-				"description": "Rumble channel display name",
-				"value": ""
-			},
-			{
-				"name": "channel_image",
-				"description": "Avatar image URL for the Rumble channel",
-				"value": ""
-			},
-			{
-				"name": "started_at",
-				"description": "Timestamp of when the stream went live (ISO 8601)",
-				"value": ""
-			},
-			{
-				"name": "scheduled_start",
-				"description": "Scheduled start time for the stream (ISO 8601)",
-				"value": ""
-			}
-		],
-		"alerts": [
-			{
-				"title": "Stream Started",
-				"key": "streamStarted",
-				"acceptedVariables": [
-					"live",
-					"viewers",
-					"title",
-					"stream_url",
-					"followers",
-					"likes",
-					"dislikes",
-					"subs",
-					"sub_gifts",
-					"rants",
-					"rant_amount"
-				],
-				"defaultMessage": "{{username}} has started streaming on Rumble!",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Stream Ended",
-				"key": "streamEnded",
-				"acceptedVariables": [
-					"live",
-					"viewers",
-					"title",
-					"followers",
-					"likes",
-					"dislikes",
-					"subs",
-					"sub_gifts",
-					"rants",
-					"rant_amount"
-				],
-				"defaultMessage": "{{username}} has ended their Rumble stream.",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Follower",
-				"key": "follower",
-				"acceptedVariables": ["followers", "stream_url", "title"],
-				"defaultMessage": "New followers! Total is now {{followers}}.",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Follow number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Rant",
-				"key": "rant",
-				"acceptedVariables": ["rants", "rant_amount", "viewers", "title"],
-				"defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Rant number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Like",
-				"key": "like",
-				"acceptedVariables": ["likes", "stream_url", "title"],
-				"defaultMessage": "Another thumbs-up! Likes: {{likes}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Like number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Dislike",
-				"key": "dislike",
-				"acceptedVariables": ["dislikes", "stream_url", "title"],
-				"defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Dislike number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Subscriber",
-				"key": "sub",
-				"acceptedVariables": ["subs", "stream_url", "title"],
-				"defaultMessage": "New subscription! Subs total: {{subs}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Sub number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Gift Subscription",
-				"key": "subGift",
-				"acceptedVariables": ["sub_gifts", "stream_url", "title"],
-				"defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Gift sub number is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			}
-		],
-		"translations": "./translations.json"
-	}
+"id": "rumble",
+"name": "Rumble",
+"version": "1.1.1",
+"author": "Lumia Stream",
+"email": "dev@lumiastream.com",
+"website": "https://lumiastream.com",
+"description": "Track Rumble livestream state and engagement with alerts, variables, and chat display.",
+"license": "MIT",
+"lumiaVersion": "^9.0.0",
+"category": "platforms",
+"keywords": "rumble, livestream, chat, followers, alerts",
+"icon": "rumble.png",
+"config": {
+"settings": [
+{
+"key": "apiKey",
+"label": "API Key",
+"type": "text",
+"placeholder": "Enter your Rumble livestream API key",
+"helperText": "Copy the key parameter from your Rumble livestream API URL",
+"required": true
+},
+{
+"key": "pollInterval",
+"label": "Poll Interval (seconds)",
+"type": "number",
+"defaultValue": 10,
+"helperText": "How often to check for stream updates (10-300 seconds)"
+}
+],
+"settings_tutorial": "./settings_tutorial.md",
+"actions_tutorial": "./actions_tutorial.md",
+"actions": [],
+"variables": [
+{
+"name": "live",
+"description": "Whether the Rumble stream is currently live",
+"value": false
+},
+{
+"name": "viewers",
+"description": "Current number of concurrent viewers watching the stream",
+"value": 0
+},
+{
+"name": "joined",
+"description": "Total viewers that have joined the stream session",
+"value": 0
+},
+{
+"name": "title",
+"description": "Current stream title",
+"value": ""
+},
+{
+"name": "thumbnail",
+"description": "Stream thumbnail URL",
+"value": ""
+},
+{
+"name": "stream_url",
+"description": "Public URL to the livestream",
+"value": ""
+},
+{
+"name": "video_id",
+"description": "Underlying Rumble video ID",
+"value": ""
+},
+{
+"name": "reactions",
+"description": "Current reaction count on the stream",
+"value": 0
+},
+{
+"name": "followers",
+"description": "Current follower count of the channel",
+"value": 0
+},
+{
+"name": "likes",
+"description": "Thumbs-up reactions on the stream",
+"value": 0
+},
+{
+"name": "dislikes",
+"description": "Thumbs-down reactions on the stream",
+"value": 0
+},
+{
+"name": "subs",
+"description": "Total paid subscriptions/memberships for the channel",
+"value": 0
+},
+{
+"name": "sub_gifts",
+"description": "Gifted subscriptions/memberships received during the stream",
+"value": 0
+},
+{
+"name": "rants",
+"description": "Number of Rants received this stream",
+"value": 0
+},
+{
+"name": "rant_amount",
+"description": "Total value of Rants received this stream",
+"value": 0
+},
+{
+"name": "chat_members",
+"description": "Active chat members in the livestream chat",
+"value": 0
+},
+{
+"name": "category",
+"description": "Category assigned to the livestream",
+"value": ""
+},
+{
+"name": "description",
+"description": "Short description of the livestream",
+"value": ""
+},
+{
+"name": "language",
+"description": "Language reported by Rumble for the stream",
+"value": ""
+},
+{
+"name": "chat_url",
+"description": "Direct URL to the livestream chat",
+"value": ""
+},
+{
+"name": "channel_name",
+"description": "Rumble channel display name",
+"value": ""
+},
+{
+"name": "channel_image",
+"description": "Avatar image URL for the Rumble channel",
+"value": ""
+},
+{
+"name": "started_at",
+"description": "Timestamp of when the stream went live (ISO 8601)",
+"value": ""
+},
+{
+"name": "scheduled_start",
+"description": "Scheduled start time for the stream (ISO 8601)",
+"value": ""
+}
+],
+"alerts": [
+{
+"title": "Stream Started",
+"key": "streamStarted",
+"acceptedVariables": [
+"live",
+"viewers",
+"title",
+"stream_url",
+"followers",
+"likes",
+"dislikes",
+"subs",
+"sub_gifts",
+"rants",
+"rant_amount"
+],
+"defaultMessage": "{{username}} has started streaming on Rumble!",
+"variationConditions": [
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Stream Ended",
+"key": "streamEnded",
+"acceptedVariables": [
+"live",
+"viewers",
+"title",
+"followers",
+"likes",
+"dislikes",
+"subs",
+"sub_gifts",
+"rants",
+"rant_amount"
+],
+"defaultMessage": "{{username}} has ended their Rumble stream.",
+"variationConditions": [
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Follower",
+"key": "follower",
+"acceptedVariables": ["followers", "stream_url", "title"],
+"defaultMessage": "New followers! Total is now {{followers}}.",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Follow number is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Rant",
+"key": "rant",
+"acceptedVariables": ["rants", "rant_amount", "viewers", "title"],
+"defaultMessage": "New rant received! Total rants: {{rants}} ({{rant_amount}})",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Rant number is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Like",
+"key": "like",
+"acceptedVariables": ["likes", "stream_url", "title"],
+"defaultMessage": "Another thumbs-up! Likes: {{likes}}",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Like number is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Dislike",
+"key": "dislike",
+"acceptedVariables": ["dislikes", "stream_url", "title"],
+"defaultMessage": "Someone hit dislike. Total dislikes: {{dislikes}}",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Dislike number is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Subscriber",
+"key": "sub",
+"acceptedVariables": ["subs", "stream_url", "title"],
+"defaultMessage": "New subscription! Subs total: {{subs}}",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Sub number is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Gift Subscription",
+"key": "subGift",
+"acceptedVariables": ["sub_gifts", "stream_url", "title"],
+"defaultMessage": "Gifted subs came through! Gift total: {{sub_gifts}}",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Gift sub number is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+}
+],
+"translations": "./translations.json"
+}
 }
 
 ```
@@ -17226,16 +17270,17 @@ module.exports = RumblePlugin;
 ## rumble/package.json
 
 ```
+
 {
-	"name": "lumia-rumble",
-	"version": "1.0.0",
-	"private": true,
-	"description": "Lumia Stream plugin that monitors a Rumble livestream and surfaces follower, rant, reaction, and subscription activity.",
-	"main": "main.js",
-	"scripts": {},
-	"dependencies": {
-		"@lumiastream/plugin": "^0.4.1"
-	}
+"name": "lumia-rumble",
+"version": "1.0.0",
+"private": true,
+"description": "Lumia Stream plugin that monitors a Rumble livestream and surfaces follower, rant, reaction, and subscription activity.",
+"main": "main.js",
+"scripts": {},
+"dependencies": {
+"@lumiastream/plugin": "^0.4.1"
+}
 }
 
 ```
@@ -17243,51 +17288,58 @@ module.exports = RumblePlugin;
 ## rumble/settings_tutorial.md
 
 ```
+
 ---
+
 ### 🔑 Get Your Rumble Livestream API URL
-1) Open https://rumble.com/account/livestream-api while logged in.
-2) Copy the full Livestream API URL shown on that page.
-3) Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).
+
+1. Open https://rumble.com/account/livestream-api while logged in.
+2. Copy the full Livestream API URL shown on that page.
+3. Paste it into the **API Key** field in Lumia (the plugin will extract the `key` automatically).
+
 ---
+
 ### ✅ Verify Access
-Click **Save** to start syncing data.
----
+
+## Click **Save** to start syncing data.
+
 ### ⏱️ Adjust Polling
-Set a poll interval that balances freshness with API limits (10–300 seconds).
----
+
+## Set a poll interval that balances freshness with API limits (10–300 seconds).
 
 ```
 
 ## rumble/translations.json
 
 ```
+
 {
-	"en": {
-		"live": "Whether the Rumble stream is currently live",
-		"viewers": "Current number of concurrent viewers watching the stream",
-		"joined": "Total viewers that have joined the stream session",
-		"title": "Current stream title",
-		"thumbnail": "Stream thumbnail URL",
-		"stream_url": "Public URL to the livestream",
-		"video_id": "Underlying Rumble video ID",
-		"reactions": "Current reaction count on the stream",
-		"followers": "Current follower count of the channel",
-		"likes": "Thumbs-up reactions on the stream",
-		"dislikes": "Thumbs-down reactions on the stream",
-		"subs": "Total paid subscriptions/memberships for the channel",
-		"sub_gifts": "Gifted subscriptions/memberships received during the stream",
-		"rants": "Number of Rants received this stream",
-		"rant_amount": "Total value of Rants received this stream",
-		"chat_members": "Active chat members in the livestream chat",
-		"category": "Category assigned to the livestream",
-		"description": "Short description of the livestream",
-		"language": "Language reported by Rumble for the stream",
-		"chat_url": "Direct URL to the livestream chat",
-		"channel_name": "Rumble channel display name",
-		"channel_image": "Avatar image URL for the Rumble channel",
-		"started_at": "Timestamp of when the stream went live (ISO 8601)",
-		"scheduled_start": "Scheduled start time for the stream (ISO 8601)"
-	}
+"en": {
+"live": "Whether the Rumble stream is currently live",
+"viewers": "Current number of concurrent viewers watching the stream",
+"joined": "Total viewers that have joined the stream session",
+"title": "Current stream title",
+"thumbnail": "Stream thumbnail URL",
+"stream_url": "Public URL to the livestream",
+"video_id": "Underlying Rumble video ID",
+"reactions": "Current reaction count on the stream",
+"followers": "Current follower count of the channel",
+"likes": "Thumbs-up reactions on the stream",
+"dislikes": "Thumbs-down reactions on the stream",
+"subs": "Total paid subscriptions/memberships for the channel",
+"sub_gifts": "Gifted subscriptions/memberships received during the stream",
+"rants": "Number of Rants received this stream",
+"rant_amount": "Total value of Rants received this stream",
+"chat_members": "Active chat members in the livestream chat",
+"category": "Category assigned to the livestream",
+"description": "Short description of the livestream",
+"language": "Language reported by Rumble for the stream",
+"chat_url": "Direct URL to the livestream chat",
+"channel_name": "Rumble channel display name",
+"channel_image": "Avatar image URL for the Rumble channel",
+"started_at": "Timestamp of when the stream went live (ISO 8601)",
+"scheduled_start": "Scheduled start time for the stream (ISO 8601)"
+}
 }
 
 ```
@@ -17295,531 +17347,535 @@ Set a poll interval that balances freshness with API limits (10–300 seconds).
 ## settings_showcase/main.js
 
 ```
+
 const { Plugin } = require("@lumiastream/plugin");
 
 const VARIABLE_NAMES = {
-	saveCount: "save_count",
-	lastSavedAt: "last_saved_at",
-	lastSavedValuesJson: "last_saved_values_json",
+saveCount: "save_count",
+lastSavedAt: "last_saved_at",
+lastSavedValuesJson: "last_saved_values_json",
 };
 const ACTION_VARIABLE_NAMES = {
-	actionMessage: "settings_showcase_action_message",
-	actionStatus: "settings_showcase_action_status",
-	actionSaveCount: "settings_showcase_action_save_count",
-	actionSnapshot: "settings_showcase_action_snapshot",
+actionMessage: "settings_showcase_action_message",
+actionStatus: "settings_showcase_action_status",
+actionSaveCount: "settings_showcase_action_save_count",
+actionSnapshot: "settings_showcase_action_snapshot",
 };
 
 const TEAM_OPTIONS_BY_LEAGUE = Object.freeze({
-	nfl: Object.freeze([
-		{ label: "Kansas City Chiefs", value: "nfl:kc" },
-		{ label: "San Francisco 49ers", value: "nfl:sf" },
-		{ label: "Buffalo Bills", value: "nfl:buf" },
-		{ label: "Detroit Lions", value: "nfl:det" },
-	]),
-	nba: Object.freeze([
-		{ label: "Boston Celtics", value: "nba:bos" },
-		{ label: "Los Angeles Lakers", value: "nba:lal" },
-		{ label: "Milwaukee Bucks", value: "nba:mil" },
-		{ label: "Denver Nuggets", value: "nba:den" },
-	]),
-	mlb: Object.freeze([
-		{ label: "Los Angeles Dodgers", value: "mlb:lad" },
-		{ label: "Atlanta Braves", value: "mlb:atl" },
-		{ label: "New York Yankees", value: "mlb:nyy" },
-		{ label: "Houston Astros", value: "mlb:hou" },
-	]),
-	nhl: Object.freeze([
-		{ label: "Vegas Golden Knights", value: "nhl:vgk" },
-		{ label: "Colorado Avalanche", value: "nhl:col" },
-		{ label: "New York Rangers", value: "nhl:nyr" },
-		{ label: "Edmonton Oilers", value: "nhl:edm" },
-	]),
+nfl: Object.freeze([
+{ label: "Kansas City Chiefs", value: "nfl:kc" },
+{ label: "San Francisco 49ers", value: "nfl:sf" },
+{ label: "Buffalo Bills", value: "nfl:buf" },
+{ label: "Detroit Lions", value: "nfl:det" },
+]),
+nba: Object.freeze([
+{ label: "Boston Celtics", value: "nba:bos" },
+{ label: "Los Angeles Lakers", value: "nba:lal" },
+{ label: "Milwaukee Bucks", value: "nba:mil" },
+{ label: "Denver Nuggets", value: "nba:den" },
+]),
+mlb: Object.freeze([
+{ label: "Los Angeles Dodgers", value: "mlb:lad" },
+{ label: "Atlanta Braves", value: "mlb:atl" },
+{ label: "New York Yankees", value: "mlb:nyy" },
+{ label: "Houston Astros", value: "mlb:hou" },
+]),
+nhl: Object.freeze([
+{ label: "Vegas Golden Knights", value: "nhl:vgk" },
+{ label: "Colorado Avalanche", value: "nhl:col" },
+{ label: "New York Rangers", value: "nhl:nyr" },
+{ label: "Edmonton Oilers", value: "nhl:edm" },
+]),
 });
 
 const FIELD_SPECS = [
-	{ key: "textField", label: "text", type: "text" },
-	{ key: "validatedTextField", label: "validated_text", type: "text" },
-	{ key: "numberField", label: "number", type: "number" },
-	{ key: "pollIntervalField", label: "poll_interval", type: "number" },
-	{ key: "selectField", label: "select", type: "select" },
-	{
-		key: "selectMultipleField",
-		label: "select_multiple",
-		type: "select",
-		multiple: true,
-	},
-	{ key: "checkboxField", label: "checkbox", type: "checkbox" },
-	{ key: "sliderField", label: "slider", type: "slider" },
-	{ key: "disabledInfoField", label: "disabled_info", type: "text" },
-	{ key: "hiddenTextField", label: "hidden_text", type: "text" },
-	{ key: "groupedTextField", label: "grouped_text", type: "text" },
-	{ key: "fileField", label: "file", type: "file" },
-	{ key: "passwordField", label: "password", type: "password" },
-	{
-		key: "oauthAccessToken",
-		label: "oauth_access_token",
-		type: "password",
-	},
-	{
-		key: "oauthRefreshToken",
-		label: "oauth_refresh_token",
-		type: "password",
-	},
-	{
-		key: "oauthTokenSecret",
-		label: "oauth_token_secret",
-		type: "password",
-	},
-	{ key: "toggleField", label: "toggle", type: "toggle" },
-	{ key: "textareaField", label: "textarea", type: "textarea" },
-	{ key: "emailField", label: "email", type: "email" },
-	{ key: "urlField", label: "url", type: "url" },
-	{ key: "datetimeField", label: "datetime", type: "datetime" },
-	{ key: "colorField", label: "color", type: "color" },
-	{ key: "leagueField", label: "league", type: "select" },
-	{
-		key: "teamLookupField",
-		label: "team_lookup",
-		type: "select",
-		multiple: true,
-	},
-	{ key: "jsonField", label: "json", type: "json" },
-	{ key: "roiField", label: "roi", type: "roi" },
-	{ key: "namedMapField", label: "named_map", type: "named_map" },
+{ key: "textField", label: "text", type: "text" },
+{ key: "validatedTextField", label: "validated_text", type: "text" },
+{ key: "numberField", label: "number", type: "number" },
+{ key: "pollIntervalField", label: "poll_interval", type: "number" },
+{ key: "selectField", label: "select", type: "select" },
+{
+key: "selectMultipleField",
+label: "select_multiple",
+type: "select",
+multiple: true,
+},
+{ key: "checkboxField", label: "checkbox", type: "checkbox" },
+{ key: "sliderField", label: "slider", type: "slider" },
+{ key: "disabledInfoField", label: "disabled_info", type: "text" },
+{ key: "hiddenTextField", label: "hidden_text", type: "text" },
+{ key: "groupedTextField", label: "grouped_text", type: "text" },
+{ key: "fileField", label: "file", type: "file" },
+{ key: "passwordField", label: "password", type: "password" },
+{
+key: "oauthAccessToken",
+label: "oauth_access_token",
+type: "password",
+},
+{
+key: "oauthRefreshToken",
+label: "oauth_refresh_token",
+type: "password",
+},
+{
+key: "oauthTokenSecret",
+label: "oauth_token_secret",
+type: "password",
+},
+{ key: "toggleField", label: "toggle", type: "toggle" },
+{ key: "textareaField", label: "textarea", type: "textarea" },
+{ key: "emailField", label: "email", type: "email" },
+{ key: "urlField", label: "url", type: "url" },
+{ key: "datetimeField", label: "datetime", type: "datetime" },
+{ key: "colorField", label: "color", type: "color" },
+{ key: "leagueField", label: "league", type: "select" },
+{
+key: "teamLookupField",
+label: "team_lookup",
+type: "select",
+multiple: true,
+},
+{ key: "jsonField", label: "json", type: "json" },
+{ key: "roiField", label: "roi", type: "roi" },
+{ key: "namedMapField", label: "named_map", type: "named_map" },
 ];
 
 function asString(value, fallback = "") {
-	if (typeof value === "string") {
-		return value;
-	}
-	if (value === undefined || value === null) {
-		return fallback;
-	}
-	return String(value);
+if (typeof value === "string") {
+return value;
+}
+if (value === undefined || value === null) {
+return fallback;
+}
+return String(value);
 }
 
 function asBoolean(value, fallback = false) {
-	if (typeof value === "boolean") {
-		return value;
-	}
-	if (typeof value === "number") {
-		return value !== 0;
-	}
-	if (typeof value === "string") {
-		const normalized = value.trim().toLowerCase();
-		if (["1", "true", "yes", "on", "enabled"].includes(normalized)) {
-			return true;
-		}
-		if (["0", "false", "no", "off", "disabled"].includes(normalized)) {
-			return false;
-		}
-	}
-	return fallback;
+if (typeof value === "boolean") {
+return value;
+}
+if (typeof value === "number") {
+return value !== 0;
+}
+if (typeof value === "string") {
+const normalized = value.trim().toLowerCase();
+if (["1", "true", "yes", "on", "enabled"].includes(normalized)) {
+return true;
+}
+if (["0", "false", "no", "off", "disabled"].includes(normalized)) {
+return false;
+}
+}
+return fallback;
 }
 
 function asNumber(value, fallback = 0) {
-	if (typeof value === "number" && Number.isFinite(value)) {
-		return value;
-	}
-	if (typeof value === "string" && value.trim().length) {
-		const parsed = Number(value);
-		if (Number.isFinite(parsed)) {
-			return parsed;
-		}
-	}
-	return fallback;
+if (typeof value === "number" && Number.isFinite(value)) {
+return value;
+}
+if (typeof value === "string" && value.trim().length) {
+const parsed = Number(value);
+if (Number.isFinite(parsed)) {
+return parsed;
+}
+}
+return fallback;
 }
 
 function asStringList(value) {
-	if (!Array.isArray(value)) {
-		return [];
-	}
-	const cleaned = value
-		.map((item) => asString(item).trim())
-		.filter((item) => item.length > 0);
-	return Array.from(new Set(cleaned));
+if (!Array.isArray(value)) {
+return [];
+}
+const cleaned = value
+.map((item) => asString(item).trim())
+.filter((item) => item.length > 0);
+return Array.from(new Set(cleaned));
 }
 
 function asJsonValue(value) {
-	if (value === undefined) {
-		return null;
-	}
-	if (typeof value === "string") {
-		const trimmed = value.trim();
-		if (!trimmed.length) {
-			return null;
-		}
-		try {
-			return JSON.parse(trimmed);
-		} catch {
-			return { _invalidJson: trimmed };
-		}
-	}
-	return value;
+if (value === undefined) {
+return null;
+}
+if (typeof value === "string") {
+const trimmed = value.trim();
+if (!trimmed.length) {
+return null;
+}
+try {
+return JSON.parse(trimmed);
+} catch {
+return { \_invalidJson: trimmed };
+}
+}
+return value;
 }
 
 function asRoi(value) {
-	const parsed = asJsonValue(value);
-	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-		return null;
-	}
+const parsed = asJsonValue(value);
+if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+return null;
+}
 
-	const unitToken = asString(parsed.unit, "ratio").toLowerCase();
-	const unit = unitToken === "pixels" || unitToken === "px" ? "pixels" : "ratio";
-	const max = unit === "ratio" ? 1 : Number.POSITIVE_INFINITY;
-	const clamp = (input) => Math.max(0, Math.min(max, input));
+    const unitToken = asString(parsed.unit, "ratio").toLowerCase();
+    const unit = unitToken === "pixels" || unitToken === "px" ? "pixels" : "ratio";
+    const max = unit === "ratio" ? 1 : Number.POSITIVE_INFINITY;
+    const clamp = (input) => Math.max(0, Math.min(max, input));
 
-	const x = clamp(asNumber(parsed.x, 0));
-	const y = clamp(asNumber(parsed.y, 0));
-	const width = clamp(asNumber(parsed.width, unit === "ratio" ? 1 : 500));
-	const height = clamp(asNumber(parsed.height, unit === "ratio" ? 1 : 500));
-	if (width <= 0 || height <= 0) {
-		return null;
-	}
-	return { x, y, width, height, unit };
+    const x = clamp(asNumber(parsed.x, 0));
+    const y = clamp(asNumber(parsed.y, 0));
+    const width = clamp(asNumber(parsed.width, unit === "ratio" ? 1 : 500));
+    const height = clamp(asNumber(parsed.height, unit === "ratio" ? 1 : 500));
+    if (width <= 0 || height <= 0) {
+    	return null;
+    }
+    return { x, y, width, height, unit };
+
 }
 
 function asNamedMap(value) {
-	const parsed = asJsonValue(value);
-	if (!parsed) {
-		return [];
-	}
+const parsed = asJsonValue(value);
+if (!parsed) {
+return [];
+}
 
-	if (Array.isArray(parsed)) {
-		return parsed
-			.map((entry) => {
-				if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-					return null;
-				}
-				const name = asString(entry.name ?? entry.key, "").trim();
-				const rawValue = entry.value ?? entry.path ?? "";
-				const mappedValue =
-					typeof rawValue === "string"
-						? rawValue
-						: formatForOutput(asJsonValue(rawValue));
-				if (!name && !mappedValue) {
-					return null;
-				}
-				return { name, value: mappedValue };
-			})
-			.filter(Boolean);
-	}
+    if (Array.isArray(parsed)) {
+    	return parsed
+    		.map((entry) => {
+    			if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    				return null;
+    			}
+    			const name = asString(entry.name ?? entry.key, "").trim();
+    			const rawValue = entry.value ?? entry.path ?? "";
+    			const mappedValue =
+    				typeof rawValue === "string"
+    					? rawValue
+    					: formatForOutput(asJsonValue(rawValue));
+    			if (!name && !mappedValue) {
+    				return null;
+    			}
+    			return { name, value: mappedValue };
+    		})
+    		.filter(Boolean);
+    }
 
-	if (typeof parsed === "object") {
-		return Object.entries(parsed).map(([name, rawValue]) => ({
-			name: asString(name, "").trim(),
-			value:
-				typeof rawValue === "string"
-					? rawValue
-					: formatForOutput(asJsonValue(rawValue)),
-		}));
-	}
+    if (typeof parsed === "object") {
+    	return Object.entries(parsed).map(([name, rawValue]) => ({
+    		name: asString(name, "").trim(),
+    		value:
+    			typeof rawValue === "string"
+    				? rawValue
+    				: formatForOutput(asJsonValue(rawValue)),
+    	}));
+    }
 
-	return [];
+    return [];
+
 }
 
 function normalizeValueByType(type, value, field = {}) {
-	switch (type) {
-		case "number":
-		case "slider":
-			return asNumber(value, 0);
-		case "checkbox":
-		case "toggle":
-			return asBoolean(value, false);
-		case "select":
-			if (field?.multiple) {
-				return asStringList(value);
-			}
-			return asString(value, "");
-		case "json":
-			return asJsonValue(value);
-		case "roi":
-			return asRoi(value);
-		case "named_map":
-			return asNamedMap(value);
-		case "password": {
-			const raw = asString(value, "");
-			if (!raw.length) {
-				return "";
-			}
-			return `***${raw.length} chars***`;
-		}
-		case "file":
-		case "text":
-		case "textarea":
-		case "email":
-		case "url":
-		case "color":
-		default:
-			return asString(value, "");
-	}
+switch (type) {
+case "number":
+case "slider":
+return asNumber(value, 0);
+case "checkbox":
+case "toggle":
+return asBoolean(value, false);
+case "select":
+if (field?.multiple) {
+return asStringList(value);
+}
+return asString(value, "");
+case "json":
+return asJsonValue(value);
+case "roi":
+return asRoi(value);
+case "named_map":
+return asNamedMap(value);
+case "password": {
+const raw = asString(value, "");
+if (!raw.length) {
+return "";
+}
+return `***${raw.length} chars***`;
+}
+case "file":
+case "text":
+case "textarea":
+case "email":
+case "url":
+case "color":
+default:
+return asString(value, "");
+}
 }
 
 function formatForOutput(value) {
-	if (typeof value === "string") {
-		return value;
-	}
-	try {
-		return JSON.stringify(value);
-	} catch {
-		return String(value);
-	}
+if (typeof value === "string") {
+return value;
+}
+try {
+return JSON.stringify(value);
+} catch {
+return String(value);
+}
 }
 
 function truncate(value, maxLength = 140) {
-	const text = asString(value, "");
-	if (text.length <= maxLength) {
-		return text;
-	}
-	return `${text.slice(0, maxLength - 3)}...`;
+const text = asString(value, "");
+if (text.length <= maxLength) {
+return text;
+}
+return `${text.slice(0, maxLength - 3)}...`;
 }
 
 class SettingsFieldShowcasePlugin extends Plugin {
-	constructor(manifest, context) {
-		super(manifest, context);
-		this._saveCount = 0;
-	}
+constructor(manifest, context) {
+super(manifest, context);
+this.\_saveCount = 0;
+}
 
-	async onload() {
-		await this.lumia.updateConnection(true);
-		await this._log("[settings_field_showcase] Loaded.");
-		void this.refreshSettingsOptions({ fieldKey: "leagueField" });
-		await this._emitAllFieldValues(this.settings, { reason: "load" });
-	}
+    async onload() {
+    	await this.lumia.updateConnection(true);
+    	await this._log("[settings_field_showcase] Loaded.");
+    	void this.refreshSettingsOptions({ fieldKey: "leagueField" });
+    	await this._emitAllFieldValues(this.settings, { reason: "load" });
+    }
 
-	async onunload() {
-		await this.lumia.updateConnection(false);
-	}
+    async onunload() {
+    	await this.lumia.updateConnection(false);
+    }
 
-	async onsettingsupdate(settings, previous = {}) {
-		if (this._league(settings) !== this._league(previous)) {
-			void this.refreshSettingsOptions({ fieldKey: "leagueField", settings });
-		}
-		await this._emitAllFieldValues(settings, { reason: "save" });
-	}
+    async onsettingsupdate(settings, previous = {}) {
+    	if (this._league(settings) !== this._league(previous)) {
+    		void this.refreshSettingsOptions({ fieldKey: "leagueField", settings });
+    	}
+    	await this._emitAllFieldValues(settings, { reason: "save" });
+    }
 
-	async validateAuth() {
-		return { ok: true };
-	}
+    async validateAuth() {
+    	return { ok: true };
+    }
 
-	async actions(config = {}) {
-		const actions = Array.isArray(config?.actions) ? config.actions : [];
-		const newlyPassedVariables = {};
-		let shouldStop = false;
+    async actions(config = {}) {
+    	const actions = Array.isArray(config?.actions) ? config.actions : [];
+    	const newlyPassedVariables = {};
+    	let shouldStop = false;
 
-		for (const action of actions) {
-			if (action?.type !== "passVariablesExample") {
-				continue;
-			}
+    	for (const action of actions) {
+    		if (action?.type !== "passVariablesExample") {
+    			continue;
+    		}
 
-			const params =
-				action?.value && typeof action.value === "object"
-					? action.value
-					: {};
-			const message =
-				asString(
-					params?.message,
-					"Hello from settings_showcase action",
-				).trim() || "Hello from settings_showcase action";
-			const includeSnapshot = asBoolean(params?.includeSnapshot, true);
-			const stopChain = asBoolean(params?.stopChain, false);
+    		const params =
+    			action?.value && typeof action.value === "object"
+    				? action.value
+    				: {};
+    		const message =
+    			asString(
+    				params?.message,
+    				"Hello from settings_showcase action",
+    			).trim() || "Hello from settings_showcase action";
+    		const includeSnapshot = asBoolean(params?.includeSnapshot, true);
+    		const stopChain = asBoolean(params?.stopChain, false);
 
-			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionMessage] = message;
-			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionStatus] = "ok";
-			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionSaveCount] =
-				this._saveCount;
+    		newlyPassedVariables[ACTION_VARIABLE_NAMES.actionMessage] = message;
+    		newlyPassedVariables[ACTION_VARIABLE_NAMES.actionStatus] = "ok";
+    		newlyPassedVariables[ACTION_VARIABLE_NAMES.actionSaveCount] =
+    			this._saveCount;
 
-			if (includeSnapshot) {
-				newlyPassedVariables[ACTION_VARIABLE_NAMES.actionSnapshot] =
-					JSON.stringify({
-						savedAt: new Date().toISOString(),
-						leagueField: asString(this.settings?.leagueField, ""),
-						selectField: asString(this.settings?.selectField, ""),
-						toggleField: asBoolean(this.settings?.toggleField, false),
-						saveCount: this._saveCount,
-					});
-			}
+    		if (includeSnapshot) {
+    			newlyPassedVariables[ACTION_VARIABLE_NAMES.actionSnapshot] =
+    				JSON.stringify({
+    					savedAt: new Date().toISOString(),
+    					leagueField: asString(this.settings?.leagueField, ""),
+    					selectField: asString(this.settings?.selectField, ""),
+    					toggleField: asBoolean(this.settings?.toggleField, false),
+    					saveCount: this._saveCount,
+    				});
+    		}
 
-			shouldStop = shouldStop || stopChain;
-			await this._log(
-				`[settings_field_showcase] passVariablesExample emitted variables (shouldStop=${stopChain})`,
-			);
-		}
+    		shouldStop = shouldStop || stopChain;
+    		await this._log(
+    			`[settings_field_showcase] passVariablesExample emitted variables (shouldStop=${stopChain})`,
+    		);
+    	}
 
-		const hasReturnedVariables =
-			Object.keys(newlyPassedVariables).length > 0;
-		if (!hasReturnedVariables && !shouldStop) {
-			return;
-		}
+    	const hasReturnedVariables =
+    		Object.keys(newlyPassedVariables).length > 0;
+    	if (!hasReturnedVariables && !shouldStop) {
+    		return;
+    	}
 
-		return {
-			...(hasReturnedVariables ? { newlyPassedVariables } : {}),
-			...(shouldStop ? { shouldStop: true } : {}),
-		};
-	}
+    	return {
+    		...(hasReturnedVariables ? { newlyPassedVariables } : {}),
+    		...(shouldStop ? { shouldStop: true } : {}),
+    	};
+    }
 
-	async onCustomAuthDisplaySignal(config = {}) {
-		const signalType = asString(
-			config?.type ?? config?.signalType ?? config?.signal,
-			"",
-		)
-			.trim()
-			.toLowerCase();
-		const payload =
-			config?.payload && typeof config.payload === "object"
-				? config.payload
-				: {};
+    async onCustomAuthDisplaySignal(config = {}) {
+    	const signalType = asString(
+    		config?.type ?? config?.signalType ?? config?.signal,
+    		"",
+    	)
+    		.trim()
+    		.toLowerCase();
+    	const payload =
+    		config?.payload && typeof config.payload === "object"
+    			? config.payload
+    			: {};
 
-		switch (signalType) {
-			case "ready":
-				return {
-					ok: true,
-					pluginId: this.manifest?.id,
-					message: "Settings showcase custom auth is ready.",
-					league: this._league(),
-				};
-			case "ping":
-				return {
-					ok: true,
-					pongAt: new Date().toISOString(),
-					saveCount: this._saveCount,
-				};
-			case "setleague": {
-				const requestedLeague = asString(payload.league ?? payload.value, "nfl")
-					.trim()
-					.toLowerCase();
-				const nextLeague = TEAM_OPTIONS_BY_LEAGUE[requestedLeague]
-					? requestedLeague
-					: "nfl";
-				this.updateSettings({ leagueField: nextLeague });
-				void this.refreshSettingsOptions({
-					fieldKey: "leagueField",
-					settings: { ...this.settings, leagueField: nextLeague },
-				});
-				return {
-					ok: true,
-					leagueField: nextLeague,
-					message: "League field updated from custom auth display.",
-				};
-			}
-			case "setgroupedtext": {
-				const nextValue =
-					asString(payload.text, "").trim() ||
-					"Updated from custom auth display";
-				this.updateSettings({ groupedTextField: nextValue });
-				return {
-					ok: true,
-					groupedTextField: nextValue,
-					message: "Grouped text field updated from custom auth display.",
-				};
-			}
-			case "snapshot":
-				return {
-					ok: true,
-					fields: {
-						leagueField: asString(this.settings?.leagueField, ""),
-						groupedTextField: asString(this.settings?.groupedTextField, ""),
-						selectField: asString(this.settings?.selectField, ""),
-					},
-				};
-			case "close":
-				return { ok: true, close: true };
-			default:
-				throw new Error(
-					`Unsupported customAuthDisplay signal: ${signalType || "unknown"}`,
-				);
-		}
-	}
+    	switch (signalType) {
+    		case "ready":
+    			return {
+    				ok: true,
+    				pluginId: this.manifest?.id,
+    				message: "Settings showcase custom auth is ready.",
+    				league: this._league(),
+    			};
+    		case "ping":
+    			return {
+    				ok: true,
+    				pongAt: new Date().toISOString(),
+    				saveCount: this._saveCount,
+    			};
+    		case "setleague": {
+    			const requestedLeague = asString(payload.league ?? payload.value, "nfl")
+    				.trim()
+    				.toLowerCase();
+    			const nextLeague = TEAM_OPTIONS_BY_LEAGUE[requestedLeague]
+    				? requestedLeague
+    				: "nfl";
+    			this.updateSettings({ leagueField: nextLeague });
+    			void this.refreshSettingsOptions({
+    				fieldKey: "leagueField",
+    				settings: { ...this.settings, leagueField: nextLeague },
+    			});
+    			return {
+    				ok: true,
+    				leagueField: nextLeague,
+    				message: "League field updated from custom auth display.",
+    			};
+    		}
+    		case "setgroupedtext": {
+    			const nextValue =
+    				asString(payload.text, "").trim() ||
+    				"Updated from custom auth display";
+    			this.updateSettings({ groupedTextField: nextValue });
+    			return {
+    				ok: true,
+    				groupedTextField: nextValue,
+    				message: "Grouped text field updated from custom auth display.",
+    			};
+    		}
+    		case "snapshot":
+    			return {
+    				ok: true,
+    				fields: {
+    					leagueField: asString(this.settings?.leagueField, ""),
+    					groupedTextField: asString(this.settings?.groupedTextField, ""),
+    					selectField: asString(this.settings?.selectField, ""),
+    				},
+    			};
+    		case "close":
+    			return { ok: true, close: true };
+    		default:
+    			throw new Error(
+    				`Unsupported customAuthDisplay signal: ${signalType || "unknown"}`,
+    			);
+    	}
+    }
 
-	async onCustomAuthDisplayClose(config = {}) {
-		await this._log(
-			`[settings_field_showcase] custom auth display closed: ${formatForOutput(config)}`,
-		);
-	}
+    async onCustomAuthDisplayClose(config = {}) {
+    	await this._log(
+    		`[settings_field_showcase] custom auth display closed: ${formatForOutput(config)}`,
+    	);
+    }
 
-	async refreshSettingsOptions({ fieldKey, values, settings } = {}) {
-		if (
-			fieldKey &&
-			fieldKey !== "leagueField" &&
-			fieldKey !== "teamLookupField"
-		) {
-			return;
-		}
+    async refreshSettingsOptions({ fieldKey, values, settings } = {}) {
+    	if (
+    		fieldKey &&
+    		fieldKey !== "leagueField" &&
+    		fieldKey !== "teamLookupField"
+    	) {
+    		return;
+    	}
 
-		if (typeof this.lumia?.updateSettingsFieldOptions !== "function") {
-			return;
-		}
+    	if (typeof this.lumia?.updateSettingsFieldOptions !== "function") {
+    		return;
+    	}
 
-		const previewSettings = {
-			...(this.settings && typeof this.settings === "object"
-				? this.settings
-				: {}),
-			...(settings && typeof settings === "object" ? settings : {}),
-			...(values && typeof values === "object" ? values : {}),
-		};
+    	const previewSettings = {
+    		...(this.settings && typeof this.settings === "object"
+    			? this.settings
+    			: {}),
+    		...(settings && typeof settings === "object" ? settings : {}),
+    		...(values && typeof values === "object" ? values : {}),
+    	};
 
-		const league = this._league(previewSettings);
-		const baseOptions = TEAM_OPTIONS_BY_LEAGUE[league] || TEAM_OPTIONS_BY_LEAGUE.nfl;
-		const selectedValues = asStringList(
-			values?.teamLookupField ??
-				settings?.teamLookupField ??
-				previewSettings.teamLookupField,
-		);
-		const knownValues = new Set(baseOptions.map((option) => option.value));
-		const customOptions = selectedValues
-			.filter((value) => !knownValues.has(value))
-			.map((value) => ({
-				label: `Custom: ${value}`,
-				value,
-			}));
+    	const league = this._league(previewSettings);
+    	const baseOptions = TEAM_OPTIONS_BY_LEAGUE[league] || TEAM_OPTIONS_BY_LEAGUE.nfl;
+    	const selectedValues = asStringList(
+    		values?.teamLookupField ??
+    			settings?.teamLookupField ??
+    			previewSettings.teamLookupField,
+    	);
+    	const knownValues = new Set(baseOptions.map((option) => option.value));
+    	const customOptions = selectedValues
+    		.filter((value) => !knownValues.has(value))
+    		.map((value) => ({
+    			label: `Custom: ${value}`,
+    			value,
+    		}));
 
-		await this.lumia.updateSettingsFieldOptions({
-			fieldKey: "teamLookupField",
-			options: [...baseOptions, ...customOptions],
-		});
-	}
+    	await this.lumia.updateSettingsFieldOptions({
+    		fieldKey: "teamLookupField",
+    		options: [...baseOptions, ...customOptions],
+    	});
+    }
 
-	async _emitAllFieldValues(settings, options = {}) {
-		const reason = asString(options.reason, "save");
-		const snapshot = {};
+    async _emitAllFieldValues(settings, options = {}) {
+    	const reason = asString(options.reason, "save");
+    	const snapshot = {};
 
-		for (const field of FIELD_SPECS) {
-			const normalized = normalizeValueByType(field.type, settings?.[field.key], field);
-			const output = formatForOutput(normalized);
-			snapshot[field.key] = normalized;
+    	for (const field of FIELD_SPECS) {
+    		const normalized = normalizeValueByType(field.type, settings?.[field.key], field);
+    		const output = formatForOutput(normalized);
+    		snapshot[field.key] = normalized;
 
-			await this._log(`[settings_field_showcase] ${field.label} (${field.key}) = ${output}`);
+    		await this._log(`[settings_field_showcase] ${field.label} (${field.key}) = ${output}`);
 
-		}
+    	}
 
-		this._saveCount += 1;
-		const savedAt = new Date().toISOString();
+    	this._saveCount += 1;
+    	const savedAt = new Date().toISOString();
 
-		await this.lumia.setVariable(VARIABLE_NAMES.saveCount, this._saveCount);
-		await this.lumia.setVariable(VARIABLE_NAMES.lastSavedAt, savedAt);
-		await this.lumia.setVariable(
-			VARIABLE_NAMES.lastSavedValuesJson,
-			JSON.stringify(
-				{
-					reason,
-					savedAt,
-					fields: snapshot,
-				},
-				null,
-				2,
-			),
-		);
+    	await this.lumia.setVariable(VARIABLE_NAMES.saveCount, this._saveCount);
+    	await this.lumia.setVariable(VARIABLE_NAMES.lastSavedAt, savedAt);
+    	await this.lumia.setVariable(
+    		VARIABLE_NAMES.lastSavedValuesJson,
+    		JSON.stringify(
+    			{
+    				reason,
+    				savedAt,
+    				fields: snapshot,
+    			},
+    			null,
+    			2,
+    		),
+    	);
 
-	}
+    }
 
-	async _log(message) {
-		await this.lumia.log(message);
-	}
+    async _log(message) {
+    	await this.lumia.log(message);
+    }
 
-	_league(settings = this.settings) {
-		const token = asString(settings?.leagueField, "nfl").trim().toLowerCase();
-		return TEAM_OPTIONS_BY_LEAGUE[token] ? token : "nfl";
-	}
+    _league(settings = this.settings) {
+    	const token = asString(settings?.leagueField, "nfl").trim().toLowerCase();
+    	return TEAM_OPTIONS_BY_LEAGUE[token] ? token : "nfl";
+    }
+
 }
 
 module.exports = SettingsFieldShowcasePlugin;
@@ -17829,570 +17885,571 @@ module.exports = SettingsFieldShowcasePlugin;
 ## settings_showcase/manifest.json
 
 ```
+
 {
-	"id": "settings_showcase",
-	"name": "Settings Showcase",
-	"version": "1.1.6",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"repository": "",
-	"description": "Example plugin demonstrating every available settings field type with logging on save.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "utilities",
-	"icon": "settings_showcase.png",
-	"config": {
-		"settings_tutorial": "settings_tutorial.md",
-		"oauth": {
-			"buttonLabel": "Authorize Custom OAuth Example",
-			"helperText": "Demonstrates custom OAuth configuration with serviceUrl override, extraParams, and tokenKeys mapping.",
-			"openInBrowser": true,
-			"serviceUrl": "https://example.com/oauth/authorize?provider=settings_showcase",
-			"extraParams": "external=true&source=settings_showcase",
-			"scopes": ["profile.read", "activity.read", "chat.write"],
-			"tokenKeys": {
-				"accessToken": "oauthAccessToken",
-				"refreshToken": "oauthRefreshToken",
-				"tokenSecret": "oauthTokenSecret"
-			}
-		},
-		"custom_auth_display": {
-			"entry": "./auth/setup-wizard.html",
-			"autoAutoOpen": false,
-			"authButtonLabel": "Open Settings Showcase Wizard",
-			"title": "Settings Showcase Custom Auth"
-		},
-		"settings": [
-			{
-				"key": "textField",
-				"label": "Text Field",
-				"type": "text",
-				"section": "Text & Numbers",
-				"sectionOrder": 1,
-				"group": {
-					"key": "core_text_group",
-					"label": "Core Text Inputs",
-					"helperText": "Foundational text input examples.",
-					"order": 1
-				},
-				"defaultValue": "Hello Lumia",
-				"helperText": "Example of type `text`."
-			},
-			{
-				"key": "validatedTextField",
-				"label": "Validated Text Field",
-				"type": "text",
-				"section": "Text & Numbers",
-				"sectionOrder": 1,
-				"group": "core_text_group",
-				"defaultValue": "stream_alert",
-				"validation": {
-					"minLength": 3,
-					"maxLength": 24,
-					"pattern": "^[a-z0-9_]+$"
-				},
-				"helperText": "Example of `validation` with minLength/maxLength/pattern."
-			},
-			{
-				"key": "numberField",
-				"label": "Number Field",
-				"type": "number",
-				"section": "Text & Numbers",
-				"sectionOrder": 1,
-				"group": {
-					"key": "numeric_range_group",
-					"label": "Numeric Range Inputs",
-					"helperText": "Number field examples with limits and validation.",
-					"order": 2
-				},
-				"defaultValue": 42,
-				"min": 0,
-				"max": 1000,
-				"helperText": "Example of type `number`."
-			},
-			{
-				"key": "pollIntervalField",
-				"label": "Poll Interval (seconds)",
-				"type": "number",
-				"section": "Text & Numbers",
-				"sectionOrder": 1,
-				"group": "numeric_range_group",
-				"defaultValue": 15,
-				"validation": {
-					"min": 5,
-					"max": 600
-				},
-				"helperText": "Example of `validation` min/max, similar to polling plugins."
-			},
-			{
-				"key": "selectField",
-				"label": "Select Field",
-				"type": "select",
-				"allowTyping": true,
-				"section": "Selections",
-				"sectionOrder": 2,
-				"group": {
-					"key": "selection_modes_group",
-					"label": "Selection Modes",
-					"helperText": "Single-select and multi-select behaviors.",
-					"order": 1
-				},
-				"defaultValue": "custom",
-				"options": [
-					{
-						"label": "Normal",
-						"value": "normal"
-					},
-					{
-						"label": "Custom",
-						"value": "custom"
-					},
-					{
-						"label": "Debug",
-						"value": "debug"
-					}
-				],
-				"helperText": "Example of type `select` with `allowTyping: true`."
-			},
-			{
-				"key": "selectMultipleField",
-				"label": "Select (Multiple) Field",
-				"type": "select",
-				"multiple": true,
-				"allowTyping": true,
-				"section": "Selections",
-				"sectionOrder": 2,
-				"group": "selection_modes_group",
-				"defaultValue": ["valorant", "overwatch"],
-				"options": [
-					{
-						"label": "Valorant",
-						"value": "valorant"
-					},
-					{
-						"label": "Rocket League",
-						"value": "rocket_league"
-					},
-					{
-						"label": "Overwatch",
-						"value": "overwatch"
-					},
-					{
-						"label": "League of Legends",
-						"value": "league_of_legends"
-					}
-				],
-				"helperText": "Example of type `select` with `multiple: true` and `allowTyping: true`."
-			},
-			{
-				"key": "checkboxField",
-				"label": "Checkbox Field",
-				"type": "checkbox",
-				"section": "Booleans & Sliders",
-				"sectionOrder": 3,
-				"group": {
-					"key": "state_controls_group",
-					"label": "State Controls",
-					"helperText": "Boolean and range controls for state toggles.",
-					"order": 1
-				},
-				"defaultValue": true,
-				"helperText": "Example of type `checkbox`."
-			},
-			{
-				"key": "sliderField",
-				"label": "Slider Field",
-				"type": "slider",
-				"section": "Booleans & Sliders",
-				"sectionOrder": 3,
-				"group": "state_controls_group",
-				"defaultValue": 65,
-				"min": 0,
-				"max": 100,
-				"step": 1,
-				"helperText": "Example of type `slider`."
-			},
-			{
-				"key": "toggleField",
-				"label": "Toggle Field",
-				"type": "toggle",
-				"section": "Booleans & Sliders",
-				"sectionOrder": 3,
-				"group": "state_controls_group",
-				"defaultValue": true,
-				"helperText": "Controls visibleIf examples below."
-			},
-			{
-				"key": "disabledInfoField",
-				"label": "Disabled Read-Only Field",
-				"type": "text",
-				"section": "Visibility & Layout",
-				"sectionOrder": 4,
-				"group": {
-					"key": "metadata_flags_group",
-					"label": "Metadata Flags",
-					"helperText": "Examples of disabled and hidden field metadata.",
-					"order": 1
-				},
-				"defaultValue": "Runtime-managed status field",
-				"disabled": true,
-				"helperText": "Demonstrates `disabled: true`."
-			},
-			{
-				"key": "hiddenTextField",
-				"label": "Hidden Text Field",
-				"type": "text",
-				"section": "Visibility & Layout",
-				"sectionOrder": 4,
-				"group": "metadata_flags_group",
-				"hidden": true,
-				"defaultValue": "hidden_default_value",
-				"helperText": "Demonstrates `hidden: true`."
-			},
-			{
-				"key": "groupedTextField",
-				"label": "Grouped Text Field",
-				"type": "text",
-				"section": "Visibility & Layout",
-				"sectionOrder": 4,
-				"group": {
-					"key": "visibility_group",
-					"label": "Grouped Visibility Fields",
-					"helperText": "This container demonstrates `group` and group-level `visibleIf`.",
-					"visibleIf": {
-						"key": "toggleField",
-						"equals": true
-					}
-				},
-				"defaultValue": "inside_group",
-				"helperText": "Example of grouped field."
-			},
-			{
-				"key": "fileField",
-				"label": "File Field",
-				"type": "file",
-				"section": "Visibility & Layout",
-				"sectionOrder": 4,
-				"group": "visibility_group",
-				"visibleIf": {
-					"key": "toggleField",
-					"equals": true
-				},
-				"helperText": "Example of type `file` with `visibleIf`."
-			},
-			{
-				"key": "passwordField",
-				"label": "Password Field",
-				"type": "password",
-				"section": "Visibility & Layout",
-				"sectionOrder": 4,
-				"group": "visibility_group",
-				"defaultValue": "super_secret_value",
-				"helperText": "Example of type `password`."
-			},
-			{
-				"key": "textareaField",
-				"label": "Textarea Field",
-				"type": "textarea",
-				"section": "Visibility & Layout",
-				"sectionOrder": 4,
-				"group": "visibility_group",
-				"rows": 4,
-				"defaultValue": "This is a multiline example.",
-				"visibleIf": {
-					"key": "checkboxField",
-					"equals": true
-				},
-				"helperText": "Example of type `textarea` with `visibleIf`."
-			},
-			{
-				"key": "emailField",
-				"label": "Email Field",
-				"type": "email",
-				"section": "Specialized Inputs",
-				"sectionOrder": 5,
-				"group": {
-					"key": "contact_format_group",
-					"label": "Contact & Link Inputs",
-					"helperText": "Typed fields for contact and URL values.",
-					"order": 1
-				},
-				"defaultValue": "name@example.com",
-				"helperText": "Example of type `email`."
-			},
-			{
-				"key": "urlField",
-				"label": "URL Field",
-				"type": "url",
-				"section": "Specialized Inputs",
-				"sectionOrder": 5,
-				"group": "contact_format_group",
-				"defaultValue": "https://lumiastream.com",
-				"helperText": "Example of type `url`."
-			},
-			{
-				"key": "datetimeField",
-				"label": "Datetime Field",
-				"type": "datetime",
-				"section": "Specialized Inputs",
-				"sectionOrder": 5,
-				"group": {
-					"key": "time_color_group",
-					"label": "Time & Color Inputs",
-					"helperText": "Structured datetime and color input examples.",
-					"order": 2
-				},
-				"defaultValue": "2026-03-01T15:30",
-				"helperText": "Example of type `datetime` (YYYY-MM-DDTHH:mm)."
-			},
-			{
-				"key": "colorField",
-				"label": "Color Field",
-				"type": "color",
-				"section": "Specialized Inputs",
-				"sectionOrder": 5,
-				"group": "time_color_group",
-				"defaultValue": "#33aaff",
-				"helperText": "Example of type `color`."
-			},
-			{
-				"key": "leagueField",
-				"label": "League (Dynamic Source)",
-				"type": "select",
-				"section": "Dynamic Lookup",
-				"sectionOrder": 6,
-				"group": {
-					"key": "dynamic_lookup_group",
-					"label": "Runtime Option Loading",
-					"helperText": "Demonstrates dynamic options, lookup, and dependency refresh.",
-					"order": 1
-				},
-				"defaultValue": "nfl",
-				"refreshOnChange": true,
-				"options": [
-					{
-						"label": "NFL",
-						"value": "nfl"
-					},
-					{
-						"label": "NBA",
-						"value": "nba"
-					},
-					{
-						"label": "MLB",
-						"value": "mlb"
-					},
-					{
-						"label": "NHL",
-						"value": "nhl"
-					}
-				],
-				"helperText": "Changing this refreshes team options below."
-			},
-			{
-				"key": "teamLookupField",
-				"label": "Teams (Dynamic + Lookup)",
-				"type": "select",
-				"section": "Dynamic Lookup",
-				"sectionOrder": 6,
-				"group": "dynamic_lookup_group",
-				"multiple": true,
-				"lookup": true,
-				"dynamicOptions": true,
-				"refreshOnChange": true,
-				"defaultValue": ["nfl:kc"],
-				"placeholder": "Search leagues or teams",
-				"options": [],
-				"helperText": "Example of `dynamicOptions` + `lookup` + `refreshOnChange`."
-			},
-			{
-				"key": "jsonField",
-				"label": "JSON Field",
-				"type": "json",
-				"section": "Structured Data",
-				"sectionOrder": 7,
-				"group": {
-					"key": "structured_json_group",
-					"label": "Structured Rule Payloads",
-					"helperText": "Examples of structured JSON for advanced configuration payloads.",
-					"order": 1
-				},
-				"rows": 8,
-				"visibleIf": {
-					"key": "selectField",
-					"equals": "custom"
-				},
-				"defaultValue": {
-					"rules": [
-						{
-							"name": "kill",
-							"confidence": 0.9
-						},
-						{
-							"name": "goal",
-							"confidence": 0.92
-						}
-					],
-					"cooldownMs": 1200
-				},
-				"helperText": "Example of type `json` with `visibleIf`."
-			},
-			{
-				"key": "roiField",
-				"label": "ROI Field",
-				"type": "roi",
-				"section": "ROI",
-				"sectionOrder": 8,
-				"group": {
-					"key": "roi_capture_group",
-					"label": "Region Capture",
-					"helperText": "ROI is isolated because it is specific to screen-detection workflows.",
-					"order": 1
-				},
-				"visibleIf": {
-					"key": "selectMultipleField",
-					"equals": "valorant"
-				},
-				"defaultValue": {
-					"x": 0.72,
-					"y": 0.02,
-					"width": 0.27,
-					"height": 0.45,
-					"unit": "ratio"
-				},
-				"helperText": "Example of type `roi` with `visibleIf` and array matching."
-			},
-			{
-				"key": "namedMapField",
-				"label": "Named Targets Map",
-				"type": "named_map",
-				"section": "Structured Data",
-				"sectionOrder": 7,
-				"group": {
-					"key": "named_map_examples_group",
-					"label": "Named Mapping",
-					"helperText": "Map user-defined names to values (real-world multi-channel pattern).",
-					"order": 2
-				},
-				"valueType": "text",
-				"valueLabel": "Target Value",
-				"valuePlaceholder": "username|channelId|chatroomId",
-				"valueField": {
-					"type": "text",
-					"required": true,
-					"placeholder": "lumiastream|123456|987654"
-				},
-				"outputMode": "array",
-				"allowDuplicateNames": false,
-				"defaultValue": [
-					{
-						"name": "primary",
-						"value": "lumiastream"
-					},
-					{
-						"name": "mods",
-						"value": "lumiastream_mods"
-					}
-				],
-				"helperText": "Example of type `named_map`."
-			},
-			{
-				"key": "oauthAccessToken",
-				"label": "OAuth Access Token (Mapped)",
-				"type": "password",
-				"section": "OAuth Example",
-				"sectionOrder": 9,
-				"group": {
-					"key": "oauth_mapped_tokens_group",
-					"label": "Mapped OAuth Tokens",
-					"helperText": "Read-only fields populated by oauth.tokenKeys mapping.",
-					"order": 1
-				},
-				"disabled": true,
-				"required": false,
-				"helperText": "Auto-filled by oauth.tokenKeys.accessToken."
-			},
-			{
-				"key": "oauthRefreshToken",
-				"label": "OAuth Refresh Token (Mapped)",
-				"type": "password",
-				"section": "OAuth Example",
-				"sectionOrder": 9,
-				"group": "oauth_mapped_tokens_group",
-				"disabled": true,
-				"required": false,
-				"helperText": "Auto-filled by oauth.tokenKeys.refreshToken."
-			},
-			{
-				"key": "oauthTokenSecret",
-				"label": "OAuth Token Secret (Mapped)",
-				"type": "password",
-				"section": "OAuth Example",
-				"sectionOrder": 9,
-				"group": "oauth_mapped_tokens_group",
-				"disabled": true,
-				"required": false,
-				"helperText": "Auto-filled by oauth.tokenKeys.tokenSecret."
-			}
-			],
-			"actions": [
-				{
-					"type": "passVariablesExample",
-					"label": "Pass Variables Example",
-					"description": "Demonstrates returning newlyPassedVariables from actions() for later actions in the same command.",
-					"acceptedVariables": [
-						"settings_showcase_action_message",
-						"settings_showcase_action_status",
-						"settings_showcase_action_save_count",
-						"settings_showcase_action_snapshot"
-					],
-					"fields": [
-						{
-							"key": "message",
-							"label": "Message",
-							"type": "text",
-							"defaultValue": "Hello from settings_showcase action",
-							"allowVariables": true,
-							"helperText": "Returned as settings_showcase_action_message."
-						},
-						{
-							"key": "includeSnapshot",
-							"label": "Include Snapshot",
-							"type": "toggle",
-							"defaultValue": true,
-							"helperText": "When enabled, returns a compact JSON snapshot in settings_showcase_action_snapshot."
-						},
-						{
-							"key": "stopChain",
-							"label": "Stop Remaining Actions",
-							"type": "toggle",
-							"defaultValue": false,
-							"helperText": "When enabled, actions() also returns shouldStop: true."
-						}
-					]
-				}
-			],
-			"variables": [
-			{
-				"name": "save_count",
-				"description": "How many times settings were saved/updated.",
-				"value": 0
-			},
-			{
-				"name": "last_saved_at",
-				"description": "Timestamp of the last settings save.",
-				"value": ""
-			},
-			{
-				"name": "last_saved_values_json",
-				"description": "JSON snapshot of values saved most recently.",
-				"value": ""
-			}
-		],
-		"alerts": [],
-		"translations": "./translations.json"
-	}
+"id": "settings*showcase",
+"name": "Settings Showcase",
+"version": "1.1.6",
+"author": "Lumia Stream",
+"email": "dev@lumiastream.com",
+"website": "https://lumiastream.com",
+"repository": "",
+"description": "Example plugin demonstrating every available settings field type with logging on save.",
+"license": "MIT",
+"lumiaVersion": "^9.0.0",
+"category": "utilities",
+"icon": "settings_showcase.png",
+"config": {
+"settings_tutorial": "settings_tutorial.md",
+"oauth": {
+"buttonLabel": "Authorize Custom OAuth Example",
+"helperText": "Demonstrates custom OAuth configuration with serviceUrl override, extraParams, and tokenKeys mapping.",
+"openInBrowser": true,
+"serviceUrl": "https://example.com/oauth/authorize?provider=settings_showcase",
+"extraParams": "external=true&source=settings_showcase",
+"scopes": ["profile.read", "activity.read", "chat.write"],
+"tokenKeys": {
+"accessToken": "oauthAccessToken",
+"refreshToken": "oauthRefreshToken",
+"tokenSecret": "oauthTokenSecret"
+}
+},
+"custom_auth_display": {
+"entry": "./auth/setup-wizard.html",
+"autoAutoOpen": false,
+"authButtonLabel": "Open Settings Showcase Wizard",
+"title": "Settings Showcase Custom Auth"
+},
+"settings": [
+{
+"key": "textField",
+"label": "Text Field",
+"type": "text",
+"section": "Text & Numbers",
+"sectionOrder": 1,
+"group": {
+"key": "core_text_group",
+"label": "Core Text Inputs",
+"helperText": "Foundational text input examples.",
+"order": 1
+},
+"defaultValue": "Hello Lumia",
+"helperText": "Example of type `text`."
+},
+{
+"key": "validatedTextField",
+"label": "Validated Text Field",
+"type": "text",
+"section": "Text & Numbers",
+"sectionOrder": 1,
+"group": "core_text_group",
+"defaultValue": "stream_alert",
+"validation": {
+"minLength": 3,
+"maxLength": 24,
+"pattern": "^[a-z0-9*]+$"
+},
+"helperText": "Example of `validation` with minLength/maxLength/pattern."
+},
+{
+"key": "numberField",
+"label": "Number Field",
+"type": "number",
+"section": "Text & Numbers",
+"sectionOrder": 1,
+"group": {
+"key": "numeric_range_group",
+"label": "Numeric Range Inputs",
+"helperText": "Number field examples with limits and validation.",
+"order": 2
+},
+"defaultValue": 42,
+"min": 0,
+"max": 1000,
+"helperText": "Example of type `number`."
+},
+{
+"key": "pollIntervalField",
+"label": "Poll Interval (seconds)",
+"type": "number",
+"section": "Text & Numbers",
+"sectionOrder": 1,
+"group": "numeric_range_group",
+"defaultValue": 15,
+"validation": {
+"min": 5,
+"max": 600
+},
+"helperText": "Example of `validation` min/max, similar to polling plugins."
+},
+{
+"key": "selectField",
+"label": "Select Field",
+"type": "select",
+"allowTyping": true,
+"section": "Selections",
+"sectionOrder": 2,
+"group": {
+"key": "selection_modes_group",
+"label": "Selection Modes",
+"helperText": "Single-select and multi-select behaviors.",
+"order": 1
+},
+"defaultValue": "custom",
+"options": [
+{
+"label": "Normal",
+"value": "normal"
+},
+{
+"label": "Custom",
+"value": "custom"
+},
+{
+"label": "Debug",
+"value": "debug"
+}
+],
+"helperText": "Example of type `select` with `allowTyping: true`."
+},
+{
+"key": "selectMultipleField",
+"label": "Select (Multiple) Field",
+"type": "select",
+"multiple": true,
+"allowTyping": true,
+"section": "Selections",
+"sectionOrder": 2,
+"group": "selection_modes_group",
+"defaultValue": ["valorant", "overwatch"],
+"options": [
+{
+"label": "Valorant",
+"value": "valorant"
+},
+{
+"label": "Rocket League",
+"value": "rocket_league"
+},
+{
+"label": "Overwatch",
+"value": "overwatch"
+},
+{
+"label": "League of Legends",
+"value": "league_of_legends"
+}
+],
+"helperText": "Example of type `select` with `multiple: true` and `allowTyping: true`."
+},
+{
+"key": "checkboxField",
+"label": "Checkbox Field",
+"type": "checkbox",
+"section": "Booleans & Sliders",
+"sectionOrder": 3,
+"group": {
+"key": "state_controls_group",
+"label": "State Controls",
+"helperText": "Boolean and range controls for state toggles.",
+"order": 1
+},
+"defaultValue": true,
+"helperText": "Example of type `checkbox`."
+},
+{
+"key": "sliderField",
+"label": "Slider Field",
+"type": "slider",
+"section": "Booleans & Sliders",
+"sectionOrder": 3,
+"group": "state_controls_group",
+"defaultValue": 65,
+"min": 0,
+"max": 100,
+"step": 1,
+"helperText": "Example of type `slider`."
+},
+{
+"key": "toggleField",
+"label": "Toggle Field",
+"type": "toggle",
+"section": "Booleans & Sliders",
+"sectionOrder": 3,
+"group": "state_controls_group",
+"defaultValue": true,
+"helperText": "Controls visibleIf examples below."
+},
+{
+"key": "disabledInfoField",
+"label": "Disabled Read-Only Field",
+"type": "text",
+"section": "Visibility & Layout",
+"sectionOrder": 4,
+"group": {
+"key": "metadata_flags_group",
+"label": "Metadata Flags",
+"helperText": "Examples of disabled and hidden field metadata.",
+"order": 1
+},
+"defaultValue": "Runtime-managed status field",
+"disabled": true,
+"helperText": "Demonstrates `disabled: true`."
+},
+{
+"key": "hiddenTextField",
+"label": "Hidden Text Field",
+"type": "text",
+"section": "Visibility & Layout",
+"sectionOrder": 4,
+"group": "metadata_flags_group",
+"hidden": true,
+"defaultValue": "hidden_default_value",
+"helperText": "Demonstrates `hidden: true`."
+},
+{
+"key": "groupedTextField",
+"label": "Grouped Text Field",
+"type": "text",
+"section": "Visibility & Layout",
+"sectionOrder": 4,
+"group": {
+"key": "visibility_group",
+"label": "Grouped Visibility Fields",
+"helperText": "This container demonstrates `group` and group-level `visibleIf`.",
+"visibleIf": {
+"key": "toggleField",
+"equals": true
+}
+},
+"defaultValue": "inside_group",
+"helperText": "Example of grouped field."
+},
+{
+"key": "fileField",
+"label": "File Field",
+"type": "file",
+"section": "Visibility & Layout",
+"sectionOrder": 4,
+"group": "visibility_group",
+"visibleIf": {
+"key": "toggleField",
+"equals": true
+},
+"helperText": "Example of type `file` with `visibleIf`."
+},
+{
+"key": "passwordField",
+"label": "Password Field",
+"type": "password",
+"section": "Visibility & Layout",
+"sectionOrder": 4,
+"group": "visibility_group",
+"defaultValue": "super_secret_value",
+"helperText": "Example of type `password`."
+},
+{
+"key": "textareaField",
+"label": "Textarea Field",
+"type": "textarea",
+"section": "Visibility & Layout",
+"sectionOrder": 4,
+"group": "visibility_group",
+"rows": 4,
+"defaultValue": "This is a multiline example.",
+"visibleIf": {
+"key": "checkboxField",
+"equals": true
+},
+"helperText": "Example of type `textarea` with `visibleIf`."
+},
+{
+"key": "emailField",
+"label": "Email Field",
+"type": "email",
+"section": "Specialized Inputs",
+"sectionOrder": 5,
+"group": {
+"key": "contact_format_group",
+"label": "Contact & Link Inputs",
+"helperText": "Typed fields for contact and URL values.",
+"order": 1
+},
+"defaultValue": "name@example.com",
+"helperText": "Example of type `email`."
+},
+{
+"key": "urlField",
+"label": "URL Field",
+"type": "url",
+"section": "Specialized Inputs",
+"sectionOrder": 5,
+"group": "contact_format_group",
+"defaultValue": "https://lumiastream.com",
+"helperText": "Example of type `url`."
+},
+{
+"key": "datetimeField",
+"label": "Datetime Field",
+"type": "datetime",
+"section": "Specialized Inputs",
+"sectionOrder": 5,
+"group": {
+"key": "time_color_group",
+"label": "Time & Color Inputs",
+"helperText": "Structured datetime and color input examples.",
+"order": 2
+},
+"defaultValue": "2026-03-01T15:30",
+"helperText": "Example of type `datetime` (YYYY-MM-DDTHH:mm)."
+},
+{
+"key": "colorField",
+"label": "Color Field",
+"type": "color",
+"section": "Specialized Inputs",
+"sectionOrder": 5,
+"group": "time_color_group",
+"defaultValue": "#33aaff",
+"helperText": "Example of type `color`."
+},
+{
+"key": "leagueField",
+"label": "League (Dynamic Source)",
+"type": "select",
+"section": "Dynamic Lookup",
+"sectionOrder": 6,
+"group": {
+"key": "dynamic_lookup_group",
+"label": "Runtime Option Loading",
+"helperText": "Demonstrates dynamic options, lookup, and dependency refresh.",
+"order": 1
+},
+"defaultValue": "nfl",
+"refreshOnChange": true,
+"options": [
+{
+"label": "NFL",
+"value": "nfl"
+},
+{
+"label": "NBA",
+"value": "nba"
+},
+{
+"label": "MLB",
+"value": "mlb"
+},
+{
+"label": "NHL",
+"value": "nhl"
+}
+],
+"helperText": "Changing this refreshes team options below."
+},
+{
+"key": "teamLookupField",
+"label": "Teams (Dynamic + Lookup)",
+"type": "select",
+"section": "Dynamic Lookup",
+"sectionOrder": 6,
+"group": "dynamic_lookup_group",
+"multiple": true,
+"lookup": true,
+"dynamicOptions": true,
+"refreshOnChange": true,
+"defaultValue": ["nfl:kc"],
+"placeholder": "Search leagues or teams",
+"options": [],
+"helperText": "Example of `dynamicOptions` + `lookup` + `refreshOnChange`."
+},
+{
+"key": "jsonField",
+"label": "JSON Field",
+"type": "json",
+"section": "Structured Data",
+"sectionOrder": 7,
+"group": {
+"key": "structured_json_group",
+"label": "Structured Rule Payloads",
+"helperText": "Examples of structured JSON for advanced configuration payloads.",
+"order": 1
+},
+"rows": 8,
+"visibleIf": {
+"key": "selectField",
+"equals": "custom"
+},
+"defaultValue": {
+"rules": [
+{
+"name": "kill",
+"confidence": 0.9
+},
+{
+"name": "goal",
+"confidence": 0.92
+}
+],
+"cooldownMs": 1200
+},
+"helperText": "Example of type `json` with `visibleIf`."
+},
+{
+"key": "roiField",
+"label": "ROI Field",
+"type": "roi",
+"section": "ROI",
+"sectionOrder": 8,
+"group": {
+"key": "roi_capture_group",
+"label": "Region Capture",
+"helperText": "ROI is isolated because it is specific to screen-detection workflows.",
+"order": 1
+},
+"visibleIf": {
+"key": "selectMultipleField",
+"equals": "valorant"
+},
+"defaultValue": {
+"x": 0.72,
+"y": 0.02,
+"width": 0.27,
+"height": 0.45,
+"unit": "ratio"
+},
+"helperText": "Example of type `roi` with `visibleIf` and array matching."
+},
+{
+"key": "namedMapField",
+"label": "Named Targets Map",
+"type": "named_map",
+"section": "Structured Data",
+"sectionOrder": 7,
+"group": {
+"key": "named_map_examples_group",
+"label": "Named Mapping",
+"helperText": "Map user-defined names to values (real-world multi-channel pattern).",
+"order": 2
+},
+"valueType": "text",
+"valueLabel": "Target Value",
+"valuePlaceholder": "username|channelId|chatroomId",
+"valueField": {
+"type": "text",
+"required": true,
+"placeholder": "lumiastream|123456|987654"
+},
+"outputMode": "array",
+"allowDuplicateNames": false,
+"defaultValue": [
+{
+"name": "primary",
+"value": "lumiastream"
+},
+{
+"name": "mods",
+"value": "lumiastream_mods"
+}
+],
+"helperText": "Example of type `named_map`."
+},
+{
+"key": "oauthAccessToken",
+"label": "OAuth Access Token (Mapped)",
+"type": "password",
+"section": "OAuth Example",
+"sectionOrder": 9,
+"group": {
+"key": "oauth_mapped_tokens_group",
+"label": "Mapped OAuth Tokens",
+"helperText": "Read-only fields populated by oauth.tokenKeys mapping.",
+"order": 1
+},
+"disabled": true,
+"required": false,
+"helperText": "Auto-filled by oauth.tokenKeys.accessToken."
+},
+{
+"key": "oauthRefreshToken",
+"label": "OAuth Refresh Token (Mapped)",
+"type": "password",
+"section": "OAuth Example",
+"sectionOrder": 9,
+"group": "oauth_mapped_tokens_group",
+"disabled": true,
+"required": false,
+"helperText": "Auto-filled by oauth.tokenKeys.refreshToken."
+},
+{
+"key": "oauthTokenSecret",
+"label": "OAuth Token Secret (Mapped)",
+"type": "password",
+"section": "OAuth Example",
+"sectionOrder": 9,
+"group": "oauth_mapped_tokens_group",
+"disabled": true,
+"required": false,
+"helperText": "Auto-filled by oauth.tokenKeys.tokenSecret."
+}
+],
+"actions": [
+{
+"type": "passVariablesExample",
+"label": "Pass Variables Example",
+"description": "Demonstrates returning newlyPassedVariables from actions() for later actions in the same command.",
+"acceptedVariables": [
+"settings_showcase_action_message",
+"settings_showcase_action_status",
+"settings_showcase_action_save_count",
+"settings_showcase_action_snapshot"
+],
+"fields": [
+{
+"key": "message",
+"label": "Message",
+"type": "text",
+"defaultValue": "Hello from settings_showcase action",
+"allowVariables": true,
+"helperText": "Returned as settings_showcase_action_message."
+},
+{
+"key": "includeSnapshot",
+"label": "Include Snapshot",
+"type": "toggle",
+"defaultValue": true,
+"helperText": "When enabled, returns a compact JSON snapshot in settings_showcase_action_snapshot."
+},
+{
+"key": "stopChain",
+"label": "Stop Remaining Actions",
+"type": "toggle",
+"defaultValue": false,
+"helperText": "When enabled, actions() also returns shouldStop: true."
+}
+]
+}
+],
+"variables": [
+{
+"name": "save_count",
+"description": "How many times settings were saved/updated.",
+"value": 0
+},
+{
+"name": "last_saved_at",
+"description": "Timestamp of the last settings save.",
+"value": ""
+},
+{
+"name": "last_saved_values_json",
+"description": "JSON snapshot of values saved most recently.",
+"value": ""
+}
+],
+"alerts": [],
+"translations": "./translations.json"
+}
 }
 
 ```
@@ -18400,16 +18457,17 @@ module.exports = SettingsFieldShowcasePlugin;
 ## settings_showcase/package.json
 
 ```
+
 {
-	"name": "lumia-settings-field-showcase",
-	"version": "1.0.0",
-	"private": true,
-	"description": "Example Lumia plugin demonstrating roi/json/select+multiple/file/visibleIf settings.",
-	"main": "main.js",
-	"scripts": {},
-	"dependencies": {
-		"@lumiastream/plugin": "^0.9.4"
-	}
+"name": "lumia-settings-field-showcase",
+"version": "1.0.0",
+"private": true,
+"description": "Example Lumia plugin demonstrating roi/json/select+multiple/file/visibleIf settings.",
+"main": "main.js",
+"scripts": {},
+"dependencies": {
+"@lumiastream/plugin": "^0.9.5"
+}
 }
 
 ```
@@ -18417,6 +18475,7 @@ module.exports = SettingsFieldShowcasePlugin;
 ## settings_showcase/settings_tutorial.md
 
 ```
+
 ### Settings Field Showcase
 
 This example includes every supported settings field type:
@@ -18543,16 +18602,17 @@ YouTube fallback link: https://www.youtube.com/watch?v=VCd0kYWLvMQ
 ## settings_showcase/translations.json
 
 ```
+
 {
-	"en": {
-		"save_count": "How many times settings were saved/updated.",
-		"last_saved_at": "Timestamp of the last settings save.",
-		"last_saved_values_json": "JSON snapshot of values saved most recently.",
-		"settings_showcase_action_message": "Message returned from the passVariablesExample action.",
-		"settings_showcase_action_status": "Status returned from the passVariablesExample action.",
-		"settings_showcase_action_save_count": "Current save counter returned by the passVariablesExample action.",
-		"settings_showcase_action_snapshot": "Compact JSON snapshot returned by the passVariablesExample action."
-	}
+"en": {
+"save_count": "How many times settings were saved/updated.",
+"last_saved_at": "Timestamp of the last settings save.",
+"last_saved_values_json": "JSON snapshot of values saved most recently.",
+"settings_showcase_action_message": "Message returned from the passVariablesExample action.",
+"settings_showcase_action_status": "Status returned from the passVariablesExample action.",
+"settings_showcase_action_save_count": "Current save counter returned by the passVariablesExample action.",
+"settings_showcase_action_snapshot": "Compact JSON snapshot returned by the passVariablesExample action."
+}
 }
 
 ```
@@ -18560,108 +18620,110 @@ YouTube fallback link: https://www.youtube.com/watch?v=VCd0kYWLvMQ
 ## song_request_source/main.js
 
 ```
+
 const { Plugin } = require("@lumiastream/plugin");
 
 const TRACK_SECONDS = 20;
 
 class DemoSongSource extends Plugin {
-	constructor(manifest, context) {
-		super(manifest, context);
-		this.current = null;
-		this.timer = null;
-		this.remainingMs = 0;
-		this.startedAt = 0;
-	}
+constructor(manifest, context) {
+super(manifest, context);
+this.current = null;
+this.timer = null;
+this.remainingMs = 0;
+this.startedAt = 0;
+}
 
-	async onload() {
-		await this.lumia.updateConnection(true);
-		this.lumia.log("Demo song source ready");
-	}
+    async onload() {
+    	await this.lumia.updateConnection(true);
+    	this.lumia.log("Demo song source ready");
+    }
 
-	async onunload() {
-		this.clearTimer();
-		this.current = null;
-		await this.lumia.updateConnection(false);
-	}
+    async onunload() {
+    	this.clearTimer();
+    	this.current = null;
+    	await this.lumia.updateConnection(false);
+    }
 
-	async resolveSongRequest({ query, requesterUsername, requesterPlatform }) {
-		const trimmed = String(query ?? "").trim();
-		if (!trimmed || trimmed.toLowerCase().includes("unfindable")) {
-			return null;
-		}
-		if (trimmed.toLowerCase().includes("unresolved")) {
-			return { resolved: false, track: { artist: "Unknown Artist" } };
-		}
-		return {
-			id: `demo-${Buffer.from(trimmed.toLowerCase()).toString("base64url")}`,
-			title: trimmed.replace(/\b\w/g, (c) => c.toUpperCase()),
-			artist: "Demo Artist",
-			thumbnailUrl: "https://storage.lumiastream.com/logo/lumia-icon.png",
-			url: `https://example.com/track/${encodeURIComponent(trimmed)}`,
-			durationSeconds: TRACK_SECONDS,
-			requesterUsername,
-			requesterPlatform,
-		};
-	}
+    async resolveSongRequest({ query, requesterUsername, requesterPlatform }) {
+    	const trimmed = String(query ?? "").trim();
+    	if (!trimmed || trimmed.toLowerCase().includes("unfindable")) {
+    		return null;
+    	}
+    	if (trimmed.toLowerCase().includes("unresolved")) {
+    		return { resolved: false, track: { artist: "Unknown Artist" } };
+    	}
+    	return {
+    		id: `demo-${Buffer.from(trimmed.toLowerCase()).toString("base64url")}`,
+    		title: trimmed.replace(/\b\w/g, (c) => c.toUpperCase()),
+    		artist: "Demo Artist",
+    		thumbnailUrl: "https://storage.lumiastream.com/logo/lumia-icon.png",
+    		url: `https://example.com/track/${encodeURIComponent(trimmed)}`,
+    		durationSeconds: TRACK_SECONDS,
+    		requesterUsername,
+    		requesterPlatform,
+    	};
+    }
 
-	async playSongRequest(track) {
-		this.clearTimer();
-		this.current = track;
-		this.remainingMs = (track.durationSeconds ?? TRACK_SECONDS) * 1000;
-		this.lumia.log(`Playing: ${track.title} (requested by ${track.requesterUsername ?? "unknown"})`);
-		await this.lumia.songRequestNowPlaying(track);
-		this.armEndTimer();
-	}
+    async playSongRequest(track) {
+    	this.clearTimer();
+    	this.current = track;
+    	this.remainingMs = (track.durationSeconds ?? TRACK_SECONDS) * 1000;
+    	this.lumia.log(`Playing: ${track.title} (requested by ${track.requesterUsername ?? "unknown"})`);
+    	await this.lumia.songRequestNowPlaying(track);
+    	this.armEndTimer();
+    }
 
-	async skipSongRequest() {
-		if (!this.current) return;
-		this.lumia.log(`Skipping: ${this.current.title}`);
-		await this.finishTrack();
-	}
+    async skipSongRequest() {
+    	if (!this.current) return;
+    	this.lumia.log(`Skipping: ${this.current.title}`);
+    	await this.finishTrack();
+    }
 
-	async pauseSongRequest() {
-		if (!this.current || !this.timer) return;
-		this.remainingMs = Math.max(0, this.remainingMs - (Date.now() - this.startedAt));
-		this.clearTimer();
-		this.lumia.log(`Paused: ${this.current.title}`);
-	}
+    async pauseSongRequest() {
+    	if (!this.current || !this.timer) return;
+    	this.remainingMs = Math.max(0, this.remainingMs - (Date.now() - this.startedAt));
+    	this.clearTimer();
+    	this.lumia.log(`Paused: ${this.current.title}`);
+    }
 
-	async resumeSongRequest() {
-		if (!this.current || this.timer) return;
-		this.lumia.log(`Resumed: ${this.current.title}`);
-		this.armEndTimer();
-	}
+    async resumeSongRequest() {
+    	if (!this.current || this.timer) return;
+    	this.lumia.log(`Resumed: ${this.current.title}`);
+    	this.armEndTimer();
+    }
 
-	async setSongRequestVolume(volume) {
-		this.lumia.log(`Volume set to ${volume}%`);
-	}
+    async setSongRequestVolume(volume) {
+    	this.lumia.log(`Volume set to ${volume}%`);
+    }
 
-	async clearSongRequestQueue() {
-		this.lumia.log("Queue cleared by Lumia");
-	}
+    async clearSongRequestQueue() {
+    	this.lumia.log("Queue cleared by Lumia");
+    }
 
-	armEndTimer() {
-		this.startedAt = Date.now();
-		this.timer = setTimeout(() => {
-			void this.finishTrack();
-		}, this.remainingMs);
-	}
+    armEndTimer() {
+    	this.startedAt = Date.now();
+    	this.timer = setTimeout(() => {
+    		void this.finishTrack();
+    	}, this.remainingMs);
+    }
 
-	async finishTrack() {
-		const ended = this.current;
-		this.clearTimer();
-		this.current = null;
-		if (ended) {
-			await this.lumia.songRequestEnded(ended.id);
-		}
-	}
+    async finishTrack() {
+    	const ended = this.current;
+    	this.clearTimer();
+    	this.current = null;
+    	if (ended) {
+    		await this.lumia.songRequestEnded(ended.id);
+    	}
+    }
 
-	clearTimer() {
-		if (this.timer) {
-			clearTimeout(this.timer);
-			this.timer = null;
-		}
-	}
+    clearTimer() {
+    	if (this.timer) {
+    		clearTimeout(this.timer);
+    		this.timer = null;
+    	}
+    }
+
 }
 
 module.exports = DemoSongSource;
@@ -18671,30 +18733,31 @@ module.exports = DemoSongSource;
 ## song_request_source/manifest.json
 
 ```
+
 {
-	"id": "song_request_source",
-	"name": "Demo Song Source",
-	"version": "1.0.0",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"repository": "",
-	"description": "Example song-request source plugin: resolves viewer requests to fake tracks and simulates playback so you can test the full song-request round trip.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "audio",
-	"keywords": "song request, music, example, demo",
-	"config": {
-		"hasSongRequests": true,
-		"songRequest": {
-			"label": "Demo Source",
-			"supportsSearch": true,
-			"supportsSkip": true,
-			"supportsPause": true,
-			"supportsVolume": true,
-			"supportsQueue": false
-		}
-	}
+"id": "song_request_source",
+"name": "Demo Song Source",
+"version": "1.0.0",
+"author": "Lumia Stream",
+"email": "dev@lumiastream.com",
+"website": "https://lumiastream.com",
+"repository": "",
+"description": "Example song-request source plugin: resolves viewer requests to fake tracks and simulates playback so you can test the full song-request round trip.",
+"license": "MIT",
+"lumiaVersion": "^9.0.0",
+"category": "audio",
+"keywords": "song request, music, example, demo",
+"config": {
+"hasSongRequests": true,
+"songRequest": {
+"label": "Demo Source",
+"supportsSearch": true,
+"supportsSkip": true,
+"supportsPause": true,
+"supportsVolume": true,
+"supportsQueue": false
+}
+}
 }
 
 ```
@@ -18702,12 +18765,17 @@ module.exports = DemoSongSource;
 ## steam/actions_tutorial.md
 
 ```
+
 ---
+
 ---
+
 ### Fetch Game Achievements
+
 Use **Fetch Achievements For Game** to query a specific game by name or App ID.
 The results are returned from the action through its accepted variables, including
 the resolved App ID, Steam graphics URL, playtime in minutes, and achievement data.
+
 ---
 
 ```
@@ -18715,1532 +18783,1534 @@ the resolved App ID, Steam graphics URL, playtime in minutes, and achievement da
 ## steam/main.js
 
 ```
+
 const { Plugin } = require("@lumiastream/plugin");
 
 const DEFAULTS = {
-	pollInterval: 120,
-	minPollInterval: 30,
-	maxPollInterval: 900,
-	requestTimeoutMs: 15000,
-	validationTimeoutMs: 20000,
-	lumiaCallTimeoutMs: 1000,
-	stuckRefreshMs: 60000,
-	ownedGamesRefreshSeconds: 600,
-	userAgent: "LumiaStream Steam Plugin/1.0.0",
-	achievementSchemaCacheMaxEntries: 1,
-	matchThreshold: 0.7,
+pollInterval: 120,
+minPollInterval: 30,
+maxPollInterval: 900,
+requestTimeoutMs: 15000,
+validationTimeoutMs: 20000,
+lumiaCallTimeoutMs: 1000,
+stuckRefreshMs: 60000,
+ownedGamesRefreshSeconds: 600,
+userAgent: "LumiaStream Steam Plugin/1.0.0",
+achievementSchemaCacheMaxEntries: 1,
+matchThreshold: 0.7,
 };
 
 const STEAM_API_BASE = "https://api.steampowered.com";
 
 const ALERT_KEYS = {
-	onlineStateChanged: "online_state_changed",
-	achievementUnlocked: "achievement_unlocked",
-	achievementProgressChanged: "achievement_progress_changed",
-	currentGameChanged: "current_game_changed",
-	currentGameOver: "current_game_over",
+onlineStateChanged: "online_state_changed",
+achievementUnlocked: "achievement_unlocked",
+achievementProgressChanged: "achievement_progress_changed",
+currentGameChanged: "current_game_changed",
+currentGameOver: "current_game_over",
 };
 
 const VARIABLE_NAMES = {
-	steamId: "steamid",
-	username: "persona_username",
-	onlineStatus: "online_status",
-	lastLogoff: "last_logoff",
-	profileUrl: "profile_url",
-	avatar: "avatar",
-	currentGameName: "current_game_name",
-	currentGameAppId: "current_game_appid",
-	currentGameGraphicsUrl: "current_game_graphics_url",
-	currentGamePlaytimeMinutes: "current_game_playtime_minutes",
-	gameCount: "game_count",
-	currentGameAchievementCount: "current_game_achievement_count",
-	currentGameAchievementUnlocked: "current_game_achievement_unlocked_count",
-	achievementName: "current_game_achievement_name",
-	achievementDescription: "current_game_achievement_description",
+steamId: "steamid",
+username: "persona_username",
+onlineStatus: "online_status",
+lastLogoff: "last_logoff",
+profileUrl: "profile_url",
+avatar: "avatar",
+currentGameName: "current_game_name",
+currentGameAppId: "current_game_appid",
+currentGameGraphicsUrl: "current_game_graphics_url",
+currentGamePlaytimeMinutes: "current_game_playtime_minutes",
+gameCount: "game_count",
+currentGameAchievementCount: "current_game_achievement_count",
+currentGameAchievementUnlocked: "current_game_achievement_unlocked_count",
+achievementName: "current_game_achievement_name",
+achievementDescription: "current_game_achievement_description",
 };
 
 const ACTION_VARIABLE_NAMES = {
-	requestedGameInput: "steam_requested_game_input",
-	requestedGameAppId: "steam_requested_game_appid",
-	requestedGameName: "steam_requested_game_name",
-	requestedGameGraphicsUrl: "steam_requested_game_graphics_url",
-	requestedGamePlaytimeMinutes: "steam_requested_game_playtime_minutes",
-	requestedGameAchievementCount: "steam_requested_game_achievement_count",
-	requestedGameAchievementUnlocked: "steam_requested_game_achievement_unlocked",
-	requestedGameAchievements: "steam_requested_game_achievements",
+requestedGameInput: "steam_requested_game_input",
+requestedGameAppId: "steam_requested_game_appid",
+requestedGameName: "steam_requested_game_name",
+requestedGameGraphicsUrl: "steam_requested_game_graphics_url",
+requestedGamePlaytimeMinutes: "steam_requested_game_playtime_minutes",
+requestedGameAchievementCount: "steam_requested_game_achievement_count",
+requestedGameAchievementUnlocked: "steam_requested_game_achievement_unlocked",
+requestedGameAchievements: "steam_requested_game_achievements",
 };
 
 class SteamPlugin extends Plugin {
-	constructor(manifest, context) {
-		super(manifest, context);
-		this._pollTimer = null;
-		this._refreshPromise = null;
-		this._refreshStartedAt = 0;
-		this._lastConnectionState = null;
-		this._lastVariables = new Map();
-		this._globalBackoffUntil = 0;
-		this._authFailure = false;
-		this._resolvedSteamId = "";
-		this._hasInitialSync = false;
-		this._lastPersonaState = null;
-		this._lastCurrentGameAppId = null;
-		this._lastCurrentGameName = "";
-		this._lastAchievementAppId = null;
-		this._lastAchievementUnlocked = null;
-		this._lastAchievementUnlockedKeys = null;
-		this._achievementSchemaCache = new Map();
-		this._lastOwnedFetchAt = 0;
-		this._ownedGamesByAppId = new Map();
-	}
-
-	async onload() {
-		if (!this._hasRequiredSettings()) {
-			await this._log("Missing Steam API key or Steam ID.", "warn");
-			await this._updateConnectionState(false);
-			return;
-		}
-
-		void this._refreshData({ reason: "startup" });
-		this._schedulePolling();
-	}
-
-	async onunload() {
-		this._clearPolling();
-		await this._updateConnectionState(false);
-	}
-
-	async onsettingsupdate(settings, previous = {}) {
-		const pollChanged =
-			this._pollInterval(settings) !== this._pollInterval(previous);
-		const keyChanged = (settings?.apiKey ?? "") !== (previous?.apiKey ?? "");
-		const idChanged =
-			(settings?.steamIdOrVanity ?? "") !== (previous?.steamIdOrVanity ?? "");
-
-		if (pollChanged) {
-			this._schedulePolling();
-		}
-
-		if (keyChanged || idChanged) {
-			this._authFailure = false;
-			this._globalBackoffUntil = 0;
-			this._resolvedSteamId = "";
-			this._hasInitialSync = false;
-			this._lastPersonaState = null;
-			this._lastCurrentGameAppId = null;
-			this._lastCurrentGameName = "";
-			this._lastAchievementAppId = null;
-			this._lastAchievementUnlocked = null;
-			this._lastAchievementUnlockedKeys = null;
-			this._achievementSchemaCache.clear();
-			this._lastOwnedFetchAt = 0;
-			this._ownedGamesByAppId.clear();
-		}
-
-		await this._refreshData({ reason: "settings-update" });
-	}
-
-	async actions(config) {
-		const actions = Array.isArray(config?.actions) ? config.actions : [];
-		const newlyPassedVariables = {};
-		for (const action of actions) {
-			const params = action.value;
-			try {
-				switch (action.type) {
-					case "refresh":
-						await this._refreshData({ reason: "manual-action" });
-						break;
-					case "fetch_game":
-						this._mergeActionVariables(
-							newlyPassedVariables,
-							await this._handleFetchGame(params),
-						);
-						break;
-				}
-			} catch (error) {
-				const message = this._errorMessage(error);
-				await this._log(
-					`Action ${action.type ?? "unknown"} failed: ${message}`,
-					"error",
-				);
-			}
-		}
-
-		if (Object.keys(newlyPassedVariables).length) {
-			return { newlyPassedVariables };
-		}
-	}
-
-	_mergeActionVariables(target, variables) {
-		if (!variables || typeof variables !== "object") {
-			return;
-		}
-		for (const [key, value] of Object.entries(variables)) {
-			if (!key) {
-				continue;
-			}
-			target[key] = value;
-		}
-	}
-
-	async validateAuth(data = {}) {
-		const settings = this._settingsWith(data);
-		if (!this._hasRequiredSettings(settings)) {
-			await this._log("Steam validation failed: missing API key or Steam ID.", "warn");
-			await this._updateConnectionState(false);
-			return {
-				ok: false,
-				message: "Missing Steam API key or Steam ID.",
-			};
-		}
-
-		try {
-			await this._log("Validating Steam connection.");
-			const steamId = await this._withTimeout(
-				(async () => {
-					const resolvedSteamId = await this._resolveSteamId(settings, {
-						cache: false,
-					});
-					await this._fetchPlayerSummary(resolvedSteamId, settings);
-					return resolvedSteamId;
-				})(),
-				DEFAULTS.validationTimeoutMs,
-				"Steam validation timed out.",
-			);
-			await this._updateConnectionState(true);
-			await this._log(`Steam validation succeeded for SteamID64 ${steamId}.`);
-			return { ok: true };
-		} catch (error) {
-			const message = this._errorMessage(error);
-			await this._log(`Steam validation failed: ${message}`, "error");
-			await this._updateConnectionState(false);
-			return { ok: false, message };
-		}
-	}
-
-	_tag() {
-		return `[${this.manifest?.id ?? "steam"}]`;
-	}
-
-	async _log(message, severity = "info") {
-		const prefix = this._tag();
-		const decorated =
-			severity === "warn"
-				? `${prefix} WARN ${message}`
-				: severity === "error"
-					? `${prefix} ERROR ${message}`
-					: `${prefix} ${message}`;
-
-		if (severity === "warn") {
-			console.warn(decorated);
-		} else if (severity === "error") {
-			console.error(decorated);
-		} else if (this._debugEnabled()) {
-			console.log(decorated);
-		}
-
-		if (typeof this.lumia?.log !== "function") {
-			return;
-		}
-
-		try {
-			await this._withTimeout(
-				Promise.resolve(this.lumia.log(decorated)),
-				DEFAULTS.lumiaCallTimeoutMs,
-				"Lumia log timed out.",
-			);
-		} catch {
-			// Keep plugin flow alive when logging transport is unavailable.
-		}
-	}
-
-	async _tempDebug(message) {
-		if (!this._debugEnabled()) {
-			return;
-		}
-
-		const prefixed = `[TEMP DEBUG] ${message}`;
-		await this._log(prefixed, "info");
-	}
-
-	async _refreshData({ reason } = {}) {
-		if (!this._hasRequiredSettings()) {
-			await this._updateConnectionState(false);
-			return;
-		}
-
-		if (this._authFailure) {
-			return;
-		}
-
-		const now = Date.now();
-		if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
-			return;
-		}
-
-		if (this._refreshPromise) {
-			const elapsed = Date.now() - this._refreshStartedAt;
-			if (elapsed <= DEFAULTS.stuckRefreshMs) {
-				return this._refreshPromise;
-			}
-			this._refreshPromise = null;
-			this._refreshStartedAt = 0;
-		}
-
-		this._refreshStartedAt = Date.now();
-		this._refreshPromise = (async () => {
-			try {
-				const steamId = await this._resolveSteamId();
-				const forceFullRefresh =
-					reason === "startup" ||
-					reason === "settings-update" ||
-					reason === "manual-action";
-				const now = Date.now();
-
-				const summaryResult = await this._safeFetch("summary", () =>
-					this._fetchPlayerSummary(steamId),
-				);
-				const achievementAppId = this._determineAchievementAppId(summaryResult.data);
-				const currentGameAppId = this._coerceNumber(
-					summaryResult?.data?.gameid,
-					0,
-				);
-
-				const shouldFetchOwned =
-					forceFullRefresh ||
-					!this._lastOwnedFetchAt ||
-					now - this._lastOwnedFetchAt >= this._ownedGamesRefreshMs() ||
-					Boolean(
-						currentGameAppId &&
-							currentGameAppId !== this._lastCurrentGameAppId &&
-							!this._ownedGamesByAppId.has(currentGameAppId),
-					);
-				let ownedResult = { ok: false, data: null };
-				if (shouldFetchOwned) {
-					ownedResult = await this._safeFetch("owned games", () =>
-						this._fetchOwnedGames(steamId),
-					);
-					if (ownedResult.ok) {
-						this._lastOwnedFetchAt = Date.now();
-					}
-				}
-
-				// Poll current-game achievements each cycle so multiple unlocks in
-				// the same play session can be detected without long delays.
-				const shouldFetchAchievements = Boolean(achievementAppId);
-
-				let achievementsResult = { ok: false, data: null };
-				if (shouldFetchAchievements) {
-					achievementsResult = await this._safeFetch("achievements", () =>
-						this._fetchAchievements(steamId, achievementAppId),
-					);
-				}
-
-				const currentGameName = this._coerceString(
-					summaryResult?.data?.gameextrainfo,
-					"",
-				);
-				const achievementEntries = Array.isArray(
-					achievementsResult?.data?.playerstats?.achievements,
-				)
-					? achievementsResult.data.playerstats.achievements
-					: [];
-				const achievementCount = achievementEntries.length;
-				const unlockedCount = achievementEntries.filter(
-					(achievement) => achievement?.achieved === 1,
-				).length;
-				const achievementSnapshot = this._summarizeAchievements(
-					achievementEntries,
-					40,
-				);
-				await this._tempDebug(
-					`refresh reason=${reason ?? "unknown"} steamId=${steamId} game='${currentGameName || "none"}' appId=${achievementAppId || 0} summaryOk=${summaryResult.ok} ownedFetched=${shouldFetchOwned} ownedOk=${ownedResult.ok} achievementsFetched=${shouldFetchAchievements} achievementsOk=${shouldFetchAchievements ? achievementsResult.ok : "skipped"} unlocked=${unlockedCount}/${achievementCount} achievements='${achievementSnapshot || "none"}'`,
-				);
-
-				await this._applySummary(summaryResult.data, steamId);
-				if (shouldFetchOwned) {
-					await this._applyOwnedGames(ownedResult.data);
-				}
-				if (summaryResult.data) {
-					await this._applyCurrentGameDetails(currentGameAppId);
-				}
-				if (shouldFetchAchievements) {
-					await this._applyAchievements(achievementsResult.data);
-				} else {
-					await this._applyAchievements(null, { clear: true });
-				}
-				await this._emitAlerts({
-					summary: summaryResult.data,
-					achievementAppId,
-					achievements: shouldFetchAchievements ? achievementsResult.data : null,
-				});
-
-				const hadSuccessfulRefresh =
-					summaryResult.ok ||
-					(shouldFetchOwned && ownedResult.ok) ||
-					(shouldFetchAchievements && achievementsResult.ok);
-
-				await this._updateConnectionState(hadSuccessfulRefresh);
-			} catch (error) {
-				await this._log(
-					`Steam refresh failed: ${this._errorMessage(error)}`,
-					"error",
-				);
-				await this._updateConnectionState(false);
-			} finally {
-				this._refreshPromise = null;
-				this._refreshStartedAt = 0;
-			}
-		})();
-
-		return this._refreshPromise;
-	}
-
-	async _resolveSteamId(settings = this.settings, { cache = true } = {}) {
-		if (cache && this._resolvedSteamId) {
-			return this._resolvedSteamId;
-		}
-
-		const input = this._normalizeSteamIdentifier(
-			this._coerceString(settings?.steamIdOrVanity, "").trim(),
-		);
-		if (!input) {
-			throw new Error("Missing Steam ID or vanity name.");
-		}
-
-		if (/^\d{17}$/.test(input)) {
-			if (cache) {
-				this._resolvedSteamId = input;
-			}
-			return input;
-		}
-
-		const resolved = await this._fetchResolveVanity(input, settings);
-		const steamId = this._coerceString(resolved?.steamid, "");
-		if (!steamId) {
-			throw new Error("Could not resolve vanity URL.");
-		}
-
-		if (cache) {
-			this._resolvedSteamId = steamId;
-		}
-		return steamId;
-	}
-
-	_normalizeSteamIdentifier(value) {
-		if (!value) return "";
-		const raw = String(value).trim();
-		if (!raw) return "";
-
-		const profileMatch = raw.match(
-			/^https?:\/\/steamcommunity\.com\/(id|profiles)\/([^\/?#]+).*$/i,
-		);
-		if (profileMatch) {
-			const [, type, identifier] = profileMatch;
-			if (type.toLowerCase() === "profiles") {
-				return identifier;
-			}
-			return identifier;
-		}
-
-		return raw;
-	}
-
-	async _fetchResolveVanity(vanity, settings = this.settings) {
-		const url = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v1/?key=${encodeURIComponent(
-			this._apiKey(settings),
-		)}&vanityurl=${encodeURIComponent(vanity)}&url_type=1`;
-		const response = await this._fetchJson(url);
-		return response?.response ?? null;
-	}
-
-	async _fetchPlayerSummary(steamId, settings = this.settings) {
-		const url = `${STEAM_API_BASE}/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(
-			this._apiKey(settings),
-		)}&steamids=${encodeURIComponent(steamId)}`;
-		const response = await this._fetchJson(url);
-		return response?.response?.players?.[0] ?? null;
-	}
-
-	async _fetchOwnedGames(steamId, settings = this.settings) {
-		const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
-			this._apiKey(settings),
-		)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=0&include_played_free_games=1`;
-		return this._fetchJson(url);
-	}
-
-	async _fetchAchievements(steamId, appId, settings = this.settings) {
-		const targetAppId = this._coerceNumber(appId, 0);
-		if (!targetAppId) {
-			return null;
-		}
-
-		const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?key=${encodeURIComponent(
-			this._apiKey(settings),
-		)}&steamid=${encodeURIComponent(steamId)}&appid=${targetAppId}&l=en&_=${Date.now()}`;
-		return this._fetchJson(url);
-	}
-
-	async _fetchAchievementSchema(appId, settings = this.settings) {
-		const targetAppId = this._coerceNumber(appId, 0);
-		if (!targetAppId) {
-			return null;
-		}
-
-		const url = `${STEAM_API_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(
-			this._apiKey(settings),
-		)}&appid=${targetAppId}&l=en`;
-		return this._fetchJson(url);
-	}
-
-	async _fetchOwnedGamesWithInfo(steamId, settings = this.settings) {
-		const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
-			this._apiKey(settings),
-		)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=1&include_played_free_games=1`;
-		return this._fetchJson(url);
-	}
-
-	_determineAchievementAppId(summary) {
-		const summaryGameId = this._coerceNumber(summary?.gameid, 0);
-		if (summaryGameId) {
-			return summaryGameId;
-		}
-		return 0;
-	}
-
-	async _fetchJson(url) {
-		let response = await this._request(url);
-		if (url.includes("/ISteamUserStats/GetPlayerAchievements/")) {
-			const appIdMatch = url.match(/[?&]appid=(\d+)/);
-			const appId = appIdMatch?.[1] ?? "unknown";
-			await this._tempDebug(
-				`achievement_http appId=${appId} status=${response.status} cacheControl='${this._coerceString(response.headers.get("cache-control"), "")}' age='${this._coerceString(response.headers.get("age"), "")}' etag='${this._coerceString(response.headers.get("etag"), "")}'`,
-				{ throttleKey: `achievement-http:${appId}:${response.status}`, intervalMs: 10 * 1000 },
-			);
-		}
-
-		if (response.status === 429) {
-			const retryAfter = this._coerceNumber(
-				response.headers.get("Retry-After"),
-				60,
-			);
-			this._applyGlobalBackoff(retryAfter);
-			throw new Error(`Rate limited (429). Backing off for ${retryAfter}s.`);
-		}
-
-		if (response.status === 401 || response.status === 403) {
-			this._authFailure = true;
-			this._clearPolling();
-			await this._showApiKeyFailureToast();
-			throw new Error("Unauthorized. Check your Steam API key.");
-		}
-
-		if (!response.ok) {
-			const body = await response.text();
-			const trimmed = this._truncateError(body);
-			throw new Error(
-				`Steam API error (${response.status}) on ${url}: ${trimmed || "No response body"}`,
-			);
-		}
-
-		return response.json();
-	}
-
-	async _request(url) {
-		const headers = {
-			Accept: "application/json",
-			"User-Agent": DEFAULTS.userAgent,
-			"Cache-Control": "no-cache, no-store, max-age=0",
-			Pragma: "no-cache",
-		};
-		const timeoutMs = Math.max(1000, DEFAULTS.requestTimeoutMs);
-		const supportsAbort = typeof AbortController !== "undefined";
-
-		if (!supportsAbort) {
-			let timeoutId = null;
-			try {
-				return await Promise.race([
-					fetch(url, { headers, cache: "no-store" }),
-					new Promise((_, reject) => {
-						timeoutId = setTimeout(() => {
-							reject(new Error(`Steam request timed out after ${timeoutMs}ms.`));
-						}, timeoutMs);
-					}),
-				]);
-			} finally {
-				if (timeoutId) {
-					clearTimeout(timeoutId);
-				}
-			}
-		}
-
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-		try {
-			return await fetch(url, {
-				headers,
-				cache: "no-store",
-				signal: controller.signal,
-			});
-		} catch (error) {
-			if (error?.name === "AbortError") {
-				throw new Error(`Steam request timed out after ${timeoutMs}ms.`);
-			}
-			throw error;
-		} finally {
-			clearTimeout(timeoutId);
-		}
-	}
-
-	async _applySummary(summary, steamId) {
-		if (!summary) {
-			await this._setVariableIfChanged(VARIABLE_NAMES.steamId, steamId);
-			return;
-		}
-
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.steamId,
-			this._coerceString(summary?.steamid ?? steamId, ""),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.username,
-			this._coerceString(summary?.personaname, ""),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.onlineStatus,
-			this._mapPersonaState(this._coerceNumber(summary?.personastate, 0)),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.lastLogoff,
-			this._coerceNumber(summary?.lastlogoff, 0),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.profileUrl,
-			this._coerceString(summary?.profileurl, ""),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.avatar,
-			this._coerceString(summary?.avatarfull, ""),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.currentGameName,
-			this._coerceString(summary?.gameextrainfo, ""),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.currentGameAppId,
-			this._coerceNumber(summary?.gameid, 0),
-		);
-	}
-
-	async _applyOwnedGames(owned) {
-		if (!owned) {
-			return;
-		}
-
-		this._cacheOwnedGames(owned);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.gameCount,
-			this._coerceNumber(owned?.response?.game_count, 0),
-		);
-	}
-
-	_cacheOwnedGames(owned) {
-		const games = Array.isArray(owned?.response?.games)
-			? owned.response.games
-			: [];
-		this._ownedGamesByAppId.clear();
-		if (!games.length) {
-			return;
-		}
-
-		for (const game of games) {
-			const appId = this._gameAppId(game);
-			if (!appId) {
-				continue;
-			}
-			this._ownedGamesByAppId.set(appId, game);
-		}
-	}
-
-	async _applyCurrentGameDetails(appId) {
-		const currentGameAppId = this._coerceNumber(appId, 0);
-		if (!currentGameAppId) {
-			await this._setVariableIfChanged(VARIABLE_NAMES.currentGameGraphicsUrl, "");
-			await this._setVariableIfChanged(
-				VARIABLE_NAMES.currentGamePlaytimeMinutes,
-				0,
-			);
-			return;
-		}
-
-		const game = this._ownedGamesByAppId.get(currentGameAppId);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.currentGameGraphicsUrl,
-			this._gameGraphicsUrl(currentGameAppId),
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.currentGamePlaytimeMinutes,
-			this._gamePlaytimeMinutes(game),
-		);
-	}
-
-	async _applyAchievements(payload, { clear = false } = {}) {
-		if (!payload) {
-			if (!clear) {
-				return;
-			}
-			await this._setVariableIfChanged(
-				VARIABLE_NAMES.currentGameAchievementCount,
-				0,
-			);
-			await this._setVariableIfChanged(
-				VARIABLE_NAMES.currentGameAchievementUnlocked,
-				0,
-			);
-			await this._setVariableIfChanged(VARIABLE_NAMES.achievementName, "");
-			await this._setVariableIfChanged(
-				VARIABLE_NAMES.achievementDescription,
-				"",
-			);
-			return;
-		}
-
-		const achievements = Array.isArray(payload?.playerstats?.achievements)
-			? payload.playerstats.achievements
-			: [];
-		const unlocked = achievements.filter((a) => a?.achieved === 1).length;
-
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.currentGameAchievementCount,
-			achievements.length,
-		);
-		await this._setVariableIfChanged(
-			VARIABLE_NAMES.currentGameAchievementUnlocked,
-			unlocked,
-		);
-	}
-
-	async _emitAlerts({ summary, achievementAppId, achievements }) {
-		const hasSummary = Boolean(summary && typeof summary === "object");
-		// Do not emit status/game-change alerts until we have at least one real
-		// profile snapshot to use as baseline.
-		if (!hasSummary) {
-			return;
-		}
-		const personaStateRaw = hasSummary
-			? this._coerceNumber(summary?.personastate, 0)
-			: null;
-		const personaState =
-			personaStateRaw === null ? null : this._mapPersonaState(personaStateRaw);
-		const currentGameAppId = this._coerceNumber(summary?.gameid, 0);
-		const currentGameName = this._coerceString(summary?.gameextrainfo, "");
-
-		const achievementList = Array.isArray(
-			achievements?.playerstats?.achievements,
-		)
-			? achievements.playerstats.achievements
-			: null;
-		const unlockedAchievements = achievementList
-			? achievementList.filter((a) => a?.achieved === 1)
-			: [];
-		const unlockedAchievementKeys = achievementList
-			? this._getAchievementUnlockedKeys(unlockedAchievements)
-			: null;
-		const unlocked = unlockedAchievements.length;
-		const total = achievementList ? achievementList.length : 0;
-		const alertVars = this._buildAlertVariables({
-			summary,
-			onlineStatus: personaState,
-			achievementUnlocked: unlocked,
-			achievementCount: total,
-		});
-
-		if (!this._hasInitialSync) {
-			this._lastPersonaState = personaState;
-			this._lastCurrentGameAppId = currentGameAppId || null;
-			this._lastCurrentGameName = currentGameName;
-			this._lastAchievementAppId = achievementAppId || null;
-			this._lastAchievementUnlocked = achievementList ? unlocked : null;
-			this._lastAchievementUnlockedKeys = unlockedAchievementKeys;
-			this._hasInitialSync = true;
-			return;
-		}
-
-		if (
-			personaState !== null &&
-			this._lastPersonaState !== null &&
-			personaState !== this._lastPersonaState
-		) {
-			await this.lumia.triggerAlert({
-				alert: ALERT_KEYS.onlineStateChanged,
-				...this._buildAlertPayload(alertVars, {
-					dynamicValue: alertVars.online_status,
-				}),
-			});
-		}
-
-		if (
-			achievementList &&
-			achievementAppId &&
-			this._lastAchievementAppId === achievementAppId &&
-			this._lastAchievementUnlocked !== null &&
-			unlocked !== this._lastAchievementUnlocked
-		) {
-			const newlyUnlocked = unlockedAchievements.filter((achievement) => {
-				const key = this._achievementKey(achievement);
-				if (!key) {
-					return false;
-				}
-
-				return !this._lastAchievementUnlockedKeys?.has(key);
-			});
-			const achievementAlertVars = this._buildAlertVariables({
-				summary,
-				onlineStatus: personaState,
-				achievementUnlocked: unlocked,
-				achievementCount: total,
-				achievementName: "",
-				achievementDescription: "",
-			});
-
-			const sortedNewlyUnlocked = [...newlyUnlocked].sort(
-				(a, b) =>
-					this._coerceNumber(a?.unlocktime, 0) -
-					this._coerceNumber(b?.unlocktime, 0),
-			);
-			for (const unlockedAchievement of sortedNewlyUnlocked) {
-				const unlockedDetails = await this._resolveAchievementDetails(
-					achievementAppId,
-					unlockedAchievement,
-				);
-				const unlockedAlertVars = this._buildAlertVariables({
-					summary,
-					onlineStatus: personaState,
-					achievementUnlocked: unlocked,
-					achievementCount: total,
-					achievementName: unlockedDetails.name,
-					achievementDescription: unlockedDetails.description,
-				});
-				await this._setVariableIfChanged(
-					VARIABLE_NAMES.achievementName,
-					unlockedDetails.name,
-				);
-				await this._setVariableIfChanged(
-					VARIABLE_NAMES.achievementDescription,
-					unlockedDetails.description,
-				);
-				await this.lumia.triggerAlert({
-					alert: ALERT_KEYS.achievementUnlocked,
-					...this._buildAlertPayload(unlockedAlertVars, {
-						dynamicValue: unlockedAlertVars.achievement_name,
-					}),
-				});
-			}
-
-			await this.lumia.triggerAlert({
-				alert: ALERT_KEYS.achievementProgressChanged,
-				...this._buildAlertPayload(achievementAlertVars, {
-					dynamicValue: `${achievementAlertVars.current_game_achievement_unlocked_count}/${achievementAlertVars.current_game_achievement_count}`,
-				}),
-			});
-		}
-
-		const previousGameAppId = this._lastCurrentGameAppId;
-		const previousGameName = this._lastCurrentGameName;
-		const changedToNewGame =
-			Boolean(currentGameAppId) &&
-			(previousGameAppId === null || currentGameAppId !== previousGameAppId);
-		const changedToNoGame =
-			!currentGameAppId && previousGameAppId !== null;
-
-		if (changedToNewGame) {
-			await this.lumia.triggerAlert({
-				alert: ALERT_KEYS.currentGameChanged,
-				...this._buildAlertPayload(alertVars, {
-					dynamicValue: alertVars.current_game_name,
-				}),
-			});
-		}
-
-		if (changedToNoGame) {
-			await this.lumia.triggerAlert({
-				alert: ALERT_KEYS.currentGameOver,
-				...this._buildAlertPayload(alertVars, {
-					dynamicValue: previousGameName || "Stopped Playing",
-					extraSettings: { previous_game_name: previousGameName ?? "" },
-				}),
-			});
-		}
-
-		if (personaState !== null) {
-			this._lastPersonaState = personaState;
-		}
-		if (currentGameAppId) {
-			this._lastCurrentGameAppId = currentGameAppId;
-		} else {
-			this._lastCurrentGameAppId = null;
-		}
-		this._lastCurrentGameName = currentGameName;
-		if (achievementAppId && achievementList) {
-			this._lastAchievementAppId = achievementAppId;
-			this._lastAchievementUnlocked = unlocked;
-			this._lastAchievementUnlockedKeys = unlockedAchievementKeys;
-		}
-	}
-
-	_achievementKey(achievement) {
-		const key = this._coerceString(achievement?.apiname, "").trim();
-		return key || "";
-	}
-
-	_getAchievementUnlockedKeys(achievementList) {
-		const keys = new Set();
-		for (const achievement of achievementList) {
-			const key = this._achievementKey(achievement);
-			if (!key) {
-				continue;
-			}
-			keys.add(key);
-		}
-		return keys;
-	}
-
-	async _getAchievementSchemaByApp(appId) {
-		const targetAppId = this._coerceNumber(appId, 0);
-		if (!targetAppId) {
-			return null;
-		}
-
-		const cached = this._achievementSchemaCache.get(targetAppId);
-		if (cached && typeof cached === "object") {
-			// Move hit to the end to preserve LRU order.
-			this._achievementSchemaCache.delete(targetAppId);
-			this._achievementSchemaCache.set(targetAppId, cached);
-			return cached.value ?? null;
-		}
-
-		const schemaResult = await this._safeFetch("achievement schema", () =>
-			this._fetchAchievementSchema(targetAppId),
-		);
-		const schemaAchievements = Array.isArray(
-			schemaResult?.data?.game?.availableGameStats?.achievements,
-		)
-			? schemaResult.data.game.availableGameStats.achievements
-			: [];
-		const schemaMap = new Map();
-		for (const achievement of schemaAchievements) {
-			const key = this._coerceString(achievement?.name, "").trim();
-			if (!key) {
-				continue;
-			}
-			schemaMap.set(key, {
-				name: this._coerceString(
-					achievement?.displayName ?? achievement?.name,
-					"",
-				),
-				description: this._coerceString(achievement?.description, ""),
-			});
-		}
-
-		this._achievementSchemaCache.set(targetAppId, {
-			value: schemaMap,
-		});
-		this._pruneAchievementSchemaCache();
-		return schemaMap;
-	}
-
-	async _resolveAchievementDetails(appId, achievement) {
-		const apiName = this._coerceString(achievement?.apiname, "").trim();
-		if (!apiName) {
-			return { name: "", description: "" };
-		}
-
-		const runtimeName = this._coerceString(
-			achievement?.name ?? achievement?.displayName,
-			"",
-		).trim();
-		const runtimeDescription = this._coerceString(
-			achievement?.description,
-			"",
-		).trim();
-		if (runtimeName && runtimeDescription) {
-			return { name: runtimeName, description: runtimeDescription };
-		}
-
-		const schemaMap = await this._getAchievementSchemaByApp(appId);
-		const schemaMatch = schemaMap?.get(apiName);
-
-		return {
-			name: runtimeName || this._coerceString(schemaMatch?.name, apiName),
-			description:
-				runtimeDescription || this._coerceString(schemaMatch?.description, ""),
-		};
-	}
-
-	async _handleFetchGame(params = {}) {
-		if (!this._hasRequiredSettings()) {
-			await this._log("Missing Steam API key or Steam ID.", "warn");
-			return null;
-		}
-
-		const gameInput = this._coerceString(params?.game, "").trim();
-		if (!gameInput) {
-			await this._log("Game name or App ID is required.", "warn");
-			return null;
-		}
-
-		const steamId = await this._resolveSteamId();
-		await this._tempDebug(
-			`fetch_game input='${gameInput}' steamId=${steamId}`,
-		);
-		let appId = null;
-		let gameName = "";
-		let resolvedGame = null;
-
-		const numericOnly = gameInput.match(/^\d+$/);
-		if (numericOnly) {
-			appId = this._coerceNumber(numericOnly[0], 0);
-		}
-
-		let ownedGames = null;
-		if (!appId || !gameName) {
-			ownedGames = await this._fetchOwnedGamesWithInfo(steamId);
-			const games = Array.isArray(ownedGames?.response?.games)
-				? ownedGames.response.games
-				: [];
-			const ownedSample = games
-				.slice(0, 5)
-				.map((game) => this._coerceString(game?.name, ""))
-				.filter(Boolean)
-				.join(" | ");
-			await this._tempDebug(
-				`fetch_game ownedGamesCount=${games.length} sample='${ownedSample}'`,
-			);
-			if (!appId) {
-				const match = this._resolveGameFromOwnedGames(games, gameInput);
-				if (!match) {
-					const ranked = this._rankGameMatches(games, gameInput)
-						.slice(0, 5)
-						.map((item) => `${item.name} (${item.appid}) score=${item.score}`)
-						.join(" | ");
-					await this._tempDebug(
-						`fetch_game no_match input='${gameInput}' topMatches='${ranked || "none"}'`,
-					);
-					await this._log(`No close match found for '${gameInput}'.`, "warn");
-					await this._showActionToast(
-						`No owned game matched '${gameInput}'.`,
-						"warn",
-					);
-					return null;
-				}
-				appId = match.appid;
-				gameName = match.name;
-				resolvedGame = match.game;
-			} else {
-				const found = games.find(
-					(game) => String(game?.appid) === String(appId),
-				);
-				gameName = this._coerceString(found?.name, "");
-				resolvedGame = found ?? null;
-			}
-
-			// No search results variable exposed.
-		}
-
-		if (!appId) {
-			await this._log(`Unable to resolve game '${gameInput}'.`, "warn");
-			await this._showActionToast(
-				`Unable to resolve game '${gameInput}'.`,
-				"warn",
-			);
-			return null;
-		}
-		await this._tempDebug(
-			`fetch_game resolved appId=${appId} gameName='${gameName || "unknown"}'`,
-		);
-
-		const achievements = await this._fetchAchievements(steamId, appId);
-		const list = Array.isArray(achievements?.playerstats?.achievements)
-			? achievements.playerstats.achievements
-			: [];
-		const unlocked = list.filter((a) => a?.achieved === 1).length;
-		const achievementSnapshot = this._summarizeAchievements(list, 80);
-		const playerStatsSuccess = achievements?.playerstats?.success;
-		const playerStatsGameName = this._coerceString(
-			achievements?.playerstats?.gameName,
-			"",
-		);
-		await this._tempDebug(
-			`fetch_game achievements appId=${appId} playerStatsSuccess=${
-				playerStatsSuccess === undefined ? "undefined" : playerStatsSuccess
-			} gameName='${playerStatsGameName || gameName || "unknown"}' unlocked=${unlocked}/${list.length} achievements='${achievementSnapshot || "none"}'`,
-		);
-
-		const resolvedGameName = gameName || this._coerceString(gameInput, "");
-		const actionVariables = {
-			[ACTION_VARIABLE_NAMES.requestedGameInput]: gameInput,
-			[ACTION_VARIABLE_NAMES.requestedGameAppId]: appId,
-			[ACTION_VARIABLE_NAMES.requestedGameName]: resolvedGameName,
-			[ACTION_VARIABLE_NAMES.requestedGameGraphicsUrl]:
-				this._gameGraphicsUrl(appId),
-			[ACTION_VARIABLE_NAMES.requestedGamePlaytimeMinutes]:
-				this._gamePlaytimeMinutes(resolvedGame),
-			[ACTION_VARIABLE_NAMES.requestedGameAchievementCount]: list.length,
-			[ACTION_VARIABLE_NAMES.requestedGameAchievementUnlocked]: unlocked,
-			[ACTION_VARIABLE_NAMES.requestedGameAchievements]: JSON.stringify(
-				achievements ?? {},
-			),
-		};
-
-		await this._showActionToast(
-			gameName
-				? `Fetched achievements for ${gameName}.`
-				: `Fetched achievements for App ID ${appId}.`,
-			"success",
-		);
-
-		return actionVariables;
-	}
-
-	_resolveGameFromOwnedGames(games, input) {
-		const ranked = this._rankGameMatches(games, input);
-		if (!ranked.length) return null;
-		const best = ranked[0];
-		if (best.score < DEFAULTS.matchThreshold) {
-			return null;
-		}
-		return best;
-	}
-
-	_rankGameMatches(games, input) {
-		const normalizedInput = this._normalizeMatchText(input);
-		if (!normalizedInput) return [];
-
-		const results = [];
-		for (const game of games) {
-			const name = this._coerceString(game?.name, "");
-			if (!name) continue;
-			const score = this._scoreMatch(name, normalizedInput);
-			if (score <= 0) continue;
-			results.push({
-				appid: game.appid,
-				name,
-				game,
-				score: Number(score.toFixed(3)),
-			});
-		}
-
-		results.sort((a, b) => b.score - a.score);
-		return results.slice(0, 10);
-	}
-
-	_gameAppId(game) {
-		return this._coerceNumber(game?.appid, 0);
-	}
-
-	_gameGraphicsUrl(appId) {
-		const targetAppId = this._coerceNumber(appId, 0);
-		if (!targetAppId) {
-			return "";
-		}
-		return `https://cdn.akamai.steamstatic.com/steam/apps/${targetAppId}/header.jpg`;
-	}
-
-	_gamePlaytimeMinutes(game) {
-		return this._coerceNumber(game?.playtime_forever, 0);
-	}
-
-	_scoreMatch(name, normalizedInput) {
-		const normalizedName = this._normalizeMatchText(name);
-		if (!normalizedName) return 0;
-
-		if (normalizedName === normalizedInput) return 1;
-		if (normalizedName.startsWith(normalizedInput)) return 0.95;
-		if (normalizedInput.startsWith(normalizedName)) return 0.9;
-		if (
-			normalizedName.includes(normalizedInput) ||
-			normalizedInput.includes(normalizedName)
-		) {
-			return 0.85;
-		}
-		const distance = this._levenshtein(normalizedName, normalizedInput);
-		const maxLen = Math.max(normalizedName.length, normalizedInput.length);
-		return maxLen ? 1 - distance / maxLen : 0;
-	}
-
-	_normalizeMatchText(value) {
-		return this._coerceString(value, "")
-			.toLowerCase()
-			.replace(/\s+/g, " ")
-			.trim();
-	}
-
-	_summarizeAchievementEntry(achievement) {
-		const key = this._coerceString(
-			achievement?.apiname ?? achievement?.name ?? achievement?.displayName,
-			"unknown",
-		).trim();
-		const achieved = achievement?.achieved === 1 ? 1 : 0;
-		return `${key}:${achieved}`;
-	}
-
-	_summarizeAchievements(achievementList, limit = 40) {
-		if (!Array.isArray(achievementList) || !achievementList.length) {
-			return "";
-		}
-
-		const max = Math.max(1, this._coerceNumber(limit, 40));
-		const limited = achievementList.slice(0, max);
-		const summary = limited
-			.map((achievement) => this._summarizeAchievementEntry(achievement))
-			.join(", ");
-		const remaining = achievementList.length - limited.length;
-		if (remaining > 0) {
-			return `${summary} ... +${remaining} more`;
-		}
-		return summary;
-	}
-
-	_mapPersonaState(value) {
-		return this._coerceNumber(value, 0) === 0 ? "Offline" : "Online";
-	}
-
-	_buildAlertVariables({
-		summary,
-		onlineStatus,
-		achievementUnlocked,
-		achievementCount,
-		achievementName = "",
-		achievementDescription = "",
-	}) {
-		const currentGameAppId = this._coerceNumber(summary?.gameid, 0);
-		const currentGame = this._ownedGamesByAppId.get(currentGameAppId);
-		return {
-			persona_username: this._coerceString(summary?.personaname, ""),
-			online_status: this._coerceString(onlineStatus, ""),
-			current_game_name: this._coerceString(summary?.gameextrainfo, ""),
-			current_game_appid: currentGameAppId,
-			current_game_graphics_url: this._gameGraphicsUrl(currentGameAppId),
-			current_game_playtime_minutes: this._gamePlaytimeMinutes(currentGame),
-			current_game_achievement_unlocked_count: this._coerceNumber(
-				achievementUnlocked,
-				0,
-			),
-			current_game_achievement_count: this._coerceNumber(achievementCount, 0),
-			achievement_name: this._coerceString(achievementName, ""),
-			achievement_description: this._coerceString(achievementDescription, ""),
-		};
-	}
-
-	_buildAlertPayload(variables, { dynamicValue, extraSettings } = {}) {
-		const value =
-			dynamicValue ??
-			variables.current_game_name ??
-			variables.persona_username ??
-			"";
-		return {
-			dynamic: {
-				value,
-				online_status: variables.online_status,
-			},
-			extraSettings: {
-				...(variables ?? {}),
-				...(extraSettings ?? {}),
-			},
-		};
-	}
-
-	_levenshtein(a, b) {
-		if (a === b) return 0;
-		if (!a) return b.length;
-		if (!b) return a.length;
-
-		const matrix = Array.from({ length: a.length + 1 }, () =>
-			new Array(b.length + 1).fill(0),
-		);
-
-		for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
-		for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
-
-		for (let i = 1; i <= a.length; i++) {
-			for (let j = 1; j <= b.length; j++) {
-				const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-				matrix[i][j] = Math.min(
-					matrix[i - 1][j] + 1,
-					matrix[i][j - 1] + 1,
-					matrix[i - 1][j - 1] + cost,
-				);
-			}
-		}
-
-		return matrix[a.length][b.length];
-	}
-
-	_applyGlobalBackoff(seconds) {
-		const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
-		const until = Date.now() + delayMs;
-		if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
-			this._globalBackoffUntil = until;
-		}
-	}
-
-	async _showApiKeyFailureToast() {
-		if (typeof this.lumia?.showToast !== "function") {
-			return;
-		}
-		try {
-			await this._withTimeout(
-				Promise.resolve(
-					this.lumia.showToast({
-						message: "Invalid Steam API key. Update the plugin settings.",
-						time: 6,
-						type: "error",
-					}),
-				),
-				DEFAULTS.lumiaCallTimeoutMs,
-				"Lumia toast timed out.",
-			);
-		} catch (error) {
-			return;
-		}
-	}
-
-	async _showActionToast(message, type = "info") {
-		if (typeof this.lumia?.showToast !== "function") {
-			return;
-		}
-		try {
-			await this._withTimeout(
-				Promise.resolve(
-					this.lumia.showToast({
-						message,
-						time: 4,
-						type,
-					}),
-				),
-				DEFAULTS.lumiaCallTimeoutMs,
-				"Lumia toast timed out.",
-			);
-		} catch (error) {
-			return;
-		}
-	}
-
-	_schedulePolling() {
-		this._clearPolling();
-
-		const intervalSeconds = this._pollInterval(this.settings);
-		if (!this._hasRequiredSettings() || intervalSeconds <= 0) {
-			return;
-		}
-
-		this._pollTimer = setInterval(() => {
-			void this._refreshData({ reason: "poll" });
-		}, intervalSeconds * 1000);
-	}
-
-	_clearPolling() {
-		if (this._pollTimer) {
-			clearInterval(this._pollTimer);
-			this._pollTimer = null;
-		}
-	}
-
-	_settingsWith(data = {}) {
-		return {
-			...(this.settings && typeof this.settings === "object" ? this.settings : {}),
-			...(data && typeof data === "object" ? data : {}),
-		};
-	}
-
-	_hasRequiredSettings(settings = this.settings) {
-		return Boolean(this._apiKey(settings) && this._steamIdInput(settings));
-	}
-
-	_apiKey(settings = this.settings) {
-		return this._coerceString(settings?.apiKey, "");
-	}
-
-	_steamIdInput(settings = this.settings) {
-		return this._coerceString(settings?.steamIdOrVanity, "");
-	}
-
-	_pollInterval(settings = this.settings) {
-		const interval = this._coerceNumber(
-			settings?.pollInterval,
-			DEFAULTS.pollInterval,
-		);
-		if (!Number.isFinite(interval)) {
-			return DEFAULTS.pollInterval;
-		}
-		return Math.min(
-			Math.max(interval, DEFAULTS.minPollInterval),
-			DEFAULTS.maxPollInterval,
-		);
-	}
-
-	_ownedGamesRefreshMs(settings = this.settings) {
-		const pollSeconds = this._pollInterval(settings);
-		const refreshSeconds = Math.max(
-			DEFAULTS.ownedGamesRefreshSeconds,
-			pollSeconds * 5,
-		);
-		return refreshSeconds * 1000;
-	}
-
-	_debugEnabled(settings = this.settings) {
-		return Boolean(settings?.debugLogs);
-	}
-
-	async _updateConnectionState(state) {
-		if (this._lastConnectionState === state) {
-			return;
-		}
-
-		const previousState = this._lastConnectionState;
-		this._lastConnectionState = state;
-
-		if (typeof this.lumia?.updateConnection !== "function") {
-			return;
-		}
-
-		try {
-			await this._withTimeout(
-				Promise.resolve(this.lumia.updateConnection(state)),
-				DEFAULTS.lumiaCallTimeoutMs,
-				"Lumia connection update timed out.",
-			);
-			if (!state) {
-				await this._log(
-					"Steam connection is down; check the API key, Steam ID, and Steam profile privacy.",
-					"warn",
-				);
-			} else if (previousState === false) {
-				await this._log("Steam connection restored.");
-			}
-		} catch (error) {
-			const message = this._errorMessage(error);
-			await this._log(
-				`Failed to update Steam connection state: ${message}`,
-				"warn",
-			);
-		}
-	}
-
-	async _safeFetch(label, fn) {
-		try {
-			return { ok: true, data: await fn() };
-		} catch (error) {
-			await this._log(
-				`Steam ${label || "request"} failed: ${this._errorMessage(error)}`,
-				"warn",
-			);
-			return { ok: false, data: null };
-		}
-	}
-
-	_pruneAchievementSchemaCache() {
-		const maxEntries = Math.max(
-			1,
-			this._coerceNumber(DEFAULTS.achievementSchemaCacheMaxEntries, 1),
-		);
-		while (this._achievementSchemaCache.size > maxEntries) {
-			const oldestKey = this._achievementSchemaCache.keys().next().value;
-			if (oldestKey === undefined) {
-				return;
-			}
-			this._achievementSchemaCache.delete(oldestKey);
-		}
-	}
-
-	async _setVariable(name, value) {
-		if (typeof this.lumia.setVariable !== "function") {
-			return;
-		}
-
-		await this.lumia.setVariable(name, value);
-	}
-
-	async _setVariableIfChanged(name, value) {
-		const normalized = this._normalizeValue(value);
-		const previous = this._lastVariables.get(name);
-		if (this._valuesEqual(previous, normalized)) {
-			return false;
-		}
-		this._lastVariables.set(name, normalized);
-		await this._setVariable(name, value);
-		return true;
-	}
-
-	_normalizeValue(value) {
-		if (value === null || value === undefined) {
-			return "";
-		}
-		if (typeof value === "object") {
-			try {
-				return JSON.stringify(value);
-			} catch (error) {
-				return String(value);
-			}
-		}
-		return String(value);
-	}
-
-	_valuesEqual(a, b) {
-		return a === b;
-	}
-
-	_withTimeout(promise, timeoutMs, message) {
-		const ms = Math.max(1, this._coerceNumber(timeoutMs, 1000));
-		return new Promise((resolve, reject) => {
-			const timeoutId = setTimeout(() => {
-				reject(new Error(message || `Operation timed out after ${ms}ms.`));
-			}, ms);
-
-			Promise.resolve(promise).then(
-				(value) => {
-					clearTimeout(timeoutId);
-					resolve(value);
-				},
-				(error) => {
-					clearTimeout(timeoutId);
-					reject(error);
-				},
-			);
-		});
-	}
-
-	_errorMessage(error) {
-		if (!error) {
-			return "Unknown error";
-		}
-		if (typeof error === "string") {
-			return error;
-		}
-		return error?.message || String(error);
-	}
-
-	_truncateError(value) {
-		if (!value) {
-			return "";
-		}
-		const trimmed = String(value).replace(/\s+/g, " ").trim();
-		return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
-	}
-
-	_coerceNumber(value, fallback = 0) {
-		const number = Number(value);
-		return Number.isFinite(number) ? number : fallback;
-	}
-
-	_coerceString(value, fallback = "") {
-		if (typeof value === "string") {
-			return value;
-		}
-		if (value === null || value === undefined) {
-			return fallback;
-		}
-		return String(value);
-	}
+constructor(manifest, context) {
+super(manifest, context);
+this.\_pollTimer = null;
+this.\_refreshPromise = null;
+this.\_refreshStartedAt = 0;
+this.\_lastConnectionState = null;
+this.\_lastVariables = new Map();
+this.\_globalBackoffUntil = 0;
+this.\_authFailure = false;
+this.\_resolvedSteamId = "";
+this.\_hasInitialSync = false;
+this.\_lastPersonaState = null;
+this.\_lastCurrentGameAppId = null;
+this.\_lastCurrentGameName = "";
+this.\_lastAchievementAppId = null;
+this.\_lastAchievementUnlocked = null;
+this.\_lastAchievementUnlockedKeys = null;
+this.\_achievementSchemaCache = new Map();
+this.\_lastOwnedFetchAt = 0;
+this.\_ownedGamesByAppId = new Map();
+}
+
+    async onload() {
+    	if (!this._hasRequiredSettings()) {
+    		await this._log("Missing Steam API key or Steam ID.", "warn");
+    		await this._updateConnectionState(false);
+    		return;
+    	}
+
+    	void this._refreshData({ reason: "startup" });
+    	this._schedulePolling();
+    }
+
+    async onunload() {
+    	this._clearPolling();
+    	await this._updateConnectionState(false);
+    }
+
+    async onsettingsupdate(settings, previous = {}) {
+    	const pollChanged =
+    		this._pollInterval(settings) !== this._pollInterval(previous);
+    	const keyChanged = (settings?.apiKey ?? "") !== (previous?.apiKey ?? "");
+    	const idChanged =
+    		(settings?.steamIdOrVanity ?? "") !== (previous?.steamIdOrVanity ?? "");
+
+    	if (pollChanged) {
+    		this._schedulePolling();
+    	}
+
+    	if (keyChanged || idChanged) {
+    		this._authFailure = false;
+    		this._globalBackoffUntil = 0;
+    		this._resolvedSteamId = "";
+    		this._hasInitialSync = false;
+    		this._lastPersonaState = null;
+    		this._lastCurrentGameAppId = null;
+    		this._lastCurrentGameName = "";
+    		this._lastAchievementAppId = null;
+    		this._lastAchievementUnlocked = null;
+    		this._lastAchievementUnlockedKeys = null;
+    		this._achievementSchemaCache.clear();
+    		this._lastOwnedFetchAt = 0;
+    		this._ownedGamesByAppId.clear();
+    	}
+
+    	await this._refreshData({ reason: "settings-update" });
+    }
+
+    async actions(config) {
+    	const actions = Array.isArray(config?.actions) ? config.actions : [];
+    	const newlyPassedVariables = {};
+    	for (const action of actions) {
+    		const params = action.value;
+    		try {
+    			switch (action.type) {
+    				case "refresh":
+    					await this._refreshData({ reason: "manual-action" });
+    					break;
+    				case "fetch_game":
+    					this._mergeActionVariables(
+    						newlyPassedVariables,
+    						await this._handleFetchGame(params),
+    					);
+    					break;
+    			}
+    		} catch (error) {
+    			const message = this._errorMessage(error);
+    			await this._log(
+    				`Action ${action.type ?? "unknown"} failed: ${message}`,
+    				"error",
+    			);
+    		}
+    	}
+
+    	if (Object.keys(newlyPassedVariables).length) {
+    		return { newlyPassedVariables };
+    	}
+    }
+
+    _mergeActionVariables(target, variables) {
+    	if (!variables || typeof variables !== "object") {
+    		return;
+    	}
+    	for (const [key, value] of Object.entries(variables)) {
+    		if (!key) {
+    			continue;
+    		}
+    		target[key] = value;
+    	}
+    }
+
+    async validateAuth(data = {}) {
+    	const settings = this._settingsWith(data);
+    	if (!this._hasRequiredSettings(settings)) {
+    		await this._log("Steam validation failed: missing API key or Steam ID.", "warn");
+    		await this._updateConnectionState(false);
+    		return {
+    			ok: false,
+    			message: "Missing Steam API key or Steam ID.",
+    		};
+    	}
+
+    	try {
+    		await this._log("Validating Steam connection.");
+    		const steamId = await this._withTimeout(
+    			(async () => {
+    				const resolvedSteamId = await this._resolveSteamId(settings, {
+    					cache: false,
+    				});
+    				await this._fetchPlayerSummary(resolvedSteamId, settings);
+    				return resolvedSteamId;
+    			})(),
+    			DEFAULTS.validationTimeoutMs,
+    			"Steam validation timed out.",
+    		);
+    		await this._updateConnectionState(true);
+    		await this._log(`Steam validation succeeded for SteamID64 ${steamId}.`);
+    		return { ok: true };
+    	} catch (error) {
+    		const message = this._errorMessage(error);
+    		await this._log(`Steam validation failed: ${message}`, "error");
+    		await this._updateConnectionState(false);
+    		return { ok: false, message };
+    	}
+    }
+
+    _tag() {
+    	return `[${this.manifest?.id ?? "steam"}]`;
+    }
+
+    async _log(message, severity = "info") {
+    	const prefix = this._tag();
+    	const decorated =
+    		severity === "warn"
+    			? `${prefix} WARN ${message}`
+    			: severity === "error"
+    				? `${prefix} ERROR ${message}`
+    				: `${prefix} ${message}`;
+
+    	if (severity === "warn") {
+    		console.warn(decorated);
+    	} else if (severity === "error") {
+    		console.error(decorated);
+    	} else if (this._debugEnabled()) {
+    		console.log(decorated);
+    	}
+
+    	if (typeof this.lumia?.log !== "function") {
+    		return;
+    	}
+
+    	try {
+    		await this._withTimeout(
+    			Promise.resolve(this.lumia.log(decorated)),
+    			DEFAULTS.lumiaCallTimeoutMs,
+    			"Lumia log timed out.",
+    		);
+    	} catch {
+    		// Keep plugin flow alive when logging transport is unavailable.
+    	}
+    }
+
+    async _tempDebug(message) {
+    	if (!this._debugEnabled()) {
+    		return;
+    	}
+
+    	const prefixed = `[TEMP DEBUG] ${message}`;
+    	await this._log(prefixed, "info");
+    }
+
+    async _refreshData({ reason } = {}) {
+    	if (!this._hasRequiredSettings()) {
+    		await this._updateConnectionState(false);
+    		return;
+    	}
+
+    	if (this._authFailure) {
+    		return;
+    	}
+
+    	const now = Date.now();
+    	if (this._globalBackoffUntil && now < this._globalBackoffUntil) {
+    		return;
+    	}
+
+    	if (this._refreshPromise) {
+    		const elapsed = Date.now() - this._refreshStartedAt;
+    		if (elapsed <= DEFAULTS.stuckRefreshMs) {
+    			return this._refreshPromise;
+    		}
+    		this._refreshPromise = null;
+    		this._refreshStartedAt = 0;
+    	}
+
+    	this._refreshStartedAt = Date.now();
+    	this._refreshPromise = (async () => {
+    		try {
+    			const steamId = await this._resolveSteamId();
+    			const forceFullRefresh =
+    				reason === "startup" ||
+    				reason === "settings-update" ||
+    				reason === "manual-action";
+    			const now = Date.now();
+
+    			const summaryResult = await this._safeFetch("summary", () =>
+    				this._fetchPlayerSummary(steamId),
+    			);
+    			const achievementAppId = this._determineAchievementAppId(summaryResult.data);
+    			const currentGameAppId = this._coerceNumber(
+    				summaryResult?.data?.gameid,
+    				0,
+    			);
+
+    			const shouldFetchOwned =
+    				forceFullRefresh ||
+    				!this._lastOwnedFetchAt ||
+    				now - this._lastOwnedFetchAt >= this._ownedGamesRefreshMs() ||
+    				Boolean(
+    					currentGameAppId &&
+    						currentGameAppId !== this._lastCurrentGameAppId &&
+    						!this._ownedGamesByAppId.has(currentGameAppId),
+    				);
+    			let ownedResult = { ok: false, data: null };
+    			if (shouldFetchOwned) {
+    				ownedResult = await this._safeFetch("owned games", () =>
+    					this._fetchOwnedGames(steamId),
+    				);
+    				if (ownedResult.ok) {
+    					this._lastOwnedFetchAt = Date.now();
+    				}
+    			}
+
+    			// Poll current-game achievements each cycle so multiple unlocks in
+    			// the same play session can be detected without long delays.
+    			const shouldFetchAchievements = Boolean(achievementAppId);
+
+    			let achievementsResult = { ok: false, data: null };
+    			if (shouldFetchAchievements) {
+    				achievementsResult = await this._safeFetch("achievements", () =>
+    					this._fetchAchievements(steamId, achievementAppId),
+    				);
+    			}
+
+    			const currentGameName = this._coerceString(
+    				summaryResult?.data?.gameextrainfo,
+    				"",
+    			);
+    			const achievementEntries = Array.isArray(
+    				achievementsResult?.data?.playerstats?.achievements,
+    			)
+    				? achievementsResult.data.playerstats.achievements
+    				: [];
+    			const achievementCount = achievementEntries.length;
+    			const unlockedCount = achievementEntries.filter(
+    				(achievement) => achievement?.achieved === 1,
+    			).length;
+    			const achievementSnapshot = this._summarizeAchievements(
+    				achievementEntries,
+    				40,
+    			);
+    			await this._tempDebug(
+    				`refresh reason=${reason ?? "unknown"} steamId=${steamId} game='${currentGameName || "none"}' appId=${achievementAppId || 0} summaryOk=${summaryResult.ok} ownedFetched=${shouldFetchOwned} ownedOk=${ownedResult.ok} achievementsFetched=${shouldFetchAchievements} achievementsOk=${shouldFetchAchievements ? achievementsResult.ok : "skipped"} unlocked=${unlockedCount}/${achievementCount} achievements='${achievementSnapshot || "none"}'`,
+    			);
+
+    			await this._applySummary(summaryResult.data, steamId);
+    			if (shouldFetchOwned) {
+    				await this._applyOwnedGames(ownedResult.data);
+    			}
+    			if (summaryResult.data) {
+    				await this._applyCurrentGameDetails(currentGameAppId);
+    			}
+    			if (shouldFetchAchievements) {
+    				await this._applyAchievements(achievementsResult.data);
+    			} else {
+    				await this._applyAchievements(null, { clear: true });
+    			}
+    			await this._emitAlerts({
+    				summary: summaryResult.data,
+    				achievementAppId,
+    				achievements: shouldFetchAchievements ? achievementsResult.data : null,
+    			});
+
+    			const hadSuccessfulRefresh =
+    				summaryResult.ok ||
+    				(shouldFetchOwned && ownedResult.ok) ||
+    				(shouldFetchAchievements && achievementsResult.ok);
+
+    			await this._updateConnectionState(hadSuccessfulRefresh);
+    		} catch (error) {
+    			await this._log(
+    				`Steam refresh failed: ${this._errorMessage(error)}`,
+    				"error",
+    			);
+    			await this._updateConnectionState(false);
+    		} finally {
+    			this._refreshPromise = null;
+    			this._refreshStartedAt = 0;
+    		}
+    	})();
+
+    	return this._refreshPromise;
+    }
+
+    async _resolveSteamId(settings = this.settings, { cache = true } = {}) {
+    	if (cache && this._resolvedSteamId) {
+    		return this._resolvedSteamId;
+    	}
+
+    	const input = this._normalizeSteamIdentifier(
+    		this._coerceString(settings?.steamIdOrVanity, "").trim(),
+    	);
+    	if (!input) {
+    		throw new Error("Missing Steam ID or vanity name.");
+    	}
+
+    	if (/^\d{17}$/.test(input)) {
+    		if (cache) {
+    			this._resolvedSteamId = input;
+    		}
+    		return input;
+    	}
+
+    	const resolved = await this._fetchResolveVanity(input, settings);
+    	const steamId = this._coerceString(resolved?.steamid, "");
+    	if (!steamId) {
+    		throw new Error("Could not resolve vanity URL.");
+    	}
+
+    	if (cache) {
+    		this._resolvedSteamId = steamId;
+    	}
+    	return steamId;
+    }
+
+    _normalizeSteamIdentifier(value) {
+    	if (!value) return "";
+    	const raw = String(value).trim();
+    	if (!raw) return "";
+
+    	const profileMatch = raw.match(
+    		/^https?:\/\/steamcommunity\.com\/(id|profiles)\/([^\/?#]+).*$/i,
+    	);
+    	if (profileMatch) {
+    		const [, type, identifier] = profileMatch;
+    		if (type.toLowerCase() === "profiles") {
+    			return identifier;
+    		}
+    		return identifier;
+    	}
+
+    	return raw;
+    }
+
+    async _fetchResolveVanity(vanity, settings = this.settings) {
+    	const url = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v1/?key=${encodeURIComponent(
+    		this._apiKey(settings),
+    	)}&vanityurl=${encodeURIComponent(vanity)}&url_type=1`;
+    	const response = await this._fetchJson(url);
+    	return response?.response ?? null;
+    }
+
+    async _fetchPlayerSummary(steamId, settings = this.settings) {
+    	const url = `${STEAM_API_BASE}/ISteamUser/GetPlayerSummaries/v2/?key=${encodeURIComponent(
+    		this._apiKey(settings),
+    	)}&steamids=${encodeURIComponent(steamId)}`;
+    	const response = await this._fetchJson(url);
+    	return response?.response?.players?.[0] ?? null;
+    }
+
+    async _fetchOwnedGames(steamId, settings = this.settings) {
+    	const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
+    		this._apiKey(settings),
+    	)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=0&include_played_free_games=1`;
+    	return this._fetchJson(url);
+    }
+
+    async _fetchAchievements(steamId, appId, settings = this.settings) {
+    	const targetAppId = this._coerceNumber(appId, 0);
+    	if (!targetAppId) {
+    		return null;
+    	}
+
+    	const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?key=${encodeURIComponent(
+    		this._apiKey(settings),
+    	)}&steamid=${encodeURIComponent(steamId)}&appid=${targetAppId}&l=en&_=${Date.now()}`;
+    	return this._fetchJson(url);
+    }
+
+    async _fetchAchievementSchema(appId, settings = this.settings) {
+    	const targetAppId = this._coerceNumber(appId, 0);
+    	if (!targetAppId) {
+    		return null;
+    	}
+
+    	const url = `${STEAM_API_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(
+    		this._apiKey(settings),
+    	)}&appid=${targetAppId}&l=en`;
+    	return this._fetchJson(url);
+    }
+
+    async _fetchOwnedGamesWithInfo(steamId, settings = this.settings) {
+    	const url = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(
+    		this._apiKey(settings),
+    	)}&steamid=${encodeURIComponent(steamId)}&include_appinfo=1&include_played_free_games=1`;
+    	return this._fetchJson(url);
+    }
+
+    _determineAchievementAppId(summary) {
+    	const summaryGameId = this._coerceNumber(summary?.gameid, 0);
+    	if (summaryGameId) {
+    		return summaryGameId;
+    	}
+    	return 0;
+    }
+
+    async _fetchJson(url) {
+    	let response = await this._request(url);
+    	if (url.includes("/ISteamUserStats/GetPlayerAchievements/")) {
+    		const appIdMatch = url.match(/[?&]appid=(\d+)/);
+    		const appId = appIdMatch?.[1] ?? "unknown";
+    		await this._tempDebug(
+    			`achievement_http appId=${appId} status=${response.status} cacheControl='${this._coerceString(response.headers.get("cache-control"), "")}' age='${this._coerceString(response.headers.get("age"), "")}' etag='${this._coerceString(response.headers.get("etag"), "")}'`,
+    			{ throttleKey: `achievement-http:${appId}:${response.status}`, intervalMs: 10 * 1000 },
+    		);
+    	}
+
+    	if (response.status === 429) {
+    		const retryAfter = this._coerceNumber(
+    			response.headers.get("Retry-After"),
+    			60,
+    		);
+    		this._applyGlobalBackoff(retryAfter);
+    		throw new Error(`Rate limited (429). Backing off for ${retryAfter}s.`);
+    	}
+
+    	if (response.status === 401 || response.status === 403) {
+    		this._authFailure = true;
+    		this._clearPolling();
+    		await this._showApiKeyFailureToast();
+    		throw new Error("Unauthorized. Check your Steam API key.");
+    	}
+
+    	if (!response.ok) {
+    		const body = await response.text();
+    		const trimmed = this._truncateError(body);
+    		throw new Error(
+    			`Steam API error (${response.status}) on ${url}: ${trimmed || "No response body"}`,
+    		);
+    	}
+
+    	return response.json();
+    }
+
+    async _request(url) {
+    	const headers = {
+    		Accept: "application/json",
+    		"User-Agent": DEFAULTS.userAgent,
+    		"Cache-Control": "no-cache, no-store, max-age=0",
+    		Pragma: "no-cache",
+    	};
+    	const timeoutMs = Math.max(1000, DEFAULTS.requestTimeoutMs);
+    	const supportsAbort = typeof AbortController !== "undefined";
+
+    	if (!supportsAbort) {
+    		let timeoutId = null;
+    		try {
+    			return await Promise.race([
+    				fetch(url, { headers, cache: "no-store" }),
+    				new Promise((_, reject) => {
+    					timeoutId = setTimeout(() => {
+    						reject(new Error(`Steam request timed out after ${timeoutMs}ms.`));
+    					}, timeoutMs);
+    				}),
+    			]);
+    		} finally {
+    			if (timeoutId) {
+    				clearTimeout(timeoutId);
+    			}
+    		}
+    	}
+
+    	const controller = new AbortController();
+    	const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    	try {
+    		return await fetch(url, {
+    			headers,
+    			cache: "no-store",
+    			signal: controller.signal,
+    		});
+    	} catch (error) {
+    		if (error?.name === "AbortError") {
+    			throw new Error(`Steam request timed out after ${timeoutMs}ms.`);
+    		}
+    		throw error;
+    	} finally {
+    		clearTimeout(timeoutId);
+    	}
+    }
+
+    async _applySummary(summary, steamId) {
+    	if (!summary) {
+    		await this._setVariableIfChanged(VARIABLE_NAMES.steamId, steamId);
+    		return;
+    	}
+
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.steamId,
+    		this._coerceString(summary?.steamid ?? steamId, ""),
+    	);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.username,
+    		this._coerceString(summary?.personaname, ""),
+    	);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.onlineStatus,
+    		this._mapPersonaState(this._coerceNumber(summary?.personastate, 0)),
+    	);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.lastLogoff,
+    		this._coerceNumber(summary?.lastlogoff, 0),
+    	);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.profileUrl,
+    		this._coerceString(summary?.profileurl, ""),
+    	);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.avatar,
+    		this._coerceString(summary?.avatarfull, ""),
+    	);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.currentGameName,
+    		this._coerceString(summary?.gameextrainfo, ""),
+    	);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.currentGameAppId,
+    		this._coerceNumber(summary?.gameid, 0),
+    	);
+    }
+
+    async _applyOwnedGames(owned) {
+    	if (!owned) {
+    		return;
+    	}
+
+    	this._cacheOwnedGames(owned);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.gameCount,
+    		this._coerceNumber(owned?.response?.game_count, 0),
+    	);
+    }
+
+    _cacheOwnedGames(owned) {
+    	const games = Array.isArray(owned?.response?.games)
+    		? owned.response.games
+    		: [];
+    	this._ownedGamesByAppId.clear();
+    	if (!games.length) {
+    		return;
+    	}
+
+    	for (const game of games) {
+    		const appId = this._gameAppId(game);
+    		if (!appId) {
+    			continue;
+    		}
+    		this._ownedGamesByAppId.set(appId, game);
+    	}
+    }
+
+    async _applyCurrentGameDetails(appId) {
+    	const currentGameAppId = this._coerceNumber(appId, 0);
+    	if (!currentGameAppId) {
+    		await this._setVariableIfChanged(VARIABLE_NAMES.currentGameGraphicsUrl, "");
+    		await this._setVariableIfChanged(
+    			VARIABLE_NAMES.currentGamePlaytimeMinutes,
+    			0,
+    		);
+    		return;
+    	}
+
+    	const game = this._ownedGamesByAppId.get(currentGameAppId);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.currentGameGraphicsUrl,
+    		this._gameGraphicsUrl(currentGameAppId),
+    	);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.currentGamePlaytimeMinutes,
+    		this._gamePlaytimeMinutes(game),
+    	);
+    }
+
+    async _applyAchievements(payload, { clear = false } = {}) {
+    	if (!payload) {
+    		if (!clear) {
+    			return;
+    		}
+    		await this._setVariableIfChanged(
+    			VARIABLE_NAMES.currentGameAchievementCount,
+    			0,
+    		);
+    		await this._setVariableIfChanged(
+    			VARIABLE_NAMES.currentGameAchievementUnlocked,
+    			0,
+    		);
+    		await this._setVariableIfChanged(VARIABLE_NAMES.achievementName, "");
+    		await this._setVariableIfChanged(
+    			VARIABLE_NAMES.achievementDescription,
+    			"",
+    		);
+    		return;
+    	}
+
+    	const achievements = Array.isArray(payload?.playerstats?.achievements)
+    		? payload.playerstats.achievements
+    		: [];
+    	const unlocked = achievements.filter((a) => a?.achieved === 1).length;
+
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.currentGameAchievementCount,
+    		achievements.length,
+    	);
+    	await this._setVariableIfChanged(
+    		VARIABLE_NAMES.currentGameAchievementUnlocked,
+    		unlocked,
+    	);
+    }
+
+    async _emitAlerts({ summary, achievementAppId, achievements }) {
+    	const hasSummary = Boolean(summary && typeof summary === "object");
+    	// Do not emit status/game-change alerts until we have at least one real
+    	// profile snapshot to use as baseline.
+    	if (!hasSummary) {
+    		return;
+    	}
+    	const personaStateRaw = hasSummary
+    		? this._coerceNumber(summary?.personastate, 0)
+    		: null;
+    	const personaState =
+    		personaStateRaw === null ? null : this._mapPersonaState(personaStateRaw);
+    	const currentGameAppId = this._coerceNumber(summary?.gameid, 0);
+    	const currentGameName = this._coerceString(summary?.gameextrainfo, "");
+
+    	const achievementList = Array.isArray(
+    		achievements?.playerstats?.achievements,
+    	)
+    		? achievements.playerstats.achievements
+    		: null;
+    	const unlockedAchievements = achievementList
+    		? achievementList.filter((a) => a?.achieved === 1)
+    		: [];
+    	const unlockedAchievementKeys = achievementList
+    		? this._getAchievementUnlockedKeys(unlockedAchievements)
+    		: null;
+    	const unlocked = unlockedAchievements.length;
+    	const total = achievementList ? achievementList.length : 0;
+    	const alertVars = this._buildAlertVariables({
+    		summary,
+    		onlineStatus: personaState,
+    		achievementUnlocked: unlocked,
+    		achievementCount: total,
+    	});
+
+    	if (!this._hasInitialSync) {
+    		this._lastPersonaState = personaState;
+    		this._lastCurrentGameAppId = currentGameAppId || null;
+    		this._lastCurrentGameName = currentGameName;
+    		this._lastAchievementAppId = achievementAppId || null;
+    		this._lastAchievementUnlocked = achievementList ? unlocked : null;
+    		this._lastAchievementUnlockedKeys = unlockedAchievementKeys;
+    		this._hasInitialSync = true;
+    		return;
+    	}
+
+    	if (
+    		personaState !== null &&
+    		this._lastPersonaState !== null &&
+    		personaState !== this._lastPersonaState
+    	) {
+    		await this.lumia.triggerAlert({
+    			alert: ALERT_KEYS.onlineStateChanged,
+    			...this._buildAlertPayload(alertVars, {
+    				dynamicValue: alertVars.online_status,
+    			}),
+    		});
+    	}
+
+    	if (
+    		achievementList &&
+    		achievementAppId &&
+    		this._lastAchievementAppId === achievementAppId &&
+    		this._lastAchievementUnlocked !== null &&
+    		unlocked !== this._lastAchievementUnlocked
+    	) {
+    		const newlyUnlocked = unlockedAchievements.filter((achievement) => {
+    			const key = this._achievementKey(achievement);
+    			if (!key) {
+    				return false;
+    			}
+
+    			return !this._lastAchievementUnlockedKeys?.has(key);
+    		});
+    		const achievementAlertVars = this._buildAlertVariables({
+    			summary,
+    			onlineStatus: personaState,
+    			achievementUnlocked: unlocked,
+    			achievementCount: total,
+    			achievementName: "",
+    			achievementDescription: "",
+    		});
+
+    		const sortedNewlyUnlocked = [...newlyUnlocked].sort(
+    			(a, b) =>
+    				this._coerceNumber(a?.unlocktime, 0) -
+    				this._coerceNumber(b?.unlocktime, 0),
+    		);
+    		for (const unlockedAchievement of sortedNewlyUnlocked) {
+    			const unlockedDetails = await this._resolveAchievementDetails(
+    				achievementAppId,
+    				unlockedAchievement,
+    			);
+    			const unlockedAlertVars = this._buildAlertVariables({
+    				summary,
+    				onlineStatus: personaState,
+    				achievementUnlocked: unlocked,
+    				achievementCount: total,
+    				achievementName: unlockedDetails.name,
+    				achievementDescription: unlockedDetails.description,
+    			});
+    			await this._setVariableIfChanged(
+    				VARIABLE_NAMES.achievementName,
+    				unlockedDetails.name,
+    			);
+    			await this._setVariableIfChanged(
+    				VARIABLE_NAMES.achievementDescription,
+    				unlockedDetails.description,
+    			);
+    			await this.lumia.triggerAlert({
+    				alert: ALERT_KEYS.achievementUnlocked,
+    				...this._buildAlertPayload(unlockedAlertVars, {
+    					dynamicValue: unlockedAlertVars.achievement_name,
+    				}),
+    			});
+    		}
+
+    		await this.lumia.triggerAlert({
+    			alert: ALERT_KEYS.achievementProgressChanged,
+    			...this._buildAlertPayload(achievementAlertVars, {
+    				dynamicValue: `${achievementAlertVars.current_game_achievement_unlocked_count}/${achievementAlertVars.current_game_achievement_count}`,
+    			}),
+    		});
+    	}
+
+    	const previousGameAppId = this._lastCurrentGameAppId;
+    	const previousGameName = this._lastCurrentGameName;
+    	const changedToNewGame =
+    		Boolean(currentGameAppId) &&
+    		(previousGameAppId === null || currentGameAppId !== previousGameAppId);
+    	const changedToNoGame =
+    		!currentGameAppId && previousGameAppId !== null;
+
+    	if (changedToNewGame) {
+    		await this.lumia.triggerAlert({
+    			alert: ALERT_KEYS.currentGameChanged,
+    			...this._buildAlertPayload(alertVars, {
+    				dynamicValue: alertVars.current_game_name,
+    			}),
+    		});
+    	}
+
+    	if (changedToNoGame) {
+    		await this.lumia.triggerAlert({
+    			alert: ALERT_KEYS.currentGameOver,
+    			...this._buildAlertPayload(alertVars, {
+    				dynamicValue: previousGameName || "Stopped Playing",
+    				extraSettings: { previous_game_name: previousGameName ?? "" },
+    			}),
+    		});
+    	}
+
+    	if (personaState !== null) {
+    		this._lastPersonaState = personaState;
+    	}
+    	if (currentGameAppId) {
+    		this._lastCurrentGameAppId = currentGameAppId;
+    	} else {
+    		this._lastCurrentGameAppId = null;
+    	}
+    	this._lastCurrentGameName = currentGameName;
+    	if (achievementAppId && achievementList) {
+    		this._lastAchievementAppId = achievementAppId;
+    		this._lastAchievementUnlocked = unlocked;
+    		this._lastAchievementUnlockedKeys = unlockedAchievementKeys;
+    	}
+    }
+
+    _achievementKey(achievement) {
+    	const key = this._coerceString(achievement?.apiname, "").trim();
+    	return key || "";
+    }
+
+    _getAchievementUnlockedKeys(achievementList) {
+    	const keys = new Set();
+    	for (const achievement of achievementList) {
+    		const key = this._achievementKey(achievement);
+    		if (!key) {
+    			continue;
+    		}
+    		keys.add(key);
+    	}
+    	return keys;
+    }
+
+    async _getAchievementSchemaByApp(appId) {
+    	const targetAppId = this._coerceNumber(appId, 0);
+    	if (!targetAppId) {
+    		return null;
+    	}
+
+    	const cached = this._achievementSchemaCache.get(targetAppId);
+    	if (cached && typeof cached === "object") {
+    		// Move hit to the end to preserve LRU order.
+    		this._achievementSchemaCache.delete(targetAppId);
+    		this._achievementSchemaCache.set(targetAppId, cached);
+    		return cached.value ?? null;
+    	}
+
+    	const schemaResult = await this._safeFetch("achievement schema", () =>
+    		this._fetchAchievementSchema(targetAppId),
+    	);
+    	const schemaAchievements = Array.isArray(
+    		schemaResult?.data?.game?.availableGameStats?.achievements,
+    	)
+    		? schemaResult.data.game.availableGameStats.achievements
+    		: [];
+    	const schemaMap = new Map();
+    	for (const achievement of schemaAchievements) {
+    		const key = this._coerceString(achievement?.name, "").trim();
+    		if (!key) {
+    			continue;
+    		}
+    		schemaMap.set(key, {
+    			name: this._coerceString(
+    				achievement?.displayName ?? achievement?.name,
+    				"",
+    			),
+    			description: this._coerceString(achievement?.description, ""),
+    		});
+    	}
+
+    	this._achievementSchemaCache.set(targetAppId, {
+    		value: schemaMap,
+    	});
+    	this._pruneAchievementSchemaCache();
+    	return schemaMap;
+    }
+
+    async _resolveAchievementDetails(appId, achievement) {
+    	const apiName = this._coerceString(achievement?.apiname, "").trim();
+    	if (!apiName) {
+    		return { name: "", description: "" };
+    	}
+
+    	const runtimeName = this._coerceString(
+    		achievement?.name ?? achievement?.displayName,
+    		"",
+    	).trim();
+    	const runtimeDescription = this._coerceString(
+    		achievement?.description,
+    		"",
+    	).trim();
+    	if (runtimeName && runtimeDescription) {
+    		return { name: runtimeName, description: runtimeDescription };
+    	}
+
+    	const schemaMap = await this._getAchievementSchemaByApp(appId);
+    	const schemaMatch = schemaMap?.get(apiName);
+
+    	return {
+    		name: runtimeName || this._coerceString(schemaMatch?.name, apiName),
+    		description:
+    			runtimeDescription || this._coerceString(schemaMatch?.description, ""),
+    	};
+    }
+
+    async _handleFetchGame(params = {}) {
+    	if (!this._hasRequiredSettings()) {
+    		await this._log("Missing Steam API key or Steam ID.", "warn");
+    		return null;
+    	}
+
+    	const gameInput = this._coerceString(params?.game, "").trim();
+    	if (!gameInput) {
+    		await this._log("Game name or App ID is required.", "warn");
+    		return null;
+    	}
+
+    	const steamId = await this._resolveSteamId();
+    	await this._tempDebug(
+    		`fetch_game input='${gameInput}' steamId=${steamId}`,
+    	);
+    	let appId = null;
+    	let gameName = "";
+    	let resolvedGame = null;
+
+    	const numericOnly = gameInput.match(/^\d+$/);
+    	if (numericOnly) {
+    		appId = this._coerceNumber(numericOnly[0], 0);
+    	}
+
+    	let ownedGames = null;
+    	if (!appId || !gameName) {
+    		ownedGames = await this._fetchOwnedGamesWithInfo(steamId);
+    		const games = Array.isArray(ownedGames?.response?.games)
+    			? ownedGames.response.games
+    			: [];
+    		const ownedSample = games
+    			.slice(0, 5)
+    			.map((game) => this._coerceString(game?.name, ""))
+    			.filter(Boolean)
+    			.join(" | ");
+    		await this._tempDebug(
+    			`fetch_game ownedGamesCount=${games.length} sample='${ownedSample}'`,
+    		);
+    		if (!appId) {
+    			const match = this._resolveGameFromOwnedGames(games, gameInput);
+    			if (!match) {
+    				const ranked = this._rankGameMatches(games, gameInput)
+    					.slice(0, 5)
+    					.map((item) => `${item.name} (${item.appid}) score=${item.score}`)
+    					.join(" | ");
+    				await this._tempDebug(
+    					`fetch_game no_match input='${gameInput}' topMatches='${ranked || "none"}'`,
+    				);
+    				await this._log(`No close match found for '${gameInput}'.`, "warn");
+    				await this._showActionToast(
+    					`No owned game matched '${gameInput}'.`,
+    					"warn",
+    				);
+    				return null;
+    			}
+    			appId = match.appid;
+    			gameName = match.name;
+    			resolvedGame = match.game;
+    		} else {
+    			const found = games.find(
+    				(game) => String(game?.appid) === String(appId),
+    			);
+    			gameName = this._coerceString(found?.name, "");
+    			resolvedGame = found ?? null;
+    		}
+
+    		// No search results variable exposed.
+    	}
+
+    	if (!appId) {
+    		await this._log(`Unable to resolve game '${gameInput}'.`, "warn");
+    		await this._showActionToast(
+    			`Unable to resolve game '${gameInput}'.`,
+    			"warn",
+    		);
+    		return null;
+    	}
+    	await this._tempDebug(
+    		`fetch_game resolved appId=${appId} gameName='${gameName || "unknown"}'`,
+    	);
+
+    	const achievements = await this._fetchAchievements(steamId, appId);
+    	const list = Array.isArray(achievements?.playerstats?.achievements)
+    		? achievements.playerstats.achievements
+    		: [];
+    	const unlocked = list.filter((a) => a?.achieved === 1).length;
+    	const achievementSnapshot = this._summarizeAchievements(list, 80);
+    	const playerStatsSuccess = achievements?.playerstats?.success;
+    	const playerStatsGameName = this._coerceString(
+    		achievements?.playerstats?.gameName,
+    		"",
+    	);
+    	await this._tempDebug(
+    		`fetch_game achievements appId=${appId} playerStatsSuccess=${
+    			playerStatsSuccess === undefined ? "undefined" : playerStatsSuccess
+    		} gameName='${playerStatsGameName || gameName || "unknown"}' unlocked=${unlocked}/${list.length} achievements='${achievementSnapshot || "none"}'`,
+    	);
+
+    	const resolvedGameName = gameName || this._coerceString(gameInput, "");
+    	const actionVariables = {
+    		[ACTION_VARIABLE_NAMES.requestedGameInput]: gameInput,
+    		[ACTION_VARIABLE_NAMES.requestedGameAppId]: appId,
+    		[ACTION_VARIABLE_NAMES.requestedGameName]: resolvedGameName,
+    		[ACTION_VARIABLE_NAMES.requestedGameGraphicsUrl]:
+    			this._gameGraphicsUrl(appId),
+    		[ACTION_VARIABLE_NAMES.requestedGamePlaytimeMinutes]:
+    			this._gamePlaytimeMinutes(resolvedGame),
+    		[ACTION_VARIABLE_NAMES.requestedGameAchievementCount]: list.length,
+    		[ACTION_VARIABLE_NAMES.requestedGameAchievementUnlocked]: unlocked,
+    		[ACTION_VARIABLE_NAMES.requestedGameAchievements]: JSON.stringify(
+    			achievements ?? {},
+    		),
+    	};
+
+    	await this._showActionToast(
+    		gameName
+    			? `Fetched achievements for ${gameName}.`
+    			: `Fetched achievements for App ID ${appId}.`,
+    		"success",
+    	);
+
+    	return actionVariables;
+    }
+
+    _resolveGameFromOwnedGames(games, input) {
+    	const ranked = this._rankGameMatches(games, input);
+    	if (!ranked.length) return null;
+    	const best = ranked[0];
+    	if (best.score < DEFAULTS.matchThreshold) {
+    		return null;
+    	}
+    	return best;
+    }
+
+    _rankGameMatches(games, input) {
+    	const normalizedInput = this._normalizeMatchText(input);
+    	if (!normalizedInput) return [];
+
+    	const results = [];
+    	for (const game of games) {
+    		const name = this._coerceString(game?.name, "");
+    		if (!name) continue;
+    		const score = this._scoreMatch(name, normalizedInput);
+    		if (score <= 0) continue;
+    		results.push({
+    			appid: game.appid,
+    			name,
+    			game,
+    			score: Number(score.toFixed(3)),
+    		});
+    	}
+
+    	results.sort((a, b) => b.score - a.score);
+    	return results.slice(0, 10);
+    }
+
+    _gameAppId(game) {
+    	return this._coerceNumber(game?.appid, 0);
+    }
+
+    _gameGraphicsUrl(appId) {
+    	const targetAppId = this._coerceNumber(appId, 0);
+    	if (!targetAppId) {
+    		return "";
+    	}
+    	return `https://cdn.akamai.steamstatic.com/steam/apps/${targetAppId}/header.jpg`;
+    }
+
+    _gamePlaytimeMinutes(game) {
+    	return this._coerceNumber(game?.playtime_forever, 0);
+    }
+
+    _scoreMatch(name, normalizedInput) {
+    	const normalizedName = this._normalizeMatchText(name);
+    	if (!normalizedName) return 0;
+
+    	if (normalizedName === normalizedInput) return 1;
+    	if (normalizedName.startsWith(normalizedInput)) return 0.95;
+    	if (normalizedInput.startsWith(normalizedName)) return 0.9;
+    	if (
+    		normalizedName.includes(normalizedInput) ||
+    		normalizedInput.includes(normalizedName)
+    	) {
+    		return 0.85;
+    	}
+    	const distance = this._levenshtein(normalizedName, normalizedInput);
+    	const maxLen = Math.max(normalizedName.length, normalizedInput.length);
+    	return maxLen ? 1 - distance / maxLen : 0;
+    }
+
+    _normalizeMatchText(value) {
+    	return this._coerceString(value, "")
+    		.toLowerCase()
+    		.replace(/\s+/g, " ")
+    		.trim();
+    }
+
+    _summarizeAchievementEntry(achievement) {
+    	const key = this._coerceString(
+    		achievement?.apiname ?? achievement?.name ?? achievement?.displayName,
+    		"unknown",
+    	).trim();
+    	const achieved = achievement?.achieved === 1 ? 1 : 0;
+    	return `${key}:${achieved}`;
+    }
+
+    _summarizeAchievements(achievementList, limit = 40) {
+    	if (!Array.isArray(achievementList) || !achievementList.length) {
+    		return "";
+    	}
+
+    	const max = Math.max(1, this._coerceNumber(limit, 40));
+    	const limited = achievementList.slice(0, max);
+    	const summary = limited
+    		.map((achievement) => this._summarizeAchievementEntry(achievement))
+    		.join(", ");
+    	const remaining = achievementList.length - limited.length;
+    	if (remaining > 0) {
+    		return `${summary} ... +${remaining} more`;
+    	}
+    	return summary;
+    }
+
+    _mapPersonaState(value) {
+    	return this._coerceNumber(value, 0) === 0 ? "Offline" : "Online";
+    }
+
+    _buildAlertVariables({
+    	summary,
+    	onlineStatus,
+    	achievementUnlocked,
+    	achievementCount,
+    	achievementName = "",
+    	achievementDescription = "",
+    }) {
+    	const currentGameAppId = this._coerceNumber(summary?.gameid, 0);
+    	const currentGame = this._ownedGamesByAppId.get(currentGameAppId);
+    	return {
+    		persona_username: this._coerceString(summary?.personaname, ""),
+    		online_status: this._coerceString(onlineStatus, ""),
+    		current_game_name: this._coerceString(summary?.gameextrainfo, ""),
+    		current_game_appid: currentGameAppId,
+    		current_game_graphics_url: this._gameGraphicsUrl(currentGameAppId),
+    		current_game_playtime_minutes: this._gamePlaytimeMinutes(currentGame),
+    		current_game_achievement_unlocked_count: this._coerceNumber(
+    			achievementUnlocked,
+    			0,
+    		),
+    		current_game_achievement_count: this._coerceNumber(achievementCount, 0),
+    		achievement_name: this._coerceString(achievementName, ""),
+    		achievement_description: this._coerceString(achievementDescription, ""),
+    	};
+    }
+
+    _buildAlertPayload(variables, { dynamicValue, extraSettings } = {}) {
+    	const value =
+    		dynamicValue ??
+    		variables.current_game_name ??
+    		variables.persona_username ??
+    		"";
+    	return {
+    		dynamic: {
+    			value,
+    			online_status: variables.online_status,
+    		},
+    		extraSettings: {
+    			...(variables ?? {}),
+    			...(extraSettings ?? {}),
+    		},
+    	};
+    }
+
+    _levenshtein(a, b) {
+    	if (a === b) return 0;
+    	if (!a) return b.length;
+    	if (!b) return a.length;
+
+    	const matrix = Array.from({ length: a.length + 1 }, () =>
+    		new Array(b.length + 1).fill(0),
+    	);
+
+    	for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+    	for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+
+    	for (let i = 1; i <= a.length; i++) {
+    		for (let j = 1; j <= b.length; j++) {
+    			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+    			matrix[i][j] = Math.min(
+    				matrix[i - 1][j] + 1,
+    				matrix[i][j - 1] + 1,
+    				matrix[i - 1][j - 1] + cost,
+    			);
+    		}
+    	}
+
+    	return matrix[a.length][b.length];
+    }
+
+    _applyGlobalBackoff(seconds) {
+    	const delayMs = Math.max(0, this._coerceNumber(seconds, 0)) * 1000;
+    	const until = Date.now() + delayMs;
+    	if (!this._globalBackoffUntil || until > this._globalBackoffUntil) {
+    		this._globalBackoffUntil = until;
+    	}
+    }
+
+    async _showApiKeyFailureToast() {
+    	if (typeof this.lumia?.showToast !== "function") {
+    		return;
+    	}
+    	try {
+    		await this._withTimeout(
+    			Promise.resolve(
+    				this.lumia.showToast({
+    					message: "Invalid Steam API key. Update the plugin settings.",
+    					time: 6,
+    					type: "error",
+    				}),
+    			),
+    			DEFAULTS.lumiaCallTimeoutMs,
+    			"Lumia toast timed out.",
+    		);
+    	} catch (error) {
+    		return;
+    	}
+    }
+
+    async _showActionToast(message, type = "info") {
+    	if (typeof this.lumia?.showToast !== "function") {
+    		return;
+    	}
+    	try {
+    		await this._withTimeout(
+    			Promise.resolve(
+    				this.lumia.showToast({
+    					message,
+    					time: 4,
+    					type,
+    				}),
+    			),
+    			DEFAULTS.lumiaCallTimeoutMs,
+    			"Lumia toast timed out.",
+    		);
+    	} catch (error) {
+    		return;
+    	}
+    }
+
+    _schedulePolling() {
+    	this._clearPolling();
+
+    	const intervalSeconds = this._pollInterval(this.settings);
+    	if (!this._hasRequiredSettings() || intervalSeconds <= 0) {
+    		return;
+    	}
+
+    	this._pollTimer = setInterval(() => {
+    		void this._refreshData({ reason: "poll" });
+    	}, intervalSeconds * 1000);
+    }
+
+    _clearPolling() {
+    	if (this._pollTimer) {
+    		clearInterval(this._pollTimer);
+    		this._pollTimer = null;
+    	}
+    }
+
+    _settingsWith(data = {}) {
+    	return {
+    		...(this.settings && typeof this.settings === "object" ? this.settings : {}),
+    		...(data && typeof data === "object" ? data : {}),
+    	};
+    }
+
+    _hasRequiredSettings(settings = this.settings) {
+    	return Boolean(this._apiKey(settings) && this._steamIdInput(settings));
+    }
+
+    _apiKey(settings = this.settings) {
+    	return this._coerceString(settings?.apiKey, "");
+    }
+
+    _steamIdInput(settings = this.settings) {
+    	return this._coerceString(settings?.steamIdOrVanity, "");
+    }
+
+    _pollInterval(settings = this.settings) {
+    	const interval = this._coerceNumber(
+    		settings?.pollInterval,
+    		DEFAULTS.pollInterval,
+    	);
+    	if (!Number.isFinite(interval)) {
+    		return DEFAULTS.pollInterval;
+    	}
+    	return Math.min(
+    		Math.max(interval, DEFAULTS.minPollInterval),
+    		DEFAULTS.maxPollInterval,
+    	);
+    }
+
+    _ownedGamesRefreshMs(settings = this.settings) {
+    	const pollSeconds = this._pollInterval(settings);
+    	const refreshSeconds = Math.max(
+    		DEFAULTS.ownedGamesRefreshSeconds,
+    		pollSeconds * 5,
+    	);
+    	return refreshSeconds * 1000;
+    }
+
+    _debugEnabled(settings = this.settings) {
+    	return Boolean(settings?.debugLogs);
+    }
+
+    async _updateConnectionState(state) {
+    	if (this._lastConnectionState === state) {
+    		return;
+    	}
+
+    	const previousState = this._lastConnectionState;
+    	this._lastConnectionState = state;
+
+    	if (typeof this.lumia?.updateConnection !== "function") {
+    		return;
+    	}
+
+    	try {
+    		await this._withTimeout(
+    			Promise.resolve(this.lumia.updateConnection(state)),
+    			DEFAULTS.lumiaCallTimeoutMs,
+    			"Lumia connection update timed out.",
+    		);
+    		if (!state) {
+    			await this._log(
+    				"Steam connection is down; check the API key, Steam ID, and Steam profile privacy.",
+    				"warn",
+    			);
+    		} else if (previousState === false) {
+    			await this._log("Steam connection restored.");
+    		}
+    	} catch (error) {
+    		const message = this._errorMessage(error);
+    		await this._log(
+    			`Failed to update Steam connection state: ${message}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    async _safeFetch(label, fn) {
+    	try {
+    		return { ok: true, data: await fn() };
+    	} catch (error) {
+    		await this._log(
+    			`Steam ${label || "request"} failed: ${this._errorMessage(error)}`,
+    			"warn",
+    		);
+    		return { ok: false, data: null };
+    	}
+    }
+
+    _pruneAchievementSchemaCache() {
+    	const maxEntries = Math.max(
+    		1,
+    		this._coerceNumber(DEFAULTS.achievementSchemaCacheMaxEntries, 1),
+    	);
+    	while (this._achievementSchemaCache.size > maxEntries) {
+    		const oldestKey = this._achievementSchemaCache.keys().next().value;
+    		if (oldestKey === undefined) {
+    			return;
+    		}
+    		this._achievementSchemaCache.delete(oldestKey);
+    	}
+    }
+
+    async _setVariable(name, value) {
+    	if (typeof this.lumia.setVariable !== "function") {
+    		return;
+    	}
+
+    	await this.lumia.setVariable(name, value);
+    }
+
+    async _setVariableIfChanged(name, value) {
+    	const normalized = this._normalizeValue(value);
+    	const previous = this._lastVariables.get(name);
+    	if (this._valuesEqual(previous, normalized)) {
+    		return false;
+    	}
+    	this._lastVariables.set(name, normalized);
+    	await this._setVariable(name, value);
+    	return true;
+    }
+
+    _normalizeValue(value) {
+    	if (value === null || value === undefined) {
+    		return "";
+    	}
+    	if (typeof value === "object") {
+    		try {
+    			return JSON.stringify(value);
+    		} catch (error) {
+    			return String(value);
+    		}
+    	}
+    	return String(value);
+    }
+
+    _valuesEqual(a, b) {
+    	return a === b;
+    }
+
+    _withTimeout(promise, timeoutMs, message) {
+    	const ms = Math.max(1, this._coerceNumber(timeoutMs, 1000));
+    	return new Promise((resolve, reject) => {
+    		const timeoutId = setTimeout(() => {
+    			reject(new Error(message || `Operation timed out after ${ms}ms.`));
+    		}, ms);
+
+    		Promise.resolve(promise).then(
+    			(value) => {
+    				clearTimeout(timeoutId);
+    				resolve(value);
+    			},
+    			(error) => {
+    				clearTimeout(timeoutId);
+    				reject(error);
+    			},
+    		);
+    	});
+    }
+
+    _errorMessage(error) {
+    	if (!error) {
+    		return "Unknown error";
+    	}
+    	if (typeof error === "string") {
+    		return error;
+    	}
+    	return error?.message || String(error);
+    }
+
+    _truncateError(value) {
+    	if (!value) {
+    		return "";
+    	}
+    	const trimmed = String(value).replace(/\s+/g, " ").trim();
+    	return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+    }
+
+    _coerceNumber(value, fallback = 0) {
+    	const number = Number(value);
+    	return Number.isFinite(number) ? number : fallback;
+    }
+
+    _coerceString(value, fallback = "") {
+    	if (typeof value === "string") {
+    		return value;
+    	}
+    	if (value === null || value === undefined) {
+    		return fallback;
+    	}
+    	return String(value);
+    }
+
 }
 
 module.exports = SteamPlugin;
@@ -20250,260 +20320,261 @@ module.exports = SteamPlugin;
 ## steam/manifest.json
 
 ```
+
 {
-	"id": "steam",
-	"name": "Steam",
-	"version": "1.1.0",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"description": "Track Steam profile status, current/recent games, and achievements in Lumia with optional alerts and actions.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "games",
-	"keywords": "steam, steam api, gaming, profile, online status, achievements, recently played",
-	"icon": "steam.png",
-	"config": {
-		"settings": [
-			{
-				"key": "apiKey",
-				"label": "Steam Web API Key",
-				"type": "password",
-				"section": "General",
-				"sectionOrder": 1,
-				"helperText": "Required for all Steam Web API requests.",
-				"required": true
-			},
-			{
-				"key": "steamIdOrVanity",
-				"label": "Steam ID or Vanity Name",
-				"type": "text",
-				"section": "General",
-				"sectionOrder": 1,
-				"helperText": "Enter a SteamID64 or a vanity URL name.",
-				"required": true
-			},
-			{
-				"key": "pollInterval",
-				"label": "Poll Interval (seconds)",
-				"type": "number",
-				"section": "General",
-				"sectionOrder": 1,
-				"defaultValue": 30,
-				"min": 30,
-				"max": 900,
-				"helperText": "How often to refresh current status/game and current-game achievements (30-900 seconds). Owned games refresh less frequently automatically."
-			},
-			{
-				"key": "debugLogs",
-				"label": "Enable Debug Logs",
-				"type": "checkbox",
-				"section": "Advanced",
-				"sectionOrder": 2,
-				"defaultValue": false,
-				"refreshOnChange": true,
-				"helperText": "Writes detailed Steam plugin diagnostics to Lumia logs for troubleshooting."
-			}
-		],
-		"settings_tutorial": "./settings_tutorial.md",
-		"actions_tutorial": "./actions_tutorial.md",
-		"actions": [
-			{
-				"type": "fetch_game",
-				"label": "Fetch Achievements For Game",
-				"description": "Fetch achievements by game name or App ID (owned games only).",
-				"acceptedVariables": [
-					"steam_requested_game_input",
-					"steam_requested_game_appid",
-					"steam_requested_game_name",
-					"steam_requested_game_graphics_url",
-					"steam_requested_game_playtime_minutes",
-					"steam_requested_game_achievement_count",
-					"steam_requested_game_achievement_unlocked",
-					"steam_requested_game_achievements"
-				],
-				"fields": [
-					{
-						"key": "game",
-						"label": "Game Name or App ID",
-						"type": "text",
-						"placeholder": "ex: Sonic or 1145360",
-						"helperText": "Searches your owned games library for a match.",
-						"allowVariables": true
-					}
-				]
-			}
-		],
-		"variables": [
-			{
-				"name": "steamid",
-				"description": "SteamID64.",
-				"value": ""
-			},
-			{
-				"name": "persona_username",
-				"description": "Username (Steam persona name).",
-				"value": ""
-			},
-			{
-				"name": "online_status",
-				"description": "Online status (text).",
-				"value": "Offline"
-			},
-			{
-				"name": "last_logoff",
-				"description": "Last logoff Unix timestamp.",
-				"value": 0
-			},
-			{
-				"name": "profile_url",
-				"description": "Profile URL.",
-				"value": ""
-			},
-			{
-				"name": "avatar",
-				"description": "Avatar URL.",
-				"value": ""
-			},
-			{
-				"name": "current_game_name",
-				"description": "Current in-game name (if playing).",
-				"value": ""
-			},
-			{
-				"name": "current_game_appid",
-				"description": "Current in-game app ID (if playing).",
-				"value": 0
-			},
-			{
-				"name": "current_game_graphics_url",
-				"description": "Current game's Steam header image URL.",
-				"value": ""
-			},
-			{
-				"name": "current_game_playtime_minutes",
-				"description": "Total Steam playtime for the current game, in minutes.",
-				"value": 0
-			},
-			{
-				"name": "game_count",
-				"description": "Owned games count.",
-				"value": 0
-			},
-			{
-				"name": "current_game_achievement_count",
-				"description": "Total achievements for the current/last played game.",
-				"value": 0
-			},
-			{
-				"name": "current_game_achievement_unlocked_count",
-				"description": "Unlocked achievements for the current/last played game.",
-				"value": 0
-			},
-			{
-				"name": "current_game_achievement_name",
-				"description": "Most recently unlocked current-game achievement name.",
-				"value": ""
-			},
-			{
-				"name": "current_game_achievement_description",
-				"description": "Most recently unlocked current-game achievement description.",
-				"value": ""
-			}
-		],
-		"alerts": [
-			{
-				"title": "Online Status Changed",
-				"key": "online_state_changed",
-				"acceptedVariables": ["persona_username", "online_status"],
-				"defaultMessage": "{{persona_username}} is now {{online_status}}.",
-				"defaults": {
-					"on": false
-				},
-				"variationConditions": [
-					{
-						"type": "EQUAL_SELECTION",
-						"description": "Pick a online for status.",
-						"selections": [
-							{
-								"label": "Online",
-								"value": "online",
-								"message": "{{persona_username}} is now Online."
-							},
-							{
-								"label": "Offline",
-								"value": "offline",
-								"message": "{{persona_username}} went Offline."
-							}
-						]
-					}
-				]
-			},
-			{
-				"title": "Achievement Unlocked",
-				"key": "achievement_unlocked",
-				"acceptedVariables": [
-					"current_game_name",
-					"achievement_name",
-					"achievement_description",
-					"current_game_achievement_unlocked_count",
-					"current_game_achievement_count"
-				],
-				"defaultMessage": "{{current_game_name}}: {{achievement_name}} - {{achievement_description}}.",
-				"variationConditions": [
-					{
-						"type": "EQUAL_STRING",
-						"description": "Achievement Name"
-					}
-				]
-			},
-			{
-				"title": "Achievement Progress Changed",
-				"key": "achievement_progress_changed",
-				"acceptedVariables": [
-					"current_game_name",
-					"achievement_name",
-					"achievement_description",
-					"current_game_achievement_unlocked_count",
-					"current_game_achievement_count"
-				],
-				"defaultMessage": "{{current_game_name}} achievements: {{current_game_achievement_unlocked_count}}/{{current_game_achievement_count}}.",
-				"defaults": {
-					"on": false
-				}
-			},
-			{
-				"title": "Game Changed",
-				"key": "current_game_changed",
-				"acceptedVariables": [
-					"current_game_name",
-					"current_game_appid",
-					"current_game_graphics_url",
-					"current_game_playtime_minutes"
-				],
-				"defaultMessage": "Now playing {{current_game_name}}.",
-				"variationConditions": [
-					{
-						"type": "EQUAL_STRING",
-						"description": "Game Name"
-					}
-				]
-			},
-			{
-				"title": "Game Over",
-				"key": "current_game_over",
-				"acceptedVariables": ["previous_game_name"],
-				"defaultMessage": "Stopped playing {{previous_game_name}}.",
-				"variationConditions": [
-					{
-						"type": "EQUAL_STRING",
-						"description": "Previous Game Name"
-					}
-				]
-			}
-		],
-		"translations": "./translations.json"
-	}
+"id": "steam",
+"name": "Steam",
+"version": "1.1.0",
+"author": "Lumia Stream",
+"email": "dev@lumiastream.com",
+"website": "https://lumiastream.com",
+"description": "Track Steam profile status, current/recent games, and achievements in Lumia with optional alerts and actions.",
+"license": "MIT",
+"lumiaVersion": "^9.0.0",
+"category": "games",
+"keywords": "steam, steam api, gaming, profile, online status, achievements, recently played",
+"icon": "steam.png",
+"config": {
+"settings": [
+{
+"key": "apiKey",
+"label": "Steam Web API Key",
+"type": "password",
+"section": "General",
+"sectionOrder": 1,
+"helperText": "Required for all Steam Web API requests.",
+"required": true
+},
+{
+"key": "steamIdOrVanity",
+"label": "Steam ID or Vanity Name",
+"type": "text",
+"section": "General",
+"sectionOrder": 1,
+"helperText": "Enter a SteamID64 or a vanity URL name.",
+"required": true
+},
+{
+"key": "pollInterval",
+"label": "Poll Interval (seconds)",
+"type": "number",
+"section": "General",
+"sectionOrder": 1,
+"defaultValue": 30,
+"min": 30,
+"max": 900,
+"helperText": "How often to refresh current status/game and current-game achievements (30-900 seconds). Owned games refresh less frequently automatically."
+},
+{
+"key": "debugLogs",
+"label": "Enable Debug Logs",
+"type": "checkbox",
+"section": "Advanced",
+"sectionOrder": 2,
+"defaultValue": false,
+"refreshOnChange": true,
+"helperText": "Writes detailed Steam plugin diagnostics to Lumia logs for troubleshooting."
+}
+],
+"settings_tutorial": "./settings_tutorial.md",
+"actions_tutorial": "./actions_tutorial.md",
+"actions": [
+{
+"type": "fetch_game",
+"label": "Fetch Achievements For Game",
+"description": "Fetch achievements by game name or App ID (owned games only).",
+"acceptedVariables": [
+"steam_requested_game_input",
+"steam_requested_game_appid",
+"steam_requested_game_name",
+"steam_requested_game_graphics_url",
+"steam_requested_game_playtime_minutes",
+"steam_requested_game_achievement_count",
+"steam_requested_game_achievement_unlocked",
+"steam_requested_game_achievements"
+],
+"fields": [
+{
+"key": "game",
+"label": "Game Name or App ID",
+"type": "text",
+"placeholder": "ex: Sonic or 1145360",
+"helperText": "Searches your owned games library for a match.",
+"allowVariables": true
+}
+]
+}
+],
+"variables": [
+{
+"name": "steamid",
+"description": "SteamID64.",
+"value": ""
+},
+{
+"name": "persona_username",
+"description": "Username (Steam persona name).",
+"value": ""
+},
+{
+"name": "online_status",
+"description": "Online status (text).",
+"value": "Offline"
+},
+{
+"name": "last_logoff",
+"description": "Last logoff Unix timestamp.",
+"value": 0
+},
+{
+"name": "profile_url",
+"description": "Profile URL.",
+"value": ""
+},
+{
+"name": "avatar",
+"description": "Avatar URL.",
+"value": ""
+},
+{
+"name": "current_game_name",
+"description": "Current in-game name (if playing).",
+"value": ""
+},
+{
+"name": "current_game_appid",
+"description": "Current in-game app ID (if playing).",
+"value": 0
+},
+{
+"name": "current_game_graphics_url",
+"description": "Current game's Steam header image URL.",
+"value": ""
+},
+{
+"name": "current_game_playtime_minutes",
+"description": "Total Steam playtime for the current game, in minutes.",
+"value": 0
+},
+{
+"name": "game_count",
+"description": "Owned games count.",
+"value": 0
+},
+{
+"name": "current_game_achievement_count",
+"description": "Total achievements for the current/last played game.",
+"value": 0
+},
+{
+"name": "current_game_achievement_unlocked_count",
+"description": "Unlocked achievements for the current/last played game.",
+"value": 0
+},
+{
+"name": "current_game_achievement_name",
+"description": "Most recently unlocked current-game achievement name.",
+"value": ""
+},
+{
+"name": "current_game_achievement_description",
+"description": "Most recently unlocked current-game achievement description.",
+"value": ""
+}
+],
+"alerts": [
+{
+"title": "Online Status Changed",
+"key": "online_state_changed",
+"acceptedVariables": ["persona_username", "online_status"],
+"defaultMessage": "{{persona_username}} is now {{online_status}}.",
+"defaults": {
+"on": false
+},
+"variationConditions": [
+{
+"type": "EQUAL_SELECTION",
+"description": "Pick a online for status.",
+"selections": [
+{
+"label": "Online",
+"value": "online",
+"message": "{{persona_username}} is now Online."
+},
+{
+"label": "Offline",
+"value": "offline",
+"message": "{{persona_username}} went Offline."
+}
+]
+}
+]
+},
+{
+"title": "Achievement Unlocked",
+"key": "achievement_unlocked",
+"acceptedVariables": [
+"current_game_name",
+"achievement_name",
+"achievement_description",
+"current_game_achievement_unlocked_count",
+"current_game_achievement_count"
+],
+"defaultMessage": "{{current_game_name}}: {{achievement_name}} - {{achievement_description}}.",
+"variationConditions": [
+{
+"type": "EQUAL_STRING",
+"description": "Achievement Name"
+}
+]
+},
+{
+"title": "Achievement Progress Changed",
+"key": "achievement_progress_changed",
+"acceptedVariables": [
+"current_game_name",
+"achievement_name",
+"achievement_description",
+"current_game_achievement_unlocked_count",
+"current_game_achievement_count"
+],
+"defaultMessage": "{{current_game_name}} achievements: {{current_game_achievement_unlocked_count}}/{{current_game_achievement_count}}.",
+"defaults": {
+"on": false
+}
+},
+{
+"title": "Game Changed",
+"key": "current_game_changed",
+"acceptedVariables": [
+"current_game_name",
+"current_game_appid",
+"current_game_graphics_url",
+"current_game_playtime_minutes"
+],
+"defaultMessage": "Now playing {{current_game_name}}.",
+"variationConditions": [
+{
+"type": "EQUAL_STRING",
+"description": "Game Name"
+}
+]
+},
+{
+"title": "Game Over",
+"key": "current_game_over",
+"acceptedVariables": ["previous_game_name"],
+"defaultMessage": "Stopped playing {{previous_game_name}}.",
+"variationConditions": [
+{
+"type": "EQUAL_STRING",
+"description": "Previous Game Name"
+}
+]
+}
+],
+"translations": "./translations.json"
+}
 }
 
 ```
@@ -20511,16 +20582,17 @@ module.exports = SteamPlugin;
 ## steam/package.json
 
 ```
+
 {
-	"name": "lumia-example-steam",
-	"version": "1.0.1",
-	"private": true,
-	"description": "Example Lumia Stream plugin that pulls Steam data from the Steam Web API.",
-	"main": "main.js",
-	"scripts": {},
-	"dependencies": {
-		"@lumiastream/plugin": "^0.4.1"
-	}
+"name": "lumia-example-steam",
+"version": "1.0.1",
+"private": true,
+"description": "Example Lumia Stream plugin that pulls Steam data from the Steam Web API.",
+"main": "main.js",
+"scripts": {},
+"dependencies": {
+"@lumiastream/plugin": "^0.4.1"
+}
 }
 
 ```
@@ -20528,47 +20600,52 @@ module.exports = SteamPlugin;
 ## steam/settings_tutorial.md
 
 ```
+
 ---
+
 ### Steam Web API Key
-1) Open the [Steam Web API Key page](https://steamcommunity.com/dev/apikey) and sign in.
-2) Enter a domain name (you can use `localhost`).
-3) Accept the terms and click **Register**.
-4) Copy the generated key and paste it into **Steam Web API Key**.
+
+1. Open the [Steam Web API Key page](https://steamcommunity.com/dev/apikey) and sign in.
+2. Enter a domain name (you can use `localhost`).
+3. Accept the terms and click **Register**.
+4. Copy the generated key and paste it into **Steam Web API Key**.
 
 ### Steam ID
-1) Open your Steam profile.
-2) Paste **any** of the following into **Steam ID / Vanity Name**:
+
+1. Open your Steam profile.
+2. Paste **any** of the following into **Steam ID / Vanity Name**:
    - Your SteamID64 (from account details)
    - Your vanity profile name
    - Your full profile URL (example: `https://steamcommunity.com/id/yourname` or `https://steamcommunity.com/profiles/7656119...`)
 
 ### Achievements
-Achievement stats are pulled automatically from your **current** game while you are playing.
----
+
+## Achievement stats are pulled automatically from your **current** game while you are playing.
 
 ```
 
 ## steam/translations.json
 
 ```
+
 {
-	"en": {
-		"steamid": "SteamID64.",
-		"persona_username": "Username (Steam persona name).",
-		"online_status": "Online status (Online or Offline).",
-		"last_logoff": "Last logoff Unix timestamp.",
-		"profile_url": "Profile URL.",
-		"avatar": "Avatar URL.",
-		"current_game_name": "Current in-game name (if playing).",
-		"current_game_appid": "Current in-game app ID (if playing).",
-		"current_game_graphics_url": "Current game's Steam header image URL.",
-		"current_game_playtime_minutes": "Total Steam playtime for the current game, in minutes.",
-		"game_count": "Owned games count.",
-		"current_game_achievement_count": "Total achievements for the current/last played game.",
-		"current_game_achievement_unlocked_count": "Unlocked achievements for the current/last played game.",
-		"current_game_achievement_name": "Most recently unlocked current-game achievement name.",
-		"current_game_achievement_description": "Most recently unlocked current-game achievement description."
-	}
+"en": {
+"steamid": "SteamID64.",
+"persona_username": "Username (Steam persona name).",
+"online_status": "Online status (Online or Offline).",
+"last_logoff": "Last logoff Unix timestamp.",
+"profile_url": "Profile URL.",
+"avatar": "Avatar URL.",
+"current_game_name": "Current in-game name (if playing).",
+"current_game_appid": "Current in-game app ID (if playing).",
+"current_game_graphics_url": "Current game's Steam header image URL.",
+"current_game_playtime_minutes": "Total Steam playtime for the current game, in minutes.",
+"game_count": "Owned games count.",
+"current_game_achievement_count": "Total achievements for the current/last played game.",
+"current_game_achievement_unlocked_count": "Unlocked achievements for the current/last played game.",
+"current_game_achievement_name": "Most recently unlocked current-game achievement name.",
+"current_game_achievement_description": "Most recently unlocked current-game achievement description."
+}
 }
 
 ```
@@ -20576,16 +20653,19 @@ Achievement stats are pulled automatically from your **current** game while you 
 ## system_monitor/README.md
 
 ```
+
 # System Monitor Plugin
 
 Monitors CPU, RAM, and GPU usage (when available) and exposes variables and alerts.
 
 ## Variables
+
 - `cpu_usage`, `cpu_bucket`
 - `ram_usage`, `ram_bucket`, `ram_used_mb`, `ram_total_mb`
 - `gpu_available`, `gpu_usage`, `gpu_bucket`
 
 ## Alerts
+
 - `cpu_alert` (warning/critical variations)
 - `ram_alert` (warning/critical variations)
 - `gpu_alert` (warning/critical variations)
@@ -20593,6 +20673,7 @@ Monitors CPU, RAM, and GPU usage (when available) and exposes variables and aler
 Alerts only fire when entering a new bucket (normal -> warning -> critical).
 
 ## Notes
+
 - GPU usage depends on OS and driver support. If not available, `gpu_available` is false and no GPU alert fires.
 
 ```
@@ -20600,295 +20681,297 @@ Alerts only fire when entering a new bucket (normal -> warning -> critical).
 ## system_monitor/main.js
 
 ```
+
 const { Plugin } = require("@lumiastream/plugin");
 const os = require("os");
 
 function safeRequireSystemInformation() {
-	try {
-		return require("systeminformation");
-	} catch (error) {
-		return null;
-	}
+try {
+return require("systeminformation");
+} catch (error) {
+return null;
+}
 }
 
 const DEFAULTS = {
-	pollIntervalSec: 2,
-	cpuWarn: 70,
-	cpuCritical: 90,
-	ramWarn: 70,
-	ramCritical: 90,
-	gpuWarn: 70,
-	gpuCritical: 90,
+pollIntervalSec: 2,
+cpuWarn: 70,
+cpuCritical: 90,
+ramWarn: 70,
+ramCritical: 90,
+gpuWarn: 70,
+gpuCritical: 90,
 };
 
 const VARIABLES = {
-	cpuUsage: "cpu_usage",
-	cpuBucket: "cpu_bucket",
-	ramUsage: "ram_usage",
-	ramBucket: "ram_bucket",
-	ramUsedMb: "ram_used_mb",
-	ramTotalMb: "ram_total_mb",
-	gpuAvailable: "gpu_available",
-	gpuUsage: "gpu_usage",
-	gpuBucket: "gpu_bucket",
+cpuUsage: "cpu_usage",
+cpuBucket: "cpu_bucket",
+ramUsage: "ram_usage",
+ramBucket: "ram_bucket",
+ramUsedMb: "ram_used_mb",
+ramTotalMb: "ram_total_mb",
+gpuAvailable: "gpu_available",
+gpuUsage: "gpu_usage",
+gpuBucket: "gpu_bucket",
 };
 
 const ALERTS = {
-	cpu: "cpu_alert",
-	ram: "ram_alert",
-	gpu: "gpu_alert",
+cpu: "cpu_alert",
+ram: "ram_alert",
+gpu: "gpu_alert",
 };
 
 class SystemMonitorPlugin extends Plugin {
-	async onload() {
-		this._si = safeRequireSystemInformation();
-		if (!this._si) {
-			await this.lumia.log(
-				"[System Monitor] systeminformation not installed. CPU/RAM will use basic OS stats and GPU will be disabled. Run `npm install` in the plugin folder for full support."
-			);
-		}
+async onload() {
+this.\_si = safeRequireSystemInformation();
+if (!this.\_si) {
+await this.lumia.log(
+"[System Monitor] systeminformation not installed. CPU/RAM will use basic OS stats and GPU will be disabled. Run `npm install` in the plugin folder for full support."
+);
+}
 
-		this._interval = null;
-		this._lastBuckets = {
-			cpu: "normal",
-			ram: "normal",
-			gpu: "normal",
-		};
-		this._lastCpuSample = this._readCpuTimes();
-		await this._startPolling();
-	}
+    	this._interval = null;
+    	this._lastBuckets = {
+    		cpu: "normal",
+    		ram: "normal",
+    		gpu: "normal",
+    	};
+    	this._lastCpuSample = this._readCpuTimes();
+    	await this._startPolling();
+    }
 
-	async onsettingsupdate(settings, previous = {}) {
-		const next = this._normalizeSettings(settings);
-		const prev = this._normalizeSettings(previous);
+    async onsettingsupdate(settings, previous = {}) {
+    	const next = this._normalizeSettings(settings);
+    	const prev = this._normalizeSettings(previous);
 
-		if (next.pollIntervalSec !== prev.pollIntervalSec) {
-			await this._startPolling();
-		}
-	}
+    	if (next.pollIntervalSec !== prev.pollIntervalSec) {
+    		await this._startPolling();
+    	}
+    }
 
-	onunload() {
-		this._stopPolling();
-	}
+    onunload() {
+    	this._stopPolling();
+    }
 
-	_normalizeSettings(settings = this.settings) {
-		return {
-			pollIntervalSec: this._number(settings?.pollIntervalSec, DEFAULTS.pollIntervalSec),
-			cpuWarn: this._number(settings?.cpuWarn, DEFAULTS.cpuWarn),
-			cpuCritical: this._number(settings?.cpuCritical, DEFAULTS.cpuCritical),
-			ramWarn: this._number(settings?.ramWarn, DEFAULTS.ramWarn),
-			ramCritical: this._number(settings?.ramCritical, DEFAULTS.ramCritical),
-			gpuWarn: this._number(settings?.gpuWarn, DEFAULTS.gpuWarn),
-			gpuCritical: this._number(settings?.gpuCritical, DEFAULTS.gpuCritical),
-		};
-	}
+    _normalizeSettings(settings = this.settings) {
+    	return {
+    		pollIntervalSec: this._number(settings?.pollIntervalSec, DEFAULTS.pollIntervalSec),
+    		cpuWarn: this._number(settings?.cpuWarn, DEFAULTS.cpuWarn),
+    		cpuCritical: this._number(settings?.cpuCritical, DEFAULTS.cpuCritical),
+    		ramWarn: this._number(settings?.ramWarn, DEFAULTS.ramWarn),
+    		ramCritical: this._number(settings?.ramCritical, DEFAULTS.ramCritical),
+    		gpuWarn: this._number(settings?.gpuWarn, DEFAULTS.gpuWarn),
+    		gpuCritical: this._number(settings?.gpuCritical, DEFAULTS.gpuCritical),
+    	};
+    }
 
-	_number(value, fallback) {
-		const parsed = Number(value);
-		return Number.isFinite(parsed) ? parsed : fallback;
-	}
+    _number(value, fallback) {
+    	const parsed = Number(value);
+    	return Number.isFinite(parsed) ? parsed : fallback;
+    }
 
-	_stopPolling() {
-		if (this._interval) {
-			clearInterval(this._interval);
-			this._interval = null;
-		}
-	}
+    _stopPolling() {
+    	if (this._interval) {
+    		clearInterval(this._interval);
+    		this._interval = null;
+    	}
+    }
 
-	async _startPolling() {
-		this._stopPolling();
-		const { pollIntervalSec } = this._normalizeSettings();
-		const intervalMs = Math.max(1, pollIntervalSec) * 1000;
+    async _startPolling() {
+    	this._stopPolling();
+    	const { pollIntervalSec } = this._normalizeSettings();
+    	const intervalMs = Math.max(1, pollIntervalSec) * 1000;
 
-		await this._pollOnce();
-		this._interval = setInterval(() => {
-			this._pollOnce().catch((error) => {
-				this.lumia.log(
-					`[System Monitor] Poll failed: ${error?.message ?? String(error)}`
-				);
-			});
-		}, intervalMs);
-	}
+    	await this._pollOnce();
+    	this._interval = setInterval(() => {
+    		this._pollOnce().catch((error) => {
+    			this.lumia.log(
+    				`[System Monitor] Poll failed: ${error?.message ?? String(error)}`
+    			);
+    		});
+    	}, intervalMs);
+    }
 
-	async _pollOnce() {
-		const settings = this._normalizeSettings();
-		const { cpuUsage, memUsed, memTotal, gpuInfo } = await this._readMetrics();
-		const ramUsage =
-			memTotal > 0
-				? this._roundPercent((memUsed / memTotal) * 100)
-				: 0;
+    async _pollOnce() {
+    	const settings = this._normalizeSettings();
+    	const { cpuUsage, memUsed, memTotal, gpuInfo } = await this._readMetrics();
+    	const ramUsage =
+    		memTotal > 0
+    			? this._roundPercent((memUsed / memTotal) * 100)
+    			: 0;
 
-		await Promise.all([
-			this.lumia.setVariable(VARIABLES.cpuUsage, cpuUsage),
-			this.lumia.setVariable(VARIABLES.ramUsage, ramUsage),
-			this.lumia.setVariable(VARIABLES.ramUsedMb, this._toMb(memUsed)),
-			this.lumia.setVariable(VARIABLES.ramTotalMb, this._toMb(memTotal)),
-			this.lumia.setVariable(VARIABLES.gpuAvailable, gpuInfo.available),
-			this.lumia.setVariable(VARIABLES.gpuUsage, gpuInfo.usage),
-		]);
+    	await Promise.all([
+    		this.lumia.setVariable(VARIABLES.cpuUsage, cpuUsage),
+    		this.lumia.setVariable(VARIABLES.ramUsage, ramUsage),
+    		this.lumia.setVariable(VARIABLES.ramUsedMb, this._toMb(memUsed)),
+    		this.lumia.setVariable(VARIABLES.ramTotalMb, this._toMb(memTotal)),
+    		this.lumia.setVariable(VARIABLES.gpuAvailable, gpuInfo.available),
+    		this.lumia.setVariable(VARIABLES.gpuUsage, gpuInfo.usage),
+    	]);
 
-		const cpuBucket = this._bucket(cpuUsage, settings.cpuWarn, settings.cpuCritical);
-		const ramBucket = this._bucket(ramUsage, settings.ramWarn, settings.ramCritical);
-		const gpuBucket = gpuInfo.available
-			? this._bucket(gpuInfo.usage, settings.gpuWarn, settings.gpuCritical)
-			: "normal";
+    	const cpuBucket = this._bucket(cpuUsage, settings.cpuWarn, settings.cpuCritical);
+    	const ramBucket = this._bucket(ramUsage, settings.ramWarn, settings.ramCritical);
+    	const gpuBucket = gpuInfo.available
+    		? this._bucket(gpuInfo.usage, settings.gpuWarn, settings.gpuCritical)
+    		: "normal";
 
-		await Promise.all([
-			this.lumia.setVariable(VARIABLES.cpuBucket, cpuBucket),
-			this.lumia.setVariable(VARIABLES.ramBucket, ramBucket),
-			this.lumia.setVariable(VARIABLES.gpuBucket, gpuBucket),
-		]);
+    	await Promise.all([
+    		this.lumia.setVariable(VARIABLES.cpuBucket, cpuBucket),
+    		this.lumia.setVariable(VARIABLES.ramBucket, ramBucket),
+    		this.lumia.setVariable(VARIABLES.gpuBucket, gpuBucket),
+    	]);
 
-		await this._maybeAlert({
-			metric: "cpu",
-			bucket: cpuBucket,
-			usage: cpuUsage,
-			variables: { cpu_usage: cpuUsage, cpu_bucket: cpuBucket },
-		});
+    	await this._maybeAlert({
+    		metric: "cpu",
+    		bucket: cpuBucket,
+    		usage: cpuUsage,
+    		variables: { cpu_usage: cpuUsage, cpu_bucket: cpuBucket },
+    	});
 
-		await this._maybeAlert({
-			metric: "ram",
-			bucket: ramBucket,
-			usage: ramUsage,
-			variables: {
-				ram_usage: ramUsage,
-				ram_bucket: ramBucket,
-				ram_used_mb: this._toMb(memUsed),
-				ram_total_mb: this._toMb(memTotal),
-			},
-		});
+    	await this._maybeAlert({
+    		metric: "ram",
+    		bucket: ramBucket,
+    		usage: ramUsage,
+    		variables: {
+    			ram_usage: ramUsage,
+    			ram_bucket: ramBucket,
+    			ram_used_mb: this._toMb(memUsed),
+    			ram_total_mb: this._toMb(memTotal),
+    		},
+    	});
 
-		if (gpuInfo.available) {
-			await this._maybeAlert({
-				metric: "gpu",
-				bucket: gpuBucket,
-				usage: gpuInfo.usage,
-				variables: { gpu_usage: gpuInfo.usage, gpu_bucket: gpuBucket },
-			});
-		}
-	}
+    	if (gpuInfo.available) {
+    		await this._maybeAlert({
+    			metric: "gpu",
+    			bucket: gpuBucket,
+    			usage: gpuInfo.usage,
+    			variables: { gpu_usage: gpuInfo.usage, gpu_bucket: gpuBucket },
+    		});
+    	}
+    }
 
-	async _readMetrics() {
-		if (this._si) {
-			const [load, mem, graphics] = await Promise.all([
-				this._si.currentLoad(),
-				this._si.mem(),
-				this._si.graphics().catch(() => ({ controllers: [] })),
-			]);
+    async _readMetrics() {
+    	if (this._si) {
+    		const [load, mem, graphics] = await Promise.all([
+    			this._si.currentLoad(),
+    			this._si.mem(),
+    			this._si.graphics().catch(() => ({ controllers: [] })),
+    		]);
 
-			const cpuUsage = this._roundPercent(load?.currentLoad);
-			const memUsed = this._number(mem?.used ?? mem?.active, 0);
-			const memTotal = this._number(mem?.total, 0);
-			const gpuInfo = this._resolveGpuUsage(graphics);
+    		const cpuUsage = this._roundPercent(load?.currentLoad);
+    		const memUsed = this._number(mem?.used ?? mem?.active, 0);
+    		const memTotal = this._number(mem?.total, 0);
+    		const gpuInfo = this._resolveGpuUsage(graphics);
 
-			return { cpuUsage, memUsed, memTotal, gpuInfo };
-		}
+    		return { cpuUsage, memUsed, memTotal, gpuInfo };
+    	}
 
-		const cpuUsage = this._readCpuUsageFallback();
-		const memTotal = os.totalmem();
-		const memFree = os.freemem();
-		const memUsed = Math.max(0, memTotal - memFree);
+    	const cpuUsage = this._readCpuUsageFallback();
+    	const memTotal = os.totalmem();
+    	const memFree = os.freemem();
+    	const memUsed = Math.max(0, memTotal - memFree);
 
-		return {
-			cpuUsage: this._roundPercent(cpuUsage),
-			memUsed,
-			memTotal,
-			gpuInfo: { available: false, usage: 0 },
-		};
-	}
+    	return {
+    		cpuUsage: this._roundPercent(cpuUsage),
+    		memUsed,
+    		memTotal,
+    		gpuInfo: { available: false, usage: 0 },
+    	};
+    }
 
-	_readCpuTimes() {
-		const cpus = os.cpus();
-		let idle = 0;
-		let total = 0;
+    _readCpuTimes() {
+    	const cpus = os.cpus();
+    	let idle = 0;
+    	let total = 0;
 
-		for (const cpu of cpus) {
-			const times = cpu.times || {};
-			idle += times.idle ?? 0;
-			total +=
-				(times.user ?? 0) +
-				(times.nice ?? 0) +
-				(times.sys ?? 0) +
-				(times.irq ?? 0) +
-				(times.idle ?? 0);
-		}
+    	for (const cpu of cpus) {
+    		const times = cpu.times || {};
+    		idle += times.idle ?? 0;
+    		total +=
+    			(times.user ?? 0) +
+    			(times.nice ?? 0) +
+    			(times.sys ?? 0) +
+    			(times.irq ?? 0) +
+    			(times.idle ?? 0);
+    	}
 
-		return { idle, total };
-	}
+    	return { idle, total };
+    }
 
-	_readCpuUsageFallback() {
-		const prev = this._lastCpuSample || this._readCpuTimes();
-		const next = this._readCpuTimes();
-		this._lastCpuSample = next;
+    _readCpuUsageFallback() {
+    	const prev = this._lastCpuSample || this._readCpuTimes();
+    	const next = this._readCpuTimes();
+    	this._lastCpuSample = next;
 
-		const idle = next.idle - prev.idle;
-		const total = next.total - prev.total;
-		if (total <= 0) return 0;
+    	const idle = next.idle - prev.idle;
+    	const total = next.total - prev.total;
+    	if (total <= 0) return 0;
 
-		return (1 - idle / total) * 100;
-	}
+    	return (1 - idle / total) * 100;
+    }
 
-	_roundPercent(value) {
-		const number = this._number(value, 0);
-		return Math.max(0, Math.min(100, Number(number.toFixed(1))));
-	}
+    _roundPercent(value) {
+    	const number = this._number(value, 0);
+    	return Math.max(0, Math.min(100, Number(number.toFixed(1))));
+    }
 
-	_toMb(value) {
-		return Number((this._number(value, 0) / 1024 / 1024).toFixed(0));
-	}
+    _toMb(value) {
+    	return Number((this._number(value, 0) / 1024 / 1024).toFixed(0));
+    }
 
-	_bucket(value, warn, critical) {
-		if (value >= critical) return "critical";
-		if (value >= warn) return "warning";
-		return "normal";
-	}
+    _bucket(value, warn, critical) {
+    	if (value >= critical) return "critical";
+    	if (value >= warn) return "warning";
+    	return "normal";
+    }
 
-	_resolveGpuUsage(graphics) {
-		const controllers = Array.isArray(graphics?.controllers)
-			? graphics.controllers
-			: [];
+    _resolveGpuUsage(graphics) {
+    	const controllers = Array.isArray(graphics?.controllers)
+    		? graphics.controllers
+    		: [];
 
-		const values = controllers
-			.map((controller) => {
-				const candidate =
-					controller?.utilizationGpu ??
-					controller?.utilizationGPU ??
-					controller?.utilization ??
-					controller?.utilization_gpu ??
-					controller?.gpuUtilization ??
-					controller?.gpu_utilization;
-				return this._number(candidate, NaN);
-			})
-			.filter((value) => Number.isFinite(value));
+    	const values = controllers
+    		.map((controller) => {
+    			const candidate =
+    				controller?.utilizationGpu ??
+    				controller?.utilizationGPU ??
+    				controller?.utilization ??
+    				controller?.utilization_gpu ??
+    				controller?.gpuUtilization ??
+    				controller?.gpu_utilization;
+    			return this._number(candidate, NaN);
+    		})
+    		.filter((value) => Number.isFinite(value));
 
-		if (!values.length) {
-			return { available: false, usage: 0 };
-		}
+    	if (!values.length) {
+    		return { available: false, usage: 0 };
+    	}
 
-		const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
-		return { available: true, usage: this._roundPercent(avg) };
-	}
+    	const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+    	return { available: true, usage: this._roundPercent(avg) };
+    }
 
-	async _maybeAlert({ metric, bucket, usage, variables }) {
-		const last = this._lastBuckets[metric] ?? "normal";
-		this._lastBuckets[metric] = bucket;
+    async _maybeAlert({ metric, bucket, usage, variables }) {
+    	const last = this._lastBuckets[metric] ?? "normal";
+    	this._lastBuckets[metric] = bucket;
 
-		if (bucket === last || bucket === "normal") {
-			return;
-		}
+    	if (bucket === last || bucket === "normal") {
+    		return;
+    	}
 
-		const alertKey = ALERTS[metric];
-		if (!alertKey) return;
+    	const alertKey = ALERTS[metric];
+    	if (!alertKey) return;
 
-		await this.lumia.triggerAlert({
-			alert: alertKey,
-			dynamic: {
-				name: "value",
-				value: bucket,
-			},
-			extraSettings: variables,
-		});
-	}
+    	await this.lumia.triggerAlert({
+    		alert: alertKey,
+    		dynamic: {
+    			name: "value",
+    			value: bucket,
+    		},
+    		extraSettings: variables,
+    	});
+    }
+
 }
 
 module.exports = SystemMonitorPlugin;
@@ -20898,176 +20981,177 @@ module.exports = SystemMonitorPlugin;
 ## system_monitor/manifest.json
 
 ```
+
 {
-  "id": "system_monitor",
-  "name": "System Monitor",
-  "version": "1.0.0",
-  "author": "Lumia Stream",
-  "email": "",
-  "website": "",
-  "repository": "",
-  "description": "Monitor CPU, RAM, and GPU usage with variables and alerts.",
-  "license": "MIT",
-  "lumiaVersion": "^9.0.0",
-  "category": "utilities",
-  "main": "main.js",
-  "icon": "system_monitor.png",
-  "keywords": "system, cpu, ram, gpu, alerts",
-  "config": {
-    "settings": [
-      {
-        "key": "pollIntervalSec",
-        "label": "Poll Interval (seconds)",
-        "type": "number",
-        "defaultValue": 30,
-        "min": 10,
-        "max": 120,
-        "helperText": "How often to sample CPU/RAM/GPU usage."
-      },
-      {
-        "key": "cpuWarn",
-        "label": "CPU Warning Threshold (%)",
-        "type": "number",
-        "defaultValue": 70,
-        "min": 1,
-        "max": 99
-      },
-      {
-        "key": "cpuCritical",
-        "label": "CPU Critical Threshold (%)",
-        "type": "number",
-        "defaultValue": 90,
-        "min": 1,
-        "max": 100
-      },
-      {
-        "key": "ramWarn",
-        "label": "RAM Warning Threshold (%)",
-        "type": "number",
-        "defaultValue": 70,
-        "min": 1,
-        "max": 99
-      },
-      {
-        "key": "ramCritical",
-        "label": "RAM Critical Threshold (%)",
-        "type": "number",
-        "defaultValue": 90,
-        "min": 1,
-        "max": 100
-      },
-      {
-        "key": "gpuWarn",
-        "label": "GPU Warning Threshold (%)",
-        "type": "number",
-        "defaultValue": 70,
-        "min": 1,
-        "max": 99
-      },
-      {
-        "key": "gpuCritical",
-        "label": "GPU Critical Threshold (%)",
-        "type": "number",
-        "defaultValue": 90,
-        "min": 1,
-        "max": 100
-      }
-    ],
-    "variables": [
-      {
-        "name": "cpu_usage",
-        "value": 0
-      },
-      {
-        "name": "cpu_bucket",
-        "value": "normal"
-      },
-      {
-        "name": "ram_usage",
-        "value": 0
-      },
-      {
-        "name": "ram_bucket",
-        "value": "normal"
-      },
-      {
-        "name": "ram_used_mb",
-        "value": 0
-      },
-      {
-        "name": "ram_total_mb",
-        "value": 0
-      },
-      {
-        "name": "gpu_available",
-        "value": false
-      },
-      {
-        "name": "gpu_usage",
-        "value": 0
-      },
-      {
-        "name": "gpu_bucket",
-        "value": "normal"
-      }
-    ],
-    "translations": "./translations.json",
-    "alerts": [
-      {
-        "title": "CPU Usage Alert",
-        "key": "cpu_alert",
-        "acceptedVariables": ["cpu_usage", "cpu_bucket"],
-        "defaultMessage": "CPU at {{cpu_usage}}% ({{cpu_bucket}})",
-        "variationConditions": [
-          {
-            "type": "EQUAL_SELECTION",
-            "description": "Bucket type",
-            "selections": [
-              { "label": "Warning", "value": "warning" },
-              { "label": "Critical", "value": "critical" }
-            ]
-          }
-        ]
-      },
-      {
-        "title": "RAM Usage Alert",
-        "key": "ram_alert",
-        "acceptedVariables": [
-          "ram_usage",
-          "ram_bucket",
-          "ram_used_mb",
-          "ram_total_mb"
-        ],
-        "defaultMessage": "RAM at {{ram_usage}}% ({{ram_bucket}})",
-        "variationConditions": [
-          {
-            "type": "EQUAL_SELECTION",
-            "description": "Bucket type",
-            "selections": [
-              { "label": "Warning", "value": "warning" },
-              { "label": "Critical", "value": "critical" }
-            ]
-          }
-        ]
-      },
-      {
-        "title": "GPU Usage Alert",
-        "key": "gpu_alert",
-        "acceptedVariables": ["gpu_usage", "gpu_bucket"],
-        "defaultMessage": "GPU at {{gpu_usage}}% ({{gpu_bucket}})",
-        "variationConditions": [
-          {
-            "type": "EQUAL_SELECTION",
-            "description": "Bucket type",
-            "selections": [
-              { "label": "Warning", "value": "warning" },
-              { "label": "Critical", "value": "critical" }
-            ]
-          }
-        ]
-      }
-    ]
-  }
+"id": "system_monitor",
+"name": "System Monitor",
+"version": "1.0.0",
+"author": "Lumia Stream",
+"email": "",
+"website": "",
+"repository": "",
+"description": "Monitor CPU, RAM, and GPU usage with variables and alerts.",
+"license": "MIT",
+"lumiaVersion": "^9.0.0",
+"category": "utilities",
+"main": "main.js",
+"icon": "system_monitor.png",
+"keywords": "system, cpu, ram, gpu, alerts",
+"config": {
+"settings": [
+{
+"key": "pollIntervalSec",
+"label": "Poll Interval (seconds)",
+"type": "number",
+"defaultValue": 30,
+"min": 10,
+"max": 120,
+"helperText": "How often to sample CPU/RAM/GPU usage."
+},
+{
+"key": "cpuWarn",
+"label": "CPU Warning Threshold (%)",
+"type": "number",
+"defaultValue": 70,
+"min": 1,
+"max": 99
+},
+{
+"key": "cpuCritical",
+"label": "CPU Critical Threshold (%)",
+"type": "number",
+"defaultValue": 90,
+"min": 1,
+"max": 100
+},
+{
+"key": "ramWarn",
+"label": "RAM Warning Threshold (%)",
+"type": "number",
+"defaultValue": 70,
+"min": 1,
+"max": 99
+},
+{
+"key": "ramCritical",
+"label": "RAM Critical Threshold (%)",
+"type": "number",
+"defaultValue": 90,
+"min": 1,
+"max": 100
+},
+{
+"key": "gpuWarn",
+"label": "GPU Warning Threshold (%)",
+"type": "number",
+"defaultValue": 70,
+"min": 1,
+"max": 99
+},
+{
+"key": "gpuCritical",
+"label": "GPU Critical Threshold (%)",
+"type": "number",
+"defaultValue": 90,
+"min": 1,
+"max": 100
+}
+],
+"variables": [
+{
+"name": "cpu_usage",
+"value": 0
+},
+{
+"name": "cpu_bucket",
+"value": "normal"
+},
+{
+"name": "ram_usage",
+"value": 0
+},
+{
+"name": "ram_bucket",
+"value": "normal"
+},
+{
+"name": "ram_used_mb",
+"value": 0
+},
+{
+"name": "ram_total_mb",
+"value": 0
+},
+{
+"name": "gpu_available",
+"value": false
+},
+{
+"name": "gpu_usage",
+"value": 0
+},
+{
+"name": "gpu_bucket",
+"value": "normal"
+}
+],
+"translations": "./translations.json",
+"alerts": [
+{
+"title": "CPU Usage Alert",
+"key": "cpu_alert",
+"acceptedVariables": ["cpu_usage", "cpu_bucket"],
+"defaultMessage": "CPU at {{cpu_usage}}% ({{cpu_bucket}})",
+"variationConditions": [
+{
+"type": "EQUAL_SELECTION",
+"description": "Bucket type",
+"selections": [
+{ "label": "Warning", "value": "warning" },
+{ "label": "Critical", "value": "critical" }
+]
+}
+]
+},
+{
+"title": "RAM Usage Alert",
+"key": "ram_alert",
+"acceptedVariables": [
+"ram_usage",
+"ram_bucket",
+"ram_used_mb",
+"ram_total_mb"
+],
+"defaultMessage": "RAM at {{ram_usage}}% ({{ram_bucket}})",
+"variationConditions": [
+{
+"type": "EQUAL_SELECTION",
+"description": "Bucket type",
+"selections": [
+{ "label": "Warning", "value": "warning" },
+{ "label": "Critical", "value": "critical" }
+]
+}
+]
+},
+{
+"title": "GPU Usage Alert",
+"key": "gpu_alert",
+"acceptedVariables": ["gpu_usage", "gpu_bucket"],
+"defaultMessage": "GPU at {{gpu_usage}}% ({{gpu_bucket}})",
+"variationConditions": [
+{
+"type": "EQUAL_SELECTION",
+"description": "Bucket type",
+"selections": [
+{ "label": "Warning", "value": "warning" },
+{ "label": "Critical", "value": "critical" }
+]
+}
+]
+}
+]
+}
 }
 
 ```
@@ -21075,16 +21159,17 @@ module.exports = SystemMonitorPlugin;
 ## system_monitor/package.json
 
 ```
+
 {
-	"name": "lumia-system-monitor-plugin",
-	"version": "1.0.0",
-	"description": "System monitor plugin for CPU/RAM/GPU usage with alerts.",
-	"main": "main.js",
-	"author": "Lumia Stream",
-	"license": "MIT",
-	"dependencies": {
-		"systeminformation": "^5.23.6"
-	}
+"name": "lumia-system-monitor-plugin",
+"version": "1.0.0",
+"description": "System monitor plugin for CPU/RAM/GPU usage with alerts.",
+"main": "main.js",
+"author": "Lumia Stream",
+"license": "MIT",
+"dependencies": {
+"systeminformation": "^5.23.6"
+}
 }
 
 ```
@@ -21092,20 +21177,21 @@ module.exports = SystemMonitorPlugin;
 ## system_monitor/translations.json
 
 ```
+
 {
-  "en": {
-    "variables": {
-      "cpu_usage": "Current CPU usage percent.",
-      "cpu_bucket": "Current CPU bucket: normal, warning, critical.",
-      "ram_usage": "Current RAM usage percent.",
-      "ram_bucket": "Current RAM bucket: normal, warning, critical.",
-      "ram_used_mb": "Current RAM used (MB).",
-      "ram_total_mb": "Total RAM (MB).",
-      "gpu_available": "Whether GPU usage is available.",
-      "gpu_usage": "Current GPU usage percent (if available).",
-      "gpu_bucket": "Current GPU bucket: normal, warning, critical."
-    }
-  }
+"en": {
+"variables": {
+"cpu_usage": "Current CPU usage percent.",
+"cpu_bucket": "Current CPU bucket: normal, warning, critical.",
+"ram_usage": "Current RAM usage percent.",
+"ram_bucket": "Current RAM bucket: normal, warning, critical.",
+"ram_used_mb": "Current RAM used (MB).",
+"ram_total_mb": "Total RAM (MB).",
+"gpu_available": "Whether GPU usage is available.",
+"gpu_usage": "Current GPU usage percent (if available).",
+"gpu_bucket": "Current GPU bucket: normal, warning, critical."
+}
+}
 }
 
 ```
@@ -21113,8 +21199,11 @@ module.exports = SystemMonitorPlugin;
 ## trovo/actions_tutorial.md
 
 ```
+
 ---
+
 ### Actions
+
 - **Send Chat Message**: post a message to Trovo chat.
 - **Update Live Title**: update your Trovo stream title via channel API.
 - **Update Category**: find the closest Trovo category from your text and update it.
@@ -21122,6 +21211,7 @@ module.exports = SystemMonitorPlugin;
 - **Unhost Channel**: run `/unhost` command.
 - **Set Title (Command)**: run `/settitle title` command.
 - **Trigger Alert**: fire one Trovo alert manually for testing.
+
 ---
 
 ```
@@ -21129,6 +21219,7 @@ module.exports = SystemMonitorPlugin;
 ## trovo/main.js
 
 ```
+
 const { Plugin } = require("@lumiastream/plugin");
 const WebSocket = require("ws");
 
@@ -21149,3486 +21240,3486 @@ const STARTUP_BACKFILL_TOLERANCE_SECONDS = 2;
 const MAX_TRACKED_CHAT_IDS = 2000;
 const HTTP_REQUEST_TIMEOUT_MS = 15000;
 const TROVO_BADGE_TOKEN_URLS = {
-	broadcaster:
-		"https://static.trovo.live/imgupload/application/20200423_yp9vmkduxdBroadcaster.png?imageView2/2/format/webp&max_age=31536000",
-	creator:
-		"https://static.trovo.live/imgupload/application/20200423_yp9vmkduxdBroadcaster.png?imageView2/2/format/webp&max_age=31536000",
-	owner:
-		"https://static.trovo.live/imgupload/application/20200423_yp9vmkduxdBroadcaster.png?imageView2/2/format/webp&max_age=31536000",
-	streamer:
-		"https://static.trovo.live/imgupload/application/20200423_yp9vmkduxdBroadcaster.png?imageView2/2/format/webp&max_age=31536000",
+broadcaster:
+"https://static.trovo.live/imgupload/application/20200423_yp9vmkduxdBroadcaster.png?imageView2/2/format/webp&max_age=31536000",
+creator:
+"https://static.trovo.live/imgupload/application/20200423_yp9vmkduxdBroadcaster.png?imageView2/2/format/webp&max_age=31536000",
+owner:
+"https://static.trovo.live/imgupload/application/20200423_yp9vmkduxdBroadcaster.png?imageView2/2/format/webp&max_age=31536000",
+streamer:
+"https://static.trovo.live/imgupload/application/20200423_yp9vmkduxdBroadcaster.png?imageView2/2/format/webp&max_age=31536000",
 };
 
 const CHAT_TYPE_IDS = {
-	NORMAL_CHAT: 0,
-	SPELLS: 5,
-	SUPER_CAP_CHAT: 6,
-	COLORFUL_CHAT: 7,
-	SPELL_CHAT: 8,
-	BULLET_SCREEN_CHAT: 9,
-	SUBSCRIBER: 5001,
-	SYSTEM_MESSAGE: 5002,
-	FOLLOWER: 5003,
-	WELCOME_VIEWER: 5004,
-	GIFT_SUB_BASIC: 5005,
-	INDIVIDUAL_GIFT_SUB: 5006,
-	ACTIVITY_EVENT: 5007,
-	WELCOME_RAID_VIEWER: 5008,
-	CUSTOM_SPELL: 5009,
-	STREAM_ONLINE_OFFLINE: 5012,
-	UNFOLLOWER: 5013,
+NORMAL_CHAT: 0,
+SPELLS: 5,
+SUPER_CAP_CHAT: 6,
+COLORFUL_CHAT: 7,
+SPELL_CHAT: 8,
+BULLET_SCREEN_CHAT: 9,
+SUBSCRIBER: 5001,
+SYSTEM_MESSAGE: 5002,
+FOLLOWER: 5003,
+WELCOME_VIEWER: 5004,
+GIFT_SUB_BASIC: 5005,
+INDIVIDUAL_GIFT_SUB: 5006,
+ACTIVITY_EVENT: 5007,
+WELCOME_RAID_VIEWER: 5008,
+CUSTOM_SPELL: 5009,
+STREAM_ONLINE_OFFLINE: 5012,
+UNFOLLOWER: 5013,
 };
 
 const CHAT_MESSAGE_TYPES = new Set([
-	CHAT_TYPE_IDS.NORMAL_CHAT,
-	CHAT_TYPE_IDS.SUPER_CAP_CHAT,
-	CHAT_TYPE_IDS.COLORFUL_CHAT,
-	CHAT_TYPE_IDS.SPELL_CHAT,
-	CHAT_TYPE_IDS.BULLET_SCREEN_CHAT,
+CHAT_TYPE_IDS.NORMAL_CHAT,
+CHAT_TYPE_IDS.SUPER_CAP_CHAT,
+CHAT_TYPE_IDS.COLORFUL_CHAT,
+CHAT_TYPE_IDS.SPELL_CHAT,
+CHAT_TYPE_IDS.BULLET_SCREEN_CHAT,
 ]);
 
 const ALERT_KEYS = {
-	streamLive: "streamLive",
-	streamOffline: "streamOffline",
-	firstChatter: "firstChatter",
-	entrance: "entrance",
-	channelJoin: "channelJoin",
-	follower: "follower",
-	subscriber: "subscriber",
-	subscriptionGift: "subscriptionGift",
-	raid: "raid",
-	spell: "spell",
+streamLive: "streamLive",
+streamOffline: "streamOffline",
+firstChatter: "firstChatter",
+entrance: "entrance",
+channelJoin: "channelJoin",
+follower: "follower",
+subscriber: "subscriber",
+subscriptionGift: "subscriptionGift",
+raid: "raid",
+spell: "spell",
 };
 
 const VALID_ALERT_KEYS = new Set(Object.values(ALERT_KEYS));
 
 const VARIABLE_NAMES = {
-	uptime: "uptime",
-	live: "live",
-	sessionChatCount: "session_chat_count",
-	lastFollower: "last_follower",
-	currentFirstChatter: "current_first_chatter",
-	currentFirstChatterCount: "current_first_chatter_count",
-	previousFirstChatter: "previous_first_chatter",
-	previousFirstChatterCount: "previous_first_chatter_count",
-	lastChatter: "last_chatter",
-	lastRaider: "last_raider",
-	lastRaidAmount: "last_raid_amount",
-	sessionFollowerCount: "session_follower_count",
-	sessionSubscribersCount: "session_subscribers_count",
-	sessionRaiders: "session_raiders",
-	lastSubscriber: "last_subscriber",
-	sessionSubscribers: "session_subscribers",
-	channelId: "channel_id",
-	username: "username",
-	displayName: "display_name",
-	lastSpell: "last_spell",
-	lastSpellAmount: "last_spell_amount",
-	lastSpellValue: "last_spell_value",
-	lastMessage: "last_message",
-	lastMessageId: "last_message_id",
-	lastEventAt: "last_event_at",
+uptime: "uptime",
+live: "live",
+sessionChatCount: "session_chat_count",
+lastFollower: "last_follower",
+currentFirstChatter: "current_first_chatter",
+currentFirstChatterCount: "current_first_chatter_count",
+previousFirstChatter: "previous_first_chatter",
+previousFirstChatterCount: "previous_first_chatter_count",
+lastChatter: "last_chatter",
+lastRaider: "last_raider",
+lastRaidAmount: "last_raid_amount",
+sessionFollowerCount: "session_follower_count",
+sessionSubscribersCount: "session_subscribers_count",
+sessionRaiders: "session_raiders",
+lastSubscriber: "last_subscriber",
+sessionSubscribers: "session_subscribers",
+channelId: "channel_id",
+username: "username",
+displayName: "display_name",
+lastSpell: "last_spell",
+lastSpellAmount: "last_spell_amount",
+lastSpellValue: "last_spell_value",
+lastMessage: "last_message",
+lastMessageId: "last_message_id",
+lastEventAt: "last_event_at",
 };
 
 const VARIABLE_DEFAULTS = {
-	[VARIABLE_NAMES.uptime]: "",
-	[VARIABLE_NAMES.live]: false,
-	[VARIABLE_NAMES.sessionChatCount]: 0,
-	[VARIABLE_NAMES.lastFollower]: "",
-	[VARIABLE_NAMES.currentFirstChatter]: "",
-	[VARIABLE_NAMES.currentFirstChatterCount]: 0,
-	[VARIABLE_NAMES.previousFirstChatter]: "",
-	[VARIABLE_NAMES.previousFirstChatterCount]: 0,
-	[VARIABLE_NAMES.lastChatter]: "",
-	[VARIABLE_NAMES.lastRaider]: "",
-	[VARIABLE_NAMES.lastRaidAmount]: 0,
-	[VARIABLE_NAMES.sessionFollowerCount]: 0,
-	[VARIABLE_NAMES.sessionSubscribersCount]: 0,
-	[VARIABLE_NAMES.sessionRaiders]: "",
-	[VARIABLE_NAMES.lastSubscriber]: "",
-	[VARIABLE_NAMES.sessionSubscribers]: "",
-	[VARIABLE_NAMES.channelId]: "",
-	[VARIABLE_NAMES.username]: "",
-	[VARIABLE_NAMES.displayName]: "",
-	[VARIABLE_NAMES.lastSpell]: "",
-	[VARIABLE_NAMES.lastSpellAmount]: 0,
-	[VARIABLE_NAMES.lastSpellValue]: 0,
-	[VARIABLE_NAMES.lastMessage]: "",
-	[VARIABLE_NAMES.lastMessageId]: "",
-	[VARIABLE_NAMES.lastEventAt]: "",
+[VARIABLE_NAMES.uptime]: "",
+[VARIABLE_NAMES.live]: false,
+[VARIABLE_NAMES.sessionChatCount]: 0,
+[VARIABLE_NAMES.lastFollower]: "",
+[VARIABLE_NAMES.currentFirstChatter]: "",
+[VARIABLE_NAMES.currentFirstChatterCount]: 0,
+[VARIABLE_NAMES.previousFirstChatter]: "",
+[VARIABLE_NAMES.previousFirstChatterCount]: 0,
+[VARIABLE_NAMES.lastChatter]: "",
+[VARIABLE_NAMES.lastRaider]: "",
+[VARIABLE_NAMES.lastRaidAmount]: 0,
+[VARIABLE_NAMES.sessionFollowerCount]: 0,
+[VARIABLE_NAMES.sessionSubscribersCount]: 0,
+[VARIABLE_NAMES.sessionRaiders]: "",
+[VARIABLE_NAMES.lastSubscriber]: "",
+[VARIABLE_NAMES.sessionSubscribers]: "",
+[VARIABLE_NAMES.channelId]: "",
+[VARIABLE_NAMES.username]: "",
+[VARIABLE_NAMES.displayName]: "",
+[VARIABLE_NAMES.lastSpell]: "",
+[VARIABLE_NAMES.lastSpellAmount]: 0,
+[VARIABLE_NAMES.lastSpellValue]: 0,
+[VARIABLE_NAMES.lastMessage]: "",
+[VARIABLE_NAMES.lastMessageId]: "",
+[VARIABLE_NAMES.lastEventAt]: "",
 };
 
 class TrovoPlugin extends Plugin {
-	constructor(manifest, context) {
-		super(manifest, context);
-		this._ws = null;
-		this._connectPromise = null;
-		this._tokenRefreshPromise = null;
-		this._heartbeatTimer = null;
-		this._reconnectTimer = null;
-		this._manualStop = false;
-		this._reconnectAttempts = 0;
-		this._nonceCounter = 1;
-		this._pendingRequests = new Map();
-		this._lastConnectionState = null;
-		this._variableCache = new Map();
-		this._connectedAtMs = 0;
-		this._startupSuppressUntilMs = 0;
-		this._recentChatIds = new Set();
-		this._recentChatIdOrder = [];
-		this._chatMessageAuthors = new Map();
-		this._chatMessageAuthorOrder = [];
-		this._emoteLookup = new Map();
-		this._authRefreshFailureHandled = false;
-		this._state = this._createRuntimeState();
-	}
-
-	_createRuntimeState() {
-		return {
-			live: false,
-			uptimeStartedAt: 0,
-			channelId: "",
-			userId: "",
-			username: "",
-			displayName: "",
-			sessionChatCount: 0,
-			sessionFollowerCount: 0,
-			sessionSubscribersCount: 0,
-			sessionRaiders: [],
-			sessionSubscribers: [],
-			currentFirstChatter: "",
-			currentFirstChatterCount: 0,
-			previousFirstChatter: "",
-			previousFirstChatterCount: 0,
-			sessionSeenUsers: new Set(),
-			sessionJoinedUsers: new Set(),
-		};
-	}
-
-	async onload() {
-		await this._hydrateVariableDefaults();
-
-		if (this._hasCredentials(this.settings)) {
-			await this._connect();
-		} else {
-			await this._updateConnectionState(false);
-		}
-	}
-
-	async onunload() {
-		await this._stop({ manual: true, resetLiveState: true });
-	}
-
-	async onsettingsupdate(settings, previous = {}) {
-		const hasNow = this._hasCredentials(settings);
-		const hadBefore = this._hasCredentials(previous);
-
-		if (!hasNow) {
-			await this._stop({ manual: true, resetLiveState: true });
-			return;
-		}
-
-		if (!hadBefore) {
-			this._manualStop = false;
-			await this._connect();
-			return;
-		}
-
-		if (this._requiresReconnect(settings, previous)) {
-			await this._reconnect();
-		}
-	}
-
-	async validateAuth(data = {}) {
-		const credentials = this._resolveCredentials(data);
-		if (!this._hasCredentials(credentials)) {
-			return {
-				ok: false,
-				message: "OAuth tokens are required. Authorize the plugin first.",
-			};
-		}
-
-		try {
-			const profile = await this._fetchProfile(credentials, { persist: false });
-			await this._fetchChatToken(credentials, { persist: false });
-			const username = this._string(
-				profile?.username || profile?.displayName || profile?.channelId,
-				"Trovo user",
-			);
-			return { ok: true, message: `Validated as ${username}.` };
-		} catch (error) {
-			return {
-				ok: false,
-				message: this._errorMessage(error),
-			};
-		}
-	}
-
-	async actions(config = {}) {
-		const actions = Array.isArray(config.actions) ? config.actions : [];
-		for (const action of actions) {
-			if (!action || action.on === false) {
-				continue;
-			}
-
-			switch (action.type) {
-				case "send_chat":
-					await this._runSendChatAction(action.value);
-					break;
-				case "update_live_title":
-					await this._runUpdateLiveTitleAction(action.value);
-					break;
-				case "update_category":
-					await this._runUpdateCategoryAction(action.value);
-					break;
-				case "host_channel":
-					await this._runHostChannelAction(action.value);
-					break;
-				case "unhost_channel":
-					await this._runUnhostChannelAction();
-					break;
-				case "set_title_command":
-					await this._runSetTitleCommandAction(action.value);
-					break;
-				case "trigger_alert":
-					await this._runTriggerAlertAction(action.value);
-					break;
-				default:
-					break;
-			}
-		}
-	}
-
-	async chatbot(config = {}) {
-		const message = this._string(config?.message, "").trim();
-		if (!message) {
-			return false;
-		}
-
-		const credentials = this._resolveCredentials(this.settings);
-		await this._sendTrovoChatMessage(message, credentials);
-		return true;
-	}
-
-	async modCommand(type, value = {}) {
-		const commandType = this._string(type, "").trim().toLowerCase();
-		const username = this._normalizeCommandUsername(value?.username);
-		const credentials = this._resolveCredentials(this.settings);
-		const rawMessage = this._string(value?.message, "").trim();
-		const duration = this._parseInteger(value?.duration, 10);
-
-		try {
-			switch (commandType) {
-				case "delete": {
-					const messageId = rawMessage;
-					if (!messageId) {
-						await this._log("Delete message skipped: missing message ID", "warn");
-						return false;
-					}
-					const uid = this._resolveDeleteMessageUid(messageId, username);
-					if (!uid) {
-						await this._log(
-							`Delete message skipped: unable to resolve user ID for message "${messageId}"`,
-							"warn",
-						);
-						return false;
-					}
-					await this._deleteChatMessage(messageId, uid, credentials);
-					return true;
-				}
-				case "add-moderator":
-					if (!username) {
-						await this._log("Add moderator skipped: missing username", "warn");
-						return false;
-					}
-					await this._performChatCommand(`mod ${username}`, credentials);
-					return true;
-				case "remove-moderator":
-					if (!username) {
-						await this._log(
-							"Remove moderator skipped: missing username",
-							"warn",
-						);
-						return false;
-					}
-					await this._performChatCommand(`unmod ${username}`, credentials);
-					return true;
-				case "ban":
-					if (!username) {
-						await this._log("Ban skipped: missing username", "warn");
-						return false;
-					}
-					await this._performChatCommand(`ban ${username}`, credentials);
-					return true;
-				case "timeout": {
-					if (!username) {
-						await this._log("Timeout skipped: missing username", "warn");
-						return false;
-					}
-					const timeoutDuration = Math.max(1, duration);
-					await this._performChatCommand(
-						`ban ${username} ${timeoutDuration}`,
-						credentials,
-					);
-					return true;
-				}
-				case "unban":
-					if (!username) {
-						await this._log("Unban skipped: missing username", "warn");
-						return false;
-					}
-					await this._performChatCommand(`unban ${username}`, credentials);
-					return true;
-				default:
-					await this._log(`Unsupported mod command type "${commandType}"`, "warn");
-					return false;
-			}
-		} catch (error) {
-			await this._log(
-				`Mod command "${commandType || "unknown"}" failed: ${this._errorMessage(
-					error,
-				)}`,
-				"error",
-			);
-			throw error;
-		}
-	}
-
-	async variableFunction({ key } = {}) {
-		if (key !== VARIABLE_NAMES.uptime) {
-			return "";
-		}
-
-		if (!this._state.live || !this._state.uptimeStartedAt) {
-			return "Is not live";
-		}
-
-		return this._formatDuration(Date.now() - this._state.uptimeStartedAt);
-	}
-
-	async _runSendChatAction(raw = {}) {
-		const message = this._string(raw?.message, "").trim();
-		if (!message) {
-			return;
-		}
-
-		try {
-			await this.chatbot({ message });
-		} catch (error) {
-			await this._log(
-				`[Trovo] Failed to send chatbot message: ${this._errorMessage(error)}`,
-				"warn",
-			);
-		}
-	}
-
-	async _runTriggerAlertAction(raw = {}) {
-		const requestedAlert = this._string(raw?.alertKey, ALERT_KEYS.follower);
-		const alert = VALID_ALERT_KEYS.has(requestedAlert)
-			? requestedAlert
-			: ALERT_KEYS.follower;
-		const username = this._string(
-			raw?.username,
-			this._state.username || "trovo",
-		);
-		const value = this._string(raw?.value, username || "1");
-
-		await this._triggerAlert(alert, {
-			dynamic: {
-				name: username,
-				value,
-			},
-			extraSettings: this._buildAlertExtraSettings({}, username, {
-				name: username,
-				value,
-				test: true,
-			}),
-		});
-	}
-
-	async _runUpdateLiveTitleAction(raw = {}) {
-		const liveTitle = this._string(raw?.liveTitle || raw?.title, "");
-		if (!liveTitle.trim()) {
-			return;
-		}
-
-		try {
-			const credentials = this._resolveCredentials(this.settings);
-			await this._updateChannelInfo(
-				{
-					live_title: liveTitle,
-				},
-				credentials,
-			);
-			await this._log(`[Trovo] Updated live title to "${liveTitle}"`);
-		} catch (error) {
-			await this._log(
-				`[Trovo] Failed to update live title: ${this._errorMessage(error)}`,
-				"warn",
-			);
-		}
-	}
-
-	async _runUpdateCategoryAction(raw = {}) {
-		const query = this._string(
-			raw?.category || raw?.categoryQuery || raw?.query,
-			"",
-		).trim();
-		if (!query) {
-			return;
-		}
-
-		try {
-			const credentials = this._resolveCredentials(this.settings);
-			const best = await this._findBestCategoryMatch(query);
-			await this._updateChannelInfo(
-				{
-					category_id: this._string(best?.id, ""),
-				},
-				credentials,
-			);
-			await this._log(
-				`[Trovo] Updated category to "${best?.name || "Unknown"}" (${best?.id || "?"}) from query "${query}"`,
-			);
-		} catch (error) {
-			await this._log(
-				`[Trovo] Failed to update category from "${query}": ${this._errorMessage(error)}`,
-				"warn",
-			);
-		}
-	}
-
-	async _runHostChannelAction(raw = {}) {
-		const username = this._normalizeCommandUsername(
-			raw?.username || raw?.channel || raw?.target,
-		);
-		if (!username) {
-			return;
-		}
-
-		try {
-			const credentials = this._resolveCredentials(this.settings);
-			await this._performChatCommand(`host ${username}`, credentials);
-			await this._log(`[Trovo] Host command sent for "${username}"`);
-		} catch (error) {
-			await this._log(
-				`[Trovo] Failed to host "${username}": ${this._errorMessage(error)}`,
-				"warn",
-			);
-		}
-	}
-
-	async _runUnhostChannelAction() {
-		try {
-			const credentials = this._resolveCredentials(this.settings);
-			await this._performChatCommand("unhost", credentials);
-			await this._log("[Trovo] Unhost command sent");
-		} catch (error) {
-			await this._log(
-				`[Trovo] Failed to unhost: ${this._errorMessage(error)}`,
-				"warn",
-			);
-		}
-	}
-
-	async _runSetTitleCommandAction(raw = {}) {
-		const title = this._string(raw?.title || raw?.liveTitle, "").trim();
-		if (!title) {
-			return;
-		}
-
-		try {
-			const credentials = this._resolveCredentials(this.settings);
-			await this._performChatCommand(`settitle ${title}`, credentials);
-			await this._log(`[Trovo] Set title command sent: "${title}"`);
-		} catch (error) {
-			await this._log(
-				`[Trovo] Failed to send set title command: ${this._errorMessage(
-					error,
-				)}`,
-				"warn",
-			);
-		}
-	}
-
-	async _connect() {
-		if (this._manualStop) {
-			return;
-		}
-
-		if (this._connectPromise) {
-			return this._connectPromise;
-		}
-
-		this._connectPromise = (async () => {
-			const credentials = this._resolveCredentials(this.settings);
-			if (!this._hasCredentials(credentials)) {
-				await this._updateConnectionState(false);
-				return;
-			}
-
-			this._manualStop = false;
-			this._authRefreshFailureHandled = false;
-			await this._closeSocket();
-			this._stopHeartbeat();
-			this._rejectPendingRequests(new Error("Trovo reconnecting"));
-
-			try {
-				const profile = await this._fetchProfile(credentials);
-				await this._applyResolvedProfile(profile);
-				await this._refreshEmoteLookup();
-
-				const chatToken = await this._fetchChatToken(credentials);
-				await this._openSocket(chatToken);
-				this._reconnectAttempts = 0;
-			} catch (error) {
-				await this._updateConnectionState(false);
-				await this._log(
-					`[Trovo] Connection failed: ${this._errorMessage(error)}`,
-					"warn",
-				);
-				this._scheduleReconnect();
-			}
-		})().finally(() => {
-			this._connectPromise = null;
-		});
-
-		return this._connectPromise;
-	}
-
-	async _reconnect() {
-		this._manualStop = true;
-		await this._closeSocket();
-		this._stopHeartbeat();
-		this._rejectPendingRequests(new Error("Trovo reconnect requested"));
-		this._manualStop = false;
-		await this._connect();
-	}
-
-	async _stop({ manual = true, resetLiveState = false } = {}) {
-		this._manualStop = manual;
-		this._clearReconnectTimer();
-		this._stopHeartbeat();
-		this._rejectPendingRequests(new Error("Trovo stopped"));
-		await this._closeSocket();
-		await this._updateConnectionState(false);
-
-		if (resetLiveState) {
-			this._state.live = false;
-			this._state.uptimeStartedAt = 0;
-			await this._setVariable(VARIABLE_NAMES.live, false);
-			await this._setVariable(VARIABLE_NAMES.uptime, "");
-		}
-	}
-
-	async _openSocket(chatToken) {
-		const ws = new WebSocket(TROVO_CHAT_WS_URL);
-		this._ws = ws;
-
-		const timeoutMs = this._connectionTimeoutMs();
-		await new Promise((resolve, reject) => {
-			let settled = false;
-			let authenticated = false;
-
-			const complete = (fn, value) => {
-				if (settled) {
-					return;
-				}
-				settled = true;
-				clearTimeout(timeoutId);
-				fn(value);
-			};
-
-			const timeoutId = setTimeout(() => {
-				complete(reject, new Error("Trovo websocket connection timed out"));
-				try {
-					ws.terminate();
-				} catch {
-					try {
-						ws.close();
-					} catch {}
-				}
-			}, timeoutMs);
-
-			ws.on("open", async () => {
-				try {
-					await this._sendSocket(
-						{
-							type: "AUTH",
-							data: { token: chatToken },
-						},
-						{ awaitResponse: true, timeoutMs: 10000 },
-					);
-
-					this._markStartupBoundary();
-					authenticated = true;
-					await this._updateConnectionState(true);
-					this._startHeartbeat();
-					complete(resolve);
-				} catch (error) {
-					complete(reject, error);
-					try {
-						ws.close();
-					} catch {}
-				}
-			});
-
-			ws.on("message", (raw) => {
-				void this._handleSocketMessage(raw);
-			});
-
-			ws.on("error", (error) => {
-				if (!authenticated) {
-					complete(reject, error);
-				}
-				void this._log(
-					`[Trovo] Websocket error: ${this._errorMessage(error)}`,
-					"warn",
-				);
-			});
-
-			ws.on("close", (code, reasonBuffer) => {
-				const reason = this._socketReason(reasonBuffer);
-				void this._handleSocketClose(ws, code, reason);
-				if (!authenticated) {
-					complete(
-						reject,
-						new Error(`Trovo websocket closed before auth (${code})`),
-					);
-				}
-			});
-		});
-	}
-
-	async _handleSocketClose(socket, code, reason) {
-		if (socket !== this._ws) {
-			return;
-		}
-
-		this._ws = null;
-		this._stopHeartbeat();
-		this._rejectPendingRequests(
-			new Error(
-				`Trovo websocket closed (${code}${reason ? `: ${reason}` : ""})`,
-			),
-		);
-		await this._updateConnectionState(false);
-
-		if (this._manualStop) {
-			return;
-		}
-
-		await this._log(
-			`[Trovo] Socket closed (${code}${reason ? `: ${reason}` : ""}), scheduling reconnect`,
-			"warn",
-		);
-		this._scheduleReconnect();
-	}
-
-	_scheduleReconnect() {
-		if (this._manualStop || this._reconnectTimer) {
-			return;
-		}
-
-		const attempt = this._reconnectAttempts;
-		const baseDelay = this._reconnectDelaySeconds();
-		const multiplier = Math.min(16, 2 ** attempt);
-		const delaySeconds = Math.min(
-			MAX_RECONNECT_DELAY_SECONDS,
-			Math.max(1, baseDelay * multiplier),
-		);
-		this._reconnectAttempts += 1;
-
-		this._reconnectTimer = setTimeout(() => {
-			this._reconnectTimer = null;
-			if (this._manualStop) {
-				return;
-			}
-			void this._connect();
-		}, delaySeconds * 1000);
-	}
-
-	_clearReconnectTimer() {
-		if (!this._reconnectTimer) {
-			return;
-		}
-		clearTimeout(this._reconnectTimer);
-		this._reconnectTimer = null;
-	}
-
-	_startHeartbeat() {
-		this._stopHeartbeat();
-		const intervalMs = this._heartbeatMs();
-		this._heartbeatTimer = setInterval(() => {
-			void this._sendSocket({ type: "PING" }).catch(() => {});
-		}, intervalMs);
-		void this._sendSocket({ type: "PING" }).catch(() => {});
-	}
-
-	_stopHeartbeat() {
-		if (!this._heartbeatTimer) {
-			return;
-		}
-		clearInterval(this._heartbeatTimer);
-		this._heartbeatTimer = null;
-	}
-
-	async _closeSocket() {
-		const ws = this._ws;
-		if (!ws) {
-			return;
-		}
-
-		this._ws = null;
-
-		try {
-			if (
-				ws.readyState === WebSocket.OPEN ||
-				ws.readyState === WebSocket.CONNECTING
-			) {
-				ws.close(1000, "manual close");
-			}
-		} catch {}
-	}
-
-	async _handleSocketMessage(raw) {
-		const messageText = this._socketMessageToString(raw);
-		if (!messageText) {
-			return;
-		}
-
-		let payload;
-		try {
-			payload = JSON.parse(messageText);
-		} catch {
-			return;
-		}
-
-		if (payload?.nonce) {
-			const nonce = this._string(payload.nonce, "");
-			if (nonce && this._pendingRequests.has(nonce)) {
-				const pending = this._pendingRequests.get(nonce);
-				this._pendingRequests.delete(nonce);
-				clearTimeout(pending.timeout);
-				if (this._isErrorResponse(payload)) {
-					pending.reject(new Error(this._responseError(payload)));
-				} else {
-					pending.resolve(payload);
-				}
-				return;
-			}
-		}
-
-		const type = this._string(payload?.type, "").toUpperCase();
-		if (type === "PING") {
-			void this._sendSocket({ type: "pong" }).catch(() => {});
-			return;
-		}
-
-		if (type !== "CHAT") {
-			return;
-		}
-
-		const chats = Array.isArray(payload?.data?.chats) ? payload.data.chats : [];
-		for (const chat of chats) {
-			if (this._isDuplicateChat(chat)) {
-				continue;
-			}
-			await this._handleChatEvent(chat);
-		}
-	}
-
-	async _handleChatEvent(chat) {
-		const suppressEvent = this._shouldSuppressStartupEvent(chat);
-		const typeId = this._number(chat?.type, -1);
-		switch (typeId) {
-			case CHAT_TYPE_IDS.STREAM_ONLINE_OFFLINE:
-				await this._handleStreamOnlineOffline(chat, {
-					suppressAlert: suppressEvent,
-				});
-				return;
-			case CHAT_TYPE_IDS.FOLLOWER:
-				if (suppressEvent) return;
-				await this._handleFollower(chat);
-				return;
-			case CHAT_TYPE_IDS.SUBSCRIBER:
-				if (suppressEvent) return;
-				await this._handleSubscriber(chat);
-				return;
-			case CHAT_TYPE_IDS.GIFT_SUB_BASIC:
-				if (suppressEvent) return;
-				await this._handleGiftSubBasic(chat);
-				return;
-			case CHAT_TYPE_IDS.INDIVIDUAL_GIFT_SUB:
-				if (suppressEvent) return;
-				await this._handleIndividualGiftSub(chat);
-				return;
-			case CHAT_TYPE_IDS.WELCOME_VIEWER:
-				if (suppressEvent) return;
-				await this._handleChannelJoin(chat);
-				return;
-			case CHAT_TYPE_IDS.WELCOME_RAID_VIEWER:
-				if (suppressEvent) return;
-				await this._handleRaid(chat);
-				return;
-			case CHAT_TYPE_IDS.SPELLS:
-			case CHAT_TYPE_IDS.CUSTOM_SPELL:
-				if (suppressEvent) return;
-				if (this._includeSpells()) {
-					await this._handleSpell(chat);
-				}
-				return;
-			default:
-				break;
-		}
-
-		if (CHAT_MESSAGE_TYPES.has(typeId)) {
-			if (suppressEvent) return;
-			await this._handleChatMessage(chat);
-		}
-	}
-
-	async _handleStreamOnlineOffline(chat, { suppressAlert = false } = {}) {
-		const nextLive = this._resolveStreamLiveState(chat);
-		const streamStatus = this._string(
-			chat?.content_data?.status || chat?.content_data?.stream_status,
-			"",
-		).trim();
-		if (nextLive === null) {
-			return;
-		}
-		if (nextLive === this._state.live) {
-			return;
-		}
-
-		if (nextLive) {
-			await this._handleStreamStarted(chat, { suppressAlert });
-			return;
-		}
-
-		await this._handleStreamEnded(chat, { suppressAlert });
-	}
-
-	_resolveStreamLiveState(chat) {
-		const content = this._string(chat?.content, "").trim().toLowerCase();
-		const contentState = this._resolveLiveStateToken(content);
-		if (contentState !== null) {
-			return contentState;
-		}
-
-		const contentData =
-			chat && typeof chat.content_data === "object" && chat.content_data
-				? chat.content_data
-				: {};
-		const liveKeys = [
-			contentData.is_live,
-			contentData.live,
-			contentData.live_status,
-			contentData.stream_live,
-		];
-		for (const value of liveKeys) {
-			const parsed = this._resolveLiveStateValue(value);
-			if (parsed !== null) {
-				return parsed;
-			}
-		}
-
-		const status = this._string(
-			contentData.status || contentData.stream_status,
-			"",
-		)
-			.trim()
-			.toLowerCase();
-		const statusState = this._resolveLiveStateToken(status);
-		if (statusState !== null) {
-			return statusState;
-		}
-
-		const topLevelState = this._resolveLiveStateValue(
-			chat?.is_live ?? chat?.live,
-		);
-		if (topLevelState !== null) {
-			return topLevelState;
-		}
-
-		return null;
-	}
-
-	_resolveLiveStateToken(raw = "") {
-		const token = this._string(raw, "").trim().toLowerCase();
-		if (!token) {
-			return null;
-		}
-
-		if (
-			token === "stream_on" ||
-			token === "online" ||
-			token === "live" ||
-			token.includes("go_live") ||
-			token.includes("stream_online") ||
-			token.includes("live_start")
-		) {
-			return true;
-		}
-
-		if (
-			token === "stream_off" ||
-			token === "offline" ||
-			token.includes("stream_off") ||
-			token.includes("stream_offline") ||
-			token.includes("stream_end") ||
-			token.includes("live_end")
-		) {
-			return false;
-		}
-
-		return null;
-	}
-
-	_resolveLiveStateValue(value) {
-		if (typeof value === "boolean") {
-			return value;
-		}
-		if (typeof value === "number") {
-			if (value === 1) return true;
-			if (value === 0) return false;
-			return null;
-		}
-		if (typeof value === "string") {
-			const normalized = value.trim().toLowerCase();
-			if (["1", "true", "yes", "on", "live", "online"].includes(normalized)) {
-				return true;
-			}
-			if (
-				["0", "false", "no", "off", "offline", "stream_off"].includes(
-					normalized,
-				)
-			) {
-				return false;
-			}
-			return this._resolveLiveStateToken(normalized);
-		}
-		return null;
-	}
-
-	async _handleStreamStarted(chat, { suppressAlert = false } = {}) {
-		if (this._state.currentFirstChatter) {
-			this._state.previousFirstChatter = this._state.currentFirstChatter;
-			this._state.previousFirstChatterCount =
-				this._state.currentFirstChatterCount;
-		}
-
-		this._state.currentFirstChatter = "";
-		this._state.currentFirstChatterCount = 0;
-		this._state.sessionSeenUsers.clear();
-		this._state.sessionJoinedUsers.clear();
-		this._state.sessionChatCount = 0;
-		this._state.sessionFollowerCount = 0;
-		this._state.sessionSubscribersCount = 0;
-		this._state.sessionRaiders = [];
-		this._state.sessionSubscribers = [];
-		this._state.live = true;
-		this._state.uptimeStartedAt = Date.now();
-
-		await Promise.all([
-			this._setVariable(VARIABLE_NAMES.live, true),
-			this._setVariable(
-				VARIABLE_NAMES.previousFirstChatter,
-				this._state.previousFirstChatter,
-			),
-			this._setVariable(
-				VARIABLE_NAMES.previousFirstChatterCount,
-				this._state.previousFirstChatterCount,
-			),
-			this._setVariable(VARIABLE_NAMES.currentFirstChatter, ""),
-			this._setVariable(VARIABLE_NAMES.currentFirstChatterCount, 0),
-			this._setVariable(VARIABLE_NAMES.sessionChatCount, 0),
-			this._setVariable(VARIABLE_NAMES.sessionFollowerCount, 0),
-			this._setVariable(VARIABLE_NAMES.sessionSubscribersCount, 0),
-			this._setVariable(VARIABLE_NAMES.sessionRaiders, ""),
-			this._setVariable(VARIABLE_NAMES.sessionSubscribers, ""),
-			this._setVariable(VARIABLE_NAMES.uptime, "0s"),
-		]);
-
-		if (suppressAlert) {
-			return;
-		}
-
-		await this._markLastEvent();
-		const streamLiveMessage = this._string(chat?.content, "") || undefined;
-		await this._triggerAlert(ALERT_KEYS.streamLive, {
-			dynamic: {
-				name: this._state.username,
-				value: true,
-			},
-			extraSettings: this._buildAlertExtraSettings(chat, this._state.username, {
-				name: this._state.username,
-				value: true,
-				message: streamLiveMessage,
-			}),
-		});
-	}
-
-	async _handleStreamEnded(chat, { suppressAlert = false } = {}) {
-		this._state.live = false;
-		this._state.uptimeStartedAt = 0;
-		this._state.sessionSeenUsers.clear();
-		this._state.sessionJoinedUsers.clear();
-		this._state.sessionChatCount = 0;
-		this._state.sessionFollowerCount = 0;
-		this._state.sessionSubscribersCount = 0;
-		this._state.sessionRaiders = [];
-		this._state.sessionSubscribers = [];
-
-		await Promise.all([
-			this._setVariable(VARIABLE_NAMES.live, false),
-			this._setVariable(VARIABLE_NAMES.uptime, ""),
-			this._setVariable(VARIABLE_NAMES.sessionChatCount, 0),
-			this._setVariable(VARIABLE_NAMES.sessionFollowerCount, 0),
-			this._setVariable(VARIABLE_NAMES.sessionSubscribersCount, 0),
-			this._setVariable(VARIABLE_NAMES.sessionRaiders, ""),
-			this._setVariable(VARIABLE_NAMES.sessionSubscribers, ""),
-		]);
-
-		if (suppressAlert) {
-			return;
-		}
-
-		await this._markLastEvent();
-		const streamOfflineMessage = this._string(chat?.content, "") || undefined;
-		await this._triggerAlert(ALERT_KEYS.streamOffline, {
-			dynamic: {
-				name: this._state.username,
-				value: false,
-			},
-			extraSettings: this._buildAlertExtraSettings(chat, this._state.username, {
-				name: this._state.username,
-				value: false,
-				message: streamOfflineMessage,
-			}),
-		});
-	}
-
-	async _handleChatMessage(chat) {
-		const username = this._string(
-			chat?.user_name || chat?.nick_name,
-			"",
-		).trim();
-		const message = this._string(chat?.content, "").trim();
-		if (!username || !message) {
-			return;
-		}
-		this._trackChatMessageAuthor(chat);
-
-		this._state.sessionChatCount += 1;
-		await Promise.all([
-			this._setVariable(
-				VARIABLE_NAMES.sessionChatCount,
-				this._state.sessionChatCount,
-			),
-			this._setVariable(VARIABLE_NAMES.lastChatter, username),
-			this._setVariable(VARIABLE_NAMES.lastMessage, message),
-			this._setVariable(
-				VARIABLE_NAMES.lastMessageId,
-				this._string(chat?.message_id, ""),
-			),
-		]);
-
-		await this._markLastEvent();
-		await this._handleEntranceAndFirstChatter(chat, username);
-
-		this._displayChatMessage(chat, username, message);
-
-		if (this._state.live && this._state.uptimeStartedAt) {
-			await this._setVariable(
-				VARIABLE_NAMES.uptime,
-				this._formatDuration(Date.now() - this._state.uptimeStartedAt),
-			);
-		}
-	}
-
-	_buildSessionUserKey(chat, fallbackUsername = "") {
-		const userId = this._string(chat?.user_id, "").trim();
-		if (userId) {
-			return `id:${userId}`;
-		}
-		const username = this._string(
-			chat?.user_name || chat?.nick_name,
-			fallbackUsername,
-		)
-			.trim()
-			.toLowerCase();
-		return `name:${username}`;
-	}
-
-	async _handleEntranceAndFirstChatter(chat, username) {
-		const key = this._buildSessionUserKey(chat, username);
-		if (this._state.sessionSeenUsers.has(key)) {
-			return;
-		}
-		this._state.sessionSeenUsers.add(key);
-		const entranceMessage = this._string(chat?.content, "") || undefined;
-
-		const entranceOnlyWhenLive = this._bool(
-			this.settings?.entranceOnlyWhenLive,
-			true,
-		);
-		const shouldTriggerEntrance =
-			!entranceOnlyWhenLive || this._state.live === true;
-		if (shouldTriggerEntrance) {
-			await this._triggerAlert(ALERT_KEYS.entrance, {
-				dynamic: {
-					name: username,
-					value: username,
-				},
-				extraSettings: this._buildAlertExtraSettings(chat, username, {
-					name: username,
-					value: username,
-					message: entranceMessage,
-				}),
-			});
-		}
-
-		if (this._state.currentFirstChatter) {
-			return;
-		}
-
-		const streak =
-			this._state.previousFirstChatter &&
-			this._state.previousFirstChatter.toLowerCase() === key
-				? this._state.previousFirstChatterCount + 1
-				: 1;
-
-		this._state.currentFirstChatter = username;
-		this._state.currentFirstChatterCount = streak;
-
-		await Promise.all([
-			this._setVariable(VARIABLE_NAMES.currentFirstChatter, username),
-			this._setVariable(VARIABLE_NAMES.currentFirstChatterCount, streak),
-		]);
-
-		const firstChatterOnlyWhenLive = this._bool(
-			this.settings?.firstChatterOnlyWhenLive,
-			true,
-		);
-		const shouldTriggerFirstChatter =
-			!firstChatterOnlyWhenLive || this._state.live === true;
-		if (!shouldTriggerFirstChatter) {
-			return;
-		}
-
-		await this._triggerAlert(ALERT_KEYS.firstChatter, {
-			dynamic: {
-				name: username,
-				value: streak,
-			},
-			extraSettings: this._buildAlertExtraSettings(chat, username, {
-				name: username,
-				value: streak,
-				first_chatter_count: streak,
-				message: entranceMessage,
-			}),
-		});
-	}
-
-	async _handleFollower(chat) {
-		const username = this._string(
-			chat?.user_name || chat?.nick_name,
-			"",
-		).trim();
-		if (!username) {
-			return;
-		}
-
-		this._state.sessionFollowerCount += 1;
-		await Promise.all([
-			this._setVariable(VARIABLE_NAMES.lastFollower, username),
-			this._setVariable(
-				VARIABLE_NAMES.sessionFollowerCount,
-				this._state.sessionFollowerCount,
-			),
-		]);
-		await this._markLastEvent();
-		const followerMessage = this._string(chat?.content, "") || undefined;
-
-		await this._triggerAlert(ALERT_KEYS.follower, {
-			dynamic: {
-				name: username,
-				value: username,
-			},
-			extraSettings: this._buildAlertExtraSettings(chat, username, {
-				name: username,
-				value: username,
-				followers_session_total: this._state.sessionFollowerCount,
-				message: followerMessage,
-			}),
-			showInEventList: true,
-		});
-	}
-
-	async _handleSubscriber(chat) {
-		const username = this._string(
-			chat?.user_name || chat?.nick_name,
-			"",
-		).trim();
-		if (!username) {
-			return;
-		}
-
-		this._state.sessionSubscribersCount += 1;
-		this._pushUnique(this._state.sessionSubscribers, username);
-
-		await Promise.all([
-			this._setVariable(VARIABLE_NAMES.lastSubscriber, username),
-			this._setVariable(
-				VARIABLE_NAMES.sessionSubscribersCount,
-				this._state.sessionSubscribersCount,
-			),
-			this._setVariable(
-				VARIABLE_NAMES.sessionSubscribers,
-				this._state.sessionSubscribers.join(", "),
-			),
-		]);
-		await this._markLastEvent();
-		const subscriberMessage = this._string(chat?.content, "") || undefined;
-
-		await this._triggerAlert(ALERT_KEYS.subscriber, {
-			dynamic: {
-				name: username,
-				value: username,
-			},
-			extraSettings: this._buildAlertExtraSettings(chat, username, {
-				name: username,
-				value: username,
-				subscribers_session_total: this._state.sessionSubscribersCount,
-				message: subscriberMessage,
-			}),
-			showInEventList: true,
-		});
-	}
-
-	async _handleGiftSubBasic(chat) {
-		const gifter = this._string(chat?.user_name || chat?.nick_name, "").trim();
-		if (!gifter) {
-			return;
-		}
-
-		const giftAmount = Math.max(1, this._parseInteger(chat?.content, 1));
-		const recipient = this._extractRecipient(chat?.content);
-		await this._handleGiftSubCommon(chat, {
-			gifter,
-			recipient,
-			giftAmount,
-		});
-	}
-
-	async _handleIndividualGiftSub(chat) {
-		const gifter = this._string(chat?.user_name || chat?.nick_name, "").trim();
-		if (!gifter) {
-			return;
-		}
-
-		const recipient = this._extractRecipient(chat?.content);
-		await this._handleGiftSubCommon(chat, {
-			gifter,
-			recipient,
-			giftAmount: 1,
-		});
-	}
-
-	async _handleGiftSubCommon(chat, { gifter, recipient, giftAmount }) {
-		const finalRecipient = recipient || gifter;
-		this._state.sessionSubscribersCount += Math.max(1, giftAmount);
-		this._pushUnique(this._state.sessionSubscribers, finalRecipient);
-
-		await Promise.all([
-			this._setVariable(VARIABLE_NAMES.lastSubscriber, finalRecipient),
-			this._setVariable(
-				VARIABLE_NAMES.sessionSubscribersCount,
-				this._state.sessionSubscribersCount,
-			),
-			this._setVariable(
-				VARIABLE_NAMES.sessionSubscribers,
-				this._state.sessionSubscribers.join(", "),
-			),
-		]);
-		await this._markLastEvent();
-		const giftMessage = this._string(chat?.content, "") || undefined;
-
-		await this._triggerAlert(ALERT_KEYS.subscriptionGift, {
-			dynamic: {
-				name: gifter,
-				value: this._string(chat?.sub_tier, "1"),
-			},
-			extraSettings: this._buildAlertExtraSettings(chat, gifter, {
-				name: gifter,
-				value: this._string(chat?.sub_tier, "1"),
-				giftAmount,
-				totalGifts: giftAmount,
-				isGift: true,
-				subMonths: 1,
-				username: gifter,
-				gifter,
-				recipient: finalRecipient,
-				amount: giftAmount,
-				subPlan: this._string(chat?.sub_tier, "1"),
-				message: giftMessage,
-			}),
-			showInEventList: true,
-		});
-	}
-
-	async _handleChannelJoin(chat) {
-		const username = this._string(
-			chat?.user_name || chat?.nick_name,
-			"",
-		).trim();
-		if (!username) {
-			return;
-		}
-		const key = this._buildSessionUserKey(chat, username);
-		if (this._state.sessionJoinedUsers.has(key)) {
-			return;
-		}
-		this._state.sessionJoinedUsers.add(key);
-
-		await this._markLastEvent();
-		const channelJoinMessage = this._string(chat?.content, "") || undefined;
-		await this._triggerAlert(ALERT_KEYS.channelJoin, {
-			dynamic: {
-				name: username,
-				value: username,
-			},
-			extraSettings: this._buildAlertExtraSettings(chat, username, {
-				name: username,
-				value: username,
-				message: channelJoinMessage,
-			}),
-		});
-	}
-
-	async _handleRaid(chat) {
-		const username = this._string(
-			chat?.user_name || chat?.nick_name,
-			"",
-		).trim();
-		if (!username) {
-			return;
-		}
-
-		const viewers = this._extractRaidViewers(chat?.content);
-		this._pushUnique(this._state.sessionRaiders, username);
-
-		await Promise.all([
-			this._setVariable(VARIABLE_NAMES.lastRaider, username),
-			this._setVariable(VARIABLE_NAMES.lastRaidAmount, viewers),
-			this._setVariable(
-				VARIABLE_NAMES.sessionRaiders,
-				this._state.sessionRaiders.join(", "),
-			),
-		]);
-		await this._markLastEvent();
-		const raidMessage = this._string(chat?.content, "") || undefined;
-
-		await this._triggerAlert(ALERT_KEYS.raid, {
-			dynamic: {
-				name: username,
-				value: viewers,
-			},
-			extraSettings: this._buildAlertExtraSettings(chat, username, {
-				name: username,
-				value: viewers,
-				viewers,
-				message: raidMessage,
-			}),
-			showInEventList: true,
-		});
-	}
-
-	async _handleSpell(chat) {
-		const username = this._string(
-			chat?.user_name || chat?.nick_name,
-			"",
-		).trim();
-		if (!username) {
-			return;
-		}
-
-		const parsed = this._parseSpell(chat);
-		if (!parsed.name) {
-			return;
-		}
-
-		await Promise.all([
-			this._setVariable(VARIABLE_NAMES.lastSpell, parsed.name),
-			this._setVariable(VARIABLE_NAMES.lastSpellAmount, parsed.amount),
-			this._setVariable(VARIABLE_NAMES.lastSpellValue, parsed.value),
-		]);
-		await this._markLastEvent();
-
-		await this._triggerAlert(ALERT_KEYS.spell, {
-			dynamic: {
-				name: username,
-				value: parsed.name,
-			},
-			extraSettings: this._buildAlertExtraSettings(chat, username, {
-				name: username,
-				value: parsed.name,
-				spell: parsed.name,
-				spell_quantity: parsed.amount,
-				spell_value: parsed.value,
-				spell_type: parsed.valueType,
-				spell_combined_value: parsed.value * parsed.amount,
-				message: undefined,
-			}),
-			showInEventList: true,
-		});
-	}
-
-	_parseSpell(chat) {
-		const contentData =
-			chat && typeof chat.content_data === "object" && chat.content_data
-				? chat.content_data
-				: {};
-		let content = {};
-		if (typeof chat?.content === "string") {
-			try {
-				content = JSON.parse(chat.content);
-			} catch {
-				content = {};
-			}
-		}
-
-		const name = this._string(
-			contentData.gift_display_name || content.gift || content.name,
-			"",
-		).trim();
-		const amount = Math.max(
-			1,
-			this._number(contentData.gift_num ?? content.num, 1),
-		);
-		const value = this._number(content.gift_value, 0);
-		const valueType = this._string(content.value_type, "");
-
-		return {
-			name,
-			amount,
-			value,
-			valueType,
-		};
-	}
-
-	_displayChatMessage(chat, username, message) {
-		const roles = this._stringList(chat?.roles);
-		const medals = this._stringList(chat?.medals);
-		const roleFlags = this._buildRoleFlags(roles, medals, username, chat);
-		const badges = this._extractBadgeUrls(chat);
-		const emotesRaw = this._buildChatEmotesRaw(chat, message);
-		const messageId =
-			this._string(chat?.message_id, "").trim() ||
-			`trovo-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-		const userId = this._extractUserId(chat);
-
-		try {
-			this.lumia.displayChat({
-				username,
-				displayname: this._string(chat?.nick_name, username),
-				message,
-				avatar: this._string(chat?.avatar, "") || undefined,
-				color: "#3cdb7d",
-				badges: badges.length ? badges : undefined,
-				messageId,
-				channel: this._state.channelId || undefined,
-				userId: userId || undefined,
-				userLevels: {
-					isSelf: roleFlags.isSelf,
-					mod: roleFlags.mod,
-					vip: roleFlags.vip,
-					tier3: roleFlags.tier3,
-					tier2: roleFlags.tier2,
-					subscriber: roleFlags.subscriber,
-					follower: roleFlags.follower,
-				},
-				emotesRaw: emotesRaw || undefined,
-			});
-		} catch (error) {
-			void this._log(
-				`[Trovo] Failed to relay chat message: ${this._errorMessage(error)}`,
-				"warn",
-			);
-		}
-	}
-
-	_buildRoleFlags(roles, medals, username, chat = {}) {
-		const lowerRoles = roles.map((role) =>
-			this._string(role, "").toLowerCase(),
-		);
-		const lowerMedals = medals.map((medal) =>
-			this._string(medal, "").toLowerCase(),
-		);
-		const roleTokens = [...lowerRoles, ...lowerMedals];
-		const selfUsername = this._state.username.toLowerCase();
-		const tier = this._maxTierLevel(chat);
-		const tier3 =
-			tier >= 3 ||
-			roleTokens.some(
-				(token) =>
-					token.includes("tier3") ||
-					token.includes("tier_3") ||
-					token.includes("sub_lv_3"),
-			);
-		const tier2 =
-			tier >= 2 ||
-			tier3 ||
-			roleTokens.some(
-				(token) =>
-					token.includes("tier2") ||
-					token.includes("tier_2") ||
-					token.includes("sub_lv_2"),
-			);
-		const subscriber =
-			tier >= 1 ||
-			tier2 ||
-			tier3 ||
-			roleTokens.some(
-				(token) =>
-					token.includes("subscriber") ||
-					token.includes("member") ||
-					token.includes("founder"),
-			);
-
-		return {
-			isSelf:
-				roleTokens.includes("streamer") ||
-				roleTokens.includes("broadcaster") ||
-				(selfUsername && username.toLowerCase() === selfUsername),
-			mod:
-				roleTokens.includes("supermod") ||
-				roleTokens.includes("moderator") ||
-				roleTokens.includes("mod"),
-			vip: roleTokens.some((token) => token.includes("vip")),
-			tier3,
-			tier2,
-			subscriber,
-			follower: roleTokens.some((token) => token.includes("follower")),
-		};
-	}
-
-	_buildChatEmotesRaw(chat, message) {
-		const text = this._string(message, "");
-		if (!text) {
-			return "";
-		}
-
-		const explicit = this._extractEmotesFromContentData(chat, text);
-		const inferred =
-			explicit.length > 0 ? [] : this._inferEmotesFromMessageText(text);
-		const emotes = [...explicit, ...inferred];
-		if (!emotes.length) {
-			return "";
-		}
-
-		const unique = [];
-		const seen = new Set();
-		for (const emote of emotes) {
-			const key = `${emote.url}|${emote.start}|${emote.end}`;
-			if (seen.has(key)) {
-				continue;
-			}
-			seen.add(key);
-			unique.push(emote);
-		}
-
-		if (!unique.length) {
-			return "";
-		}
-
-		try {
-			return JSON.stringify(unique);
-		} catch {
-			return "";
-		}
-	}
-
-	_extractEmotesFromContentData(chat, message) {
-		const contentData =
-			chat && typeof chat.content_data === "object" && chat.content_data
-				? chat.content_data
-				: {};
-		const sources = [
-			...this._asObjectArray(contentData?.normal_emote_enabled),
-			...this._asObjectArray(contentData?.custom_emote_enabled),
-			...this._asObjectArray(contentData?.chatroom),
-		];
-		if (!sources.length) {
-			return [];
-		}
-
-		const results = [];
-		for (const entry of sources) {
-			const normalized = this._normalizeChatEmoteEntry(entry, message);
-			if (normalized.length) {
-				results.push(...normalized);
-			}
-		}
-		return results;
-	}
-
-	_normalizeChatEmoteEntry(entry, message) {
-		if (!entry || typeof entry !== "object") {
-			return [];
-		}
-
-		const name = this._firstString(
-			entry.name,
-			entry.id,
-			entry.emote_id,
-			entry.emoteId,
-			entry.emote_name,
-			entry.emoteName,
-			entry.keyword,
-			entry.content,
-			entry.text,
-		);
-		const directUrl = this._normalizeBadgeUrl(
-			this._firstString(
-				entry.url,
-				entry.webp,
-				entry.gifp,
-				entry.image,
-				entry.icon,
-				entry.icon_url,
-				entry.iconUrl,
-			),
-		);
-		const fallbackUrl = name ? this._lookupEmoteUrl(name) : "";
-		const url = directUrl || fallbackUrl;
-		if (!url) {
-			return [];
-		}
-
-		const locations = this._extractEmoteLocations(entry, message, name);
-		if (!locations.length) {
-			return [];
-		}
-
-		const id = name || this._string(entry.id, "") || url;
-		return locations.map((location) => ({
-			id,
-			url,
-			start: location.start,
-			end: location.end,
-		}));
-	}
-
-	_extractEmoteLocations(entry, message, name = "") {
-		const rawStart = this._extractNumeric(
-			entry.start,
-			entry.start_index,
-			entry.startIndex,
-			entry.from,
-			entry.begin,
-			entry.offset,
-			entry.location?.start,
-			entry.location?.from,
-		);
-		const rawEnd = this._extractNumeric(
-			entry.end,
-			entry.end_index,
-			entry.endIndex,
-			entry.to,
-			entry.finish,
-			entry.location?.end,
-			entry.location?.to,
-		);
-		const rawLength = this._extractNumeric(
-			entry.length,
-			entry.len,
-			entry.count,
-			entry.location?.length,
-		);
-		const explicit = this._normalizeExplicitLocation(
-			message,
-			rawStart,
-			rawEnd,
-			rawLength,
-			name,
-		);
-		if (explicit) {
-			return [explicit];
-		}
-
-		return this._findTokenLocationsFromMessage(message, name);
-	}
-
-	_normalizeExplicitLocation(message, rawStart, rawEnd, rawLength, name = "") {
-		if (!Number.isFinite(rawStart)) {
-			return null;
-		}
-
-		const messageLength = this._string(message, "").length;
-		let startUnit = Math.max(0, Math.floor(rawStart));
-		let endUnit = null;
-
-		if (Number.isFinite(rawEnd)) {
-			endUnit = Math.floor(rawEnd);
-			if (endUnit < startUnit) {
-				return null;
-			}
-			const token = this._string(name, "");
-			if (token) {
-				const inclusiveSlice = message.slice(startUnit, endUnit + 1);
-				const exclusiveSlice = message.slice(startUnit, endUnit);
-				if (inclusiveSlice === token) {
-					// inclusive index, keep as-is.
-				} else if (exclusiveSlice === token && endUnit > startUnit) {
-					endUnit -= 1;
-				}
-			}
-		} else if (Number.isFinite(rawLength) && rawLength > 0) {
-			endUnit = startUnit + Math.floor(rawLength) - 1;
-		} else if (name) {
-			endUnit = startUnit + name.length - 1;
-		}
-
-		if (!Number.isFinite(endUnit) || endUnit < startUnit) {
-			return null;
-		}
-		if (startUnit >= messageLength) {
-			return null;
-		}
-		endUnit = Math.min(endUnit, messageLength - 1);
-
-		const start = this._toCodePointIndex(message, startUnit);
-		const end = this._toCodePointIndex(message, endUnit + 1) - 1;
-		if (end < start) {
-			return null;
-		}
-		return { start, end };
-	}
-
-	_findTokenLocationsFromMessage(message, token) {
-		const text = this._string(message, "");
-		const needle = this._string(token, "");
-		if (!text || !needle) {
-			return [];
-		}
-
-		const locations = [];
-		let offset = 0;
-		while (offset <= text.length) {
-			const index = text.indexOf(needle, offset);
-			if (index === -1) {
-				break;
-			}
-
-			const start = this._toCodePointIndex(text, index);
-			const end = this._toCodePointIndex(text, index + needle.length) - 1;
-			if (end >= start) {
-				locations.push({ start, end });
-			}
-			offset = index + needle.length;
-		}
-
-		return locations;
-	}
-
-	_inferEmotesFromMessageText(message) {
-		const text = this._string(message, "");
-		if (!text || !this._emoteLookup?.size) {
-			return [];
-		}
-
-		const matches = [];
-		const tokenPattern = /\S+/g;
-		let tokenMatch;
-
-		while ((tokenMatch = tokenPattern.exec(text))) {
-			const token = this._string(tokenMatch[0], "");
-			if (!token) {
-				continue;
-			}
-
-			const variants = this._tokenVariants(token);
-			let picked = null;
-			for (const variant of variants) {
-				const lookup = this._emoteLookup.get(variant.lookupKey);
-				if (!lookup) {
-					continue;
-				}
-				picked = {
-					lookup,
-					startOffset: variant.startOffset,
-					endOffset: variant.endOffset,
-				};
-				break;
-			}
-
-			if (!picked) {
-				continue;
-			}
-
-			const startUnit = tokenMatch.index + picked.startOffset;
-			const endUnit = tokenMatch.index + token.length - picked.endOffset - 1;
-			if (endUnit < startUnit) {
-				continue;
-			}
-
-			const start = this._toCodePointIndex(text, startUnit);
-			const end = this._toCodePointIndex(text, endUnit + 1) - 1;
-			if (end < start) {
-				continue;
-			}
-
-			matches.push({
-				id: picked.lookup.name,
-				url: picked.lookup.url,
-				start,
-				end,
-			});
-		}
-
-		return matches;
-	}
-
-	_tokenVariants(token) {
-		const raw = this._string(token, "");
-		if (!raw) {
-			return [];
-		}
-
-		const variants = [
-			{
-				value: raw,
-				startOffset: 0,
-				endOffset: 0,
-			},
-		];
-
-		if (raw.startsWith(":") && raw.length > 1) {
-			variants.push({
-				value: raw.slice(1),
-				startOffset: 1,
-				endOffset: 0,
-			});
-		}
-
-		const leadingMatch = raw.match(/^[:([{<"'`]+/);
-		const trailingMatch = raw.match(/[)\]}>,"'.`?]+$/);
-		const leading = leadingMatch ? leadingMatch[0].length : 0;
-		const trailing = trailingMatch ? trailingMatch[0].length : 0;
-		const trimmed = raw.slice(leading, raw.length - trailing);
-		if (trimmed && trimmed !== raw) {
-			variants.push({
-				value: trimmed,
-				startOffset: leading,
-				endOffset: trailing,
-			});
-		}
-
-		return variants.map((variant) => ({
-			...variant,
-			lookupKey: variant.value.toLowerCase(),
-		}));
-	}
-
-	_lookupEmoteUrl(name) {
-		const key = this._string(name, "").trim().toLowerCase();
-		if (!key || !this._emoteLookup?.size) {
-			return "";
-		}
-		const direct = this._emoteLookup.get(key);
-		if (direct?.url) {
-			return this._string(direct.url, "");
-		}
-
-		const withoutColon = key.startsWith(":") ? key.slice(1) : key;
-		if (withoutColon && withoutColon !== key) {
-			const alt = this._emoteLookup.get(withoutColon);
-			if (alt?.url) {
-				return this._string(alt.url, "");
-			}
-		}
-
-		const withColon = key.startsWith(":") ? key : `:${key}`;
-		if (withColon !== key) {
-			const alt = this._emoteLookup.get(withColon);
-			if (alt?.url) {
-				return this._string(alt.url, "");
-			}
-		}
-
-		return "";
-	}
-
-	_asObjectArray(value) {
-		if (Array.isArray(value)) {
-			return value.filter(
-				(entry) => entry && typeof entry === "object" && !Array.isArray(entry),
-			);
-		}
-		if (typeof value === "string") {
-			const text = value.trim();
-			if (!text) {
-				return [];
-			}
-			try {
-				const parsed = JSON.parse(text);
-				if (Array.isArray(parsed)) {
-					return parsed.filter(
-						(entry) =>
-							entry && typeof entry === "object" && !Array.isArray(entry),
-					);
-				}
-				if (parsed && typeof parsed === "object") {
-					return [parsed];
-				}
-			} catch {
-				return [];
-			}
-		}
-		return [];
-	}
-
-	_toCodePointIndex(text, codeUnitIndex) {
-		const message = this._string(text, "");
-		if (!message) {
-			return 0;
-		}
-		const bounded = Math.max(
-			0,
-			Math.min(message.length, Math.floor(codeUnitIndex)),
-		);
-		return Array.from(message.slice(0, bounded)).length;
-	}
-
-	_extractNumeric(...values) {
-		for (const value of values) {
-			const parsed = this._number(value, Number.NaN);
-			if (Number.isFinite(parsed)) {
-				return parsed;
-			}
-		}
-		return Number.NaN;
-	}
-
-	_maxTierLevel(chat = {}) {
-		return Math.max(
-			this._coerceTierLevel(chat?.sub_tier),
-			this._coerceTierLevel(chat?.sub_lv),
-			this._coerceTierLevel(chat?.tier),
-			this._coerceTierLevel(chat?.content_data?.sub_tier),
-			this._coerceTierLevel(chat?.content_data?.sub_lv),
-		);
-	}
-
-	_coerceTierLevel(value) {
-		if (typeof value === "number" && Number.isFinite(value)) {
-			return Math.max(0, Math.floor(value));
-		}
-
-		const text = this._string(value, "").trim().toLowerCase();
-		if (!text) {
-			return 0;
-		}
-
-		const numeric = Number(text);
-		if (Number.isFinite(numeric)) {
-			return Math.max(0, Math.floor(numeric));
-		}
-
-		const match =
-			text.match(/tier[^0-9]*([0-9]+)/) ||
-			text.match(/sub[^0-9]*([0-9]+)/) ||
-			text.match(/([0-9]+)/);
-		if (!match?.[1]) {
-			return 0;
-		}
-
-		const parsed = Number(match[1]);
-		return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
-	}
-
-	_buildAlertUser(chat, fallbackUsername = "") {
-		const username = this._string(
-			chat?.user_name || chat?.nick_name,
-			fallbackUsername || this._state.username,
-		).trim();
-		const displayname = this._string(chat?.nick_name, username);
-		const avatar = this._string(chat?.avatar, "");
-		const userId = this._string(chat?.user_id, "");
-		const roles = this._stringList(chat?.roles);
-		const medals = this._stringList(chat?.medals);
-		const userLevels = this._buildRoleFlags(
-			roles,
-			medals,
-			username,
-			chat || {},
-		);
-
-		return {
-			username,
-			displayname,
-			avatar: avatar || undefined,
-			userId: userId || undefined,
-			userLevels,
-		};
-	}
-
-	_buildAlertExtraSettings(chat, fallbackUsername = "", overrides = {}) {
-		const alertUser = this._buildAlertUser(chat, fallbackUsername);
-		const roles = this._stringList(chat?.roles);
-		const medals = this._stringList(chat?.medals);
-		const uptime =
-			this._state.live && this._state.uptimeStartedAt
-				? this._formatDuration(Date.now() - this._state.uptimeStartedAt)
-				: "";
-
-		return {
-			username: alertUser.username,
-			displayname: alertUser.displayname,
-			avatar: alertUser.avatar,
-			userId: alertUser.userId,
-			live: this._state.live,
-			uptime,
-			channel_id: this._state.channelId,
-			display_name: this._state.displayName,
-			session_chat_count: this._state.sessionChatCount,
-			session_follower_count: this._state.sessionFollowerCount,
-			session_subscribers_count: this._state.sessionSubscribersCount,
-			session_raiders: this._state.sessionRaiders.join(", "),
-			session_subscribers: this._state.sessionSubscribers.join(", "),
-			sub_tier: this._string(chat?.sub_tier, ""),
-			sub_level: this._string(chat?.sub_lv, ""),
-			roles: roles.join(","),
-			medals: medals.join(","),
-			...overrides,
-		};
-	}
-
-	async _triggerAlert(
-		alert,
-		{ dynamic = {}, extraSettings = {}, showInEventList } = {},
-	) {
-		try {
-			const normalizedDynamic = this._normalizeAlertDynamic(dynamic);
-			await this.lumia.triggerAlert({
-				alert,
-				dynamic: normalizedDynamic,
-				extraSettings,
-				showInEventList:
-					typeof showInEventList === "boolean" ? showInEventList : false,
-			});
-		} catch (error) {
-			await this._log(
-				`[Trovo] Failed to trigger alert ${alert}: ${this._errorMessage(error)}`,
-				"warn",
-			);
-		}
-	}
-
-	_normalizeAlertDynamic(dynamic = {}) {
-		const name = this._string(dynamic?.name, "");
-		let value = dynamic?.value;
-		if (
-			typeof value !== "string" &&
-			typeof value !== "number" &&
-			typeof value !== "boolean"
-		) {
-			value = this._string(value, "");
-		}
-		return { name, value };
-	}
-
-	async _markLastEvent() {
-		await this._setVariable(
-			VARIABLE_NAMES.lastEventAt,
-			new Date().toISOString(),
-		);
-	}
-
-	async _hydrateVariableDefaults() {
-		const updates = Object.entries(VARIABLE_DEFAULTS).map(([name, value]) =>
-			this._setVariable(name, value, { force: true }),
-		);
-		await Promise.all(updates);
-	}
-
-	async _applyResolvedProfile(profile = {}) {
-		const channelId = this._string(profile?.channelId, this._state.channelId);
-		const userId = this._string(profile?.userId, this._state.userId);
-		const username = this._string(profile?.username, this._state.username);
-		const displayName = this._string(
-			profile?.displayName || username,
-			this._state.displayName,
-		);
-
-		if (!channelId && !username) {
-			return;
-		}
-
-		this._state.channelId = channelId;
-		this._state.userId = userId;
-		this._state.username = username;
-		this._state.displayName = displayName;
-
-		await Promise.all([
-			this._setVariable(VARIABLE_NAMES.channelId, channelId),
-			this._setVariable(VARIABLE_NAMES.username, username),
-			this._setVariable(VARIABLE_NAMES.displayName, displayName),
-		]);
-	}
-
-	_resolveCredentials(source = {}) {
-		return {
-			clientId: TROVO_CLIENT_ID,
-			accessToken: this._normalizeToken(source?.accessToken),
-			refreshToken: this._string(source?.refreshToken, "").trim(),
-			tokenExpiresAt: this._number(source?.tokenExpiresAt, 0),
-		};
-	}
-
-	_hasCredentials(source = {}) {
-		const credentials = this._resolveCredentials(source);
-		return Boolean(this._hasAuthTokens(credentials));
-	}
-
-	_hasAuthTokens(source = this.settings) {
-		return Boolean(this._accessToken(source) || this._refreshToken(source));
-	}
-
-	_accessToken(source = this.settings) {
-		return this._normalizeToken(source?.accessToken);
-	}
-
-	_refreshToken(source = this.settings) {
-		return this._string(source?.refreshToken, "").trim();
-	}
-
-	_tokenExpiresAt(source = this.settings) {
-		return this._number(source?.tokenExpiresAt, 0);
-	}
-
-	_canRefreshTokens(source = this.settings) {
-		return Boolean(
-			this._refreshToken(source) &&
-			typeof this.lumia?.refreshOAuthToken === "function",
-		);
-	}
-
-	_requiresReconnect(settings, previous) {
-		const keys = ["accessToken", "refreshToken", "tokenExpiresAt"];
-
-		for (const key of keys) {
-			if ((settings?.[key] ?? "") !== (previous?.[key] ?? "")) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	_extractUserId(chat = {}) {
-		const direct = this._firstString(
-			chat?.uid,
-			chat?.sender_id,
-			chat?.senderId,
-			chat?.user_id,
-			chat?.userId,
-		);
-		const normalizedDirect = this._string(direct, "").trim();
-		if (normalizedDirect) {
-			return normalizedDirect;
-		}
-
-		const parsedFromMessageId = this._extractUidFromTrovoMessageId(
-			chat?.message_id || chat?.messageId || chat?.id,
-		);
-		return parsedFromMessageId || "";
-	}
-
-	_trackChatMessageAuthor(chat = {}) {
-		const messageId = this._string(
-			chat?.message_id || chat?.messageId || chat?.id,
-			"",
-		).trim();
-		if (!messageId) {
-			return;
-		}
-
-		const uid = this._extractUserId(chat);
-		if (!uid) {
-			return;
-		}
-
-		this._chatMessageAuthors.set(messageId, uid);
-		this._chatMessageAuthorOrder.push(messageId);
-
-		if (this._chatMessageAuthorOrder.length > MAX_TRACKED_CHAT_MESSAGE_AUTHORS) {
-			const oldest = this._chatMessageAuthorOrder.shift();
-			if (oldest) {
-				this._chatMessageAuthors.delete(oldest);
-			}
-		}
-	}
-
-	_resolveDeleteMessageUid(messageId, username = "") {
-		const normalizedMessageId = this._string(messageId, "").trim();
-		if (!normalizedMessageId) {
-			return "";
-		}
-
-		const cached = this._string(this._chatMessageAuthors.get(normalizedMessageId), "").trim();
-		if (cached) {
-			return cached;
-		}
-
-		const parsed = this._extractUidFromTrovoMessageId(normalizedMessageId);
-		if (parsed) {
-			return parsed;
-		}
-
-		const normalizedUsername = this._normalizeCommandUsername(username);
-		if (
-			normalizedUsername &&
-			this._state.username &&
-			normalizedUsername.toLowerCase() === this._state.username.toLowerCase()
-		) {
-			return this._string(this._state.userId, "").trim();
-		}
-
-		return "";
-	}
-
-	_extractUidFromTrovoMessageId(messageId) {
-		const raw = this._string(messageId, "").trim();
-		if (!raw) {
-			return "";
-		}
-
-		const parts = raw.split("_").filter(Boolean);
-		for (let index = 1; index < parts.length; index += 1) {
-			const part = this._string(parts[index], "").trim();
-			if (/^\d+$/.test(part)) {
-				return part;
-			}
-		}
-
-		return "";
-	}
-
-	_normalizeCommandUsername(value) {
-		return this._string(value, "").trim().replace(/^@+/, "");
-	}
-
-	async _sendTrovoChatMessage(message, credentials, options = {}) {
-		const content = this._string(message, "").trim();
-		if (!content) {
-			return false;
-		}
-
-		const channelId = await this._resolveChannelId(credentials, options);
-		const payload = {
-			content,
-		};
-		if (channelId) {
-			payload.channel_id = this._number(channelId, 0);
-		}
-
-		await this._trovoPost("chat/send", payload, credentials, options);
-		return true;
-	}
-
-	async _performChatCommand(command, credentials, options = {}) {
-		const normalizedCommand = this._string(command, "").trim();
-		if (!normalizedCommand) {
-			return false;
-		}
-		const apiCommand = normalizedCommand.replace(/^\/+/, "").trim();
-		if (!apiCommand) {
-			return false;
-		}
-
-		const channelId = await this._resolveChannelId(credentials, options);
-		const parsedChannelId = this._number(channelId, 0);
-		if (!parsedChannelId) {
-			throw new Error("Perform chat command requires a valid channel_id");
-		}
-
-		const payload = {
-			command: apiCommand,
-			channel_id: parsedChannelId,
-		};
-
-		await this._trovoPost(
-			"channels/command",
-			payload,
-			credentials,
-			options,
-		);
-		return true;
-	}
-
-	async _deleteChatMessage(messageId, uid, credentials, options = {}) {
-		const normalizedMessageId = this._string(messageId, "").trim();
-		const normalizedUid = this._string(uid, "").trim();
-		if (!normalizedMessageId || !normalizedUid) {
-			return false;
-		}
-
-		const channelId = await this._resolveChannelId(credentials, options);
-		const normalizedChannelId = this._string(channelId, "").trim();
-		if (!normalizedChannelId || !/^\d+$/.test(normalizedUid)) {
-			throw new Error("Delete message requires valid channel_id and uid");
-		}
-
-		const deletePath = `channels/${encodeURIComponent(
-			normalizedChannelId,
-		)}/messages/${encodeURIComponent(normalizedMessageId)}/users/${encodeURIComponent(
-			normalizedUid,
-		)}`;
-
-		await this._trovoDelete(
-			deletePath,
-			undefined,
-			credentials,
-			options,
-		);
-		return true;
-	}
-
-	async _fetchProfile(credentials, options = {}) {
-		const payload = await this._trovoGet("getuserinfo", credentials, options);
-		const data =
-			payload && typeof payload.data === "object" && payload.data
-				? payload.data
-				: payload;
-
-		return {
-			channelId: this._string(data?.channelId || data?.channel_id, ""),
-			userId: this._string(data?.uid || data?.userId || data?.user_id, ""),
-			username: this._string(
-				data?.userName || data?.user_name || data?.username || data?.nickName,
-				"",
-			),
-			displayName: this._string(data?.nickName || data?.nick_name, ""),
-		};
-	}
-
-	async _fetchChatToken(credentials, options = {}) {
-		const payload = await this._trovoGet("chat/token", credentials, options);
-		const token = this._string(
-			payload?.token || payload?.data?.token,
-			"",
-		).trim();
-		if (!token) {
-			throw new Error("Trovo chat/token did not return a token");
-		}
-		return token;
-	}
-
-	async _searchCategories(query, limit = CATEGORY_SEARCH_LIMIT) {
-		const cleanedQuery = this._string(query, "").trim();
-		if (!cleanedQuery) {
-			return [];
-		}
-
-		const safeLimit = Math.max(1, Math.min(100, this._parseInteger(limit, 20)));
-		const payload = await this._trovoPublicPost("searchcategory", {
-			query: cleanedQuery,
-			limit: safeLimit,
-		});
-		return Array.isArray(payload?.category_info) ? payload.category_info : [];
-	}
-
-	async _findBestCategoryMatch(query) {
-		const cleanedQuery = this._string(query, "").trim();
-		if (!cleanedQuery) {
-			throw new Error("Category query is required");
-		}
-
-		const categories = await this._searchCategories(cleanedQuery);
-		if (!categories.length) {
-			throw new Error(`No Trovo categories found for "${cleanedQuery}"`);
-		}
-
-		let best = null;
-		let bestScore = Number.NEGATIVE_INFINITY;
-		for (const category of categories) {
-			const score = this._scoreCategoryMatch(cleanedQuery, category);
-			if (score > bestScore) {
-				bestScore = score;
-				best = category;
-			}
-		}
-
-		if (!best || !this._string(best?.id, "").trim()) {
-			throw new Error(`No Trovo category match found for "${cleanedQuery}"`);
-		}
-
-		return {
-			id: this._string(best.id, "").trim(),
-			name: this._string(best.name || best.short_name, "").trim(),
-		};
-	}
-
-	_scoreCategoryMatch(query, category = {}) {
-		const queryRaw = this._string(query, "").trim();
-		const queryNormalized = this._normalizeMatchText(queryRaw);
-		const categoryId = this._string(category?.id || category?.category_id, "").trim();
-		const categoryName = this._string(category?.name, "").trim();
-		const categoryShortName = this._string(
-			category?.short_name || category?.shortName,
-			"",
-		).trim();
-
-		if (!queryNormalized) {
-			return Number.NEGATIVE_INFINITY;
-		}
-		if (categoryId && queryRaw === categoryId) {
-			return 10000;
-		}
-
-		const labels = [categoryName, categoryShortName].filter(Boolean);
-		if (!labels.length) {
-			return Number.NEGATIVE_INFINITY;
-		}
-
-		let best = Number.NEGATIVE_INFINITY;
-		for (const label of labels) {
-			const normalizedLabel = this._normalizeMatchText(label);
-			if (!normalizedLabel) {
-				continue;
-			}
-
-			if (normalizedLabel === queryNormalized) {
-				best = Math.max(best, 9000);
-				continue;
-			}
-			if (normalizedLabel.startsWith(queryNormalized)) {
-				best = Math.max(best, 8000);
-				continue;
-			}
-			if (normalizedLabel.includes(queryNormalized)) {
-				best = Math.max(best, 7000);
-				continue;
-			}
-
-			const similarity = this._diceCoefficient(queryNormalized, normalizedLabel);
-			best = Math.max(best, similarity * 1000);
-		}
-
-		return best;
-	}
-
-	_diceCoefficient(left, right) {
-		const a = this._string(left, "");
-		const b = this._string(right, "");
-		if (!a || !b) {
-			return 0;
-		}
-		if (a === b) {
-			return 1;
-		}
-		if (a.length < 2 || b.length < 2) {
-			return 0;
-		}
-
-		const makeBigrams = (text) => {
-			const counts = new Map();
-			for (let i = 0; i < text.length - 1; i += 1) {
-				const key = text.slice(i, i + 2);
-				counts.set(key, (counts.get(key) || 0) + 1);
-			}
-			return counts;
-		};
-
-		const leftBigrams = makeBigrams(a);
-		const rightBigrams = makeBigrams(b);
-
-		let overlap = 0;
-		for (const [key, leftCount] of leftBigrams.entries()) {
-			const rightCount = rightBigrams.get(key) || 0;
-			overlap += Math.min(leftCount, rightCount);
-		}
-
-		const total = a.length - 1 + (b.length - 1);
-		return total > 0 ? (2 * overlap) / total : 0;
-	}
-
-	_normalizeMatchText(value) {
-		return this._string(value, "")
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, " ")
-			.trim();
-	}
-
-	async _updateChannelInfo(updates = {}, credentials, options = {}) {
-		const resolvedCredentials = this._resolveCredentials(credentials || this.settings);
-		const channelId = await this._resolveChannelId(resolvedCredentials, options);
-		const payload = {
-			channel_id: this._number(channelId, 0),
-		};
-
-		const liveTitle = this._string(updates?.live_title, "");
-		if (liveTitle.trim()) {
-			payload.live_title = liveTitle;
-		}
-
-		const categoryId = this._string(
-			updates?.category_id || updates?.category,
-			"",
-		).trim();
-		if (categoryId) {
-			const parsedCategoryId = this._parseInteger(categoryId, 0);
-			const categoryValue = parsedCategoryId || categoryId;
-			payload.category = categoryValue;
-			payload.category_id = categoryValue;
-		}
-
-		if (!payload.live_title && !payload.category && !payload.category_id) {
-			return false;
-		}
-
-		await this._trovoPost("channels/update", payload, resolvedCredentials, options);
-		return true;
-	}
-
-	async _resolveChannelId(credentials, options = {}) {
-		const existingChannelId = this._number(this._state.channelId, 0);
-		if (existingChannelId) {
-			return existingChannelId;
-		}
-
-		const profile = await this._fetchProfile(credentials, options);
-		await this._applyResolvedProfile(profile);
-		const resolvedChannelId = this._number(profile?.channelId, 0);
-		if (!resolvedChannelId) {
-			throw new Error("Unable to resolve Trovo channel id");
-		}
-		return resolvedChannelId;
-	}
-
-	async _refreshEmoteLookup() {
-		const channelId = this._number(this._state.channelId, 0);
-		if (!channelId) {
-			return;
-		}
-
-		const url = `${API_BASE_URL}/getemotes`;
-		try {
-			const response = await fetch(url, {
-				method: "POST",
-				headers: {
-					"Client-ID": TROVO_CLIENT_ID,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					emote_type: 0,
-					channel_id: [channelId],
-				}),
-			});
-
-			const bodyText = await response.text();
-			let payload = {};
-			if (bodyText) {
-				try {
-					payload = JSON.parse(bodyText);
-				} catch {
-					payload = {};
-				}
-			}
-
-			if (!response.ok || this._isErrorResponse(payload)) {
-				throw new Error(
-					this._responseError(payload) ||
-						`HTTP ${response.status} ${response.statusText || ""}`.trim(),
-				);
-			}
-
-			this._emoteLookup = this._buildEmoteLookup(payload);
-		} catch (error) {
-			await this._log(
-				`[Trovo] Failed to refresh emote lookup: ${this._errorMessage(error)}`,
-				"warn",
-			);
-		}
-	}
-
-	_buildEmoteLookup(payload = {}) {
-		const channels =
-			payload && typeof payload.channels === "object" && payload.channels
-				? payload.channels
-				: payload;
-		const lookup = new Map();
-
-		const addEmote = (emote = {}) => {
-			const name = this._string(emote?.name, "").trim();
-			if (!name) {
-				return;
-			}
-			const url = this._normalizeBadgeUrl(
-				this._firstString(emote?.webp, emote?.gifp, emote?.url),
-			);
-			if (!url) {
-				return;
-			}
-			const key = name.toLowerCase();
-			if (!lookup.has(key)) {
-				lookup.set(key, { name, url });
-			}
-		};
-
-		const customizedChannels = Array.isArray(
-			channels?.customizedEmotes?.channel,
-		)
-			? channels.customizedEmotes.channel
-			: [];
-		for (const channel of customizedChannels) {
-			const emotes = Array.isArray(channel?.emotes) ? channel.emotes : [];
-			for (const emote of emotes) {
-				addEmote(emote);
-			}
-		}
-
-		const eventEmotes = Array.isArray(channels?.eventEmotes)
-			? channels.eventEmotes
-			: [];
-		for (const emote of eventEmotes) {
-			addEmote(emote);
-		}
-
-		const globalEmotes = Array.isArray(channels?.globalEmotes)
-			? channels.globalEmotes
-			: [];
-		for (const emote of globalEmotes) {
-			addEmote(emote);
-		}
-
-		return lookup;
-	}
-
-	async _trovoGet(path, credentials, options = {}) {
-		const clientId = TROVO_CLIENT_ID;
-
-		const accessToken = await this._ensureAccessToken(credentials, options);
-		let response = await this._trovoRequest(path, clientId, accessToken);
-
-		if (response.status === 401 && this._canRefreshTokens(credentials)) {
-			const refreshedToken = await this._refreshAccessToken(
-				credentials,
-				options,
-			);
-			response = await this._trovoRequest(path, clientId, refreshedToken);
-		}
-
-		return this._readTrovoResponse(path, response);
-	}
-
-	async _trovoPost(path, payload = {}, credentials, options = {}) {
-		const clientId = TROVO_CLIENT_ID;
-		const accessToken = await this._ensureAccessToken(credentials, options);
-		let response = await this._trovoRequest(path, clientId, accessToken, {
-			method: "POST",
-			body: payload,
-		});
-
-		if (response.status === 401 && this._canRefreshTokens(credentials)) {
-			const refreshedToken = await this._refreshAccessToken(credentials, options);
-			response = await this._trovoRequest(path, clientId, refreshedToken, {
-				method: "POST",
-				body: payload,
-			});
-		}
-
-		return this._readTrovoResponse(path, response);
-	}
-
-	async _trovoDelete(path, payload = {}, credentials, options = {}) {
-		const clientId = TROVO_CLIENT_ID;
-		const accessToken = await this._ensureAccessToken(credentials, options);
-		let response = await this._trovoRequest(path, clientId, accessToken, {
-			method: "DELETE",
-			body: payload,
-		});
-
-		if (response.status === 401 && this._canRefreshTokens(credentials)) {
-			const refreshedToken = await this._refreshAccessToken(credentials, options);
-			response = await this._trovoRequest(path, clientId, refreshedToken, {
-				method: "DELETE",
-				body: payload,
-			});
-		}
-
-		return this._readTrovoResponse(path, response);
-	}
-
-	async _trovoPublicPost(path, payload = {}) {
-		const response = await this._trovoRequest(path, TROVO_CLIENT_ID, "", {
-			method: "POST",
-			body: payload,
-		});
-		return this._readTrovoResponse(path, response);
-	}
-
-	async _readTrovoResponse(path, response) {
-		const url = `${API_BASE_URL}/${path}`;
-		const bodyText = await response.text();
-		let body = {};
-		if (bodyText) {
-			try {
-				body = JSON.parse(bodyText);
-			} catch {
-				body = { message: bodyText };
-			}
-		}
-
-		if (!response.ok) {
-			throw new Error(
-				`HTTP ${response.status} on ${url}: ${this._responseError(body) || response.statusText || "Request failed"}`,
-			);
-		}
-
-		if (this._isErrorResponse(body)) {
-			throw new Error(this._responseError(body));
-		}
-
-		return body;
-	}
-
-	async _trovoRequest(path, clientId, accessToken, options = {}) {
-		const url = `${API_BASE_URL}/${path}`;
-		const method = this._string(options?.method, "GET").toUpperCase();
-		const hasBody = options?.body !== undefined;
-		const timeoutMs = Math.max(
-			1000,
-			this._number(options?.timeoutMs, HTTP_REQUEST_TIMEOUT_MS),
-		);
-		const headers = {
-			Accept: "application/json",
-			"Client-ID": clientId,
-		};
-		if (accessToken) {
-			headers.Authorization = `OAuth ${accessToken}`;
-		}
-		if (hasBody || method !== "GET") {
-			headers["Content-Type"] = "application/json";
-		}
-
-		const requestInit = {
-			method,
-			headers,
-		};
-		if (hasBody) {
-			requestInit.body = JSON.stringify(options.body);
-		}
-
-		const controller =
-			typeof AbortController !== "undefined"
-				? new AbortController()
-				: null;
-		let timeoutHandle = null;
-		if (controller) {
-			timeoutHandle = setTimeout(() => {
-				controller.abort();
-			}, timeoutMs);
-		}
-
-		try {
-			return await fetch(url, {
-				...requestInit,
-				...(controller ? { signal: controller.signal } : {}),
-			});
-		} catch (error) {
-			if (controller?.signal?.aborted) {
-				throw new Error(
-					`Trovo request timed out after ${timeoutMs}ms (${method} ${path})`,
-				);
-			}
-			throw error;
-		} finally {
-			if (timeoutHandle) {
-				clearTimeout(timeoutHandle);
-			}
-		}
-	}
-
-	async _refreshAccessToken(
-		credentials = this._resolveCredentials(this.settings),
-		options = {},
-	) {
-		if (this._tokenRefreshPromise) {
-			return this._tokenRefreshPromise;
-		}
-
-		const refreshToken = this._refreshToken(credentials);
-		if (!refreshToken) {
-			throw new Error("Missing Trovo refresh token.");
-		}
-
-		const persist = options.persist !== false;
-		this._tokenRefreshPromise = (async () => {
-			try {
-				if (typeof this.lumia?.refreshOAuthToken !== "function") {
-					throw new Error("Missing OAuth refresh support.");
-				}
-
-				const payload = await this.lumia.refreshOAuthToken({ refreshToken });
-				const nextAccessToken = this._normalizeToken(payload?.accessToken);
-				const nextRefreshToken =
-					this._string(payload?.refreshToken, "").trim() || refreshToken;
-				const expiresAt = this._number(payload?.expiresAt, 0);
-				const tokenExpiresAt = expiresAt ? expiresAt * 1000 : 0;
-
-				if (!nextAccessToken) {
-					throw new Error(
-						"OAuth refresh did not return a Trovo access token.",
-					);
-				}
-
-				if (persist) {
-					this.updateSettings({
-						accessToken: nextAccessToken,
-						refreshToken: nextRefreshToken,
-						tokenExpiresAt,
-					});
-				}
-
-				return nextAccessToken;
-			} catch (error) {
-				await this._handleOAuthRefreshFailure(error);
-				throw error;
-			}
-		})();
-
-		try {
-			return await this._tokenRefreshPromise;
-		} finally {
-			this._tokenRefreshPromise = null;
-		}
-	}
-
-	async _ensureAccessToken(
-		credentials = this._resolveCredentials(this.settings),
-		options = {},
-	) {
-		const accessToken = this._accessToken(credentials);
-		const refreshToken = this._refreshToken(credentials);
-		const tokenExpiresAt = this._tokenExpiresAt(credentials);
-
-		if (!accessToken && !refreshToken) {
-			throw new Error("Missing Trovo access credentials.");
-		}
-
-		if (accessToken) {
-			if (
-				tokenExpiresAt &&
-				Date.now() > tokenExpiresAt - 60000 &&
-				this._canRefreshTokens(credentials)
-			) {
-				return this._refreshAccessToken(credentials, options);
-			}
-			return accessToken;
-		}
-
-		if (!this._canRefreshTokens(credentials)) {
-			throw new Error("Missing Trovo access token.");
-		}
-
-		return this._refreshAccessToken(credentials, options);
-	}
-
-	_sendSocket(payload, { awaitResponse = false, timeoutMs = 10000 } = {}) {
-		const ws = this._ws;
-		if (!ws || ws.readyState !== WebSocket.OPEN) {
-			return Promise.reject(new Error("Trovo websocket is not open"));
-		}
-
-		const nonce = String(this._nonceCounter++);
-		const packet = {
-			...payload,
-			nonce,
-		};
-
-		if (!awaitResponse) {
-			ws.send(JSON.stringify(packet));
-			return Promise.resolve(true);
-		}
-
-		return new Promise((resolve, reject) => {
-			const timeout = setTimeout(() => {
-				this._pendingRequests.delete(nonce);
-				reject(new Error("Trovo websocket request timed out"));
-			}, timeoutMs);
-
-			this._pendingRequests.set(nonce, {
-				resolve,
-				reject,
-				timeout,
-			});
-
-			try {
-				ws.send(JSON.stringify(packet));
-			} catch (error) {
-				clearTimeout(timeout);
-				this._pendingRequests.delete(nonce);
-				reject(error);
-			}
-		});
-	}
-
-	_rejectPendingRequests(error) {
-		for (const pending of this._pendingRequests.values()) {
-			clearTimeout(pending.timeout);
-			pending.reject(error);
-		}
-		this._pendingRequests.clear();
-	}
-
-	async _setVariable(name, value, { force = false } = {}) {
-		if (
-			!force &&
-			this._variableCache.has(name) &&
-			this._variableCache.get(name) === value
-		) {
-			return;
-		}
-		this._variableCache.set(name, value);
-		await this.lumia.setVariable(name, value);
-	}
-
-	async _updateConnectionState(nextState) {
-		if (this._lastConnectionState === nextState) {
-			return;
-		}
-		this._lastConnectionState = nextState;
-		await this.lumia.updateConnection(nextState);
-	}
-
-	async _handleOAuthRefreshFailure(error) {
-		if (this._authRefreshFailureHandled) {
-			return;
-		}
-		this._authRefreshFailureHandled = true;
-
-		const reason = this._errorMessage(error);
-		const message = `[Trovo] OAuth refresh failed. Disconnected plugin. Re-authorize Trovo in Connections. (${reason})`;
-		await this._log(message, "error");
-
-		try {
-			await this.lumia.showToast({
-				message:
-					'Trovo disconnected: OAuth token refresh failed. Re-authorize in Connections.',
-				time: 10000,
-			});
-		} catch {}
-
-		await this._stop({ manual: true, resetLiveState: false });
-	}
-
-	async _log(message, level = "info") {
-		if (!message) {
-			return;
-		}
-		try {
-			await this.lumia.log({ message, level });
-		} catch {}
-	}
-
-	_markStartupBoundary() {
-		const now = Date.now();
-		this._connectedAtMs = now;
-		this._startupSuppressUntilMs = now + STARTUP_SUPPRESS_SECONDS * 1000;
-		this._recentChatIds.clear();
-		this._recentChatIdOrder = [];
-		this._chatMessageAuthors.clear();
-		this._chatMessageAuthorOrder = [];
-		this._state.sessionJoinedUsers.clear();
-	}
-
-	_shouldSuppressStartupEvent(chat = {}) {
-		const eventMs = this._extractChatEventTimestampMs(chat);
-		if (eventMs > 0 && this._connectedAtMs > 0) {
-			return (
-				eventMs <
-				this._connectedAtMs - STARTUP_BACKFILL_TOLERANCE_SECONDS * 1000
-			);
-		}
-
-		return (
-			Boolean(this._startupSuppressUntilMs) &&
-			Date.now() < this._startupSuppressUntilMs
-		);
-	}
-
-	_extractChatEventTimestampMs(chat = {}) {
-		const contentData =
-			chat && typeof chat.content_data === "object" && chat.content_data
-				? chat.content_data
-				: {};
-		const candidates = [
-			chat?.send_time,
-			chat?.sendTime,
-			chat?.timestamp,
-			chat?.time,
-			chat?.ts,
-			chat?.create_time,
-			chat?.created_at,
-			chat?.createdAt,
-			contentData?.send_time,
-			contentData?.timestamp,
-			contentData?.created_at,
-		];
-
-		for (const candidate of candidates) {
-			const epochMs = this._toEpochMs(candidate);
-			if (epochMs > 0) {
-				return epochMs;
-			}
-		}
-
-		return 0;
-	}
-
-	_toEpochMs(value) {
-		if (typeof value === "number" && Number.isFinite(value)) {
-			return value >= 1e11 ? Math.floor(value) : Math.floor(value * 1000);
-		}
-
-		if (typeof value === "string") {
-			const trimmed = value.trim();
-			if (!trimmed) {
-				return 0;
-			}
-
-			const numeric = Number(trimmed);
-			if (Number.isFinite(numeric)) {
-				return this._toEpochMs(numeric);
-			}
-
-			const parsed = Date.parse(trimmed);
-			return Number.isFinite(parsed) ? parsed : 0;
-		}
-
-		return 0;
-	}
-
-	_isDuplicateChat(chat = {}) {
-		const messageId = this._string(
-			chat?.message_id || chat?.messageId || chat?.id,
-			"",
-		).trim();
-		if (!messageId) {
-			return false;
-		}
-		if (this._recentChatIds.has(messageId)) {
-			return true;
-		}
-
-		this._recentChatIds.add(messageId);
-		this._recentChatIdOrder.push(messageId);
-
-		if (this._recentChatIdOrder.length > MAX_TRACKED_CHAT_IDS) {
-			const oldest = this._recentChatIdOrder.shift();
-			if (oldest) {
-				this._recentChatIds.delete(oldest);
-			}
-		}
-
-		return false;
-	}
-
-	_includeSpells(settings = this.settings) {
-		return this._bool(settings?.includeSpells, true);
-	}
-
-	_shouldTriggerEntrance(settings = this.settings) {
-		const onlyWhenLive = this._bool(settings?.entranceOnlyWhenLive, true);
-		return onlyWhenLive ? this._state.live === true : true;
-	}
-
-	_shouldTriggerFirstChatter(settings = this.settings) {
-		const onlyWhenLive = this._bool(settings?.firstChatterOnlyWhenLive, true);
-		return onlyWhenLive ? this._state.live === true : true;
-	}
-
-	_heartbeatMs() {
-		return Math.min(90, Math.max(10, HEARTBEAT_SECONDS)) * 1000;
-	}
-
-	_connectionTimeoutMs() {
-		return Math.min(60, Math.max(5, CONNECTION_TIMEOUT_SECONDS)) * 1000;
-	}
-
-	_reconnectDelaySeconds() {
-		return Math.min(
-			MAX_RECONNECT_DELAY_SECONDS,
-			Math.max(1, RECONNECT_DELAY_SECONDS),
-		);
-	}
-
-	_isErrorResponse(payload) {
-		if (!payload || typeof payload !== "object") {
-			return false;
-		}
-
-		if (
-			payload.status &&
-			this._string(payload.status, "").toLowerCase() === "error"
-		) {
-			return true;
-		}
-
-		if (typeof payload.ret === "number" && payload.ret !== 0) {
-			return true;
-		}
-
-		if (payload.error) {
-			return true;
-		}
-
-		return false;
-	}
-
-	_responseError(payload) {
-		if (!payload) {
-			return "Unknown Trovo error";
-		}
-
-		const message =
-			this._string(payload?.retMsg, "") ||
-			this._string(payload?.message, "") ||
-			this._string(payload?.error, "");
-
-		if (message) {
-			return message;
-		}
-
-		if (typeof payload === "string") {
-			return payload;
-		}
-
-		return "Unknown Trovo error";
-	}
-
-	_extractRecipient(value) {
-		const content = this._string(value, "").trim();
-		if (!content) {
-			return "";
-		}
-
-		const commaIndex = content.indexOf(",");
-		if (commaIndex >= 0) {
-			return content.slice(commaIndex + 1).trim();
-		}
-
-		const toMatch = content.match(/\bto\s+@?([a-zA-Z0-9_]+)/i);
-		return toMatch ? this._string(toMatch[1], "") : "";
-	}
-
-	_extractRaidViewers(value) {
-		const content = this._string(value, "");
-		if (!content) {
-			return 0;
-		}
-
-		const matches = content.match(/\d+/g);
-		if (!matches || !matches.length) {
-			return 0;
-		}
-
-		return this._parseInteger(matches[matches.length - 1], 0);
-	}
-
-	_parseInteger(value, fallback = 0) {
-		const parsed = parseInt(this._string(value, ""), 10);
-		return Number.isFinite(parsed) ? parsed : fallback;
-	}
-
-	_pushUnique(list, value) {
-		const entry = this._string(value, "").trim();
-		if (!entry) {
-			return;
-		}
-
-		if (!list.includes(entry)) {
-			list.push(entry);
-		}
-
-		if (list.length > MAX_LIST_ITEMS) {
-			list.splice(0, list.length - MAX_LIST_ITEMS);
-		}
-	}
-
-	_normalizeToken(value) {
-		const text = this._string(value, "").trim();
-		if (!text) {
-			return "";
-		}
-
-		return text
-			.replace(/^OAuth\s+/i, "")
-			.replace(/^Bearer\s+/i, "")
-			.trim();
-	}
-
-	_formatDuration(milliseconds) {
-		const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
-		const days = Math.floor(totalSeconds / 86400);
-		const hours = Math.floor((totalSeconds % 86400) / 3600);
-		const minutes = Math.floor((totalSeconds % 3600) / 60);
-		const seconds = totalSeconds % 60;
-
-		const parts = [];
-		if (days) parts.push(`${days}d`);
-		if (hours) parts.push(`${hours}h`);
-		if (minutes) parts.push(`${minutes}m`);
-		if (seconds || !parts.length) parts.push(`${seconds}s`);
-		return parts.slice(0, 3).join(" ");
-	}
-
-	_socketMessageToString(raw) {
-		if (typeof raw === "string") {
-			return raw;
-		}
-		if (Buffer.isBuffer(raw)) {
-			return raw.toString("utf8");
-		}
-		if (Array.isArray(raw)) {
-			try {
-				return Buffer.concat(raw).toString("utf8");
-			} catch {
-				return "";
-			}
-		}
-		if (raw == null) {
-			return "";
-		}
-		return String(raw);
-	}
-
-	_socketReason(reasonBuffer) {
-		if (!reasonBuffer) {
-			return "";
-		}
-		if (typeof reasonBuffer === "string") {
-			return reasonBuffer;
-		}
-		if (Buffer.isBuffer(reasonBuffer)) {
-			return reasonBuffer.toString("utf8");
-		}
-		return String(reasonBuffer);
-	}
-
-	_errorMessage(error) {
-		if (error instanceof Error) {
-			return error.message;
-		}
-		if (typeof error === "string") {
-			return error;
-		}
-		if (error && typeof error === "object" && "message" in error) {
-			return this._string(error.message, "Unknown error");
-		}
-		return "Unknown error";
-	}
-
-	_bool(value, fallback = false) {
-		if (typeof value === "boolean") {
-			return value;
-		}
-		if (typeof value === "number") {
-			return value !== 0;
-		}
-		if (typeof value === "string") {
-			const normalized = value.trim().toLowerCase();
-			if (["true", "1", "yes", "on"].includes(normalized)) {
-				return true;
-			}
-			if (["false", "0", "no", "off"].includes(normalized)) {
-				return false;
-			}
-		}
-		return fallback;
-	}
-
-	_number(value, fallback = 0) {
-		if (typeof value === "number" && Number.isFinite(value)) {
-			return value;
-		}
-		if (typeof value === "string") {
-			const parsed = Number(value.trim());
-			if (Number.isFinite(parsed)) {
-				return parsed;
-			}
-		}
-		return fallback;
-	}
-
-	_string(value, fallback = "") {
-		if (typeof value === "string") {
-			return value;
-		}
-		if (value === null || value === undefined) {
-			return fallback;
-		}
-		return String(value);
-	}
-
-	_stringList(value) {
-		if (!Array.isArray(value)) {
-			return [];
-		}
-		return value.map((entry) => this._extractTokenLabel(entry)).filter(Boolean);
-	}
-
-	_extractTokenLabel(entry) {
-		if (typeof entry === "string") {
-			return entry.trim();
-		}
-		if (entry === null || entry === undefined || typeof entry !== "object") {
-			return this._string(entry, "").trim();
-		}
-
-		const directLabel = this._firstString(
-			entry.name,
-			entry.label,
-			entry.title,
-			entry.type,
-			entry.id,
-			entry.role_name,
-			entry.medal_name,
-			entry.badge_name,
-			entry.text,
-			entry.desc,
-		);
-		if (directLabel) {
-			return directLabel;
-		}
-
-		if (entry.icon && typeof entry.icon === "object") {
-			const nestedLabel = this._firstString(
-				entry.icon.name,
-				entry.icon.label,
-				entry.icon.title,
-				entry.icon.id,
-			);
-			if (nestedLabel) {
-				return nestedLabel;
-			}
-		}
-
-		return "";
-	}
-
-	_extractBadgeUrls(chat = {}) {
-		const urls = [];
-		const sources = [
-			...(Array.isArray(chat?.medals) ? chat.medals : []),
-			...(Array.isArray(chat?.roles) ? chat.roles : []),
-		];
-
-		for (const entry of sources) {
-			const url = this._extractBadgeUrl(entry);
-			if (url) {
-				urls.push(url);
-			}
-		}
-
-		return [...new Set(urls)];
-	}
-
-	_extractBadgeUrl(entry) {
-		if (!entry) {
-			return "";
-		}
-
-		if (typeof entry === "string") {
-			const normalized = this._normalizeBadgeUrl(entry);
-			if (normalized) {
-				return normalized;
-			}
-			return this._resolveBadgeTokenUrl(entry);
-		}
-
-		if (typeof entry !== "object") {
-			return "";
-		}
-
-		const iconObject =
-			entry.icon && typeof entry.icon === "object" ? entry.icon : {};
-		const raw = this._firstString(
-			entry.icon,
-			entry.icon_url,
-			entry.iconUrl,
-			entry.badge,
-			entry.badge_url,
-			entry.badgeUrl,
-			entry.image,
-			entry.image_url,
-			entry.imageUrl,
-			entry.url,
-			entry.src,
-			iconObject.url,
-			iconObject.src,
-			iconObject.image,
-			iconObject.image_url,
-		);
-		const rawToken = this._firstString(
-			entry.name,
-			entry.label,
-			entry.title,
-			entry.type,
-			entry.id,
-			entry.role_name,
-			entry.medal_name,
-			entry.badge_name,
-			iconObject.name,
-			iconObject.label,
-			iconObject.title,
-			iconObject.id,
-		);
-		const normalized = this._normalizeBadgeUrl(raw);
-		if (normalized) {
-			return normalized;
-		}
-		return this._resolveBadgeTokenUrl(rawToken);
-	}
-
-	_normalizeBadgeUrl(value) {
-		const raw = this._string(value, "").trim();
-		if (!raw) {
-			return "";
-		}
-		if (/^https?:\/\//i.test(raw)) {
-			return raw;
-		}
-		if (raw.startsWith("//")) {
-			return `https:${raw}`;
-		}
-		if (raw.startsWith("/")) {
-			return `https://trovo.live${raw}`;
-		}
-		return "";
-	}
-
-	_firstString(...values) {
-		for (const value of values) {
-			const text = this._string(value, "").trim();
-			if (text) {
-				return text;
-			}
-		}
-		return "";
-	}
-
-	_resolveBadgeTokenUrl(value) {
-		const token = this._string(value, "").trim().toLowerCase();
-		if (!token) {
-			return "";
-		}
-		return TROVO_BADGE_TOKEN_URLS[token] || "";
-	}
+constructor(manifest, context) {
+super(manifest, context);
+this.\_ws = null;
+this.\_connectPromise = null;
+this.\_tokenRefreshPromise = null;
+this.\_heartbeatTimer = null;
+this.\_reconnectTimer = null;
+this.\_manualStop = false;
+this.\_reconnectAttempts = 0;
+this.\_nonceCounter = 1;
+this.\_pendingRequests = new Map();
+this.\_lastConnectionState = null;
+this.\_variableCache = new Map();
+this.\_connectedAtMs = 0;
+this.\_startupSuppressUntilMs = 0;
+this.\_recentChatIds = new Set();
+this.\_recentChatIdOrder = [];
+this.\_chatMessageAuthors = new Map();
+this.\_chatMessageAuthorOrder = [];
+this.\_emoteLookup = new Map();
+this.\_authRefreshFailureHandled = false;
+this.\_state = this.\_createRuntimeState();
+}
+
+    _createRuntimeState() {
+    	return {
+    		live: false,
+    		uptimeStartedAt: 0,
+    		channelId: "",
+    		userId: "",
+    		username: "",
+    		displayName: "",
+    		sessionChatCount: 0,
+    		sessionFollowerCount: 0,
+    		sessionSubscribersCount: 0,
+    		sessionRaiders: [],
+    		sessionSubscribers: [],
+    		currentFirstChatter: "",
+    		currentFirstChatterCount: 0,
+    		previousFirstChatter: "",
+    		previousFirstChatterCount: 0,
+    		sessionSeenUsers: new Set(),
+    		sessionJoinedUsers: new Set(),
+    	};
+    }
+
+    async onload() {
+    	await this._hydrateVariableDefaults();
+
+    	if (this._hasCredentials(this.settings)) {
+    		await this._connect();
+    	} else {
+    		await this._updateConnectionState(false);
+    	}
+    }
+
+    async onunload() {
+    	await this._stop({ manual: true, resetLiveState: true });
+    }
+
+    async onsettingsupdate(settings, previous = {}) {
+    	const hasNow = this._hasCredentials(settings);
+    	const hadBefore = this._hasCredentials(previous);
+
+    	if (!hasNow) {
+    		await this._stop({ manual: true, resetLiveState: true });
+    		return;
+    	}
+
+    	if (!hadBefore) {
+    		this._manualStop = false;
+    		await this._connect();
+    		return;
+    	}
+
+    	if (this._requiresReconnect(settings, previous)) {
+    		await this._reconnect();
+    	}
+    }
+
+    async validateAuth(data = {}) {
+    	const credentials = this._resolveCredentials(data);
+    	if (!this._hasCredentials(credentials)) {
+    		return {
+    			ok: false,
+    			message: "OAuth tokens are required. Authorize the plugin first.",
+    		};
+    	}
+
+    	try {
+    		const profile = await this._fetchProfile(credentials, { persist: false });
+    		await this._fetchChatToken(credentials, { persist: false });
+    		const username = this._string(
+    			profile?.username || profile?.displayName || profile?.channelId,
+    			"Trovo user",
+    		);
+    		return { ok: true, message: `Validated as ${username}.` };
+    	} catch (error) {
+    		return {
+    			ok: false,
+    			message: this._errorMessage(error),
+    		};
+    	}
+    }
+
+    async actions(config = {}) {
+    	const actions = Array.isArray(config.actions) ? config.actions : [];
+    	for (const action of actions) {
+    		if (!action || action.on === false) {
+    			continue;
+    		}
+
+    		switch (action.type) {
+    			case "send_chat":
+    				await this._runSendChatAction(action.value);
+    				break;
+    			case "update_live_title":
+    				await this._runUpdateLiveTitleAction(action.value);
+    				break;
+    			case "update_category":
+    				await this._runUpdateCategoryAction(action.value);
+    				break;
+    			case "host_channel":
+    				await this._runHostChannelAction(action.value);
+    				break;
+    			case "unhost_channel":
+    				await this._runUnhostChannelAction();
+    				break;
+    			case "set_title_command":
+    				await this._runSetTitleCommandAction(action.value);
+    				break;
+    			case "trigger_alert":
+    				await this._runTriggerAlertAction(action.value);
+    				break;
+    			default:
+    				break;
+    		}
+    	}
+    }
+
+    async chatbot(config = {}) {
+    	const message = this._string(config?.message, "").trim();
+    	if (!message) {
+    		return false;
+    	}
+
+    	const credentials = this._resolveCredentials(this.settings);
+    	await this._sendTrovoChatMessage(message, credentials);
+    	return true;
+    }
+
+    async modCommand(type, value = {}) {
+    	const commandType = this._string(type, "").trim().toLowerCase();
+    	const username = this._normalizeCommandUsername(value?.username);
+    	const credentials = this._resolveCredentials(this.settings);
+    	const rawMessage = this._string(value?.message, "").trim();
+    	const duration = this._parseInteger(value?.duration, 10);
+
+    	try {
+    		switch (commandType) {
+    			case "delete": {
+    				const messageId = rawMessage;
+    				if (!messageId) {
+    					await this._log("Delete message skipped: missing message ID", "warn");
+    					return false;
+    				}
+    				const uid = this._resolveDeleteMessageUid(messageId, username);
+    				if (!uid) {
+    					await this._log(
+    						`Delete message skipped: unable to resolve user ID for message "${messageId}"`,
+    						"warn",
+    					);
+    					return false;
+    				}
+    				await this._deleteChatMessage(messageId, uid, credentials);
+    				return true;
+    			}
+    			case "add-moderator":
+    				if (!username) {
+    					await this._log("Add moderator skipped: missing username", "warn");
+    					return false;
+    				}
+    				await this._performChatCommand(`mod ${username}`, credentials);
+    				return true;
+    			case "remove-moderator":
+    				if (!username) {
+    					await this._log(
+    						"Remove moderator skipped: missing username",
+    						"warn",
+    					);
+    					return false;
+    				}
+    				await this._performChatCommand(`unmod ${username}`, credentials);
+    				return true;
+    			case "ban":
+    				if (!username) {
+    					await this._log("Ban skipped: missing username", "warn");
+    					return false;
+    				}
+    				await this._performChatCommand(`ban ${username}`, credentials);
+    				return true;
+    			case "timeout": {
+    				if (!username) {
+    					await this._log("Timeout skipped: missing username", "warn");
+    					return false;
+    				}
+    				const timeoutDuration = Math.max(1, duration);
+    				await this._performChatCommand(
+    					`ban ${username} ${timeoutDuration}`,
+    					credentials,
+    				);
+    				return true;
+    			}
+    			case "unban":
+    				if (!username) {
+    					await this._log("Unban skipped: missing username", "warn");
+    					return false;
+    				}
+    				await this._performChatCommand(`unban ${username}`, credentials);
+    				return true;
+    			default:
+    				await this._log(`Unsupported mod command type "${commandType}"`, "warn");
+    				return false;
+    		}
+    	} catch (error) {
+    		await this._log(
+    			`Mod command "${commandType || "unknown"}" failed: ${this._errorMessage(
+    				error,
+    			)}`,
+    			"error",
+    		);
+    		throw error;
+    	}
+    }
+
+    async variableFunction({ key } = {}) {
+    	if (key !== VARIABLE_NAMES.uptime) {
+    		return "";
+    	}
+
+    	if (!this._state.live || !this._state.uptimeStartedAt) {
+    		return "Is not live";
+    	}
+
+    	return this._formatDuration(Date.now() - this._state.uptimeStartedAt);
+    }
+
+    async _runSendChatAction(raw = {}) {
+    	const message = this._string(raw?.message, "").trim();
+    	if (!message) {
+    		return;
+    	}
+
+    	try {
+    		await this.chatbot({ message });
+    	} catch (error) {
+    		await this._log(
+    			`[Trovo] Failed to send chatbot message: ${this._errorMessage(error)}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    async _runTriggerAlertAction(raw = {}) {
+    	const requestedAlert = this._string(raw?.alertKey, ALERT_KEYS.follower);
+    	const alert = VALID_ALERT_KEYS.has(requestedAlert)
+    		? requestedAlert
+    		: ALERT_KEYS.follower;
+    	const username = this._string(
+    		raw?.username,
+    		this._state.username || "trovo",
+    	);
+    	const value = this._string(raw?.value, username || "1");
+
+    	await this._triggerAlert(alert, {
+    		dynamic: {
+    			name: username,
+    			value,
+    		},
+    		extraSettings: this._buildAlertExtraSettings({}, username, {
+    			name: username,
+    			value,
+    			test: true,
+    		}),
+    	});
+    }
+
+    async _runUpdateLiveTitleAction(raw = {}) {
+    	const liveTitle = this._string(raw?.liveTitle || raw?.title, "");
+    	if (!liveTitle.trim()) {
+    		return;
+    	}
+
+    	try {
+    		const credentials = this._resolveCredentials(this.settings);
+    		await this._updateChannelInfo(
+    			{
+    				live_title: liveTitle,
+    			},
+    			credentials,
+    		);
+    		await this._log(`[Trovo] Updated live title to "${liveTitle}"`);
+    	} catch (error) {
+    		await this._log(
+    			`[Trovo] Failed to update live title: ${this._errorMessage(error)}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    async _runUpdateCategoryAction(raw = {}) {
+    	const query = this._string(
+    		raw?.category || raw?.categoryQuery || raw?.query,
+    		"",
+    	).trim();
+    	if (!query) {
+    		return;
+    	}
+
+    	try {
+    		const credentials = this._resolveCredentials(this.settings);
+    		const best = await this._findBestCategoryMatch(query);
+    		await this._updateChannelInfo(
+    			{
+    				category_id: this._string(best?.id, ""),
+    			},
+    			credentials,
+    		);
+    		await this._log(
+    			`[Trovo] Updated category to "${best?.name || "Unknown"}" (${best?.id || "?"}) from query "${query}"`,
+    		);
+    	} catch (error) {
+    		await this._log(
+    			`[Trovo] Failed to update category from "${query}": ${this._errorMessage(error)}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    async _runHostChannelAction(raw = {}) {
+    	const username = this._normalizeCommandUsername(
+    		raw?.username || raw?.channel || raw?.target,
+    	);
+    	if (!username) {
+    		return;
+    	}
+
+    	try {
+    		const credentials = this._resolveCredentials(this.settings);
+    		await this._performChatCommand(`host ${username}`, credentials);
+    		await this._log(`[Trovo] Host command sent for "${username}"`);
+    	} catch (error) {
+    		await this._log(
+    			`[Trovo] Failed to host "${username}": ${this._errorMessage(error)}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    async _runUnhostChannelAction() {
+    	try {
+    		const credentials = this._resolveCredentials(this.settings);
+    		await this._performChatCommand("unhost", credentials);
+    		await this._log("[Trovo] Unhost command sent");
+    	} catch (error) {
+    		await this._log(
+    			`[Trovo] Failed to unhost: ${this._errorMessage(error)}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    async _runSetTitleCommandAction(raw = {}) {
+    	const title = this._string(raw?.title || raw?.liveTitle, "").trim();
+    	if (!title) {
+    		return;
+    	}
+
+    	try {
+    		const credentials = this._resolveCredentials(this.settings);
+    		await this._performChatCommand(`settitle ${title}`, credentials);
+    		await this._log(`[Trovo] Set title command sent: "${title}"`);
+    	} catch (error) {
+    		await this._log(
+    			`[Trovo] Failed to send set title command: ${this._errorMessage(
+    				error,
+    			)}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    async _connect() {
+    	if (this._manualStop) {
+    		return;
+    	}
+
+    	if (this._connectPromise) {
+    		return this._connectPromise;
+    	}
+
+    	this._connectPromise = (async () => {
+    		const credentials = this._resolveCredentials(this.settings);
+    		if (!this._hasCredentials(credentials)) {
+    			await this._updateConnectionState(false);
+    			return;
+    		}
+
+    		this._manualStop = false;
+    		this._authRefreshFailureHandled = false;
+    		await this._closeSocket();
+    		this._stopHeartbeat();
+    		this._rejectPendingRequests(new Error("Trovo reconnecting"));
+
+    		try {
+    			const profile = await this._fetchProfile(credentials);
+    			await this._applyResolvedProfile(profile);
+    			await this._refreshEmoteLookup();
+
+    			const chatToken = await this._fetchChatToken(credentials);
+    			await this._openSocket(chatToken);
+    			this._reconnectAttempts = 0;
+    		} catch (error) {
+    			await this._updateConnectionState(false);
+    			await this._log(
+    				`[Trovo] Connection failed: ${this._errorMessage(error)}`,
+    				"warn",
+    			);
+    			this._scheduleReconnect();
+    		}
+    	})().finally(() => {
+    		this._connectPromise = null;
+    	});
+
+    	return this._connectPromise;
+    }
+
+    async _reconnect() {
+    	this._manualStop = true;
+    	await this._closeSocket();
+    	this._stopHeartbeat();
+    	this._rejectPendingRequests(new Error("Trovo reconnect requested"));
+    	this._manualStop = false;
+    	await this._connect();
+    }
+
+    async _stop({ manual = true, resetLiveState = false } = {}) {
+    	this._manualStop = manual;
+    	this._clearReconnectTimer();
+    	this._stopHeartbeat();
+    	this._rejectPendingRequests(new Error("Trovo stopped"));
+    	await this._closeSocket();
+    	await this._updateConnectionState(false);
+
+    	if (resetLiveState) {
+    		this._state.live = false;
+    		this._state.uptimeStartedAt = 0;
+    		await this._setVariable(VARIABLE_NAMES.live, false);
+    		await this._setVariable(VARIABLE_NAMES.uptime, "");
+    	}
+    }
+
+    async _openSocket(chatToken) {
+    	const ws = new WebSocket(TROVO_CHAT_WS_URL);
+    	this._ws = ws;
+
+    	const timeoutMs = this._connectionTimeoutMs();
+    	await new Promise((resolve, reject) => {
+    		let settled = false;
+    		let authenticated = false;
+
+    		const complete = (fn, value) => {
+    			if (settled) {
+    				return;
+    			}
+    			settled = true;
+    			clearTimeout(timeoutId);
+    			fn(value);
+    		};
+
+    		const timeoutId = setTimeout(() => {
+    			complete(reject, new Error("Trovo websocket connection timed out"));
+    			try {
+    				ws.terminate();
+    			} catch {
+    				try {
+    					ws.close();
+    				} catch {}
+    			}
+    		}, timeoutMs);
+
+    		ws.on("open", async () => {
+    			try {
+    				await this._sendSocket(
+    					{
+    						type: "AUTH",
+    						data: { token: chatToken },
+    					},
+    					{ awaitResponse: true, timeoutMs: 10000 },
+    				);
+
+    				this._markStartupBoundary();
+    				authenticated = true;
+    				await this._updateConnectionState(true);
+    				this._startHeartbeat();
+    				complete(resolve);
+    			} catch (error) {
+    				complete(reject, error);
+    				try {
+    					ws.close();
+    				} catch {}
+    			}
+    		});
+
+    		ws.on("message", (raw) => {
+    			void this._handleSocketMessage(raw);
+    		});
+
+    		ws.on("error", (error) => {
+    			if (!authenticated) {
+    				complete(reject, error);
+    			}
+    			void this._log(
+    				`[Trovo] Websocket error: ${this._errorMessage(error)}`,
+    				"warn",
+    			);
+    		});
+
+    		ws.on("close", (code, reasonBuffer) => {
+    			const reason = this._socketReason(reasonBuffer);
+    			void this._handleSocketClose(ws, code, reason);
+    			if (!authenticated) {
+    				complete(
+    					reject,
+    					new Error(`Trovo websocket closed before auth (${code})`),
+    				);
+    			}
+    		});
+    	});
+    }
+
+    async _handleSocketClose(socket, code, reason) {
+    	if (socket !== this._ws) {
+    		return;
+    	}
+
+    	this._ws = null;
+    	this._stopHeartbeat();
+    	this._rejectPendingRequests(
+    		new Error(
+    			`Trovo websocket closed (${code}${reason ? `: ${reason}` : ""})`,
+    		),
+    	);
+    	await this._updateConnectionState(false);
+
+    	if (this._manualStop) {
+    		return;
+    	}
+
+    	await this._log(
+    		`[Trovo] Socket closed (${code}${reason ? `: ${reason}` : ""}), scheduling reconnect`,
+    		"warn",
+    	);
+    	this._scheduleReconnect();
+    }
+
+    _scheduleReconnect() {
+    	if (this._manualStop || this._reconnectTimer) {
+    		return;
+    	}
+
+    	const attempt = this._reconnectAttempts;
+    	const baseDelay = this._reconnectDelaySeconds();
+    	const multiplier = Math.min(16, 2 ** attempt);
+    	const delaySeconds = Math.min(
+    		MAX_RECONNECT_DELAY_SECONDS,
+    		Math.max(1, baseDelay * multiplier),
+    	);
+    	this._reconnectAttempts += 1;
+
+    	this._reconnectTimer = setTimeout(() => {
+    		this._reconnectTimer = null;
+    		if (this._manualStop) {
+    			return;
+    		}
+    		void this._connect();
+    	}, delaySeconds * 1000);
+    }
+
+    _clearReconnectTimer() {
+    	if (!this._reconnectTimer) {
+    		return;
+    	}
+    	clearTimeout(this._reconnectTimer);
+    	this._reconnectTimer = null;
+    }
+
+    _startHeartbeat() {
+    	this._stopHeartbeat();
+    	const intervalMs = this._heartbeatMs();
+    	this._heartbeatTimer = setInterval(() => {
+    		void this._sendSocket({ type: "PING" }).catch(() => {});
+    	}, intervalMs);
+    	void this._sendSocket({ type: "PING" }).catch(() => {});
+    }
+
+    _stopHeartbeat() {
+    	if (!this._heartbeatTimer) {
+    		return;
+    	}
+    	clearInterval(this._heartbeatTimer);
+    	this._heartbeatTimer = null;
+    }
+
+    async _closeSocket() {
+    	const ws = this._ws;
+    	if (!ws) {
+    		return;
+    	}
+
+    	this._ws = null;
+
+    	try {
+    		if (
+    			ws.readyState === WebSocket.OPEN ||
+    			ws.readyState === WebSocket.CONNECTING
+    		) {
+    			ws.close(1000, "manual close");
+    		}
+    	} catch {}
+    }
+
+    async _handleSocketMessage(raw) {
+    	const messageText = this._socketMessageToString(raw);
+    	if (!messageText) {
+    		return;
+    	}
+
+    	let payload;
+    	try {
+    		payload = JSON.parse(messageText);
+    	} catch {
+    		return;
+    	}
+
+    	if (payload?.nonce) {
+    		const nonce = this._string(payload.nonce, "");
+    		if (nonce && this._pendingRequests.has(nonce)) {
+    			const pending = this._pendingRequests.get(nonce);
+    			this._pendingRequests.delete(nonce);
+    			clearTimeout(pending.timeout);
+    			if (this._isErrorResponse(payload)) {
+    				pending.reject(new Error(this._responseError(payload)));
+    			} else {
+    				pending.resolve(payload);
+    			}
+    			return;
+    		}
+    	}
+
+    	const type = this._string(payload?.type, "").toUpperCase();
+    	if (type === "PING") {
+    		void this._sendSocket({ type: "pong" }).catch(() => {});
+    		return;
+    	}
+
+    	if (type !== "CHAT") {
+    		return;
+    	}
+
+    	const chats = Array.isArray(payload?.data?.chats) ? payload.data.chats : [];
+    	for (const chat of chats) {
+    		if (this._isDuplicateChat(chat)) {
+    			continue;
+    		}
+    		await this._handleChatEvent(chat);
+    	}
+    }
+
+    async _handleChatEvent(chat) {
+    	const suppressEvent = this._shouldSuppressStartupEvent(chat);
+    	const typeId = this._number(chat?.type, -1);
+    	switch (typeId) {
+    		case CHAT_TYPE_IDS.STREAM_ONLINE_OFFLINE:
+    			await this._handleStreamOnlineOffline(chat, {
+    				suppressAlert: suppressEvent,
+    			});
+    			return;
+    		case CHAT_TYPE_IDS.FOLLOWER:
+    			if (suppressEvent) return;
+    			await this._handleFollower(chat);
+    			return;
+    		case CHAT_TYPE_IDS.SUBSCRIBER:
+    			if (suppressEvent) return;
+    			await this._handleSubscriber(chat);
+    			return;
+    		case CHAT_TYPE_IDS.GIFT_SUB_BASIC:
+    			if (suppressEvent) return;
+    			await this._handleGiftSubBasic(chat);
+    			return;
+    		case CHAT_TYPE_IDS.INDIVIDUAL_GIFT_SUB:
+    			if (suppressEvent) return;
+    			await this._handleIndividualGiftSub(chat);
+    			return;
+    		case CHAT_TYPE_IDS.WELCOME_VIEWER:
+    			if (suppressEvent) return;
+    			await this._handleChannelJoin(chat);
+    			return;
+    		case CHAT_TYPE_IDS.WELCOME_RAID_VIEWER:
+    			if (suppressEvent) return;
+    			await this._handleRaid(chat);
+    			return;
+    		case CHAT_TYPE_IDS.SPELLS:
+    		case CHAT_TYPE_IDS.CUSTOM_SPELL:
+    			if (suppressEvent) return;
+    			if (this._includeSpells()) {
+    				await this._handleSpell(chat);
+    			}
+    			return;
+    		default:
+    			break;
+    	}
+
+    	if (CHAT_MESSAGE_TYPES.has(typeId)) {
+    		if (suppressEvent) return;
+    		await this._handleChatMessage(chat);
+    	}
+    }
+
+    async _handleStreamOnlineOffline(chat, { suppressAlert = false } = {}) {
+    	const nextLive = this._resolveStreamLiveState(chat);
+    	const streamStatus = this._string(
+    		chat?.content_data?.status || chat?.content_data?.stream_status,
+    		"",
+    	).trim();
+    	if (nextLive === null) {
+    		return;
+    	}
+    	if (nextLive === this._state.live) {
+    		return;
+    	}
+
+    	if (nextLive) {
+    		await this._handleStreamStarted(chat, { suppressAlert });
+    		return;
+    	}
+
+    	await this._handleStreamEnded(chat, { suppressAlert });
+    }
+
+    _resolveStreamLiveState(chat) {
+    	const content = this._string(chat?.content, "").trim().toLowerCase();
+    	const contentState = this._resolveLiveStateToken(content);
+    	if (contentState !== null) {
+    		return contentState;
+    	}
+
+    	const contentData =
+    		chat && typeof chat.content_data === "object" && chat.content_data
+    			? chat.content_data
+    			: {};
+    	const liveKeys = [
+    		contentData.is_live,
+    		contentData.live,
+    		contentData.live_status,
+    		contentData.stream_live,
+    	];
+    	for (const value of liveKeys) {
+    		const parsed = this._resolveLiveStateValue(value);
+    		if (parsed !== null) {
+    			return parsed;
+    		}
+    	}
+
+    	const status = this._string(
+    		contentData.status || contentData.stream_status,
+    		"",
+    	)
+    		.trim()
+    		.toLowerCase();
+    	const statusState = this._resolveLiveStateToken(status);
+    	if (statusState !== null) {
+    		return statusState;
+    	}
+
+    	const topLevelState = this._resolveLiveStateValue(
+    		chat?.is_live ?? chat?.live,
+    	);
+    	if (topLevelState !== null) {
+    		return topLevelState;
+    	}
+
+    	return null;
+    }
+
+    _resolveLiveStateToken(raw = "") {
+    	const token = this._string(raw, "").trim().toLowerCase();
+    	if (!token) {
+    		return null;
+    	}
+
+    	if (
+    		token === "stream_on" ||
+    		token === "online" ||
+    		token === "live" ||
+    		token.includes("go_live") ||
+    		token.includes("stream_online") ||
+    		token.includes("live_start")
+    	) {
+    		return true;
+    	}
+
+    	if (
+    		token === "stream_off" ||
+    		token === "offline" ||
+    		token.includes("stream_off") ||
+    		token.includes("stream_offline") ||
+    		token.includes("stream_end") ||
+    		token.includes("live_end")
+    	) {
+    		return false;
+    	}
+
+    	return null;
+    }
+
+    _resolveLiveStateValue(value) {
+    	if (typeof value === "boolean") {
+    		return value;
+    	}
+    	if (typeof value === "number") {
+    		if (value === 1) return true;
+    		if (value === 0) return false;
+    		return null;
+    	}
+    	if (typeof value === "string") {
+    		const normalized = value.trim().toLowerCase();
+    		if (["1", "true", "yes", "on", "live", "online"].includes(normalized)) {
+    			return true;
+    		}
+    		if (
+    			["0", "false", "no", "off", "offline", "stream_off"].includes(
+    				normalized,
+    			)
+    		) {
+    			return false;
+    		}
+    		return this._resolveLiveStateToken(normalized);
+    	}
+    	return null;
+    }
+
+    async _handleStreamStarted(chat, { suppressAlert = false } = {}) {
+    	if (this._state.currentFirstChatter) {
+    		this._state.previousFirstChatter = this._state.currentFirstChatter;
+    		this._state.previousFirstChatterCount =
+    			this._state.currentFirstChatterCount;
+    	}
+
+    	this._state.currentFirstChatter = "";
+    	this._state.currentFirstChatterCount = 0;
+    	this._state.sessionSeenUsers.clear();
+    	this._state.sessionJoinedUsers.clear();
+    	this._state.sessionChatCount = 0;
+    	this._state.sessionFollowerCount = 0;
+    	this._state.sessionSubscribersCount = 0;
+    	this._state.sessionRaiders = [];
+    	this._state.sessionSubscribers = [];
+    	this._state.live = true;
+    	this._state.uptimeStartedAt = Date.now();
+
+    	await Promise.all([
+    		this._setVariable(VARIABLE_NAMES.live, true),
+    		this._setVariable(
+    			VARIABLE_NAMES.previousFirstChatter,
+    			this._state.previousFirstChatter,
+    		),
+    		this._setVariable(
+    			VARIABLE_NAMES.previousFirstChatterCount,
+    			this._state.previousFirstChatterCount,
+    		),
+    		this._setVariable(VARIABLE_NAMES.currentFirstChatter, ""),
+    		this._setVariable(VARIABLE_NAMES.currentFirstChatterCount, 0),
+    		this._setVariable(VARIABLE_NAMES.sessionChatCount, 0),
+    		this._setVariable(VARIABLE_NAMES.sessionFollowerCount, 0),
+    		this._setVariable(VARIABLE_NAMES.sessionSubscribersCount, 0),
+    		this._setVariable(VARIABLE_NAMES.sessionRaiders, ""),
+    		this._setVariable(VARIABLE_NAMES.sessionSubscribers, ""),
+    		this._setVariable(VARIABLE_NAMES.uptime, "0s"),
+    	]);
+
+    	if (suppressAlert) {
+    		return;
+    	}
+
+    	await this._markLastEvent();
+    	const streamLiveMessage = this._string(chat?.content, "") || undefined;
+    	await this._triggerAlert(ALERT_KEYS.streamLive, {
+    		dynamic: {
+    			name: this._state.username,
+    			value: true,
+    		},
+    		extraSettings: this._buildAlertExtraSettings(chat, this._state.username, {
+    			name: this._state.username,
+    			value: true,
+    			message: streamLiveMessage,
+    		}),
+    	});
+    }
+
+    async _handleStreamEnded(chat, { suppressAlert = false } = {}) {
+    	this._state.live = false;
+    	this._state.uptimeStartedAt = 0;
+    	this._state.sessionSeenUsers.clear();
+    	this._state.sessionJoinedUsers.clear();
+    	this._state.sessionChatCount = 0;
+    	this._state.sessionFollowerCount = 0;
+    	this._state.sessionSubscribersCount = 0;
+    	this._state.sessionRaiders = [];
+    	this._state.sessionSubscribers = [];
+
+    	await Promise.all([
+    		this._setVariable(VARIABLE_NAMES.live, false),
+    		this._setVariable(VARIABLE_NAMES.uptime, ""),
+    		this._setVariable(VARIABLE_NAMES.sessionChatCount, 0),
+    		this._setVariable(VARIABLE_NAMES.sessionFollowerCount, 0),
+    		this._setVariable(VARIABLE_NAMES.sessionSubscribersCount, 0),
+    		this._setVariable(VARIABLE_NAMES.sessionRaiders, ""),
+    		this._setVariable(VARIABLE_NAMES.sessionSubscribers, ""),
+    	]);
+
+    	if (suppressAlert) {
+    		return;
+    	}
+
+    	await this._markLastEvent();
+    	const streamOfflineMessage = this._string(chat?.content, "") || undefined;
+    	await this._triggerAlert(ALERT_KEYS.streamOffline, {
+    		dynamic: {
+    			name: this._state.username,
+    			value: false,
+    		},
+    		extraSettings: this._buildAlertExtraSettings(chat, this._state.username, {
+    			name: this._state.username,
+    			value: false,
+    			message: streamOfflineMessage,
+    		}),
+    	});
+    }
+
+    async _handleChatMessage(chat) {
+    	const username = this._string(
+    		chat?.user_name || chat?.nick_name,
+    		"",
+    	).trim();
+    	const message = this._string(chat?.content, "").trim();
+    	if (!username || !message) {
+    		return;
+    	}
+    	this._trackChatMessageAuthor(chat);
+
+    	this._state.sessionChatCount += 1;
+    	await Promise.all([
+    		this._setVariable(
+    			VARIABLE_NAMES.sessionChatCount,
+    			this._state.sessionChatCount,
+    		),
+    		this._setVariable(VARIABLE_NAMES.lastChatter, username),
+    		this._setVariable(VARIABLE_NAMES.lastMessage, message),
+    		this._setVariable(
+    			VARIABLE_NAMES.lastMessageId,
+    			this._string(chat?.message_id, ""),
+    		),
+    	]);
+
+    	await this._markLastEvent();
+    	await this._handleEntranceAndFirstChatter(chat, username);
+
+    	this._displayChatMessage(chat, username, message);
+
+    	if (this._state.live && this._state.uptimeStartedAt) {
+    		await this._setVariable(
+    			VARIABLE_NAMES.uptime,
+    			this._formatDuration(Date.now() - this._state.uptimeStartedAt),
+    		);
+    	}
+    }
+
+    _buildSessionUserKey(chat, fallbackUsername = "") {
+    	const userId = this._string(chat?.user_id, "").trim();
+    	if (userId) {
+    		return `id:${userId}`;
+    	}
+    	const username = this._string(
+    		chat?.user_name || chat?.nick_name,
+    		fallbackUsername,
+    	)
+    		.trim()
+    		.toLowerCase();
+    	return `name:${username}`;
+    }
+
+    async _handleEntranceAndFirstChatter(chat, username) {
+    	const key = this._buildSessionUserKey(chat, username);
+    	if (this._state.sessionSeenUsers.has(key)) {
+    		return;
+    	}
+    	this._state.sessionSeenUsers.add(key);
+    	const entranceMessage = this._string(chat?.content, "") || undefined;
+
+    	const entranceOnlyWhenLive = this._bool(
+    		this.settings?.entranceOnlyWhenLive,
+    		true,
+    	);
+    	const shouldTriggerEntrance =
+    		!entranceOnlyWhenLive || this._state.live === true;
+    	if (shouldTriggerEntrance) {
+    		await this._triggerAlert(ALERT_KEYS.entrance, {
+    			dynamic: {
+    				name: username,
+    				value: username,
+    			},
+    			extraSettings: this._buildAlertExtraSettings(chat, username, {
+    				name: username,
+    				value: username,
+    				message: entranceMessage,
+    			}),
+    		});
+    	}
+
+    	if (this._state.currentFirstChatter) {
+    		return;
+    	}
+
+    	const streak =
+    		this._state.previousFirstChatter &&
+    		this._state.previousFirstChatter.toLowerCase() === key
+    			? this._state.previousFirstChatterCount + 1
+    			: 1;
+
+    	this._state.currentFirstChatter = username;
+    	this._state.currentFirstChatterCount = streak;
+
+    	await Promise.all([
+    		this._setVariable(VARIABLE_NAMES.currentFirstChatter, username),
+    		this._setVariable(VARIABLE_NAMES.currentFirstChatterCount, streak),
+    	]);
+
+    	const firstChatterOnlyWhenLive = this._bool(
+    		this.settings?.firstChatterOnlyWhenLive,
+    		true,
+    	);
+    	const shouldTriggerFirstChatter =
+    		!firstChatterOnlyWhenLive || this._state.live === true;
+    	if (!shouldTriggerFirstChatter) {
+    		return;
+    	}
+
+    	await this._triggerAlert(ALERT_KEYS.firstChatter, {
+    		dynamic: {
+    			name: username,
+    			value: streak,
+    		},
+    		extraSettings: this._buildAlertExtraSettings(chat, username, {
+    			name: username,
+    			value: streak,
+    			first_chatter_count: streak,
+    			message: entranceMessage,
+    		}),
+    	});
+    }
+
+    async _handleFollower(chat) {
+    	const username = this._string(
+    		chat?.user_name || chat?.nick_name,
+    		"",
+    	).trim();
+    	if (!username) {
+    		return;
+    	}
+
+    	this._state.sessionFollowerCount += 1;
+    	await Promise.all([
+    		this._setVariable(VARIABLE_NAMES.lastFollower, username),
+    		this._setVariable(
+    			VARIABLE_NAMES.sessionFollowerCount,
+    			this._state.sessionFollowerCount,
+    		),
+    	]);
+    	await this._markLastEvent();
+    	const followerMessage = this._string(chat?.content, "") || undefined;
+
+    	await this._triggerAlert(ALERT_KEYS.follower, {
+    		dynamic: {
+    			name: username,
+    			value: username,
+    		},
+    		extraSettings: this._buildAlertExtraSettings(chat, username, {
+    			name: username,
+    			value: username,
+    			followers_session_total: this._state.sessionFollowerCount,
+    			message: followerMessage,
+    		}),
+    		showInEventList: true,
+    	});
+    }
+
+    async _handleSubscriber(chat) {
+    	const username = this._string(
+    		chat?.user_name || chat?.nick_name,
+    		"",
+    	).trim();
+    	if (!username) {
+    		return;
+    	}
+
+    	this._state.sessionSubscribersCount += 1;
+    	this._pushUnique(this._state.sessionSubscribers, username);
+
+    	await Promise.all([
+    		this._setVariable(VARIABLE_NAMES.lastSubscriber, username),
+    		this._setVariable(
+    			VARIABLE_NAMES.sessionSubscribersCount,
+    			this._state.sessionSubscribersCount,
+    		),
+    		this._setVariable(
+    			VARIABLE_NAMES.sessionSubscribers,
+    			this._state.sessionSubscribers.join(", "),
+    		),
+    	]);
+    	await this._markLastEvent();
+    	const subscriberMessage = this._string(chat?.content, "") || undefined;
+
+    	await this._triggerAlert(ALERT_KEYS.subscriber, {
+    		dynamic: {
+    			name: username,
+    			value: username,
+    		},
+    		extraSettings: this._buildAlertExtraSettings(chat, username, {
+    			name: username,
+    			value: username,
+    			subscribers_session_total: this._state.sessionSubscribersCount,
+    			message: subscriberMessage,
+    		}),
+    		showInEventList: true,
+    	});
+    }
+
+    async _handleGiftSubBasic(chat) {
+    	const gifter = this._string(chat?.user_name || chat?.nick_name, "").trim();
+    	if (!gifter) {
+    		return;
+    	}
+
+    	const giftAmount = Math.max(1, this._parseInteger(chat?.content, 1));
+    	const recipient = this._extractRecipient(chat?.content);
+    	await this._handleGiftSubCommon(chat, {
+    		gifter,
+    		recipient,
+    		giftAmount,
+    	});
+    }
+
+    async _handleIndividualGiftSub(chat) {
+    	const gifter = this._string(chat?.user_name || chat?.nick_name, "").trim();
+    	if (!gifter) {
+    		return;
+    	}
+
+    	const recipient = this._extractRecipient(chat?.content);
+    	await this._handleGiftSubCommon(chat, {
+    		gifter,
+    		recipient,
+    		giftAmount: 1,
+    	});
+    }
+
+    async _handleGiftSubCommon(chat, { gifter, recipient, giftAmount }) {
+    	const finalRecipient = recipient || gifter;
+    	this._state.sessionSubscribersCount += Math.max(1, giftAmount);
+    	this._pushUnique(this._state.sessionSubscribers, finalRecipient);
+
+    	await Promise.all([
+    		this._setVariable(VARIABLE_NAMES.lastSubscriber, finalRecipient),
+    		this._setVariable(
+    			VARIABLE_NAMES.sessionSubscribersCount,
+    			this._state.sessionSubscribersCount,
+    		),
+    		this._setVariable(
+    			VARIABLE_NAMES.sessionSubscribers,
+    			this._state.sessionSubscribers.join(", "),
+    		),
+    	]);
+    	await this._markLastEvent();
+    	const giftMessage = this._string(chat?.content, "") || undefined;
+
+    	await this._triggerAlert(ALERT_KEYS.subscriptionGift, {
+    		dynamic: {
+    			name: gifter,
+    			value: this._string(chat?.sub_tier, "1"),
+    		},
+    		extraSettings: this._buildAlertExtraSettings(chat, gifter, {
+    			name: gifter,
+    			value: this._string(chat?.sub_tier, "1"),
+    			giftAmount,
+    			totalGifts: giftAmount,
+    			isGift: true,
+    			subMonths: 1,
+    			username: gifter,
+    			gifter,
+    			recipient: finalRecipient,
+    			amount: giftAmount,
+    			subPlan: this._string(chat?.sub_tier, "1"),
+    			message: giftMessage,
+    		}),
+    		showInEventList: true,
+    	});
+    }
+
+    async _handleChannelJoin(chat) {
+    	const username = this._string(
+    		chat?.user_name || chat?.nick_name,
+    		"",
+    	).trim();
+    	if (!username) {
+    		return;
+    	}
+    	const key = this._buildSessionUserKey(chat, username);
+    	if (this._state.sessionJoinedUsers.has(key)) {
+    		return;
+    	}
+    	this._state.sessionJoinedUsers.add(key);
+
+    	await this._markLastEvent();
+    	const channelJoinMessage = this._string(chat?.content, "") || undefined;
+    	await this._triggerAlert(ALERT_KEYS.channelJoin, {
+    		dynamic: {
+    			name: username,
+    			value: username,
+    		},
+    		extraSettings: this._buildAlertExtraSettings(chat, username, {
+    			name: username,
+    			value: username,
+    			message: channelJoinMessage,
+    		}),
+    	});
+    }
+
+    async _handleRaid(chat) {
+    	const username = this._string(
+    		chat?.user_name || chat?.nick_name,
+    		"",
+    	).trim();
+    	if (!username) {
+    		return;
+    	}
+
+    	const viewers = this._extractRaidViewers(chat?.content);
+    	this._pushUnique(this._state.sessionRaiders, username);
+
+    	await Promise.all([
+    		this._setVariable(VARIABLE_NAMES.lastRaider, username),
+    		this._setVariable(VARIABLE_NAMES.lastRaidAmount, viewers),
+    		this._setVariable(
+    			VARIABLE_NAMES.sessionRaiders,
+    			this._state.sessionRaiders.join(", "),
+    		),
+    	]);
+    	await this._markLastEvent();
+    	const raidMessage = this._string(chat?.content, "") || undefined;
+
+    	await this._triggerAlert(ALERT_KEYS.raid, {
+    		dynamic: {
+    			name: username,
+    			value: viewers,
+    		},
+    		extraSettings: this._buildAlertExtraSettings(chat, username, {
+    			name: username,
+    			value: viewers,
+    			viewers,
+    			message: raidMessage,
+    		}),
+    		showInEventList: true,
+    	});
+    }
+
+    async _handleSpell(chat) {
+    	const username = this._string(
+    		chat?.user_name || chat?.nick_name,
+    		"",
+    	).trim();
+    	if (!username) {
+    		return;
+    	}
+
+    	const parsed = this._parseSpell(chat);
+    	if (!parsed.name) {
+    		return;
+    	}
+
+    	await Promise.all([
+    		this._setVariable(VARIABLE_NAMES.lastSpell, parsed.name),
+    		this._setVariable(VARIABLE_NAMES.lastSpellAmount, parsed.amount),
+    		this._setVariable(VARIABLE_NAMES.lastSpellValue, parsed.value),
+    	]);
+    	await this._markLastEvent();
+
+    	await this._triggerAlert(ALERT_KEYS.spell, {
+    		dynamic: {
+    			name: username,
+    			value: parsed.name,
+    		},
+    		extraSettings: this._buildAlertExtraSettings(chat, username, {
+    			name: username,
+    			value: parsed.name,
+    			spell: parsed.name,
+    			spell_quantity: parsed.amount,
+    			spell_value: parsed.value,
+    			spell_type: parsed.valueType,
+    			spell_combined_value: parsed.value * parsed.amount,
+    			message: undefined,
+    		}),
+    		showInEventList: true,
+    	});
+    }
+
+    _parseSpell(chat) {
+    	const contentData =
+    		chat && typeof chat.content_data === "object" && chat.content_data
+    			? chat.content_data
+    			: {};
+    	let content = {};
+    	if (typeof chat?.content === "string") {
+    		try {
+    			content = JSON.parse(chat.content);
+    		} catch {
+    			content = {};
+    		}
+    	}
+
+    	const name = this._string(
+    		contentData.gift_display_name || content.gift || content.name,
+    		"",
+    	).trim();
+    	const amount = Math.max(
+    		1,
+    		this._number(contentData.gift_num ?? content.num, 1),
+    	);
+    	const value = this._number(content.gift_value, 0);
+    	const valueType = this._string(content.value_type, "");
+
+    	return {
+    		name,
+    		amount,
+    		value,
+    		valueType,
+    	};
+    }
+
+    _displayChatMessage(chat, username, message) {
+    	const roles = this._stringList(chat?.roles);
+    	const medals = this._stringList(chat?.medals);
+    	const roleFlags = this._buildRoleFlags(roles, medals, username, chat);
+    	const badges = this._extractBadgeUrls(chat);
+    	const emotesRaw = this._buildChatEmotesRaw(chat, message);
+    	const messageId =
+    		this._string(chat?.message_id, "").trim() ||
+    		`trovo-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    	const userId = this._extractUserId(chat);
+
+    	try {
+    		this.lumia.displayChat({
+    			username,
+    			displayname: this._string(chat?.nick_name, username),
+    			message,
+    			avatar: this._string(chat?.avatar, "") || undefined,
+    			color: "#3cdb7d",
+    			badges: badges.length ? badges : undefined,
+    			messageId,
+    			channel: this._state.channelId || undefined,
+    			userId: userId || undefined,
+    			userLevels: {
+    				isSelf: roleFlags.isSelf,
+    				mod: roleFlags.mod,
+    				vip: roleFlags.vip,
+    				tier3: roleFlags.tier3,
+    				tier2: roleFlags.tier2,
+    				subscriber: roleFlags.subscriber,
+    				follower: roleFlags.follower,
+    			},
+    			emotesRaw: emotesRaw || undefined,
+    		});
+    	} catch (error) {
+    		void this._log(
+    			`[Trovo] Failed to relay chat message: ${this._errorMessage(error)}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    _buildRoleFlags(roles, medals, username, chat = {}) {
+    	const lowerRoles = roles.map((role) =>
+    		this._string(role, "").toLowerCase(),
+    	);
+    	const lowerMedals = medals.map((medal) =>
+    		this._string(medal, "").toLowerCase(),
+    	);
+    	const roleTokens = [...lowerRoles, ...lowerMedals];
+    	const selfUsername = this._state.username.toLowerCase();
+    	const tier = this._maxTierLevel(chat);
+    	const tier3 =
+    		tier >= 3 ||
+    		roleTokens.some(
+    			(token) =>
+    				token.includes("tier3") ||
+    				token.includes("tier_3") ||
+    				token.includes("sub_lv_3"),
+    		);
+    	const tier2 =
+    		tier >= 2 ||
+    		tier3 ||
+    		roleTokens.some(
+    			(token) =>
+    				token.includes("tier2") ||
+    				token.includes("tier_2") ||
+    				token.includes("sub_lv_2"),
+    		);
+    	const subscriber =
+    		tier >= 1 ||
+    		tier2 ||
+    		tier3 ||
+    		roleTokens.some(
+    			(token) =>
+    				token.includes("subscriber") ||
+    				token.includes("member") ||
+    				token.includes("founder"),
+    		);
+
+    	return {
+    		isSelf:
+    			roleTokens.includes("streamer") ||
+    			roleTokens.includes("broadcaster") ||
+    			(selfUsername && username.toLowerCase() === selfUsername),
+    		mod:
+    			roleTokens.includes("supermod") ||
+    			roleTokens.includes("moderator") ||
+    			roleTokens.includes("mod"),
+    		vip: roleTokens.some((token) => token.includes("vip")),
+    		tier3,
+    		tier2,
+    		subscriber,
+    		follower: roleTokens.some((token) => token.includes("follower")),
+    	};
+    }
+
+    _buildChatEmotesRaw(chat, message) {
+    	const text = this._string(message, "");
+    	if (!text) {
+    		return "";
+    	}
+
+    	const explicit = this._extractEmotesFromContentData(chat, text);
+    	const inferred =
+    		explicit.length > 0 ? [] : this._inferEmotesFromMessageText(text);
+    	const emotes = [...explicit, ...inferred];
+    	if (!emotes.length) {
+    		return "";
+    	}
+
+    	const unique = [];
+    	const seen = new Set();
+    	for (const emote of emotes) {
+    		const key = `${emote.url}|${emote.start}|${emote.end}`;
+    		if (seen.has(key)) {
+    			continue;
+    		}
+    		seen.add(key);
+    		unique.push(emote);
+    	}
+
+    	if (!unique.length) {
+    		return "";
+    	}
+
+    	try {
+    		return JSON.stringify(unique);
+    	} catch {
+    		return "";
+    	}
+    }
+
+    _extractEmotesFromContentData(chat, message) {
+    	const contentData =
+    		chat && typeof chat.content_data === "object" && chat.content_data
+    			? chat.content_data
+    			: {};
+    	const sources = [
+    		...this._asObjectArray(contentData?.normal_emote_enabled),
+    		...this._asObjectArray(contentData?.custom_emote_enabled),
+    		...this._asObjectArray(contentData?.chatroom),
+    	];
+    	if (!sources.length) {
+    		return [];
+    	}
+
+    	const results = [];
+    	for (const entry of sources) {
+    		const normalized = this._normalizeChatEmoteEntry(entry, message);
+    		if (normalized.length) {
+    			results.push(...normalized);
+    		}
+    	}
+    	return results;
+    }
+
+    _normalizeChatEmoteEntry(entry, message) {
+    	if (!entry || typeof entry !== "object") {
+    		return [];
+    	}
+
+    	const name = this._firstString(
+    		entry.name,
+    		entry.id,
+    		entry.emote_id,
+    		entry.emoteId,
+    		entry.emote_name,
+    		entry.emoteName,
+    		entry.keyword,
+    		entry.content,
+    		entry.text,
+    	);
+    	const directUrl = this._normalizeBadgeUrl(
+    		this._firstString(
+    			entry.url,
+    			entry.webp,
+    			entry.gifp,
+    			entry.image,
+    			entry.icon,
+    			entry.icon_url,
+    			entry.iconUrl,
+    		),
+    	);
+    	const fallbackUrl = name ? this._lookupEmoteUrl(name) : "";
+    	const url = directUrl || fallbackUrl;
+    	if (!url) {
+    		return [];
+    	}
+
+    	const locations = this._extractEmoteLocations(entry, message, name);
+    	if (!locations.length) {
+    		return [];
+    	}
+
+    	const id = name || this._string(entry.id, "") || url;
+    	return locations.map((location) => ({
+    		id,
+    		url,
+    		start: location.start,
+    		end: location.end,
+    	}));
+    }
+
+    _extractEmoteLocations(entry, message, name = "") {
+    	const rawStart = this._extractNumeric(
+    		entry.start,
+    		entry.start_index,
+    		entry.startIndex,
+    		entry.from,
+    		entry.begin,
+    		entry.offset,
+    		entry.location?.start,
+    		entry.location?.from,
+    	);
+    	const rawEnd = this._extractNumeric(
+    		entry.end,
+    		entry.end_index,
+    		entry.endIndex,
+    		entry.to,
+    		entry.finish,
+    		entry.location?.end,
+    		entry.location?.to,
+    	);
+    	const rawLength = this._extractNumeric(
+    		entry.length,
+    		entry.len,
+    		entry.count,
+    		entry.location?.length,
+    	);
+    	const explicit = this._normalizeExplicitLocation(
+    		message,
+    		rawStart,
+    		rawEnd,
+    		rawLength,
+    		name,
+    	);
+    	if (explicit) {
+    		return [explicit];
+    	}
+
+    	return this._findTokenLocationsFromMessage(message, name);
+    }
+
+    _normalizeExplicitLocation(message, rawStart, rawEnd, rawLength, name = "") {
+    	if (!Number.isFinite(rawStart)) {
+    		return null;
+    	}
+
+    	const messageLength = this._string(message, "").length;
+    	let startUnit = Math.max(0, Math.floor(rawStart));
+    	let endUnit = null;
+
+    	if (Number.isFinite(rawEnd)) {
+    		endUnit = Math.floor(rawEnd);
+    		if (endUnit < startUnit) {
+    			return null;
+    		}
+    		const token = this._string(name, "");
+    		if (token) {
+    			const inclusiveSlice = message.slice(startUnit, endUnit + 1);
+    			const exclusiveSlice = message.slice(startUnit, endUnit);
+    			if (inclusiveSlice === token) {
+    				// inclusive index, keep as-is.
+    			} else if (exclusiveSlice === token && endUnit > startUnit) {
+    				endUnit -= 1;
+    			}
+    		}
+    	} else if (Number.isFinite(rawLength) && rawLength > 0) {
+    		endUnit = startUnit + Math.floor(rawLength) - 1;
+    	} else if (name) {
+    		endUnit = startUnit + name.length - 1;
+    	}
+
+    	if (!Number.isFinite(endUnit) || endUnit < startUnit) {
+    		return null;
+    	}
+    	if (startUnit >= messageLength) {
+    		return null;
+    	}
+    	endUnit = Math.min(endUnit, messageLength - 1);
+
+    	const start = this._toCodePointIndex(message, startUnit);
+    	const end = this._toCodePointIndex(message, endUnit + 1) - 1;
+    	if (end < start) {
+    		return null;
+    	}
+    	return { start, end };
+    }
+
+    _findTokenLocationsFromMessage(message, token) {
+    	const text = this._string(message, "");
+    	const needle = this._string(token, "");
+    	if (!text || !needle) {
+    		return [];
+    	}
+
+    	const locations = [];
+    	let offset = 0;
+    	while (offset <= text.length) {
+    		const index = text.indexOf(needle, offset);
+    		if (index === -1) {
+    			break;
+    		}
+
+    		const start = this._toCodePointIndex(text, index);
+    		const end = this._toCodePointIndex(text, index + needle.length) - 1;
+    		if (end >= start) {
+    			locations.push({ start, end });
+    		}
+    		offset = index + needle.length;
+    	}
+
+    	return locations;
+    }
+
+    _inferEmotesFromMessageText(message) {
+    	const text = this._string(message, "");
+    	if (!text || !this._emoteLookup?.size) {
+    		return [];
+    	}
+
+    	const matches = [];
+    	const tokenPattern = /\S+/g;
+    	let tokenMatch;
+
+    	while ((tokenMatch = tokenPattern.exec(text))) {
+    		const token = this._string(tokenMatch[0], "");
+    		if (!token) {
+    			continue;
+    		}
+
+    		const variants = this._tokenVariants(token);
+    		let picked = null;
+    		for (const variant of variants) {
+    			const lookup = this._emoteLookup.get(variant.lookupKey);
+    			if (!lookup) {
+    				continue;
+    			}
+    			picked = {
+    				lookup,
+    				startOffset: variant.startOffset,
+    				endOffset: variant.endOffset,
+    			};
+    			break;
+    		}
+
+    		if (!picked) {
+    			continue;
+    		}
+
+    		const startUnit = tokenMatch.index + picked.startOffset;
+    		const endUnit = tokenMatch.index + token.length - picked.endOffset - 1;
+    		if (endUnit < startUnit) {
+    			continue;
+    		}
+
+    		const start = this._toCodePointIndex(text, startUnit);
+    		const end = this._toCodePointIndex(text, endUnit + 1) - 1;
+    		if (end < start) {
+    			continue;
+    		}
+
+    		matches.push({
+    			id: picked.lookup.name,
+    			url: picked.lookup.url,
+    			start,
+    			end,
+    		});
+    	}
+
+    	return matches;
+    }
+
+    _tokenVariants(token) {
+    	const raw = this._string(token, "");
+    	if (!raw) {
+    		return [];
+    	}
+
+    	const variants = [
+    		{
+    			value: raw,
+    			startOffset: 0,
+    			endOffset: 0,
+    		},
+    	];
+
+    	if (raw.startsWith(":") && raw.length > 1) {
+    		variants.push({
+    			value: raw.slice(1),
+    			startOffset: 1,
+    			endOffset: 0,
+    		});
+    	}
+
+    	const leadingMatch = raw.match(/^[:([{<"'`]+/);
+    	const trailingMatch = raw.match(/[)\]}>,"'.`?]+$/);
+    	const leading = leadingMatch ? leadingMatch[0].length : 0;
+    	const trailing = trailingMatch ? trailingMatch[0].length : 0;
+    	const trimmed = raw.slice(leading, raw.length - trailing);
+    	if (trimmed && trimmed !== raw) {
+    		variants.push({
+    			value: trimmed,
+    			startOffset: leading,
+    			endOffset: trailing,
+    		});
+    	}
+
+    	return variants.map((variant) => ({
+    		...variant,
+    		lookupKey: variant.value.toLowerCase(),
+    	}));
+    }
+
+    _lookupEmoteUrl(name) {
+    	const key = this._string(name, "").trim().toLowerCase();
+    	if (!key || !this._emoteLookup?.size) {
+    		return "";
+    	}
+    	const direct = this._emoteLookup.get(key);
+    	if (direct?.url) {
+    		return this._string(direct.url, "");
+    	}
+
+    	const withoutColon = key.startsWith(":") ? key.slice(1) : key;
+    	if (withoutColon && withoutColon !== key) {
+    		const alt = this._emoteLookup.get(withoutColon);
+    		if (alt?.url) {
+    			return this._string(alt.url, "");
+    		}
+    	}
+
+    	const withColon = key.startsWith(":") ? key : `:${key}`;
+    	if (withColon !== key) {
+    		const alt = this._emoteLookup.get(withColon);
+    		if (alt?.url) {
+    			return this._string(alt.url, "");
+    		}
+    	}
+
+    	return "";
+    }
+
+    _asObjectArray(value) {
+    	if (Array.isArray(value)) {
+    		return value.filter(
+    			(entry) => entry && typeof entry === "object" && !Array.isArray(entry),
+    		);
+    	}
+    	if (typeof value === "string") {
+    		const text = value.trim();
+    		if (!text) {
+    			return [];
+    		}
+    		try {
+    			const parsed = JSON.parse(text);
+    			if (Array.isArray(parsed)) {
+    				return parsed.filter(
+    					(entry) =>
+    						entry && typeof entry === "object" && !Array.isArray(entry),
+    				);
+    			}
+    			if (parsed && typeof parsed === "object") {
+    				return [parsed];
+    			}
+    		} catch {
+    			return [];
+    		}
+    	}
+    	return [];
+    }
+
+    _toCodePointIndex(text, codeUnitIndex) {
+    	const message = this._string(text, "");
+    	if (!message) {
+    		return 0;
+    	}
+    	const bounded = Math.max(
+    		0,
+    		Math.min(message.length, Math.floor(codeUnitIndex)),
+    	);
+    	return Array.from(message.slice(0, bounded)).length;
+    }
+
+    _extractNumeric(...values) {
+    	for (const value of values) {
+    		const parsed = this._number(value, Number.NaN);
+    		if (Number.isFinite(parsed)) {
+    			return parsed;
+    		}
+    	}
+    	return Number.NaN;
+    }
+
+    _maxTierLevel(chat = {}) {
+    	return Math.max(
+    		this._coerceTierLevel(chat?.sub_tier),
+    		this._coerceTierLevel(chat?.sub_lv),
+    		this._coerceTierLevel(chat?.tier),
+    		this._coerceTierLevel(chat?.content_data?.sub_tier),
+    		this._coerceTierLevel(chat?.content_data?.sub_lv),
+    	);
+    }
+
+    _coerceTierLevel(value) {
+    	if (typeof value === "number" && Number.isFinite(value)) {
+    		return Math.max(0, Math.floor(value));
+    	}
+
+    	const text = this._string(value, "").trim().toLowerCase();
+    	if (!text) {
+    		return 0;
+    	}
+
+    	const numeric = Number(text);
+    	if (Number.isFinite(numeric)) {
+    		return Math.max(0, Math.floor(numeric));
+    	}
+
+    	const match =
+    		text.match(/tier[^0-9]*([0-9]+)/) ||
+    		text.match(/sub[^0-9]*([0-9]+)/) ||
+    		text.match(/([0-9]+)/);
+    	if (!match?.[1]) {
+    		return 0;
+    	}
+
+    	const parsed = Number(match[1]);
+    	return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+    }
+
+    _buildAlertUser(chat, fallbackUsername = "") {
+    	const username = this._string(
+    		chat?.user_name || chat?.nick_name,
+    		fallbackUsername || this._state.username,
+    	).trim();
+    	const displayname = this._string(chat?.nick_name, username);
+    	const avatar = this._string(chat?.avatar, "");
+    	const userId = this._string(chat?.user_id, "");
+    	const roles = this._stringList(chat?.roles);
+    	const medals = this._stringList(chat?.medals);
+    	const userLevels = this._buildRoleFlags(
+    		roles,
+    		medals,
+    		username,
+    		chat || {},
+    	);
+
+    	return {
+    		username,
+    		displayname,
+    		avatar: avatar || undefined,
+    		userId: userId || undefined,
+    		userLevels,
+    	};
+    }
+
+    _buildAlertExtraSettings(chat, fallbackUsername = "", overrides = {}) {
+    	const alertUser = this._buildAlertUser(chat, fallbackUsername);
+    	const roles = this._stringList(chat?.roles);
+    	const medals = this._stringList(chat?.medals);
+    	const uptime =
+    		this._state.live && this._state.uptimeStartedAt
+    			? this._formatDuration(Date.now() - this._state.uptimeStartedAt)
+    			: "";
+
+    	return {
+    		username: alertUser.username,
+    		displayname: alertUser.displayname,
+    		avatar: alertUser.avatar,
+    		userId: alertUser.userId,
+    		live: this._state.live,
+    		uptime,
+    		channel_id: this._state.channelId,
+    		display_name: this._state.displayName,
+    		session_chat_count: this._state.sessionChatCount,
+    		session_follower_count: this._state.sessionFollowerCount,
+    		session_subscribers_count: this._state.sessionSubscribersCount,
+    		session_raiders: this._state.sessionRaiders.join(", "),
+    		session_subscribers: this._state.sessionSubscribers.join(", "),
+    		sub_tier: this._string(chat?.sub_tier, ""),
+    		sub_level: this._string(chat?.sub_lv, ""),
+    		roles: roles.join(","),
+    		medals: medals.join(","),
+    		...overrides,
+    	};
+    }
+
+    async _triggerAlert(
+    	alert,
+    	{ dynamic = {}, extraSettings = {}, showInEventList } = {},
+    ) {
+    	try {
+    		const normalizedDynamic = this._normalizeAlertDynamic(dynamic);
+    		await this.lumia.triggerAlert({
+    			alert,
+    			dynamic: normalizedDynamic,
+    			extraSettings,
+    			showInEventList:
+    				typeof showInEventList === "boolean" ? showInEventList : false,
+    		});
+    	} catch (error) {
+    		await this._log(
+    			`[Trovo] Failed to trigger alert ${alert}: ${this._errorMessage(error)}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    _normalizeAlertDynamic(dynamic = {}) {
+    	const name = this._string(dynamic?.name, "");
+    	let value = dynamic?.value;
+    	if (
+    		typeof value !== "string" &&
+    		typeof value !== "number" &&
+    		typeof value !== "boolean"
+    	) {
+    		value = this._string(value, "");
+    	}
+    	return { name, value };
+    }
+
+    async _markLastEvent() {
+    	await this._setVariable(
+    		VARIABLE_NAMES.lastEventAt,
+    		new Date().toISOString(),
+    	);
+    }
+
+    async _hydrateVariableDefaults() {
+    	const updates = Object.entries(VARIABLE_DEFAULTS).map(([name, value]) =>
+    		this._setVariable(name, value, { force: true }),
+    	);
+    	await Promise.all(updates);
+    }
+
+    async _applyResolvedProfile(profile = {}) {
+    	const channelId = this._string(profile?.channelId, this._state.channelId);
+    	const userId = this._string(profile?.userId, this._state.userId);
+    	const username = this._string(profile?.username, this._state.username);
+    	const displayName = this._string(
+    		profile?.displayName || username,
+    		this._state.displayName,
+    	);
+
+    	if (!channelId && !username) {
+    		return;
+    	}
+
+    	this._state.channelId = channelId;
+    	this._state.userId = userId;
+    	this._state.username = username;
+    	this._state.displayName = displayName;
+
+    	await Promise.all([
+    		this._setVariable(VARIABLE_NAMES.channelId, channelId),
+    		this._setVariable(VARIABLE_NAMES.username, username),
+    		this._setVariable(VARIABLE_NAMES.displayName, displayName),
+    	]);
+    }
+
+    _resolveCredentials(source = {}) {
+    	return {
+    		clientId: TROVO_CLIENT_ID,
+    		accessToken: this._normalizeToken(source?.accessToken),
+    		refreshToken: this._string(source?.refreshToken, "").trim(),
+    		tokenExpiresAt: this._number(source?.tokenExpiresAt, 0),
+    	};
+    }
+
+    _hasCredentials(source = {}) {
+    	const credentials = this._resolveCredentials(source);
+    	return Boolean(this._hasAuthTokens(credentials));
+    }
+
+    _hasAuthTokens(source = this.settings) {
+    	return Boolean(this._accessToken(source) || this._refreshToken(source));
+    }
+
+    _accessToken(source = this.settings) {
+    	return this._normalizeToken(source?.accessToken);
+    }
+
+    _refreshToken(source = this.settings) {
+    	return this._string(source?.refreshToken, "").trim();
+    }
+
+    _tokenExpiresAt(source = this.settings) {
+    	return this._number(source?.tokenExpiresAt, 0);
+    }
+
+    _canRefreshTokens(source = this.settings) {
+    	return Boolean(
+    		this._refreshToken(source) &&
+    		typeof this.lumia?.refreshOAuthToken === "function",
+    	);
+    }
+
+    _requiresReconnect(settings, previous) {
+    	const keys = ["accessToken", "refreshToken", "tokenExpiresAt"];
+
+    	for (const key of keys) {
+    		if ((settings?.[key] ?? "") !== (previous?.[key] ?? "")) {
+    			return true;
+    		}
+    	}
+
+    	return false;
+    }
+
+    _extractUserId(chat = {}) {
+    	const direct = this._firstString(
+    		chat?.uid,
+    		chat?.sender_id,
+    		chat?.senderId,
+    		chat?.user_id,
+    		chat?.userId,
+    	);
+    	const normalizedDirect = this._string(direct, "").trim();
+    	if (normalizedDirect) {
+    		return normalizedDirect;
+    	}
+
+    	const parsedFromMessageId = this._extractUidFromTrovoMessageId(
+    		chat?.message_id || chat?.messageId || chat?.id,
+    	);
+    	return parsedFromMessageId || "";
+    }
+
+    _trackChatMessageAuthor(chat = {}) {
+    	const messageId = this._string(
+    		chat?.message_id || chat?.messageId || chat?.id,
+    		"",
+    	).trim();
+    	if (!messageId) {
+    		return;
+    	}
+
+    	const uid = this._extractUserId(chat);
+    	if (!uid) {
+    		return;
+    	}
+
+    	this._chatMessageAuthors.set(messageId, uid);
+    	this._chatMessageAuthorOrder.push(messageId);
+
+    	if (this._chatMessageAuthorOrder.length > MAX_TRACKED_CHAT_MESSAGE_AUTHORS) {
+    		const oldest = this._chatMessageAuthorOrder.shift();
+    		if (oldest) {
+    			this._chatMessageAuthors.delete(oldest);
+    		}
+    	}
+    }
+
+    _resolveDeleteMessageUid(messageId, username = "") {
+    	const normalizedMessageId = this._string(messageId, "").trim();
+    	if (!normalizedMessageId) {
+    		return "";
+    	}
+
+    	const cached = this._string(this._chatMessageAuthors.get(normalizedMessageId), "").trim();
+    	if (cached) {
+    		return cached;
+    	}
+
+    	const parsed = this._extractUidFromTrovoMessageId(normalizedMessageId);
+    	if (parsed) {
+    		return parsed;
+    	}
+
+    	const normalizedUsername = this._normalizeCommandUsername(username);
+    	if (
+    		normalizedUsername &&
+    		this._state.username &&
+    		normalizedUsername.toLowerCase() === this._state.username.toLowerCase()
+    	) {
+    		return this._string(this._state.userId, "").trim();
+    	}
+
+    	return "";
+    }
+
+    _extractUidFromTrovoMessageId(messageId) {
+    	const raw = this._string(messageId, "").trim();
+    	if (!raw) {
+    		return "";
+    	}
+
+    	const parts = raw.split("_").filter(Boolean);
+    	for (let index = 1; index < parts.length; index += 1) {
+    		const part = this._string(parts[index], "").trim();
+    		if (/^\d+$/.test(part)) {
+    			return part;
+    		}
+    	}
+
+    	return "";
+    }
+
+    _normalizeCommandUsername(value) {
+    	return this._string(value, "").trim().replace(/^@+/, "");
+    }
+
+    async _sendTrovoChatMessage(message, credentials, options = {}) {
+    	const content = this._string(message, "").trim();
+    	if (!content) {
+    		return false;
+    	}
+
+    	const channelId = await this._resolveChannelId(credentials, options);
+    	const payload = {
+    		content,
+    	};
+    	if (channelId) {
+    		payload.channel_id = this._number(channelId, 0);
+    	}
+
+    	await this._trovoPost("chat/send", payload, credentials, options);
+    	return true;
+    }
+
+    async _performChatCommand(command, credentials, options = {}) {
+    	const normalizedCommand = this._string(command, "").trim();
+    	if (!normalizedCommand) {
+    		return false;
+    	}
+    	const apiCommand = normalizedCommand.replace(/^\/+/, "").trim();
+    	if (!apiCommand) {
+    		return false;
+    	}
+
+    	const channelId = await this._resolveChannelId(credentials, options);
+    	const parsedChannelId = this._number(channelId, 0);
+    	if (!parsedChannelId) {
+    		throw new Error("Perform chat command requires a valid channel_id");
+    	}
+
+    	const payload = {
+    		command: apiCommand,
+    		channel_id: parsedChannelId,
+    	};
+
+    	await this._trovoPost(
+    		"channels/command",
+    		payload,
+    		credentials,
+    		options,
+    	);
+    	return true;
+    }
+
+    async _deleteChatMessage(messageId, uid, credentials, options = {}) {
+    	const normalizedMessageId = this._string(messageId, "").trim();
+    	const normalizedUid = this._string(uid, "").trim();
+    	if (!normalizedMessageId || !normalizedUid) {
+    		return false;
+    	}
+
+    	const channelId = await this._resolveChannelId(credentials, options);
+    	const normalizedChannelId = this._string(channelId, "").trim();
+    	if (!normalizedChannelId || !/^\d+$/.test(normalizedUid)) {
+    		throw new Error("Delete message requires valid channel_id and uid");
+    	}
+
+    	const deletePath = `channels/${encodeURIComponent(
+    		normalizedChannelId,
+    	)}/messages/${encodeURIComponent(normalizedMessageId)}/users/${encodeURIComponent(
+    		normalizedUid,
+    	)}`;
+
+    	await this._trovoDelete(
+    		deletePath,
+    		undefined,
+    		credentials,
+    		options,
+    	);
+    	return true;
+    }
+
+    async _fetchProfile(credentials, options = {}) {
+    	const payload = await this._trovoGet("getuserinfo", credentials, options);
+    	const data =
+    		payload && typeof payload.data === "object" && payload.data
+    			? payload.data
+    			: payload;
+
+    	return {
+    		channelId: this._string(data?.channelId || data?.channel_id, ""),
+    		userId: this._string(data?.uid || data?.userId || data?.user_id, ""),
+    		username: this._string(
+    			data?.userName || data?.user_name || data?.username || data?.nickName,
+    			"",
+    		),
+    		displayName: this._string(data?.nickName || data?.nick_name, ""),
+    	};
+    }
+
+    async _fetchChatToken(credentials, options = {}) {
+    	const payload = await this._trovoGet("chat/token", credentials, options);
+    	const token = this._string(
+    		payload?.token || payload?.data?.token,
+    		"",
+    	).trim();
+    	if (!token) {
+    		throw new Error("Trovo chat/token did not return a token");
+    	}
+    	return token;
+    }
+
+    async _searchCategories(query, limit = CATEGORY_SEARCH_LIMIT) {
+    	const cleanedQuery = this._string(query, "").trim();
+    	if (!cleanedQuery) {
+    		return [];
+    	}
+
+    	const safeLimit = Math.max(1, Math.min(100, this._parseInteger(limit, 20)));
+    	const payload = await this._trovoPublicPost("searchcategory", {
+    		query: cleanedQuery,
+    		limit: safeLimit,
+    	});
+    	return Array.isArray(payload?.category_info) ? payload.category_info : [];
+    }
+
+    async _findBestCategoryMatch(query) {
+    	const cleanedQuery = this._string(query, "").trim();
+    	if (!cleanedQuery) {
+    		throw new Error("Category query is required");
+    	}
+
+    	const categories = await this._searchCategories(cleanedQuery);
+    	if (!categories.length) {
+    		throw new Error(`No Trovo categories found for "${cleanedQuery}"`);
+    	}
+
+    	let best = null;
+    	let bestScore = Number.NEGATIVE_INFINITY;
+    	for (const category of categories) {
+    		const score = this._scoreCategoryMatch(cleanedQuery, category);
+    		if (score > bestScore) {
+    			bestScore = score;
+    			best = category;
+    		}
+    	}
+
+    	if (!best || !this._string(best?.id, "").trim()) {
+    		throw new Error(`No Trovo category match found for "${cleanedQuery}"`);
+    	}
+
+    	return {
+    		id: this._string(best.id, "").trim(),
+    		name: this._string(best.name || best.short_name, "").trim(),
+    	};
+    }
+
+    _scoreCategoryMatch(query, category = {}) {
+    	const queryRaw = this._string(query, "").trim();
+    	const queryNormalized = this._normalizeMatchText(queryRaw);
+    	const categoryId = this._string(category?.id || category?.category_id, "").trim();
+    	const categoryName = this._string(category?.name, "").trim();
+    	const categoryShortName = this._string(
+    		category?.short_name || category?.shortName,
+    		"",
+    	).trim();
+
+    	if (!queryNormalized) {
+    		return Number.NEGATIVE_INFINITY;
+    	}
+    	if (categoryId && queryRaw === categoryId) {
+    		return 10000;
+    	}
+
+    	const labels = [categoryName, categoryShortName].filter(Boolean);
+    	if (!labels.length) {
+    		return Number.NEGATIVE_INFINITY;
+    	}
+
+    	let best = Number.NEGATIVE_INFINITY;
+    	for (const label of labels) {
+    		const normalizedLabel = this._normalizeMatchText(label);
+    		if (!normalizedLabel) {
+    			continue;
+    		}
+
+    		if (normalizedLabel === queryNormalized) {
+    			best = Math.max(best, 9000);
+    			continue;
+    		}
+    		if (normalizedLabel.startsWith(queryNormalized)) {
+    			best = Math.max(best, 8000);
+    			continue;
+    		}
+    		if (normalizedLabel.includes(queryNormalized)) {
+    			best = Math.max(best, 7000);
+    			continue;
+    		}
+
+    		const similarity = this._diceCoefficient(queryNormalized, normalizedLabel);
+    		best = Math.max(best, similarity * 1000);
+    	}
+
+    	return best;
+    }
+
+    _diceCoefficient(left, right) {
+    	const a = this._string(left, "");
+    	const b = this._string(right, "");
+    	if (!a || !b) {
+    		return 0;
+    	}
+    	if (a === b) {
+    		return 1;
+    	}
+    	if (a.length < 2 || b.length < 2) {
+    		return 0;
+    	}
+
+    	const makeBigrams = (text) => {
+    		const counts = new Map();
+    		for (let i = 0; i < text.length - 1; i += 1) {
+    			const key = text.slice(i, i + 2);
+    			counts.set(key, (counts.get(key) || 0) + 1);
+    		}
+    		return counts;
+    	};
+
+    	const leftBigrams = makeBigrams(a);
+    	const rightBigrams = makeBigrams(b);
+
+    	let overlap = 0;
+    	for (const [key, leftCount] of leftBigrams.entries()) {
+    		const rightCount = rightBigrams.get(key) || 0;
+    		overlap += Math.min(leftCount, rightCount);
+    	}
+
+    	const total = a.length - 1 + (b.length - 1);
+    	return total > 0 ? (2 * overlap) / total : 0;
+    }
+
+    _normalizeMatchText(value) {
+    	return this._string(value, "")
+    		.toLowerCase()
+    		.replace(/[^a-z0-9]+/g, " ")
+    		.trim();
+    }
+
+    async _updateChannelInfo(updates = {}, credentials, options = {}) {
+    	const resolvedCredentials = this._resolveCredentials(credentials || this.settings);
+    	const channelId = await this._resolveChannelId(resolvedCredentials, options);
+    	const payload = {
+    		channel_id: this._number(channelId, 0),
+    	};
+
+    	const liveTitle = this._string(updates?.live_title, "");
+    	if (liveTitle.trim()) {
+    		payload.live_title = liveTitle;
+    	}
+
+    	const categoryId = this._string(
+    		updates?.category_id || updates?.category,
+    		"",
+    	).trim();
+    	if (categoryId) {
+    		const parsedCategoryId = this._parseInteger(categoryId, 0);
+    		const categoryValue = parsedCategoryId || categoryId;
+    		payload.category = categoryValue;
+    		payload.category_id = categoryValue;
+    	}
+
+    	if (!payload.live_title && !payload.category && !payload.category_id) {
+    		return false;
+    	}
+
+    	await this._trovoPost("channels/update", payload, resolvedCredentials, options);
+    	return true;
+    }
+
+    async _resolveChannelId(credentials, options = {}) {
+    	const existingChannelId = this._number(this._state.channelId, 0);
+    	if (existingChannelId) {
+    		return existingChannelId;
+    	}
+
+    	const profile = await this._fetchProfile(credentials, options);
+    	await this._applyResolvedProfile(profile);
+    	const resolvedChannelId = this._number(profile?.channelId, 0);
+    	if (!resolvedChannelId) {
+    		throw new Error("Unable to resolve Trovo channel id");
+    	}
+    	return resolvedChannelId;
+    }
+
+    async _refreshEmoteLookup() {
+    	const channelId = this._number(this._state.channelId, 0);
+    	if (!channelId) {
+    		return;
+    	}
+
+    	const url = `${API_BASE_URL}/getemotes`;
+    	try {
+    		const response = await fetch(url, {
+    			method: "POST",
+    			headers: {
+    				"Client-ID": TROVO_CLIENT_ID,
+    				"Content-Type": "application/json",
+    			},
+    			body: JSON.stringify({
+    				emote_type: 0,
+    				channel_id: [channelId],
+    			}),
+    		});
+
+    		const bodyText = await response.text();
+    		let payload = {};
+    		if (bodyText) {
+    			try {
+    				payload = JSON.parse(bodyText);
+    			} catch {
+    				payload = {};
+    			}
+    		}
+
+    		if (!response.ok || this._isErrorResponse(payload)) {
+    			throw new Error(
+    				this._responseError(payload) ||
+    					`HTTP ${response.status} ${response.statusText || ""}`.trim(),
+    			);
+    		}
+
+    		this._emoteLookup = this._buildEmoteLookup(payload);
+    	} catch (error) {
+    		await this._log(
+    			`[Trovo] Failed to refresh emote lookup: ${this._errorMessage(error)}`,
+    			"warn",
+    		);
+    	}
+    }
+
+    _buildEmoteLookup(payload = {}) {
+    	const channels =
+    		payload && typeof payload.channels === "object" && payload.channels
+    			? payload.channels
+    			: payload;
+    	const lookup = new Map();
+
+    	const addEmote = (emote = {}) => {
+    		const name = this._string(emote?.name, "").trim();
+    		if (!name) {
+    			return;
+    		}
+    		const url = this._normalizeBadgeUrl(
+    			this._firstString(emote?.webp, emote?.gifp, emote?.url),
+    		);
+    		if (!url) {
+    			return;
+    		}
+    		const key = name.toLowerCase();
+    		if (!lookup.has(key)) {
+    			lookup.set(key, { name, url });
+    		}
+    	};
+
+    	const customizedChannels = Array.isArray(
+    		channels?.customizedEmotes?.channel,
+    	)
+    		? channels.customizedEmotes.channel
+    		: [];
+    	for (const channel of customizedChannels) {
+    		const emotes = Array.isArray(channel?.emotes) ? channel.emotes : [];
+    		for (const emote of emotes) {
+    			addEmote(emote);
+    		}
+    	}
+
+    	const eventEmotes = Array.isArray(channels?.eventEmotes)
+    		? channels.eventEmotes
+    		: [];
+    	for (const emote of eventEmotes) {
+    		addEmote(emote);
+    	}
+
+    	const globalEmotes = Array.isArray(channels?.globalEmotes)
+    		? channels.globalEmotes
+    		: [];
+    	for (const emote of globalEmotes) {
+    		addEmote(emote);
+    	}
+
+    	return lookup;
+    }
+
+    async _trovoGet(path, credentials, options = {}) {
+    	const clientId = TROVO_CLIENT_ID;
+
+    	const accessToken = await this._ensureAccessToken(credentials, options);
+    	let response = await this._trovoRequest(path, clientId, accessToken);
+
+    	if (response.status === 401 && this._canRefreshTokens(credentials)) {
+    		const refreshedToken = await this._refreshAccessToken(
+    			credentials,
+    			options,
+    		);
+    		response = await this._trovoRequest(path, clientId, refreshedToken);
+    	}
+
+    	return this._readTrovoResponse(path, response);
+    }
+
+    async _trovoPost(path, payload = {}, credentials, options = {}) {
+    	const clientId = TROVO_CLIENT_ID;
+    	const accessToken = await this._ensureAccessToken(credentials, options);
+    	let response = await this._trovoRequest(path, clientId, accessToken, {
+    		method: "POST",
+    		body: payload,
+    	});
+
+    	if (response.status === 401 && this._canRefreshTokens(credentials)) {
+    		const refreshedToken = await this._refreshAccessToken(credentials, options);
+    		response = await this._trovoRequest(path, clientId, refreshedToken, {
+    			method: "POST",
+    			body: payload,
+    		});
+    	}
+
+    	return this._readTrovoResponse(path, response);
+    }
+
+    async _trovoDelete(path, payload = {}, credentials, options = {}) {
+    	const clientId = TROVO_CLIENT_ID;
+    	const accessToken = await this._ensureAccessToken(credentials, options);
+    	let response = await this._trovoRequest(path, clientId, accessToken, {
+    		method: "DELETE",
+    		body: payload,
+    	});
+
+    	if (response.status === 401 && this._canRefreshTokens(credentials)) {
+    		const refreshedToken = await this._refreshAccessToken(credentials, options);
+    		response = await this._trovoRequest(path, clientId, refreshedToken, {
+    			method: "DELETE",
+    			body: payload,
+    		});
+    	}
+
+    	return this._readTrovoResponse(path, response);
+    }
+
+    async _trovoPublicPost(path, payload = {}) {
+    	const response = await this._trovoRequest(path, TROVO_CLIENT_ID, "", {
+    		method: "POST",
+    		body: payload,
+    	});
+    	return this._readTrovoResponse(path, response);
+    }
+
+    async _readTrovoResponse(path, response) {
+    	const url = `${API_BASE_URL}/${path}`;
+    	const bodyText = await response.text();
+    	let body = {};
+    	if (bodyText) {
+    		try {
+    			body = JSON.parse(bodyText);
+    		} catch {
+    			body = { message: bodyText };
+    		}
+    	}
+
+    	if (!response.ok) {
+    		throw new Error(
+    			`HTTP ${response.status} on ${url}: ${this._responseError(body) || response.statusText || "Request failed"}`,
+    		);
+    	}
+
+    	if (this._isErrorResponse(body)) {
+    		throw new Error(this._responseError(body));
+    	}
+
+    	return body;
+    }
+
+    async _trovoRequest(path, clientId, accessToken, options = {}) {
+    	const url = `${API_BASE_URL}/${path}`;
+    	const method = this._string(options?.method, "GET").toUpperCase();
+    	const hasBody = options?.body !== undefined;
+    	const timeoutMs = Math.max(
+    		1000,
+    		this._number(options?.timeoutMs, HTTP_REQUEST_TIMEOUT_MS),
+    	);
+    	const headers = {
+    		Accept: "application/json",
+    		"Client-ID": clientId,
+    	};
+    	if (accessToken) {
+    		headers.Authorization = `OAuth ${accessToken}`;
+    	}
+    	if (hasBody || method !== "GET") {
+    		headers["Content-Type"] = "application/json";
+    	}
+
+    	const requestInit = {
+    		method,
+    		headers,
+    	};
+    	if (hasBody) {
+    		requestInit.body = JSON.stringify(options.body);
+    	}
+
+    	const controller =
+    		typeof AbortController !== "undefined"
+    			? new AbortController()
+    			: null;
+    	let timeoutHandle = null;
+    	if (controller) {
+    		timeoutHandle = setTimeout(() => {
+    			controller.abort();
+    		}, timeoutMs);
+    	}
+
+    	try {
+    		return await fetch(url, {
+    			...requestInit,
+    			...(controller ? { signal: controller.signal } : {}),
+    		});
+    	} catch (error) {
+    		if (controller?.signal?.aborted) {
+    			throw new Error(
+    				`Trovo request timed out after ${timeoutMs}ms (${method} ${path})`,
+    			);
+    		}
+    		throw error;
+    	} finally {
+    		if (timeoutHandle) {
+    			clearTimeout(timeoutHandle);
+    		}
+    	}
+    }
+
+    async _refreshAccessToken(
+    	credentials = this._resolveCredentials(this.settings),
+    	options = {},
+    ) {
+    	if (this._tokenRefreshPromise) {
+    		return this._tokenRefreshPromise;
+    	}
+
+    	const refreshToken = this._refreshToken(credentials);
+    	if (!refreshToken) {
+    		throw new Error("Missing Trovo refresh token.");
+    	}
+
+    	const persist = options.persist !== false;
+    	this._tokenRefreshPromise = (async () => {
+    		try {
+    			if (typeof this.lumia?.refreshOAuthToken !== "function") {
+    				throw new Error("Missing OAuth refresh support.");
+    			}
+
+    			const payload = await this.lumia.refreshOAuthToken({ refreshToken });
+    			const nextAccessToken = this._normalizeToken(payload?.accessToken);
+    			const nextRefreshToken =
+    				this._string(payload?.refreshToken, "").trim() || refreshToken;
+    			const expiresAt = this._number(payload?.expiresAt, 0);
+    			const tokenExpiresAt = expiresAt ? expiresAt * 1000 : 0;
+
+    			if (!nextAccessToken) {
+    				throw new Error(
+    					"OAuth refresh did not return a Trovo access token.",
+    				);
+    			}
+
+    			if (persist) {
+    				this.updateSettings({
+    					accessToken: nextAccessToken,
+    					refreshToken: nextRefreshToken,
+    					tokenExpiresAt,
+    				});
+    			}
+
+    			return nextAccessToken;
+    		} catch (error) {
+    			await this._handleOAuthRefreshFailure(error);
+    			throw error;
+    		}
+    	})();
+
+    	try {
+    		return await this._tokenRefreshPromise;
+    	} finally {
+    		this._tokenRefreshPromise = null;
+    	}
+    }
+
+    async _ensureAccessToken(
+    	credentials = this._resolveCredentials(this.settings),
+    	options = {},
+    ) {
+    	const accessToken = this._accessToken(credentials);
+    	const refreshToken = this._refreshToken(credentials);
+    	const tokenExpiresAt = this._tokenExpiresAt(credentials);
+
+    	if (!accessToken && !refreshToken) {
+    		throw new Error("Missing Trovo access credentials.");
+    	}
+
+    	if (accessToken) {
+    		if (
+    			tokenExpiresAt &&
+    			Date.now() > tokenExpiresAt - 60000 &&
+    			this._canRefreshTokens(credentials)
+    		) {
+    			return this._refreshAccessToken(credentials, options);
+    		}
+    		return accessToken;
+    	}
+
+    	if (!this._canRefreshTokens(credentials)) {
+    		throw new Error("Missing Trovo access token.");
+    	}
+
+    	return this._refreshAccessToken(credentials, options);
+    }
+
+    _sendSocket(payload, { awaitResponse = false, timeoutMs = 10000 } = {}) {
+    	const ws = this._ws;
+    	if (!ws || ws.readyState !== WebSocket.OPEN) {
+    		return Promise.reject(new Error("Trovo websocket is not open"));
+    	}
+
+    	const nonce = String(this._nonceCounter++);
+    	const packet = {
+    		...payload,
+    		nonce,
+    	};
+
+    	if (!awaitResponse) {
+    		ws.send(JSON.stringify(packet));
+    		return Promise.resolve(true);
+    	}
+
+    	return new Promise((resolve, reject) => {
+    		const timeout = setTimeout(() => {
+    			this._pendingRequests.delete(nonce);
+    			reject(new Error("Trovo websocket request timed out"));
+    		}, timeoutMs);
+
+    		this._pendingRequests.set(nonce, {
+    			resolve,
+    			reject,
+    			timeout,
+    		});
+
+    		try {
+    			ws.send(JSON.stringify(packet));
+    		} catch (error) {
+    			clearTimeout(timeout);
+    			this._pendingRequests.delete(nonce);
+    			reject(error);
+    		}
+    	});
+    }
+
+    _rejectPendingRequests(error) {
+    	for (const pending of this._pendingRequests.values()) {
+    		clearTimeout(pending.timeout);
+    		pending.reject(error);
+    	}
+    	this._pendingRequests.clear();
+    }
+
+    async _setVariable(name, value, { force = false } = {}) {
+    	if (
+    		!force &&
+    		this._variableCache.has(name) &&
+    		this._variableCache.get(name) === value
+    	) {
+    		return;
+    	}
+    	this._variableCache.set(name, value);
+    	await this.lumia.setVariable(name, value);
+    }
+
+    async _updateConnectionState(nextState) {
+    	if (this._lastConnectionState === nextState) {
+    		return;
+    	}
+    	this._lastConnectionState = nextState;
+    	await this.lumia.updateConnection(nextState);
+    }
+
+    async _handleOAuthRefreshFailure(error) {
+    	if (this._authRefreshFailureHandled) {
+    		return;
+    	}
+    	this._authRefreshFailureHandled = true;
+
+    	const reason = this._errorMessage(error);
+    	const message = `[Trovo] OAuth refresh failed. Disconnected plugin. Re-authorize Trovo in Connections. (${reason})`;
+    	await this._log(message, "error");
+
+    	try {
+    		await this.lumia.showToast({
+    			message:
+    				'Trovo disconnected: OAuth token refresh failed. Re-authorize in Connections.',
+    			time: 10000,
+    		});
+    	} catch {}
+
+    	await this._stop({ manual: true, resetLiveState: false });
+    }
+
+    async _log(message, level = "info") {
+    	if (!message) {
+    		return;
+    	}
+    	try {
+    		await this.lumia.log({ message, level });
+    	} catch {}
+    }
+
+    _markStartupBoundary() {
+    	const now = Date.now();
+    	this._connectedAtMs = now;
+    	this._startupSuppressUntilMs = now + STARTUP_SUPPRESS_SECONDS * 1000;
+    	this._recentChatIds.clear();
+    	this._recentChatIdOrder = [];
+    	this._chatMessageAuthors.clear();
+    	this._chatMessageAuthorOrder = [];
+    	this._state.sessionJoinedUsers.clear();
+    }
+
+    _shouldSuppressStartupEvent(chat = {}) {
+    	const eventMs = this._extractChatEventTimestampMs(chat);
+    	if (eventMs > 0 && this._connectedAtMs > 0) {
+    		return (
+    			eventMs <
+    			this._connectedAtMs - STARTUP_BACKFILL_TOLERANCE_SECONDS * 1000
+    		);
+    	}
+
+    	return (
+    		Boolean(this._startupSuppressUntilMs) &&
+    		Date.now() < this._startupSuppressUntilMs
+    	);
+    }
+
+    _extractChatEventTimestampMs(chat = {}) {
+    	const contentData =
+    		chat && typeof chat.content_data === "object" && chat.content_data
+    			? chat.content_data
+    			: {};
+    	const candidates = [
+    		chat?.send_time,
+    		chat?.sendTime,
+    		chat?.timestamp,
+    		chat?.time,
+    		chat?.ts,
+    		chat?.create_time,
+    		chat?.created_at,
+    		chat?.createdAt,
+    		contentData?.send_time,
+    		contentData?.timestamp,
+    		contentData?.created_at,
+    	];
+
+    	for (const candidate of candidates) {
+    		const epochMs = this._toEpochMs(candidate);
+    		if (epochMs > 0) {
+    			return epochMs;
+    		}
+    	}
+
+    	return 0;
+    }
+
+    _toEpochMs(value) {
+    	if (typeof value === "number" && Number.isFinite(value)) {
+    		return value >= 1e11 ? Math.floor(value) : Math.floor(value * 1000);
+    	}
+
+    	if (typeof value === "string") {
+    		const trimmed = value.trim();
+    		if (!trimmed) {
+    			return 0;
+    		}
+
+    		const numeric = Number(trimmed);
+    		if (Number.isFinite(numeric)) {
+    			return this._toEpochMs(numeric);
+    		}
+
+    		const parsed = Date.parse(trimmed);
+    		return Number.isFinite(parsed) ? parsed : 0;
+    	}
+
+    	return 0;
+    }
+
+    _isDuplicateChat(chat = {}) {
+    	const messageId = this._string(
+    		chat?.message_id || chat?.messageId || chat?.id,
+    		"",
+    	).trim();
+    	if (!messageId) {
+    		return false;
+    	}
+    	if (this._recentChatIds.has(messageId)) {
+    		return true;
+    	}
+
+    	this._recentChatIds.add(messageId);
+    	this._recentChatIdOrder.push(messageId);
+
+    	if (this._recentChatIdOrder.length > MAX_TRACKED_CHAT_IDS) {
+    		const oldest = this._recentChatIdOrder.shift();
+    		if (oldest) {
+    			this._recentChatIds.delete(oldest);
+    		}
+    	}
+
+    	return false;
+    }
+
+    _includeSpells(settings = this.settings) {
+    	return this._bool(settings?.includeSpells, true);
+    }
+
+    _shouldTriggerEntrance(settings = this.settings) {
+    	const onlyWhenLive = this._bool(settings?.entranceOnlyWhenLive, true);
+    	return onlyWhenLive ? this._state.live === true : true;
+    }
+
+    _shouldTriggerFirstChatter(settings = this.settings) {
+    	const onlyWhenLive = this._bool(settings?.firstChatterOnlyWhenLive, true);
+    	return onlyWhenLive ? this._state.live === true : true;
+    }
+
+    _heartbeatMs() {
+    	return Math.min(90, Math.max(10, HEARTBEAT_SECONDS)) * 1000;
+    }
+
+    _connectionTimeoutMs() {
+    	return Math.min(60, Math.max(5, CONNECTION_TIMEOUT_SECONDS)) * 1000;
+    }
+
+    _reconnectDelaySeconds() {
+    	return Math.min(
+    		MAX_RECONNECT_DELAY_SECONDS,
+    		Math.max(1, RECONNECT_DELAY_SECONDS),
+    	);
+    }
+
+    _isErrorResponse(payload) {
+    	if (!payload || typeof payload !== "object") {
+    		return false;
+    	}
+
+    	if (
+    		payload.status &&
+    		this._string(payload.status, "").toLowerCase() === "error"
+    	) {
+    		return true;
+    	}
+
+    	if (typeof payload.ret === "number" && payload.ret !== 0) {
+    		return true;
+    	}
+
+    	if (payload.error) {
+    		return true;
+    	}
+
+    	return false;
+    }
+
+    _responseError(payload) {
+    	if (!payload) {
+    		return "Unknown Trovo error";
+    	}
+
+    	const message =
+    		this._string(payload?.retMsg, "") ||
+    		this._string(payload?.message, "") ||
+    		this._string(payload?.error, "");
+
+    	if (message) {
+    		return message;
+    	}
+
+    	if (typeof payload === "string") {
+    		return payload;
+    	}
+
+    	return "Unknown Trovo error";
+    }
+
+    _extractRecipient(value) {
+    	const content = this._string(value, "").trim();
+    	if (!content) {
+    		return "";
+    	}
+
+    	const commaIndex = content.indexOf(",");
+    	if (commaIndex >= 0) {
+    		return content.slice(commaIndex + 1).trim();
+    	}
+
+    	const toMatch = content.match(/\bto\s+@?([a-zA-Z0-9_]+)/i);
+    	return toMatch ? this._string(toMatch[1], "") : "";
+    }
+
+    _extractRaidViewers(value) {
+    	const content = this._string(value, "");
+    	if (!content) {
+    		return 0;
+    	}
+
+    	const matches = content.match(/\d+/g);
+    	if (!matches || !matches.length) {
+    		return 0;
+    	}
+
+    	return this._parseInteger(matches[matches.length - 1], 0);
+    }
+
+    _parseInteger(value, fallback = 0) {
+    	const parsed = parseInt(this._string(value, ""), 10);
+    	return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    _pushUnique(list, value) {
+    	const entry = this._string(value, "").trim();
+    	if (!entry) {
+    		return;
+    	}
+
+    	if (!list.includes(entry)) {
+    		list.push(entry);
+    	}
+
+    	if (list.length > MAX_LIST_ITEMS) {
+    		list.splice(0, list.length - MAX_LIST_ITEMS);
+    	}
+    }
+
+    _normalizeToken(value) {
+    	const text = this._string(value, "").trim();
+    	if (!text) {
+    		return "";
+    	}
+
+    	return text
+    		.replace(/^OAuth\s+/i, "")
+    		.replace(/^Bearer\s+/i, "")
+    		.trim();
+    }
+
+    _formatDuration(milliseconds) {
+    	const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+    	const days = Math.floor(totalSeconds / 86400);
+    	const hours = Math.floor((totalSeconds % 86400) / 3600);
+    	const minutes = Math.floor((totalSeconds % 3600) / 60);
+    	const seconds = totalSeconds % 60;
+
+    	const parts = [];
+    	if (days) parts.push(`${days}d`);
+    	if (hours) parts.push(`${hours}h`);
+    	if (minutes) parts.push(`${minutes}m`);
+    	if (seconds || !parts.length) parts.push(`${seconds}s`);
+    	return parts.slice(0, 3).join(" ");
+    }
+
+    _socketMessageToString(raw) {
+    	if (typeof raw === "string") {
+    		return raw;
+    	}
+    	if (Buffer.isBuffer(raw)) {
+    		return raw.toString("utf8");
+    	}
+    	if (Array.isArray(raw)) {
+    		try {
+    			return Buffer.concat(raw).toString("utf8");
+    		} catch {
+    			return "";
+    		}
+    	}
+    	if (raw == null) {
+    		return "";
+    	}
+    	return String(raw);
+    }
+
+    _socketReason(reasonBuffer) {
+    	if (!reasonBuffer) {
+    		return "";
+    	}
+    	if (typeof reasonBuffer === "string") {
+    		return reasonBuffer;
+    	}
+    	if (Buffer.isBuffer(reasonBuffer)) {
+    		return reasonBuffer.toString("utf8");
+    	}
+    	return String(reasonBuffer);
+    }
+
+    _errorMessage(error) {
+    	if (error instanceof Error) {
+    		return error.message;
+    	}
+    	if (typeof error === "string") {
+    		return error;
+    	}
+    	if (error && typeof error === "object" && "message" in error) {
+    		return this._string(error.message, "Unknown error");
+    	}
+    	return "Unknown error";
+    }
+
+    _bool(value, fallback = false) {
+    	if (typeof value === "boolean") {
+    		return value;
+    	}
+    	if (typeof value === "number") {
+    		return value !== 0;
+    	}
+    	if (typeof value === "string") {
+    		const normalized = value.trim().toLowerCase();
+    		if (["true", "1", "yes", "on"].includes(normalized)) {
+    			return true;
+    		}
+    		if (["false", "0", "no", "off"].includes(normalized)) {
+    			return false;
+    		}
+    	}
+    	return fallback;
+    }
+
+    _number(value, fallback = 0) {
+    	if (typeof value === "number" && Number.isFinite(value)) {
+    		return value;
+    	}
+    	if (typeof value === "string") {
+    		const parsed = Number(value.trim());
+    		if (Number.isFinite(parsed)) {
+    			return parsed;
+    		}
+    	}
+    	return fallback;
+    }
+
+    _string(value, fallback = "") {
+    	if (typeof value === "string") {
+    		return value;
+    	}
+    	if (value === null || value === undefined) {
+    		return fallback;
+    	}
+    	return String(value);
+    }
+
+    _stringList(value) {
+    	if (!Array.isArray(value)) {
+    		return [];
+    	}
+    	return value.map((entry) => this._extractTokenLabel(entry)).filter(Boolean);
+    }
+
+    _extractTokenLabel(entry) {
+    	if (typeof entry === "string") {
+    		return entry.trim();
+    	}
+    	if (entry === null || entry === undefined || typeof entry !== "object") {
+    		return this._string(entry, "").trim();
+    	}
+
+    	const directLabel = this._firstString(
+    		entry.name,
+    		entry.label,
+    		entry.title,
+    		entry.type,
+    		entry.id,
+    		entry.role_name,
+    		entry.medal_name,
+    		entry.badge_name,
+    		entry.text,
+    		entry.desc,
+    	);
+    	if (directLabel) {
+    		return directLabel;
+    	}
+
+    	if (entry.icon && typeof entry.icon === "object") {
+    		const nestedLabel = this._firstString(
+    			entry.icon.name,
+    			entry.icon.label,
+    			entry.icon.title,
+    			entry.icon.id,
+    		);
+    		if (nestedLabel) {
+    			return nestedLabel;
+    		}
+    	}
+
+    	return "";
+    }
+
+    _extractBadgeUrls(chat = {}) {
+    	const urls = [];
+    	const sources = [
+    		...(Array.isArray(chat?.medals) ? chat.medals : []),
+    		...(Array.isArray(chat?.roles) ? chat.roles : []),
+    	];
+
+    	for (const entry of sources) {
+    		const url = this._extractBadgeUrl(entry);
+    		if (url) {
+    			urls.push(url);
+    		}
+    	}
+
+    	return [...new Set(urls)];
+    }
+
+    _extractBadgeUrl(entry) {
+    	if (!entry) {
+    		return "";
+    	}
+
+    	if (typeof entry === "string") {
+    		const normalized = this._normalizeBadgeUrl(entry);
+    		if (normalized) {
+    			return normalized;
+    		}
+    		return this._resolveBadgeTokenUrl(entry);
+    	}
+
+    	if (typeof entry !== "object") {
+    		return "";
+    	}
+
+    	const iconObject =
+    		entry.icon && typeof entry.icon === "object" ? entry.icon : {};
+    	const raw = this._firstString(
+    		entry.icon,
+    		entry.icon_url,
+    		entry.iconUrl,
+    		entry.badge,
+    		entry.badge_url,
+    		entry.badgeUrl,
+    		entry.image,
+    		entry.image_url,
+    		entry.imageUrl,
+    		entry.url,
+    		entry.src,
+    		iconObject.url,
+    		iconObject.src,
+    		iconObject.image,
+    		iconObject.image_url,
+    	);
+    	const rawToken = this._firstString(
+    		entry.name,
+    		entry.label,
+    		entry.title,
+    		entry.type,
+    		entry.id,
+    		entry.role_name,
+    		entry.medal_name,
+    		entry.badge_name,
+    		iconObject.name,
+    		iconObject.label,
+    		iconObject.title,
+    		iconObject.id,
+    	);
+    	const normalized = this._normalizeBadgeUrl(raw);
+    	if (normalized) {
+    		return normalized;
+    	}
+    	return this._resolveBadgeTokenUrl(rawToken);
+    }
+
+    _normalizeBadgeUrl(value) {
+    	const raw = this._string(value, "").trim();
+    	if (!raw) {
+    		return "";
+    	}
+    	if (/^https?:\/\//i.test(raw)) {
+    		return raw;
+    	}
+    	if (raw.startsWith("//")) {
+    		return `https:${raw}`;
+    	}
+    	if (raw.startsWith("/")) {
+    		return `https://trovo.live${raw}`;
+    	}
+    	return "";
+    }
+
+    _firstString(...values) {
+    	for (const value of values) {
+    		const text = this._string(value, "").trim();
+    		if (text) {
+    			return text;
+    		}
+    	}
+    	return "";
+    }
+
+    _resolveBadgeTokenUrl(value) {
+    	const token = this._string(value, "").trim().toLowerCase();
+    	if (!token) {
+    		return "";
+    	}
+    	return TROVO_BADGE_TOKEN_URLS[token] || "";
+    }
 
 }
 
@@ -24639,536 +24730,537 @@ module.exports = TrovoPlugin;
 ## trovo/manifest.json
 
 ```
+
 {
-	"id": "trovo_live",
-	"name": "Trovo",
-	"version": "1.0.2",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"description": "Trovo Live integration with chat, alerts, chatbot, moderation, variables, and stream actions.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "platforms",
-	"keywords": "trovo, livestream, chat, alerts, spells",
-	"icon": "trovo.png",
-	"config": {
-		"hasChatbot": true,
-		"oauth": {
-			"buttonLabel": "Authorize Trovo",
-			"helperText": "Connect your Trovo account to stream chat/events and auto-refresh tokens.",
-			"openInBrowser": true,
-			"scopes": [
-				"user_details_self",
-				"chat_connect",
-				"chat_send_self",
-				"channel_details_self",
-				"channel_subscriptions",
-				"channel_update_self",
-				"manage_messages",
-				"send_to_my_channel"
-			],
-			"tokenKeys": {
-				"accessToken": "accessToken",
-				"refreshToken": "refreshToken",
-				"tokenSecret": "tokenSecret"
-			}
-		},
-		"settings": [
-			{
-				"key": "accessToken",
-				"label": "Access Token",
-				"type": "password",
-				"helperText": "Auto-filled after OAuth completes.",
-				"disabled": true,
-				"required": false
-			},
-			{
-				"key": "refreshToken",
-				"label": "Refresh Token",
-				"type": "password",
-				"helperText": "Auto-filled after OAuth completes.",
-				"disabled": true,
-				"required": false
-			},
-			{
-				"key": "entranceOnlyWhenLive",
-				"label": "Entrance Alerts Only While Live",
-				"type": "toggle",
-				"defaultValue": true
-			},
-			{
-				"key": "firstChatterOnlyWhenLive",
-				"label": "First Chatter Alerts Only While Live",
-				"type": "toggle",
-				"defaultValue": true
-			}
-		],
-		"modcommandOptions": [
-			"delete",
-			"ban",
-			"unban",
-			"timeout",
-			"add-moderator",
-			"remove-moderator"
-		],
-		"settings_tutorial": "./settings_tutorial.md",
-		"actions_tutorial": "./actions_tutorial.md",
-		"actions": [
-			{
-				"type": "send_chat",
-				"label": "Send Chat Message",
-				"description": "Send a chatbot message to Trovo.",
-				"fields": [
-					{
-						"key": "message",
-						"label": "Message",
-						"type": "text",
-						"required": true,
-						"allowVariables": true
-					},
-					{
-						"key": "chatAsSelf",
-						"label": "Chat As Self",
-						"type": "checkbox",
-						"defaultValue": false
-					},
-					{
-						"key": "color",
-						"label": "Message Color (optional)",
-						"type": "color"
-					}
-				]
-			},
-			{
-				"type": "update_live_title",
-				"label": "Update Live Title",
-				"description": "Update the Trovo live title for your channel.",
-				"fields": [
-					{
-						"key": "liveTitle",
-						"label": "Live Title",
-						"type": "text",
-						"required": true,
-						"allowVariables": true
-					}
-				]
-			},
-			{
-				"type": "update_category",
-				"label": "Update Category",
-				"description": "Search Trovo categories and update to the closest matching category.",
-				"fields": [
-					{
-						"key": "category",
-						"label": "Category (name or id)",
-						"type": "text",
-						"required": true,
-						"allowVariables": true
-					}
-				]
-			},
-			{
-				"type": "host_channel",
-				"label": "Host Channel",
-				"description": "Host another Trovo channel using /host command.",
-				"fields": [
-					{
-						"key": "username",
-						"label": "Username",
-						"type": "text",
-						"required": true,
-						"allowVariables": true
-					}
-				]
-			},
-			{
-				"type": "unhost_channel",
-				"label": "Unhost Channel",
-				"description": "Stop hosting using /unhost command.",
-				"fields": []
-			},
-			{
-				"type": "set_title_command",
-				"label": "Set Title (Command)",
-				"description": "Set stream title using /settitle command.",
-				"fields": [
-					{
-						"key": "title",
-						"label": "Title",
-						"type": "text",
-						"required": true,
-						"allowVariables": true
-					}
-				]
-			},
-			{
-				"type": "trigger_alert",
-				"label": "Trigger Alert",
-				"description": "Manually trigger one of the Trovo alerts.",
-				"fields": [
-					{
-						"key": "alertKey",
-						"label": "Alert",
-						"type": "select",
-						"required": true,
-						"defaultValue": "follower",
-						"options": [
-							{
-								"label": "Stream Live",
-								"value": "streamLive"
-							},
-							{
-								"label": "Stream Offline",
-								"value": "streamOffline"
-							},
-							{
-								"label": "First Chatter",
-								"value": "firstChatter"
-							},
-							{
-								"label": "Entrance",
-								"value": "entrance"
-							},
-							{
-								"label": "Channel Join",
-								"value": "channelJoin"
-							},
-							{
-								"label": "Follower",
-								"value": "follower"
-							},
-							{
-								"label": "Subscriber",
-								"value": "subscriber"
-							},
-							{
-								"label": "Gift Subscription",
-								"value": "subscriptionGift"
-							},
-							{
-								"label": "Raid",
-								"value": "raid"
-							},
-							{
-								"label": "Spell",
-								"value": "spell"
-							}
-						]
-					},
-					{
-						"key": "username",
-						"label": "Username",
-						"type": "text",
-						"allowVariables": true
-					},
-					{
-						"key": "value",
-						"label": "Value",
-						"type": "text",
-						"allowVariables": true
-					}
-				]
-			}
-		],
-		"variableFunctions": [
-			{
-				"key": "uptime",
-				"label": "Trovo Uptime",
-				"description": "Returns current Trovo live uptime as a friendly duration."
-			}
-		],
-		"variables": [
-			{
-				"name": "uptime",
-				"description": "Friendly uptime of the current Trovo live session.",
-				"value": ""
-			},
-			{
-				"name": "live",
-				"description": "Whether Trovo stream is currently live.",
-				"value": false
-			},
-			{
-				"name": "session_chat_count",
-				"description": "Number of chat messages seen in current session.",
-				"value": 0
-			},
-			{
-				"name": "last_follower",
-				"description": "Username of the latest follower event.",
-				"value": ""
-			},
-			{
-				"name": "current_first_chatter",
-				"description": "First chatter username for the current stream session.",
-				"value": ""
-			},
-			{
-				"name": "current_first_chatter_count",
-				"description": "Current first chatter streak count.",
-				"value": 0
-			},
-			{
-				"name": "previous_first_chatter",
-				"description": "First chatter username from previous stream session.",
-				"value": ""
-			},
-			{
-				"name": "previous_first_chatter_count",
-				"description": "Previous first chatter streak count.",
-				"value": 0
-			},
-			{
-				"name": "last_chatter",
-				"description": "Username of the latest chat message author.",
-				"value": ""
-			},
-			{
-				"name": "last_raider",
-				"description": "Username of the latest raider.",
-				"value": ""
-			},
-			{
-				"name": "last_raid_amount",
-				"description": "Viewer count from the latest raid.",
-				"value": 0
-			},
-			{
-				"name": "session_follower_count",
-				"description": "Follower events counted for current session.",
-				"value": 0
-			},
-			{
-				"name": "session_subscribers_count",
-				"description": "Subscriber events counted for current session.",
-				"value": 0
-			},
-			{
-				"name": "session_raiders",
-				"description": "Comma-separated list of raiders for current session.",
-				"value": ""
-			},
-			{
-				"name": "last_subscriber",
-				"description": "Username of the latest subscriber or gift recipient.",
-				"value": ""
-			},
-			{
-				"name": "session_subscribers",
-				"description": "Comma-separated list of subscribers for current session.",
-				"value": ""
-			},
-			{
-				"name": "channel_id",
-				"description": "Resolved Trovo channel ID.",
-				"value": ""
-			},
-			{
-				"name": "username",
-				"description": "Resolved Trovo username.",
-				"value": ""
-			},
-			{
-				"name": "display_name",
-				"description": "Resolved Trovo display name.",
-				"value": ""
-			},
-			{
-				"name": "last_spell",
-				"description": "Name of the latest Trovo spell.",
-				"value": ""
-			},
-			{
-				"name": "last_spell_amount",
-				"description": "Quantity of the latest Trovo spell.",
-				"value": 0
-			},
-			{
-				"name": "last_spell_value",
-				"description": "Value per unit of the latest Trovo spell.",
-				"value": 0
-			},
-			{
-				"name": "last_message",
-				"description": "Text of the latest relayed Trovo chat message.",
-				"value": ""
-			},
-			{
-				"name": "last_message_id",
-				"description": "Message id of the latest relayed Trovo chat message.",
-				"value": ""
-			},
-			{
-				"name": "last_event_at",
-				"description": "ISO timestamp of the latest Trovo event processed.",
-				"value": ""
-			}
-		],
-		"alerts": [
-			{
-				"title": "Stream Live",
-				"key": "streamLive",
-				"acceptedVariables": [
-					"live",
-					"username",
-					"channel_id",
-					"uptime"
-				],
-				"defaultMessage": "{{username}} is now live on Trovo!"
-			},
-			{
-				"title": "Stream Offline",
-				"key": "streamOffline",
-				"acceptedVariables": [
-					"live",
-					"username",
-					"uptime"
-				],
-				"defaultMessage": "{{username}} has ended the Trovo stream."
-			},
-			{
-				"title": "First Chatter",
-				"key": "firstChatter",
-				"acceptedVariables": [
-					"current_first_chatter",
-					"current_first_chatter_count",
-					"previous_first_chatter",
-					"previous_first_chatter_count",
-					"live"
-				],
-				"defaultMessage": "{{username}} is first chatter!",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Entrance",
-				"key": "entrance",
-				"acceptedVariables": [
-					"live",
-					"session_chat_count"
-				],
-				"defaultMessage": "{{username}} entered chat.",
-				"variationConditions": [
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Channel Join",
-				"key": "channelJoin",
-				"acceptedVariables": [
-					"live",
-					"username"
-				],
-				"defaultMessage": "{{username}} joined the channel.",
-				"defaults": {
-					"on": false
-				}
-			},
-			{
-				"title": "Follower",
-				"key": "follower",
-				"acceptedVariables": [
-					"last_follower",
-					"session_follower_count",
-					"username"
-				],
-				"defaultMessage": "New Trovo follower: {{username}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Follower count is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Subscriber",
-				"key": "subscriber",
-				"acceptedVariables": [
-					"last_subscriber",
-					"session_subscribers_count",
-					"session_subscribers",
-					"username"
-				],
-				"defaultMessage": "New Trovo subscriber: {{username}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Subscriber count is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Gift Subscription",
-				"key": "subscriptionGift",
-				"acceptedVariables": [
-					"last_subscriber",
-					"session_subscribers_count",
-					"session_subscribers",
-					"username"
-				],
-				"defaultMessage": "Gift subscription event by {{username}}",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Gift amount is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Raid",
-				"key": "raid",
-				"acceptedVariables": [
-					"last_raider",
-					"last_raid_amount",
-					"session_raiders",
-					"username"
-				],
-				"defaultMessage": "{{username}} raided with {{value}} viewers!",
-				"variationConditions": [
-					{
-						"type": "GREATER_NUMBER",
-						"description": "Raid amount is greater than.."
-					},
-					{
-						"type": "RANDOM",
-						"description": "Trigger this variation based on a percent chance."
-					}
-				]
-			},
-			{
-				"title": "Spell",
-				"key": "spell",
-				"acceptedVariables": [
-					"last_spell",
-					"last_spell_amount",
-					"last_spell_value",
-					"username"
-				],
-				"defaultMessage": "{{username}} cast {{spell}} x{{spell_quantity}}"
-			}
-		],
-		"translations": "./translations.json"
-	}
+"id": "trovo_live",
+"name": "Trovo",
+"version": "1.0.2",
+"author": "Lumia Stream",
+"email": "dev@lumiastream.com",
+"website": "https://lumiastream.com",
+"description": "Trovo Live integration with chat, alerts, chatbot, moderation, variables, and stream actions.",
+"license": "MIT",
+"lumiaVersion": "^9.0.0",
+"category": "platforms",
+"keywords": "trovo, livestream, chat, alerts, spells",
+"icon": "trovo.png",
+"config": {
+"hasChatbot": true,
+"oauth": {
+"buttonLabel": "Authorize Trovo",
+"helperText": "Connect your Trovo account to stream chat/events and auto-refresh tokens.",
+"openInBrowser": true,
+"scopes": [
+"user_details_self",
+"chat_connect",
+"chat_send_self",
+"channel_details_self",
+"channel_subscriptions",
+"channel_update_self",
+"manage_messages",
+"send_to_my_channel"
+],
+"tokenKeys": {
+"accessToken": "accessToken",
+"refreshToken": "refreshToken",
+"tokenSecret": "tokenSecret"
+}
+},
+"settings": [
+{
+"key": "accessToken",
+"label": "Access Token",
+"type": "password",
+"helperText": "Auto-filled after OAuth completes.",
+"disabled": true,
+"required": false
+},
+{
+"key": "refreshToken",
+"label": "Refresh Token",
+"type": "password",
+"helperText": "Auto-filled after OAuth completes.",
+"disabled": true,
+"required": false
+},
+{
+"key": "entranceOnlyWhenLive",
+"label": "Entrance Alerts Only While Live",
+"type": "toggle",
+"defaultValue": true
+},
+{
+"key": "firstChatterOnlyWhenLive",
+"label": "First Chatter Alerts Only While Live",
+"type": "toggle",
+"defaultValue": true
+}
+],
+"modcommandOptions": [
+"delete",
+"ban",
+"unban",
+"timeout",
+"add-moderator",
+"remove-moderator"
+],
+"settings_tutorial": "./settings_tutorial.md",
+"actions_tutorial": "./actions_tutorial.md",
+"actions": [
+{
+"type": "send_chat",
+"label": "Send Chat Message",
+"description": "Send a chatbot message to Trovo.",
+"fields": [
+{
+"key": "message",
+"label": "Message",
+"type": "text",
+"required": true,
+"allowVariables": true
+},
+{
+"key": "chatAsSelf",
+"label": "Chat As Self",
+"type": "checkbox",
+"defaultValue": false
+},
+{
+"key": "color",
+"label": "Message Color (optional)",
+"type": "color"
+}
+]
+},
+{
+"type": "update_live_title",
+"label": "Update Live Title",
+"description": "Update the Trovo live title for your channel.",
+"fields": [
+{
+"key": "liveTitle",
+"label": "Live Title",
+"type": "text",
+"required": true,
+"allowVariables": true
+}
+]
+},
+{
+"type": "update_category",
+"label": "Update Category",
+"description": "Search Trovo categories and update to the closest matching category.",
+"fields": [
+{
+"key": "category",
+"label": "Category (name or id)",
+"type": "text",
+"required": true,
+"allowVariables": true
+}
+]
+},
+{
+"type": "host_channel",
+"label": "Host Channel",
+"description": "Host another Trovo channel using /host command.",
+"fields": [
+{
+"key": "username",
+"label": "Username",
+"type": "text",
+"required": true,
+"allowVariables": true
+}
+]
+},
+{
+"type": "unhost_channel",
+"label": "Unhost Channel",
+"description": "Stop hosting using /unhost command.",
+"fields": []
+},
+{
+"type": "set_title_command",
+"label": "Set Title (Command)",
+"description": "Set stream title using /settitle command.",
+"fields": [
+{
+"key": "title",
+"label": "Title",
+"type": "text",
+"required": true,
+"allowVariables": true
+}
+]
+},
+{
+"type": "trigger_alert",
+"label": "Trigger Alert",
+"description": "Manually trigger one of the Trovo alerts.",
+"fields": [
+{
+"key": "alertKey",
+"label": "Alert",
+"type": "select",
+"required": true,
+"defaultValue": "follower",
+"options": [
+{
+"label": "Stream Live",
+"value": "streamLive"
+},
+{
+"label": "Stream Offline",
+"value": "streamOffline"
+},
+{
+"label": "First Chatter",
+"value": "firstChatter"
+},
+{
+"label": "Entrance",
+"value": "entrance"
+},
+{
+"label": "Channel Join",
+"value": "channelJoin"
+},
+{
+"label": "Follower",
+"value": "follower"
+},
+{
+"label": "Subscriber",
+"value": "subscriber"
+},
+{
+"label": "Gift Subscription",
+"value": "subscriptionGift"
+},
+{
+"label": "Raid",
+"value": "raid"
+},
+{
+"label": "Spell",
+"value": "spell"
+}
+]
+},
+{
+"key": "username",
+"label": "Username",
+"type": "text",
+"allowVariables": true
+},
+{
+"key": "value",
+"label": "Value",
+"type": "text",
+"allowVariables": true
+}
+]
+}
+],
+"variableFunctions": [
+{
+"key": "uptime",
+"label": "Trovo Uptime",
+"description": "Returns current Trovo live uptime as a friendly duration."
+}
+],
+"variables": [
+{
+"name": "uptime",
+"description": "Friendly uptime of the current Trovo live session.",
+"value": ""
+},
+{
+"name": "live",
+"description": "Whether Trovo stream is currently live.",
+"value": false
+},
+{
+"name": "session_chat_count",
+"description": "Number of chat messages seen in current session.",
+"value": 0
+},
+{
+"name": "last_follower",
+"description": "Username of the latest follower event.",
+"value": ""
+},
+{
+"name": "current_first_chatter",
+"description": "First chatter username for the current stream session.",
+"value": ""
+},
+{
+"name": "current_first_chatter_count",
+"description": "Current first chatter streak count.",
+"value": 0
+},
+{
+"name": "previous_first_chatter",
+"description": "First chatter username from previous stream session.",
+"value": ""
+},
+{
+"name": "previous_first_chatter_count",
+"description": "Previous first chatter streak count.",
+"value": 0
+},
+{
+"name": "last_chatter",
+"description": "Username of the latest chat message author.",
+"value": ""
+},
+{
+"name": "last_raider",
+"description": "Username of the latest raider.",
+"value": ""
+},
+{
+"name": "last_raid_amount",
+"description": "Viewer count from the latest raid.",
+"value": 0
+},
+{
+"name": "session_follower_count",
+"description": "Follower events counted for current session.",
+"value": 0
+},
+{
+"name": "session_subscribers_count",
+"description": "Subscriber events counted for current session.",
+"value": 0
+},
+{
+"name": "session_raiders",
+"description": "Comma-separated list of raiders for current session.",
+"value": ""
+},
+{
+"name": "last_subscriber",
+"description": "Username of the latest subscriber or gift recipient.",
+"value": ""
+},
+{
+"name": "session_subscribers",
+"description": "Comma-separated list of subscribers for current session.",
+"value": ""
+},
+{
+"name": "channel_id",
+"description": "Resolved Trovo channel ID.",
+"value": ""
+},
+{
+"name": "username",
+"description": "Resolved Trovo username.",
+"value": ""
+},
+{
+"name": "display_name",
+"description": "Resolved Trovo display name.",
+"value": ""
+},
+{
+"name": "last_spell",
+"description": "Name of the latest Trovo spell.",
+"value": ""
+},
+{
+"name": "last_spell_amount",
+"description": "Quantity of the latest Trovo spell.",
+"value": 0
+},
+{
+"name": "last_spell_value",
+"description": "Value per unit of the latest Trovo spell.",
+"value": 0
+},
+{
+"name": "last_message",
+"description": "Text of the latest relayed Trovo chat message.",
+"value": ""
+},
+{
+"name": "last_message_id",
+"description": "Message id of the latest relayed Trovo chat message.",
+"value": ""
+},
+{
+"name": "last_event_at",
+"description": "ISO timestamp of the latest Trovo event processed.",
+"value": ""
+}
+],
+"alerts": [
+{
+"title": "Stream Live",
+"key": "streamLive",
+"acceptedVariables": [
+"live",
+"username",
+"channel_id",
+"uptime"
+],
+"defaultMessage": "{{username}} is now live on Trovo!"
+},
+{
+"title": "Stream Offline",
+"key": "streamOffline",
+"acceptedVariables": [
+"live",
+"username",
+"uptime"
+],
+"defaultMessage": "{{username}} has ended the Trovo stream."
+},
+{
+"title": "First Chatter",
+"key": "firstChatter",
+"acceptedVariables": [
+"current_first_chatter",
+"current_first_chatter_count",
+"previous_first_chatter",
+"previous_first_chatter_count",
+"live"
+],
+"defaultMessage": "{{username}} is first chatter!",
+"variationConditions": [
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Entrance",
+"key": "entrance",
+"acceptedVariables": [
+"live",
+"session_chat_count"
+],
+"defaultMessage": "{{username}} entered chat.",
+"variationConditions": [
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Channel Join",
+"key": "channelJoin",
+"acceptedVariables": [
+"live",
+"username"
+],
+"defaultMessage": "{{username}} joined the channel.",
+"defaults": {
+"on": false
+}
+},
+{
+"title": "Follower",
+"key": "follower",
+"acceptedVariables": [
+"last_follower",
+"session_follower_count",
+"username"
+],
+"defaultMessage": "New Trovo follower: {{username}}",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Follower count is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Subscriber",
+"key": "subscriber",
+"acceptedVariables": [
+"last_subscriber",
+"session_subscribers_count",
+"session_subscribers",
+"username"
+],
+"defaultMessage": "New Trovo subscriber: {{username}}",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Subscriber count is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Gift Subscription",
+"key": "subscriptionGift",
+"acceptedVariables": [
+"last_subscriber",
+"session_subscribers_count",
+"session_subscribers",
+"username"
+],
+"defaultMessage": "Gift subscription event by {{username}}",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Gift amount is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Raid",
+"key": "raid",
+"acceptedVariables": [
+"last_raider",
+"last_raid_amount",
+"session_raiders",
+"username"
+],
+"defaultMessage": "{{username}} raided with {{value}} viewers!",
+"variationConditions": [
+{
+"type": "GREATER_NUMBER",
+"description": "Raid amount is greater than.."
+},
+{
+"type": "RANDOM",
+"description": "Trigger this variation based on a percent chance."
+}
+]
+},
+{
+"title": "Spell",
+"key": "spell",
+"acceptedVariables": [
+"last_spell",
+"last_spell_amount",
+"last_spell_value",
+"username"
+],
+"defaultMessage": "{{username}} cast {{spell}} x{{spell_quantity}}"
+}
+],
+"translations": "./translations.json"
+}
 }
 
 ```
@@ -25176,17 +25268,18 @@ module.exports = TrovoPlugin;
 ## trovo/package.json
 
 ```
+
 {
-	"name": "lumia-trovo",
-	"version": "1.0.0",
-	"private": true,
-	"description": "Lumia Stream Trovo plugin with realtime chat/events, alerts, variables, and actions.",
-	"main": "main.js",
-	"scripts": {},
-	"dependencies": {
-		"@lumiastream/plugin": "^0.4.1",
-		"ws": "^8.18.3"
-	}
+"name": "lumia-trovo",
+"version": "1.0.0",
+"private": true,
+"description": "Lumia Stream Trovo plugin with realtime chat/events, alerts, variables, and actions.",
+"main": "main.js",
+"scripts": {},
+"dependencies": {
+"@lumiastream/plugin": "^0.4.1",
+"ws": "^8.18.3"
+}
 }
 
 ```
@@ -25194,15 +25287,20 @@ module.exports = TrovoPlugin;
 ## trovo/settings_tutorial.md
 
 ```
+
 ---
+
 ### Setup
-1) Click **Authorize Trovo** in the OAuth section.
-2) Save the plugin; it will fetch your profile and chat token, then connect to Trovo websocket chat.
+
+1. Click **Authorize Trovo** in the OAuth section.
+2. Save the plugin; it will fetch your profile and chat token, then connect to Trovo websocket chat.
 
 ### Notes
+
 - Access/refresh tokens are filled automatically by OAuth and refreshed at runtime.
 - Channel ID and username are auto-detected from Trovo API.
 - Entrance and first chatter alerts can be limited to live sessions with the provided toggles.
+
 ---
 
 ```
@@ -25210,34 +25308,35 @@ module.exports = TrovoPlugin;
 ## trovo/translations.json
 
 ```
+
 {
-	"en": {
-		"uptime": "Friendly uptime of the current Trovo live session.",
-		"live": "Whether Trovo stream is currently live.",
-		"session_chat_count": "Number of chat messages seen in current session.",
-		"last_follower": "Username of the latest follower event.",
-		"current_first_chatter": "First chatter username for the current stream session.",
-		"current_first_chatter_count": "Current first chatter streak count.",
-		"previous_first_chatter": "First chatter username from previous stream session.",
-		"previous_first_chatter_count": "Previous first chatter streak count.",
-		"last_chatter": "Username of the latest chat message author.",
-		"last_raider": "Username of the latest raider.",
-		"last_raid_amount": "Viewer count from the latest raid.",
-		"session_follower_count": "Follower events counted for current session.",
-		"session_subscribers_count": "Subscriber events counted for current session.",
-		"session_raiders": "Comma-separated list of raiders for current session.",
-		"last_subscriber": "Username of the latest subscriber or gift recipient.",
-		"session_subscribers": "Comma-separated list of subscribers for current session.",
-		"channel_id": "Resolved Trovo channel ID.",
-		"username": "Resolved Trovo username.",
-		"display_name": "Resolved Trovo display name.",
-		"last_spell": "Name of the latest Trovo spell.",
-		"last_spell_amount": "Quantity of the latest Trovo spell.",
-		"last_spell_value": "Value per unit of the latest Trovo spell.",
-		"last_message": "Text of the latest relayed Trovo chat message.",
-		"last_message_id": "Message id of the latest relayed Trovo chat message.",
-		"last_event_at": "ISO timestamp of the latest Trovo event processed."
-	}
+"en": {
+"uptime": "Friendly uptime of the current Trovo live session.",
+"live": "Whether Trovo stream is currently live.",
+"session_chat_count": "Number of chat messages seen in current session.",
+"last_follower": "Username of the latest follower event.",
+"current_first_chatter": "First chatter username for the current stream session.",
+"current_first_chatter_count": "Current first chatter streak count.",
+"previous_first_chatter": "First chatter username from previous stream session.",
+"previous_first_chatter_count": "Previous first chatter streak count.",
+"last_chatter": "Username of the latest chat message author.",
+"last_raider": "Username of the latest raider.",
+"last_raid_amount": "Viewer count from the latest raid.",
+"session_follower_count": "Follower events counted for current session.",
+"session_subscribers_count": "Subscriber events counted for current session.",
+"session_raiders": "Comma-separated list of raiders for current session.",
+"last_subscriber": "Username of the latest subscriber or gift recipient.",
+"session_subscribers": "Comma-separated list of subscribers for current session.",
+"channel_id": "Resolved Trovo channel ID.",
+"username": "Resolved Trovo username.",
+"display_name": "Resolved Trovo display name.",
+"last_spell": "Name of the latest Trovo spell.",
+"last_spell_amount": "Quantity of the latest Trovo spell.",
+"last_spell_value": "Value per unit of the latest Trovo spell.",
+"last_message": "Text of the latest relayed Trovo chat message.",
+"last_message_id": "Message id of the latest relayed Trovo chat message.",
+"last_event_at": "ISO timestamp of the latest Trovo event processed."
+}
 }
 
 ```
@@ -25245,12 +25344,16 @@ module.exports = TrovoPlugin;
 ## tts_monster/actions_tutorial.md
 
 ```
+
 ---
+
 ### Speak Action
+
 1. Enter the **Message** you want spoken.
 2. Pick a **Voice** from the loaded options, or type either a voice name or voice ID manually. Overlay URL voices use the names from the overlay account.
 3. Set **Volume** if you want to change playback volume.
 4. Enable **Log Character Usage** for Developer API usage counts, or status toasts when using Overlay URL.
+
 ---
 
 ```
@@ -25258,6 +25361,7 @@ module.exports = TrovoPlugin;
 ## tts_monster/main.js
 
 ```
+
 const { Plugin } = require("@lumiastream/plugin");
 const fs = require("fs/promises");
 const os = require("os");
@@ -25267,1159 +25371,1161 @@ const crypto = require("crypto");
 const API_BASE = "https://api.console.tts.monster";
 const OVERLAY_VOICES_URL = "https://wutface.tts.monster/";
 const OVERLAY_GENERATE_URL =
-	"https://us-central1-tts-monster.cloudfunctions.net/generateTTS";
+"https://us-central1-tts-monster.cloudfunctions.net/generateTTS";
 const TEMP_DIR_NAME = "lumia-tts-monster";
 
 const AUTH_METHODS = {
-	DEVELOPER_API: "developerApi",
-	OVERLAY_URL: "overlayUrl",
+DEVELOPER_API: "developerApi",
+OVERLAY_URL: "overlayUrl",
 };
 
 const DEFAULTS = {
-	authMethod: AUTH_METHODS.OVERLAY_URL,
-	defaultVolume: 100,
-	waitForAudioToStop: true,
-	returnUsage: true,
-	requestTimeoutMs: 0,
-	voiceCacheTtlMs: 5 * 60 * 1000,
-	maxMessageChars: 500,
-	tempFileCleanupDelayMs: 10 * 60 * 1000,
+authMethod: AUTH_METHODS.OVERLAY_URL,
+defaultVolume: 100,
+waitForAudioToStop: true,
+returnUsage: true,
+requestTimeoutMs: 0,
+voiceCacheTtlMs: 5 _ 60 _ 1000,
+maxMessageChars: 500,
+tempFileCleanupDelayMs: 10 _ 60 _ 1000,
 };
 
 const TTSMONSTER_LOGO_DATA_URI =
-	"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjI0IiBmaWxsPSIjNmQyOGQ5Ii8+PGNpcmNsZSBjeD0iMzciIGN5PSI0MyIgcj0iOSIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjYzIiBjeT0iNDMiIHI9IjkiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzNyIgY3k9IjQ1IiByPSI0IiBmaWxsPSIjMWUxYjRiIi8+PGNpcmNsZSBjeD0iNjMiIGN5PSI0NSIgcj0iNCIgZmlsbD0iIzFlMWI0YiIvPjxwYXRoIGQ9Ik0zMiA2NCBxMTggMTYgMzYgMCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjYiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPgo=";
+"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjI0IiBmaWxsPSIjNmQyOGQ5Ii8+PGNpcmNsZSBjeD0iMzciIGN5PSI0MyIgcj0iOSIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjYzIiBjeT0iNDMiIHI9IjkiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzNyIgY3k9IjQ1IiByPSI0IiBmaWxsPSIjMWUxYjRiIi8+PGNpcmNsZSBjeD0iNjMiIGN5PSI0NSIgcj0iNCIgZmlsbD0iIzFlMWI0YiIvPjxwYXRoIGQ9Ik0zMiA2NCBxMTggMTYgMzYgMCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjYiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPgo=";
 
 const trimString = (value, fallback = "") => {
-	if (typeof value !== "string") {
-		return fallback;
-	}
-	const trimmed = value.trim();
-	return trimmed.length ? trimmed : fallback;
+if (typeof value !== "string") {
+return fallback;
+}
+const trimmed = value.trim();
+return trimmed.length ? trimmed : fallback;
 };
 
 const toNumber = (value, fallback) => {
-	if (typeof value === "number" && Number.isFinite(value)) {
-		return value;
-	}
-	if (typeof value === "string" && value.trim().length) {
-		const parsed = Number(value);
-		if (Number.isFinite(parsed)) {
-			return parsed;
-		}
-	}
-	return fallback;
+if (typeof value === "number" && Number.isFinite(value)) {
+return value;
+}
+if (typeof value === "string" && value.trim().length) {
+const parsed = Number(value);
+if (Number.isFinite(parsed)) {
+return parsed;
+}
+}
+return fallback;
 };
 
 const toBoolean = (value, fallback) => {
-	if (typeof value === "boolean") {
-		return value;
-	}
-	if (typeof value === "string") {
-		const normalized = value.trim().toLowerCase();
-		if (["true", "1", "yes", "on"].includes(normalized)) {
-			return true;
-		}
-		if (["false", "0", "no", "off"].includes(normalized)) {
-			return false;
-		}
-	}
-	return fallback;
+if (typeof value === "boolean") {
+return value;
+}
+if (typeof value === "string") {
+const normalized = value.trim().toLowerCase();
+if (["true", "1", "yes", "on"].includes(normalized)) {
+return true;
+}
+if (["false", "0", "no", "off"].includes(normalized)) {
+return false;
+}
+}
+return fallback;
 };
 
 const clamp = (value, min, max) => {
-	if (!Number.isFinite(value)) {
-		return min;
-	}
-	return Math.min(max, Math.max(min, value));
+if (!Number.isFinite(value)) {
+return min;
+}
+return Math.min(max, Math.max(min, value));
 };
 
 const truncateText = (text, limit) => {
-	if (typeof text !== "string" || !limit || text.length <= limit) {
-		return { text, truncated: false };
-	}
-	return {
-		text: text.slice(0, limit),
-		truncated: true,
-	};
+if (typeof text !== "string" || !limit || text.length <= limit) {
+return { text, truncated: false };
+}
+return {
+text: text.slice(0, limit),
+truncated: true,
+};
 };
 
 const normalizeVoiceSearchValue = (value) =>
-	trimString(value, "")
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, " ")
-		.trim();
+trimString(value, "")
+.toLowerCase()
+.replace(/[^a-z0-9]+/g, " ")
+.trim();
 
 const normalizeApiToken = (value) =>
-	trimString(value, "")
-		.replace(/^Authorization:\s*/i, "")
-		.replace(/^Bearer\s+/i, "")
-		.replace(/^["']|["']$/g, "")
-		.trim();
+trimString(value, "")
+.replace(/^Authorization:\s\*/i, "")
+.replace(/^Bearer\s+/i, "")
+.replace(/^["']|["']$/g, "")
+.trim();
 
 const parseOverlayUrl = (value) => {
-	const raw = trimString(value, "");
-	if (!raw) {
-		return {
-			ok: false,
-			userId: "",
-			apiKey: "",
-			message: "Overlay URL is required.",
-		};
-	}
+const raw = trimString(value, "");
+if (!raw) {
+return {
+ok: false,
+userId: "",
+apiKey: "",
+message: "Overlay URL is required.",
+};
+}
 
-	let url;
-	try {
-		url = new URL(raw);
-	} catch (_error) {
-		try {
-			url = new URL(`https://${raw}`);
-		} catch (_fallbackError) {
-			return {
-				ok: false,
-				userId: "",
-				apiKey: "",
-				message: "Overlay URL must be a valid TTS Monster overlay URL.",
-			};
-		}
-	}
+    let url;
+    try {
+    	url = new URL(raw);
+    } catch (_error) {
+    	try {
+    		url = new URL(`https://${raw}`);
+    	} catch (_fallbackError) {
+    		return {
+    			ok: false,
+    			userId: "",
+    			apiKey: "",
+    			message: "Overlay URL must be a valid TTS Monster overlay URL.",
+    		};
+    	}
+    }
 
-	const parts = url.pathname.split("/").filter(Boolean);
-	const overlayIndex = parts.findIndex(
-		(part) => part.toLowerCase() === "overlay",
-	);
-	const userId = trimString(
-		overlayIndex >= 0
-			? decodeURIComponent(parts[overlayIndex + 1] ?? "")
-			: "",
-	);
-	const apiKey = trimString(
-		overlayIndex >= 0
-			? decodeURIComponent(parts[overlayIndex + 2] ?? "")
-			: "",
-	);
-	if (!userId || !apiKey) {
-		return {
-			ok: false,
-			userId: "",
-			apiKey: "",
-			message:
-				"Overlay URL must look like https://tts.monster/overlay/{userId}/{token}.",
-		};
-	}
+    const parts = url.pathname.split("/").filter(Boolean);
+    const overlayIndex = parts.findIndex(
+    	(part) => part.toLowerCase() === "overlay",
+    );
+    const userId = trimString(
+    	overlayIndex >= 0
+    		? decodeURIComponent(parts[overlayIndex + 1] ?? "")
+    		: "",
+    );
+    const apiKey = trimString(
+    	overlayIndex >= 0
+    		? decodeURIComponent(parts[overlayIndex + 2] ?? "")
+    		: "",
+    );
+    if (!userId || !apiKey) {
+    	return {
+    		ok: false,
+    		userId: "",
+    		apiKey: "",
+    		message:
+    			"Overlay URL must look like https://tts.monster/overlay/{userId}/{token}.",
+    	};
+    }
 
-	return { ok: true, userId, apiKey, message: "" };
+    return { ok: true, userId, apiKey, message: "" };
+
 };
 
 class TTSMonsterPlugin extends Plugin {
-	constructor(manifest, context) {
-		super(manifest, context);
-		this._voiceCache = { list: [], fetchedAt: 0, cacheKey: "" };
-		this._voiceFetchPromise = null;
-		this._lastVoiceFetchError = "";
-		this._tempFileCleanupTimers = new Set();
-	}
-
-	async onload() {
-		await this._validateConnection({ silent: true });
-		void this._refreshVoiceCache({ silent: true });
-		void this.refreshActionOptions({ actionType: "speak" });
-	}
-
-	async onsettingsupdate(settings, previous = {}) {
-		const credentialsChanged =
-			this._settingsAuthFingerprint(settings) !==
-			this._settingsAuthFingerprint(previous);
-		if (credentialsChanged) {
-			await this._validateConnection({ silent: true, settings });
-			void this._refreshVoiceCache({ force: true, silent: true, settings });
-			if (typeof this.lumia.refreshTtsVoices === "function") {
-				void this.lumia.refreshTtsVoices();
-			}
-		}
-		void this.refreshActionOptions({ actionType: "speak", settings });
-	}
-
-	async validateAuth(data = {}) {
-		return this._validateConnection({ silent: true, data });
-	}
-
-	async refreshActionOptions({ actionType, values, settings } = {}) {
-		if (actionType && actionType !== "speak") {
-			return;
-		}
-		if (typeof this.lumia?.updateActionFieldOptions !== "function") {
-			return;
-		}
-
-		const previewSettings = this._mergeSettings(settings);
-		const voices = await this._refreshVoiceCache({
-			force: true,
-			silent: true,
-			settings: previewSettings,
-		});
-		const selectedValue = trimString(values?.voice, "");
-		const options = this._buildVoiceOptions({
-			voices,
-			selectedValue,
-			credentials: this._credentials(previewSettings),
-		});
-
-		await this.lumia.updateActionFieldOptions({
-			actionType: "speak",
-			fieldKey: "voice",
-			options,
-		});
-	}
-
-	async ttsVoices() {
-		const settings = this._settingsSnapshot();
-		const credentials = this._credentials(settings);
-		if (!credentials.ok) {
-			return [];
-		}
-		const voices = await this._refreshVoiceCache({ force: true, silent: true, settings });
-		return (Array.isArray(voices) ? voices : [])
-			.map((voice) => ({
-				id: trimString(voice?.id, ""),
-				name: trimString(voice?.name, voice?.id),
-				language: trimString(voice?.language, ""),
-				imageUrl: TTSMONSTER_LOGO_DATA_URI,
-			}))
-			.filter((voice) => voice.id);
-	}
-
-	async synthesizeTts(request = {}) {
-		const settings = this._settingsSnapshot();
-		const credentials = this._credentials(settings);
-		if (!credentials.ok) {
-			throw new Error(credentials.message);
-		}
-		const voiceId = trimString(request.voiceId, "");
-		if (!voiceId) {
-			throw new Error("Missing voice id");
-		}
-		let message = trimString(request.message, "");
-		if (!message) {
-			throw new Error("Missing message text");
-		}
-		message = truncateText(message, DEFAULTS.maxMessageChars).text;
-
-		const response =
-			credentials.authMethod === AUTH_METHODS.OVERLAY_URL
-				? await this._generateOverlayTts({ credentials, voiceId, message, settings })
-				: await this._generateDeveloperApiTts({ voiceId, message, returnUsage: false, settings });
-
-		const audioUrl = trimString(response?.url ?? response?.link ?? response?.data?.link, "");
-		if (!audioUrl) {
-			throw new Error("TTS Monster did not return an audio URL.");
-		}
-		return { audioUrl };
-	}
-
-	async actions(config = {}) {
-		const actions = Array.isArray(config.actions) ? config.actions : [];
-		for (const action of actions) {
-			try {
-				if (action?.type === "speak") {
-					await this._handleSpeak(action?.value ?? {});
-				}
-			} catch (error) {
-				await this._log(
-					`Action failed: ${error instanceof Error ? error.message : String(error)}`,
-				);
-			}
-		}
-	}
-
-	async _handleSpeak(data = {}) {
-		const settings = this._settingsSnapshot();
-		const credentials = this._credentials(settings);
-		if (!credentials.ok) {
-			await this._log(credentials.message);
-			return;
-		}
-
-		let message = trimString(data.message ?? data.text, "");
-		if (!message) {
-			await this._log("Missing message text.");
-			return;
-		}
-
-		const voiceInput = trimString(data.voice, "");
-		if (!voiceInput) {
-			await this._log("Missing voice.");
-			return;
-		}
-		if (voiceInput.startsWith("__")) {
-			await this._log(
-				"Voice is not loaded yet. Type a valid voice name or voice ID, or refresh the action.",
-			);
-			return;
-		}
-		let voiceId = "";
-		try {
-			voiceId = await this._resolveVoiceId(voiceInput, settings);
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : String(error);
-			await this._log(message);
-			await this._showToast(`TTS Monster: ${message}`);
-			return;
-		}
-
-		const truncated = truncateText(message, DEFAULTS.maxMessageChars);
-		message = truncated.text;
-		if (truncated.truncated) {
-			await this._log(
-				`Message exceeded ${DEFAULTS.maxMessageChars} characters and was truncated.`,
-			);
-		}
-
-		const volume = clamp(
-			toNumber(data.volume, DEFAULTS.defaultVolume),
-			0,
-			100,
-		);
-		const waitForAudioToStop = toBoolean(
-			data.waitForAudioToStop,
-			DEFAULTS.waitForAudioToStop,
-		);
-		const returnUsage = settings.returnUsage;
-		if (returnUsage) {
-			await this._showToast("TTS Monster: generating speech...");
-		}
-
-		const response =
-			credentials.authMethod === AUTH_METHODS.OVERLAY_URL
-				? await this._generateOverlayTts({
-					credentials,
-					voiceId,
-					message,
-					settings,
-				})
-				: await this._generateDeveloperApiTts({
-					voiceId,
-					message,
-					returnUsage,
-					settings,
-				});
-
-		const audioUrl = trimString(
-			response?.url ?? response?.link ?? response?.data?.link,
-			"",
-		);
-		if (!audioUrl) {
-			throw new Error("TTS Monster did not return an audio URL.");
-		}
-		const playback = await this._preparePlaybackPath(audioUrl);
-		try {
-			await this.lumia.playAudio({
-				path: playback.path,
-				volume,
-				waitForAudioToStop,
-			});
-		} finally {
-			await this._cleanupPlaybackFile(playback, { waitForAudioToStop });
-		}
-
-		const usage = toNumber(
-			response?.characterUsage ?? response?.character_usage,
-			NaN,
-		);
-		if (returnUsage && Number.isFinite(usage)) {
-			await this._log(`Character usage: ${Math.trunc(usage)}.`);
-		}
-		if (returnUsage) {
-			const usageLabel = Number.isFinite(usage)
-				? ` Quota used: ${Math.trunc(usage)} characters.`
-				: "";
-			await this._showToast(`TTS Monster: speech played.${usageLabel}`);
-		}
-	}
-
-	async _generateDeveloperApiTts({ voiceId, message, returnUsage, settings }) {
-		const response = await this._request("/generate", {
-			method: "POST",
-			body: {
-				voice_id: voiceId,
-				message,
-				...(returnUsage ? { return_usage: true } : {}),
-			},
-			settings,
-		});
-		this._assertTtsMonsterStatus(response, "TTS Monster generation");
-		return response;
-	}
-
-	async _generateOverlayTts({ credentials, voiceId, message, settings }) {
-		const response = await this._overlayRequest({
-			url: OVERLAY_GENERATE_URL,
-			settings,
-			body: {
-				data: {
-					userId: credentials.userId,
-					key: credentials.apiKey,
-					message: `${voiceId}: ${message}`,
-					ai: true,
-					details: {
-						provider: "",
-						test: false,
-						event: "test",
-						viewerId: null,
-						raw: null,
-					},
-				},
-			},
-		});
-		this._assertTtsMonsterStatus(response, "TTS Monster overlay generation");
-		return response;
-	}
-
-	async _validateConnection({ silent = false, data = {}, settings } = {}) {
-		const previewSettings = this._mergeSettings(settings, data);
-		const credentials = this._credentials(previewSettings);
-		if (!credentials.ok) {
-			return { ok: false, message: credentials.message };
-		}
-
-		try {
-			if (credentials.authMethod === AUTH_METHODS.OVERLAY_URL) {
-				const payload = await this._fetchOverlayVoicePayload({
-					credentials,
-					settings: previewSettings,
-				});
-				const user = payload?.message;
-				const voiceCount =
-					(Array.isArray(user?.voices) ? user.voices.length : 0) +
-					(Array.isArray(user?.customVoices) ? user.customVoices.length : 0);
-				const username = trimString(user?.username, "");
-				return {
-					ok: true,
-					message: username
-						? `Validated overlay for ${username}. Loaded ${voiceCount} voices.`
-						: `Validated overlay. Loaded ${voiceCount} voices.`,
-				};
-			}
-
-			const user = await this._request("/user", {
-				method: "POST",
-				apiKey: credentials.apiKey,
-				settings: previewSettings,
-			});
-			const usage = toNumber(user?.character_usage, NaN);
-			const allowance = toNumber(user?.character_allowance, NaN);
-			if (Number.isFinite(usage) && Number.isFinite(allowance)) {
-				return {
-					ok: true,
-					message: `Validated. Usage ${Math.trunc(usage)}/${Math.trunc(allowance)} characters.`,
-				};
-			}
-			return { ok: true };
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Validation failed.";
-			if (!silent) {
-				await this._log(`Validation failed: ${message}`);
-			}
-			return { ok: false, message };
-		}
-	}
-
-	async _refreshVoiceCache({ force = false, silent = false, settings } = {}) {
-		const requestSettings = settings ?? this.settings;
-		const credentials = this._credentials(requestSettings);
-		if (!credentials.ok) {
-			this._voiceCache = { list: [], fetchedAt: 0, cacheKey: "" };
-			this._lastVoiceFetchError = credentials.message;
-			return [];
-		}
-
-		const now = Date.now();
-		const isFresh =
-			!force &&
-			this._voiceCache.cacheKey === credentials.cacheKey &&
-			now - this._voiceCache.fetchedAt < DEFAULTS.voiceCacheTtlMs;
-		if (isFresh) {
-			return this._voiceCache.list;
-		}
-
-		if (
-			this._voiceFetchPromise &&
-			this._voiceFetchPromise.cacheKey === credentials.cacheKey
-		) {
-			try {
-				return await this._voiceFetchPromise.promise;
-			} catch (_error) {
-				return this._voiceCache.list;
-			}
-		}
-
-		const promise = (async () => {
-			const payload =
-				credentials.authMethod === AUTH_METHODS.OVERLAY_URL
-					? await this._fetchOverlayVoicePayload({
-						credentials,
-						settings: requestSettings,
-					})
-					: await this._request("/voices", {
-						method: "POST",
-						apiKey: credentials.apiKey,
-						settings: requestSettings,
-					});
-			const list = this._normalizeVoices(payload);
-			this._voiceCache = {
-				list,
-				fetchedAt: Date.now(),
-				cacheKey: credentials.cacheKey,
-			};
-			this._lastVoiceFetchError = "";
-			return list;
-		})().finally(() => {
-			if (this._voiceFetchPromise?.promise === promise) {
-				this._voiceFetchPromise = null;
-			}
-		});
-		this._voiceFetchPromise = {
-			cacheKey: credentials.cacheKey,
-			promise,
-		};
-
-		try {
-			return await promise;
-		} catch (error) {
-			if (this._voiceCache.cacheKey !== credentials.cacheKey) {
-				this._voiceCache = { list: [], fetchedAt: 0, cacheKey: "" };
-			}
-			this._lastVoiceFetchError =
-				error instanceof Error ? error.message : String(error);
-			if (!silent) {
-				await this._log(
-					`Failed to load voices: ${error instanceof Error ? error.message : String(error)}`,
-				);
-			}
-			return this._voiceCache.list;
-		}
-	}
-
-	async _fetchOverlayVoicePayload({ credentials, settings }) {
-		const payload = await this._overlayRequest({
-			url: OVERLAY_VOICES_URL,
-			settings,
-			body: {
-				userId: credentials.userId,
-				apiKey: credentials.apiKey,
-				includeProviderToken: true,
-			},
-		});
-		this._assertTtsMonsterStatus(payload, "TTS Monster overlay voice list");
-		return payload;
-	}
-
-	_normalizeVoices(payload) {
-		const root =
-			payload?.message && typeof payload.message === "object"
-				? payload.message
-				: payload;
-		const publicVoices = Array.isArray(root?.voices) ? root.voices : [];
-		const customVoices = Array.isArray(root?.customVoices)
-			? root.customVoices
-			: [];
-
-		const normalizeVoice = (voice, isCustom) => {
-			if (typeof voice === "string") {
-				const id = trimString(voice, "");
-				return id
-					? {
-						id,
-						name: id,
-						sample: "",
-						metadata: "",
-						language: "",
-						isCustom,
-					}
-					: null;
-			}
-
-			const fallbackId = trimString(
-				voice?.id,
-				trimString(voice?.value, trimString(voice?.name, "")),
-			);
-			const id = trimString(
-				voice?.voice_id,
-				fallbackId,
-			);
-			if (!id) {
-				return null;
-			}
-			return {
-				id,
-				name: trimString(voice?.name, id),
-				sample: trimString(voice?.sample, ""),
-				metadata: trimString(voice?.metadata, ""),
-				language: trimString(voice?.language, ""),
-				isCustom,
-			};
-		};
-
-		return [
-			...customVoices.map((voice) => normalizeVoice(voice, true)),
-			...publicVoices.map((voice) => normalizeVoice(voice, false)),
-		]
-			.filter(Boolean)
-			.sort((left, right) => {
-				if (left.isCustom !== right.isCustom) {
-					return left.isCustom ? -1 : 1;
-				}
-				return left.name.localeCompare(right.name);
-			});
-	}
-
-	_buildVoiceOptions({ voices, selectedValue, blankLabel, credentials }) {
-		const options = [];
-		const seen = new Set();
-
-		const pushOption = (label, value) => {
-			if (seen.has(value)) {
-				return;
-			}
-			seen.add(value);
-			options.push({ label, value });
-		};
-
-		if (typeof blankLabel === "string") {
-			pushOption(blankLabel, "");
-		}
-
-		if (!credentials?.ok) {
-			pushOption(
-				credentials?.message ?? "Set credentials first",
-				"__missing_auth__",
-			);
-			return options;
-		}
-
-		if (!Array.isArray(voices) || voices.length === 0) {
-			const fallbackLabel = this._lastVoiceFetchError
-				? `No voices loaded: ${this._lastVoiceFetchError}`
-				: "No voices loaded yet. Type a voice name or voice ID manually.";
-			pushOption(fallbackLabel, "__no_loaded_voices__");
-			return options;
-		}
-
-		const selected = trimString(selectedValue, "");
-		const hasSelectedVoice =
-			selected &&
-			voices.some(
-				(voice) => voice.name === selected || voice.id === selected,
-			);
-		if (selected && !hasSelectedVoice) {
-			pushOption(`Current value: ${selected}`, selected);
-		}
-
-		for (const voice of voices) {
-			const suffixParts = [];
-			if (voice.isCustom) {
-				suffixParts.push("Custom");
-			}
-			if (voice.metadata) {
-				suffixParts.push(voice.metadata);
-			} else if (voice.language) {
-				suffixParts.push(voice.language);
-			}
-			const suffix = suffixParts.length ? ` (${suffixParts.join(" | ")})` : "";
-			pushOption(`${voice.name}${suffix}`, voice.name);
-		}
-
-		return options;
-	}
-
-	async _resolveVoiceId(input, settings) {
-		const normalizedInput = trimString(input, "");
-		if (!normalizedInput) {
-			throw new Error("Voice is required.");
-		}
-		if (normalizedInput.startsWith("__")) {
-			throw new Error("Voice is not loaded yet.");
-		}
-
-		const voices = await this._refreshVoiceCache({ silent: true, settings });
-		const exactIdMatch = voices.find((voice) => voice.id === normalizedInput);
-		if (exactIdMatch) {
-			return exactIdMatch.id;
-		}
-
-		const foldedInput = normalizedInput.toLowerCase();
-		const caseInsensitiveIdMatch = voices.find(
-			(voice) => voice.id.toLowerCase() === foldedInput,
-		);
-		if (caseInsensitiveIdMatch) {
-			return caseInsensitiveIdMatch.id;
-		}
-
-		const exactNameMatch = voices.find((voice) => voice.name === normalizedInput);
-		if (exactNameMatch) {
-			return exactNameMatch.id;
-		}
-
-		const caseInsensitiveNameMatches = voices.filter(
-			(voice) => voice.name.toLowerCase() === foldedInput,
-		);
-		if (caseInsensitiveNameMatches.length === 1) {
-			return caseInsensitiveNameMatches[0].id;
-		}
-		if (caseInsensitiveNameMatches.length > 1) {
-			throw new Error(
-				`Voice name "${normalizedInput}" matches multiple voices. Use the voice ID instead.`,
-			);
-		}
-
-		const fuzzyMatch = this._findBestFuzzyVoiceMatch(voices, normalizedInput);
-		if (fuzzyMatch?.voice?.id) {
-			return fuzzyMatch.voice.id;
-		}
-
-		if (voices.length > 0) {
-			throw new Error(`No voice can be found for "${normalizedInput}".`);
-		}
-
-		return normalizedInput;
-	}
-
-	_findBestFuzzyVoiceMatch(voices, input) {
-		const normalizedInput = normalizeVoiceSearchValue(input);
-		if (!normalizedInput) {
-			return null;
-		}
-
-		const scored = voices
-			.map((voice) => ({
-				voice,
-				score: this._scoreVoiceMatch(voice, normalizedInput),
-			}))
-			.filter((entry) => entry.score > 0)
-			.sort((left, right) => right.score - left.score);
-
-		if (!scored.length) {
-			return null;
-		}
-
-		const best = scored[0];
-		const next = scored[1];
-		if (!best || best.score < 4) {
-			return null;
-		}
-		if (next && next.score === best.score) {
-			throw new Error(
-				`Voice "${input}" matches multiple voices. Be more specific or use the voice ID instead.`,
-			);
-		}
-
-		return best;
-	}
-
-	_scoreVoiceMatch(voice, normalizedInput) {
-		const normalizedName = normalizeVoiceSearchValue(voice?.name);
-		const normalizedId = normalizeVoiceSearchValue(voice?.id);
-		const metadata = normalizeVoiceSearchValue(voice?.metadata);
-		const parts = normalizedName ? normalizedName.split(" ") : [];
-
-		if (!normalizedInput) {
-			return 0;
-		}
-		if (normalizedName && normalizedName === normalizedInput) {
-			return 100;
-		}
-		if (normalizedId && normalizedId === normalizedInput) {
-			return 95;
-		}
-		if (normalizedName && normalizedName.startsWith(normalizedInput)) {
-			return 80;
-		}
-		if (parts.some((part) => part.startsWith(normalizedInput))) {
-			return 70;
-		}
-		if (normalizedName && normalizedName.includes(normalizedInput)) {
-			return 60;
-		}
-		if (this._isSubsequenceMatch(normalizedName, normalizedInput)) {
-			return 45;
-		}
-		if (metadata && metadata.includes(normalizedInput)) {
-			return 20;
-		}
-		if (normalizedId && normalizedId.includes(normalizedInput)) {
-			return 15;
-		}
-
-		return 0;
-	}
-
-	_isSubsequenceMatch(candidate, search) {
-		if (!candidate || !search) {
-			return false;
-		}
-
-		const compactCandidate = candidate.replace(/\s+/g, "");
-		const compactSearch = search.replace(/\s+/g, "");
-		if (!compactCandidate || !compactSearch) {
-			return false;
-		}
-
-		let searchIndex = 0;
-		for (const char of compactCandidate) {
-			if (char === compactSearch[searchIndex]) {
-				searchIndex += 1;
-				if (searchIndex === compactSearch.length) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
-	async _preparePlaybackPath(audioUrl) {
-		if (typeof fetch !== "function") {
-			return { path: audioUrl, tempFilePath: "" };
-		}
-
-		try {
-			const response = await fetch(audioUrl);
-			if (!response.ok) {
-				return { path: audioUrl, tempFilePath: "" };
-			}
-
-			const audioBuffer = await response.arrayBuffer();
-			const contentType = trimString(
-				response.headers.get("content-type"),
-				"audio/wav",
-			);
-			const tempFilePath = await this._writeTempAudioFile({
-				audioBuffer,
-				contentType,
-				sourceUrl: audioUrl,
-			});
-			return { path: tempFilePath, tempFilePath };
-		} catch (_error) {
-			return { path: audioUrl, tempFilePath: "" };
-		}
-	}
-
-	async _writeTempAudioFile({ audioBuffer, contentType, sourceUrl }) {
-		const tempRoot = path.join(os.tmpdir(), TEMP_DIR_NAME);
-		await fs.mkdir(tempRoot, { recursive: true });
-		const extension = this._resolveAudioExtension({ contentType, sourceUrl });
-		const filename = `tts-monster-${Date.now()}-${crypto.randomUUID()}.${extension}`;
-		const filePath = path.join(tempRoot, filename);
-		await fs.writeFile(filePath, Buffer.from(audioBuffer));
-		return filePath;
-	}
-
-	_resolveAudioExtension({ contentType, sourceUrl }) {
-		const normalizedType = trimString(contentType, "").toLowerCase();
-		if (normalizedType.includes("mpeg") || normalizedType.includes("mp3")) {
-			return "mp3";
-		}
-		if (normalizedType.includes("ogg")) {
-			return "ogg";
-		}
-		if (normalizedType.includes("flac")) {
-			return "flac";
-		}
-		if (normalizedType.includes("aac")) {
-			return "aac";
-		}
-		if (normalizedType.includes("wav") || normalizedType.includes("wave")) {
-			return "wav";
-		}
-
-		const pathname = trimString(sourceUrl, "").toLowerCase();
-		if (pathname.endsWith(".mp3")) return "mp3";
-		if (pathname.endsWith(".ogg")) return "ogg";
-		if (pathname.endsWith(".flac")) return "flac";
-		if (pathname.endsWith(".aac")) return "aac";
-		if (pathname.endsWith(".wav")) return "wav";
-		return "wav";
-	}
-
-	async _cleanupPlaybackFile(playback, { waitForAudioToStop } = {}) {
-		const tempFilePath = trimString(playback?.tempFilePath, "");
-		if (!tempFilePath) {
-			return;
-		}
-
-		const removeFile = async () => {
-			try {
-				await fs.unlink(tempFilePath);
-			} catch (_error) {
-				// ignore cleanup failures
-			}
-		};
-
-		if (waitForAudioToStop) {
-			await removeFile();
-			return;
-		}
-
-		const timer = setTimeout(async () => {
-			this._tempFileCleanupTimers.delete(timer);
-			await removeFile();
-		}, DEFAULTS.tempFileCleanupDelayMs);
-		this._tempFileCleanupTimers.add(timer);
-	}
-
-	async _request(
-		path,
-		{ method = "POST", body, settings, apiKey: explicitApiKey } = {},
-	) {
-		const apiKey =
-			explicitApiKey === undefined
-				? this._apiKey(settings ?? this.settings)
-				: normalizeApiToken(explicitApiKey);
-		if (!apiKey) {
-			throw new Error("API key is required.");
-		}
-		if (typeof fetch !== "function") {
-			throw new Error("fetch is not available in this runtime.");
-		}
-
-		const controller =
-			typeof AbortController === "function" ? new AbortController() : null;
-		const timeoutMs = this._requestTimeoutMs(settings ?? this.settings);
-		const timeoutId =
-			controller && timeoutMs > 0
-				? setTimeout(() => controller.abort(), timeoutMs)
-				: null;
-
-		try {
-			const response = await fetch(`${API_BASE}${path}`, {
-				method,
-				headers: {
-					Authorization: apiKey,
-					...(body ? { "Content-Type": "application/json" } : {}),
-				},
-				body: body ? JSON.stringify(body) : undefined,
-				signal: controller?.signal,
-			});
-
-			const raw = await response.text();
-			const payload = raw ? this._safeJsonParse(raw) : null;
-			if (!response.ok) {
-				const errorMessage =
-					trimString(payload?.error, "") ||
-					trimString(raw, "") ||
-					response.statusText ||
-					"Request failed.";
-				throw new Error(`TTS Monster error ${response.status}: ${errorMessage}`);
-			}
-			return payload;
-		} catch (error) {
-			if (error?.name === "AbortError") {
-				throw new Error("Request timed out.");
-			}
-			throw error;
-		} finally {
-			if (timeoutId) {
-				clearTimeout(timeoutId);
-			}
-		}
-	}
-
-	async _overlayRequest({ url, body, settings }) {
-		if (typeof fetch !== "function") {
-			throw new Error("fetch is not available in this runtime.");
-		}
-
-		const controller =
-			typeof AbortController === "function" ? new AbortController() : null;
-		const timeoutMs = this._requestTimeoutMs(settings ?? this.settings);
-		const timeoutId =
-			controller && timeoutMs > 0
-				? setTimeout(() => controller.abort(), timeoutMs)
-				: null;
-
-		try {
-			const response = await fetch(url, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(body ?? {}),
-				signal: controller?.signal,
-			});
-
-			const raw = await response.text();
-			const payload = raw ? this._safeJsonParse(raw) : null;
-			if (!response.ok) {
-				const errorMessage =
-					this._payloadMessage(payload) ||
-					trimString(raw, "") ||
-					response.statusText ||
-					"Request failed.";
-				throw new Error(`TTS Monster error ${response.status}: ${errorMessage}`);
-			}
-			return payload;
-		} catch (error) {
-			if (error?.name === "AbortError") {
-				throw new Error("Request timed out.");
-			}
-			throw error;
-		} finally {
-			if (timeoutId) {
-				clearTimeout(timeoutId);
-			}
-		}
-	}
-
-	_assertTtsMonsterStatus(payload, context) {
-		const status = payload?.status;
-		if (status === undefined || status === null) {
-			return;
-		}
-		if (String(status) === "200") {
-			return;
-		}
-		throw new Error(
-			`${context} failed with status ${status}: ${
-				this._payloadMessage(payload) || "Request failed."
-			}`,
-		);
-	}
-
-	_payloadMessage(payload) {
-		return (
-			trimString(payload?.error, "") ||
-			(typeof payload?.message === "string"
-				? trimString(payload.message, "")
-				: "") ||
-			trimString(payload?.warning, "")
-		);
-	}
-
-	_safeJsonParse(value) {
-		try {
-			return JSON.parse(value);
-		} catch (_error) {
-			return null;
-		}
-	}
-
-	_mergeSettings(settings, values) {
-		return {
-			...(this.settings && typeof this.settings === "object" ? this.settings : {}),
-			...(settings && typeof settings === "object" ? settings : {}),
-			...(values && typeof values === "object" ? values : {}),
-		};
-	}
-
-	_settingsSnapshot(settings = this.settings) {
-		return {
-			authMethod: this._authMethod(settings),
-			apiKey: this._apiKey(settings),
-			overlayUrl: this._overlayUrl(settings),
-			returnUsage: toBoolean(settings?.returnUsage, DEFAULTS.returnUsage),
-			requestTimeoutMs: this._requestTimeoutMs(settings),
-		};
-	}
-
-	_credentials(settings = this.settings) {
-		const authMethod = this._authMethod(settings);
-		if (authMethod === AUTH_METHODS.OVERLAY_URL) {
-			const overlay = parseOverlayUrl(this._overlayUrl(settings));
-			if (!overlay.ok) {
-				return {
-					ok: false,
-					authMethod,
-					cacheKey: "",
-					message: overlay.message,
-				};
-			}
-			return {
-				ok: true,
-				authMethod,
-				userId: overlay.userId,
-				apiKey: overlay.apiKey,
-				cacheKey: `${authMethod}:${overlay.userId}:${overlay.apiKey}`,
-				message: "",
-			};
-		}
-
-		const apiKey = this._apiKey(settings);
-		if (!apiKey) {
-			return {
-				ok: false,
-				authMethod,
-				cacheKey: "",
-				message: "API token is required.",
-			};
-		}
-		return {
-			ok: true,
-			authMethod,
-			apiKey,
-			cacheKey: `${authMethod}:${apiKey}`,
-			message: "",
-		};
-	}
-
-	_authMethod(settings = this.settings) {
-		const value = trimString(settings?.authMethod, "");
-		if (!value && this._apiKey(settings) && !this._overlayUrl(settings)) {
-			return AUTH_METHODS.DEVELOPER_API;
-		}
-		return value === AUTH_METHODS.OVERLAY_URL
-			? AUTH_METHODS.OVERLAY_URL
-			: value === AUTH_METHODS.DEVELOPER_API
-				? AUTH_METHODS.DEVELOPER_API
-				: DEFAULTS.authMethod;
-	}
-
-	_apiKey(settings = this.settings) {
-		return normalizeApiToken(settings?.apiKey);
-	}
-
-	_overlayUrl(settings = this.settings) {
-		return trimString(settings?.overlayUrl, "");
-	}
-
-	_settingsAuthFingerprint(settings = this.settings) {
-		return [
-			this._authMethod(settings),
-			this._apiKey(settings),
-			this._overlayUrl(settings),
-		].join(":");
-	}
-
-	_requestTimeoutMs(settings = this.settings) {
-		return clamp(
-			toNumber(settings?.requestTimeoutMs, DEFAULTS.requestTimeoutMs),
-			0,
-			300000,
-		);
-	}
-
-	async _log(message) {
-		if (typeof this.lumia?.log === "function") {
-			await this.lumia.log(`[TTSMonster] ${message}`);
-		}
-	}
-
-	async _showToast(message, time = 4000) {
-		if (typeof this.lumia?.showToast !== "function") {
-			return;
-		}
-		try {
-			await this.lumia.showToast({ message, time });
-		} catch (_error) {
-			// ignore toast errors
-		}
-	}
-
-	async onunload() {
-		for (const timer of this._tempFileCleanupTimers) {
-			clearTimeout(timer);
-		}
-		this._tempFileCleanupTimers.clear();
-	}
+constructor(manifest, context) {
+super(manifest, context);
+this.\_voiceCache = { list: [], fetchedAt: 0, cacheKey: "" };
+this.\_voiceFetchPromise = null;
+this.\_lastVoiceFetchError = "";
+this.\_tempFileCleanupTimers = new Set();
+}
+
+    async onload() {
+    	await this._validateConnection({ silent: true });
+    	void this._refreshVoiceCache({ silent: true });
+    	void this.refreshActionOptions({ actionType: "speak" });
+    }
+
+    async onsettingsupdate(settings, previous = {}) {
+    	const credentialsChanged =
+    		this._settingsAuthFingerprint(settings) !==
+    		this._settingsAuthFingerprint(previous);
+    	if (credentialsChanged) {
+    		await this._validateConnection({ silent: true, settings });
+    		void this._refreshVoiceCache({ force: true, silent: true, settings });
+    		if (typeof this.lumia.refreshTtsVoices === "function") {
+    			void this.lumia.refreshTtsVoices();
+    		}
+    	}
+    	void this.refreshActionOptions({ actionType: "speak", settings });
+    }
+
+    async validateAuth(data = {}) {
+    	return this._validateConnection({ silent: true, data });
+    }
+
+    async refreshActionOptions({ actionType, values, settings } = {}) {
+    	if (actionType && actionType !== "speak") {
+    		return;
+    	}
+    	if (typeof this.lumia?.updateActionFieldOptions !== "function") {
+    		return;
+    	}
+
+    	const previewSettings = this._mergeSettings(settings);
+    	const voices = await this._refreshVoiceCache({
+    		force: true,
+    		silent: true,
+    		settings: previewSettings,
+    	});
+    	const selectedValue = trimString(values?.voice, "");
+    	const options = this._buildVoiceOptions({
+    		voices,
+    		selectedValue,
+    		credentials: this._credentials(previewSettings),
+    	});
+
+    	await this.lumia.updateActionFieldOptions({
+    		actionType: "speak",
+    		fieldKey: "voice",
+    		options,
+    	});
+    }
+
+    async ttsVoices() {
+    	const settings = this._settingsSnapshot();
+    	const credentials = this._credentials(settings);
+    	if (!credentials.ok) {
+    		return [];
+    	}
+    	const voices = await this._refreshVoiceCache({ force: true, silent: true, settings });
+    	return (Array.isArray(voices) ? voices : [])
+    		.map((voice) => ({
+    			id: trimString(voice?.id, ""),
+    			name: trimString(voice?.name, voice?.id),
+    			language: trimString(voice?.language, ""),
+    			imageUrl: TTSMONSTER_LOGO_DATA_URI,
+    		}))
+    		.filter((voice) => voice.id);
+    }
+
+    async synthesizeTts(request = {}) {
+    	const settings = this._settingsSnapshot();
+    	const credentials = this._credentials(settings);
+    	if (!credentials.ok) {
+    		throw new Error(credentials.message);
+    	}
+    	const voiceId = trimString(request.voiceId, "");
+    	if (!voiceId) {
+    		throw new Error("Missing voice id");
+    	}
+    	let message = trimString(request.message, "");
+    	if (!message) {
+    		throw new Error("Missing message text");
+    	}
+    	message = truncateText(message, DEFAULTS.maxMessageChars).text;
+
+    	const response =
+    		credentials.authMethod === AUTH_METHODS.OVERLAY_URL
+    			? await this._generateOverlayTts({ credentials, voiceId, message, settings })
+    			: await this._generateDeveloperApiTts({ voiceId, message, returnUsage: false, settings });
+
+    	const audioUrl = trimString(response?.url ?? response?.link ?? response?.data?.link, "");
+    	if (!audioUrl) {
+    		throw new Error("TTS Monster did not return an audio URL.");
+    	}
+    	return { audioUrl };
+    }
+
+    async actions(config = {}) {
+    	const actions = Array.isArray(config.actions) ? config.actions : [];
+    	for (const action of actions) {
+    		try {
+    			if (action?.type === "speak") {
+    				await this._handleSpeak(action?.value ?? {});
+    			}
+    		} catch (error) {
+    			await this._log(
+    				`Action failed: ${error instanceof Error ? error.message : String(error)}`,
+    			);
+    		}
+    	}
+    }
+
+    async _handleSpeak(data = {}) {
+    	const settings = this._settingsSnapshot();
+    	const credentials = this._credentials(settings);
+    	if (!credentials.ok) {
+    		await this._log(credentials.message);
+    		return;
+    	}
+
+    	let message = trimString(data.message ?? data.text, "");
+    	if (!message) {
+    		await this._log("Missing message text.");
+    		return;
+    	}
+
+    	const voiceInput = trimString(data.voice, "");
+    	if (!voiceInput) {
+    		await this._log("Missing voice.");
+    		return;
+    	}
+    	if (voiceInput.startsWith("__")) {
+    		await this._log(
+    			"Voice is not loaded yet. Type a valid voice name or voice ID, or refresh the action.",
+    		);
+    		return;
+    	}
+    	let voiceId = "";
+    	try {
+    		voiceId = await this._resolveVoiceId(voiceInput, settings);
+    	} catch (error) {
+    		const message =
+    			error instanceof Error ? error.message : String(error);
+    		await this._log(message);
+    		await this._showToast(`TTS Monster: ${message}`);
+    		return;
+    	}
+
+    	const truncated = truncateText(message, DEFAULTS.maxMessageChars);
+    	message = truncated.text;
+    	if (truncated.truncated) {
+    		await this._log(
+    			`Message exceeded ${DEFAULTS.maxMessageChars} characters and was truncated.`,
+    		);
+    	}
+
+    	const volume = clamp(
+    		toNumber(data.volume, DEFAULTS.defaultVolume),
+    		0,
+    		100,
+    	);
+    	const waitForAudioToStop = toBoolean(
+    		data.waitForAudioToStop,
+    		DEFAULTS.waitForAudioToStop,
+    	);
+    	const returnUsage = settings.returnUsage;
+    	if (returnUsage) {
+    		await this._showToast("TTS Monster: generating speech...");
+    	}
+
+    	const response =
+    		credentials.authMethod === AUTH_METHODS.OVERLAY_URL
+    			? await this._generateOverlayTts({
+    				credentials,
+    				voiceId,
+    				message,
+    				settings,
+    			})
+    			: await this._generateDeveloperApiTts({
+    				voiceId,
+    				message,
+    				returnUsage,
+    				settings,
+    			});
+
+    	const audioUrl = trimString(
+    		response?.url ?? response?.link ?? response?.data?.link,
+    		"",
+    	);
+    	if (!audioUrl) {
+    		throw new Error("TTS Monster did not return an audio URL.");
+    	}
+    	const playback = await this._preparePlaybackPath(audioUrl);
+    	try {
+    		await this.lumia.playAudio({
+    			path: playback.path,
+    			volume,
+    			waitForAudioToStop,
+    		});
+    	} finally {
+    		await this._cleanupPlaybackFile(playback, { waitForAudioToStop });
+    	}
+
+    	const usage = toNumber(
+    		response?.characterUsage ?? response?.character_usage,
+    		NaN,
+    	);
+    	if (returnUsage && Number.isFinite(usage)) {
+    		await this._log(`Character usage: ${Math.trunc(usage)}.`);
+    	}
+    	if (returnUsage) {
+    		const usageLabel = Number.isFinite(usage)
+    			? ` Quota used: ${Math.trunc(usage)} characters.`
+    			: "";
+    		await this._showToast(`TTS Monster: speech played.${usageLabel}`);
+    	}
+    }
+
+    async _generateDeveloperApiTts({ voiceId, message, returnUsage, settings }) {
+    	const response = await this._request("/generate", {
+    		method: "POST",
+    		body: {
+    			voice_id: voiceId,
+    			message,
+    			...(returnUsage ? { return_usage: true } : {}),
+    		},
+    		settings,
+    	});
+    	this._assertTtsMonsterStatus(response, "TTS Monster generation");
+    	return response;
+    }
+
+    async _generateOverlayTts({ credentials, voiceId, message, settings }) {
+    	const response = await this._overlayRequest({
+    		url: OVERLAY_GENERATE_URL,
+    		settings,
+    		body: {
+    			data: {
+    				userId: credentials.userId,
+    				key: credentials.apiKey,
+    				message: `${voiceId}: ${message}`,
+    				ai: true,
+    				details: {
+    					provider: "",
+    					test: false,
+    					event: "test",
+    					viewerId: null,
+    					raw: null,
+    				},
+    			},
+    		},
+    	});
+    	this._assertTtsMonsterStatus(response, "TTS Monster overlay generation");
+    	return response;
+    }
+
+    async _validateConnection({ silent = false, data = {}, settings } = {}) {
+    	const previewSettings = this._mergeSettings(settings, data);
+    	const credentials = this._credentials(previewSettings);
+    	if (!credentials.ok) {
+    		return { ok: false, message: credentials.message };
+    	}
+
+    	try {
+    		if (credentials.authMethod === AUTH_METHODS.OVERLAY_URL) {
+    			const payload = await this._fetchOverlayVoicePayload({
+    				credentials,
+    				settings: previewSettings,
+    			});
+    			const user = payload?.message;
+    			const voiceCount =
+    				(Array.isArray(user?.voices) ? user.voices.length : 0) +
+    				(Array.isArray(user?.customVoices) ? user.customVoices.length : 0);
+    			const username = trimString(user?.username, "");
+    			return {
+    				ok: true,
+    				message: username
+    					? `Validated overlay for ${username}. Loaded ${voiceCount} voices.`
+    					: `Validated overlay. Loaded ${voiceCount} voices.`,
+    			};
+    		}
+
+    		const user = await this._request("/user", {
+    			method: "POST",
+    			apiKey: credentials.apiKey,
+    			settings: previewSettings,
+    		});
+    		const usage = toNumber(user?.character_usage, NaN);
+    		const allowance = toNumber(user?.character_allowance, NaN);
+    		if (Number.isFinite(usage) && Number.isFinite(allowance)) {
+    			return {
+    				ok: true,
+    				message: `Validated. Usage ${Math.trunc(usage)}/${Math.trunc(allowance)} characters.`,
+    			};
+    		}
+    		return { ok: true };
+    	} catch (error) {
+    		const message =
+    			error instanceof Error ? error.message : "Validation failed.";
+    		if (!silent) {
+    			await this._log(`Validation failed: ${message}`);
+    		}
+    		return { ok: false, message };
+    	}
+    }
+
+    async _refreshVoiceCache({ force = false, silent = false, settings } = {}) {
+    	const requestSettings = settings ?? this.settings;
+    	const credentials = this._credentials(requestSettings);
+    	if (!credentials.ok) {
+    		this._voiceCache = { list: [], fetchedAt: 0, cacheKey: "" };
+    		this._lastVoiceFetchError = credentials.message;
+    		return [];
+    	}
+
+    	const now = Date.now();
+    	const isFresh =
+    		!force &&
+    		this._voiceCache.cacheKey === credentials.cacheKey &&
+    		now - this._voiceCache.fetchedAt < DEFAULTS.voiceCacheTtlMs;
+    	if (isFresh) {
+    		return this._voiceCache.list;
+    	}
+
+    	if (
+    		this._voiceFetchPromise &&
+    		this._voiceFetchPromise.cacheKey === credentials.cacheKey
+    	) {
+    		try {
+    			return await this._voiceFetchPromise.promise;
+    		} catch (_error) {
+    			return this._voiceCache.list;
+    		}
+    	}
+
+    	const promise = (async () => {
+    		const payload =
+    			credentials.authMethod === AUTH_METHODS.OVERLAY_URL
+    				? await this._fetchOverlayVoicePayload({
+    					credentials,
+    					settings: requestSettings,
+    				})
+    				: await this._request("/voices", {
+    					method: "POST",
+    					apiKey: credentials.apiKey,
+    					settings: requestSettings,
+    				});
+    		const list = this._normalizeVoices(payload);
+    		this._voiceCache = {
+    			list,
+    			fetchedAt: Date.now(),
+    			cacheKey: credentials.cacheKey,
+    		};
+    		this._lastVoiceFetchError = "";
+    		return list;
+    	})().finally(() => {
+    		if (this._voiceFetchPromise?.promise === promise) {
+    			this._voiceFetchPromise = null;
+    		}
+    	});
+    	this._voiceFetchPromise = {
+    		cacheKey: credentials.cacheKey,
+    		promise,
+    	};
+
+    	try {
+    		return await promise;
+    	} catch (error) {
+    		if (this._voiceCache.cacheKey !== credentials.cacheKey) {
+    			this._voiceCache = { list: [], fetchedAt: 0, cacheKey: "" };
+    		}
+    		this._lastVoiceFetchError =
+    			error instanceof Error ? error.message : String(error);
+    		if (!silent) {
+    			await this._log(
+    				`Failed to load voices: ${error instanceof Error ? error.message : String(error)}`,
+    			);
+    		}
+    		return this._voiceCache.list;
+    	}
+    }
+
+    async _fetchOverlayVoicePayload({ credentials, settings }) {
+    	const payload = await this._overlayRequest({
+    		url: OVERLAY_VOICES_URL,
+    		settings,
+    		body: {
+    			userId: credentials.userId,
+    			apiKey: credentials.apiKey,
+    			includeProviderToken: true,
+    		},
+    	});
+    	this._assertTtsMonsterStatus(payload, "TTS Monster overlay voice list");
+    	return payload;
+    }
+
+    _normalizeVoices(payload) {
+    	const root =
+    		payload?.message && typeof payload.message === "object"
+    			? payload.message
+    			: payload;
+    	const publicVoices = Array.isArray(root?.voices) ? root.voices : [];
+    	const customVoices = Array.isArray(root?.customVoices)
+    		? root.customVoices
+    		: [];
+
+    	const normalizeVoice = (voice, isCustom) => {
+    		if (typeof voice === "string") {
+    			const id = trimString(voice, "");
+    			return id
+    				? {
+    					id,
+    					name: id,
+    					sample: "",
+    					metadata: "",
+    					language: "",
+    					isCustom,
+    				}
+    				: null;
+    		}
+
+    		const fallbackId = trimString(
+    			voice?.id,
+    			trimString(voice?.value, trimString(voice?.name, "")),
+    		);
+    		const id = trimString(
+    			voice?.voice_id,
+    			fallbackId,
+    		);
+    		if (!id) {
+    			return null;
+    		}
+    		return {
+    			id,
+    			name: trimString(voice?.name, id),
+    			sample: trimString(voice?.sample, ""),
+    			metadata: trimString(voice?.metadata, ""),
+    			language: trimString(voice?.language, ""),
+    			isCustom,
+    		};
+    	};
+
+    	return [
+    		...customVoices.map((voice) => normalizeVoice(voice, true)),
+    		...publicVoices.map((voice) => normalizeVoice(voice, false)),
+    	]
+    		.filter(Boolean)
+    		.sort((left, right) => {
+    			if (left.isCustom !== right.isCustom) {
+    				return left.isCustom ? -1 : 1;
+    			}
+    			return left.name.localeCompare(right.name);
+    		});
+    }
+
+    _buildVoiceOptions({ voices, selectedValue, blankLabel, credentials }) {
+    	const options = [];
+    	const seen = new Set();
+
+    	const pushOption = (label, value) => {
+    		if (seen.has(value)) {
+    			return;
+    		}
+    		seen.add(value);
+    		options.push({ label, value });
+    	};
+
+    	if (typeof blankLabel === "string") {
+    		pushOption(blankLabel, "");
+    	}
+
+    	if (!credentials?.ok) {
+    		pushOption(
+    			credentials?.message ?? "Set credentials first",
+    			"__missing_auth__",
+    		);
+    		return options;
+    	}
+
+    	if (!Array.isArray(voices) || voices.length === 0) {
+    		const fallbackLabel = this._lastVoiceFetchError
+    			? `No voices loaded: ${this._lastVoiceFetchError}`
+    			: "No voices loaded yet. Type a voice name or voice ID manually.";
+    		pushOption(fallbackLabel, "__no_loaded_voices__");
+    		return options;
+    	}
+
+    	const selected = trimString(selectedValue, "");
+    	const hasSelectedVoice =
+    		selected &&
+    		voices.some(
+    			(voice) => voice.name === selected || voice.id === selected,
+    		);
+    	if (selected && !hasSelectedVoice) {
+    		pushOption(`Current value: ${selected}`, selected);
+    	}
+
+    	for (const voice of voices) {
+    		const suffixParts = [];
+    		if (voice.isCustom) {
+    			suffixParts.push("Custom");
+    		}
+    		if (voice.metadata) {
+    			suffixParts.push(voice.metadata);
+    		} else if (voice.language) {
+    			suffixParts.push(voice.language);
+    		}
+    		const suffix = suffixParts.length ? ` (${suffixParts.join(" | ")})` : "";
+    		pushOption(`${voice.name}${suffix}`, voice.name);
+    	}
+
+    	return options;
+    }
+
+    async _resolveVoiceId(input, settings) {
+    	const normalizedInput = trimString(input, "");
+    	if (!normalizedInput) {
+    		throw new Error("Voice is required.");
+    	}
+    	if (normalizedInput.startsWith("__")) {
+    		throw new Error("Voice is not loaded yet.");
+    	}
+
+    	const voices = await this._refreshVoiceCache({ silent: true, settings });
+    	const exactIdMatch = voices.find((voice) => voice.id === normalizedInput);
+    	if (exactIdMatch) {
+    		return exactIdMatch.id;
+    	}
+
+    	const foldedInput = normalizedInput.toLowerCase();
+    	const caseInsensitiveIdMatch = voices.find(
+    		(voice) => voice.id.toLowerCase() === foldedInput,
+    	);
+    	if (caseInsensitiveIdMatch) {
+    		return caseInsensitiveIdMatch.id;
+    	}
+
+    	const exactNameMatch = voices.find((voice) => voice.name === normalizedInput);
+    	if (exactNameMatch) {
+    		return exactNameMatch.id;
+    	}
+
+    	const caseInsensitiveNameMatches = voices.filter(
+    		(voice) => voice.name.toLowerCase() === foldedInput,
+    	);
+    	if (caseInsensitiveNameMatches.length === 1) {
+    		return caseInsensitiveNameMatches[0].id;
+    	}
+    	if (caseInsensitiveNameMatches.length > 1) {
+    		throw new Error(
+    			`Voice name "${normalizedInput}" matches multiple voices. Use the voice ID instead.`,
+    		);
+    	}
+
+    	const fuzzyMatch = this._findBestFuzzyVoiceMatch(voices, normalizedInput);
+    	if (fuzzyMatch?.voice?.id) {
+    		return fuzzyMatch.voice.id;
+    	}
+
+    	if (voices.length > 0) {
+    		throw new Error(`No voice can be found for "${normalizedInput}".`);
+    	}
+
+    	return normalizedInput;
+    }
+
+    _findBestFuzzyVoiceMatch(voices, input) {
+    	const normalizedInput = normalizeVoiceSearchValue(input);
+    	if (!normalizedInput) {
+    		return null;
+    	}
+
+    	const scored = voices
+    		.map((voice) => ({
+    			voice,
+    			score: this._scoreVoiceMatch(voice, normalizedInput),
+    		}))
+    		.filter((entry) => entry.score > 0)
+    		.sort((left, right) => right.score - left.score);
+
+    	if (!scored.length) {
+    		return null;
+    	}
+
+    	const best = scored[0];
+    	const next = scored[1];
+    	if (!best || best.score < 4) {
+    		return null;
+    	}
+    	if (next && next.score === best.score) {
+    		throw new Error(
+    			`Voice "${input}" matches multiple voices. Be more specific or use the voice ID instead.`,
+    		);
+    	}
+
+    	return best;
+    }
+
+    _scoreVoiceMatch(voice, normalizedInput) {
+    	const normalizedName = normalizeVoiceSearchValue(voice?.name);
+    	const normalizedId = normalizeVoiceSearchValue(voice?.id);
+    	const metadata = normalizeVoiceSearchValue(voice?.metadata);
+    	const parts = normalizedName ? normalizedName.split(" ") : [];
+
+    	if (!normalizedInput) {
+    		return 0;
+    	}
+    	if (normalizedName && normalizedName === normalizedInput) {
+    		return 100;
+    	}
+    	if (normalizedId && normalizedId === normalizedInput) {
+    		return 95;
+    	}
+    	if (normalizedName && normalizedName.startsWith(normalizedInput)) {
+    		return 80;
+    	}
+    	if (parts.some((part) => part.startsWith(normalizedInput))) {
+    		return 70;
+    	}
+    	if (normalizedName && normalizedName.includes(normalizedInput)) {
+    		return 60;
+    	}
+    	if (this._isSubsequenceMatch(normalizedName, normalizedInput)) {
+    		return 45;
+    	}
+    	if (metadata && metadata.includes(normalizedInput)) {
+    		return 20;
+    	}
+    	if (normalizedId && normalizedId.includes(normalizedInput)) {
+    		return 15;
+    	}
+
+    	return 0;
+    }
+
+    _isSubsequenceMatch(candidate, search) {
+    	if (!candidate || !search) {
+    		return false;
+    	}
+
+    	const compactCandidate = candidate.replace(/\s+/g, "");
+    	const compactSearch = search.replace(/\s+/g, "");
+    	if (!compactCandidate || !compactSearch) {
+    		return false;
+    	}
+
+    	let searchIndex = 0;
+    	for (const char of compactCandidate) {
+    		if (char === compactSearch[searchIndex]) {
+    			searchIndex += 1;
+    			if (searchIndex === compactSearch.length) {
+    				return true;
+    			}
+    		}
+    	}
+    	return false;
+    }
+
+    async _preparePlaybackPath(audioUrl) {
+    	if (typeof fetch !== "function") {
+    		return { path: audioUrl, tempFilePath: "" };
+    	}
+
+    	try {
+    		const response = await fetch(audioUrl);
+    		if (!response.ok) {
+    			return { path: audioUrl, tempFilePath: "" };
+    		}
+
+    		const audioBuffer = await response.arrayBuffer();
+    		const contentType = trimString(
+    			response.headers.get("content-type"),
+    			"audio/wav",
+    		);
+    		const tempFilePath = await this._writeTempAudioFile({
+    			audioBuffer,
+    			contentType,
+    			sourceUrl: audioUrl,
+    		});
+    		return { path: tempFilePath, tempFilePath };
+    	} catch (_error) {
+    		return { path: audioUrl, tempFilePath: "" };
+    	}
+    }
+
+    async _writeTempAudioFile({ audioBuffer, contentType, sourceUrl }) {
+    	const tempRoot = path.join(os.tmpdir(), TEMP_DIR_NAME);
+    	await fs.mkdir(tempRoot, { recursive: true });
+    	const extension = this._resolveAudioExtension({ contentType, sourceUrl });
+    	const filename = `tts-monster-${Date.now()}-${crypto.randomUUID()}.${extension}`;
+    	const filePath = path.join(tempRoot, filename);
+    	await fs.writeFile(filePath, Buffer.from(audioBuffer));
+    	return filePath;
+    }
+
+    _resolveAudioExtension({ contentType, sourceUrl }) {
+    	const normalizedType = trimString(contentType, "").toLowerCase();
+    	if (normalizedType.includes("mpeg") || normalizedType.includes("mp3")) {
+    		return "mp3";
+    	}
+    	if (normalizedType.includes("ogg")) {
+    		return "ogg";
+    	}
+    	if (normalizedType.includes("flac")) {
+    		return "flac";
+    	}
+    	if (normalizedType.includes("aac")) {
+    		return "aac";
+    	}
+    	if (normalizedType.includes("wav") || normalizedType.includes("wave")) {
+    		return "wav";
+    	}
+
+    	const pathname = trimString(sourceUrl, "").toLowerCase();
+    	if (pathname.endsWith(".mp3")) return "mp3";
+    	if (pathname.endsWith(".ogg")) return "ogg";
+    	if (pathname.endsWith(".flac")) return "flac";
+    	if (pathname.endsWith(".aac")) return "aac";
+    	if (pathname.endsWith(".wav")) return "wav";
+    	return "wav";
+    }
+
+    async _cleanupPlaybackFile(playback, { waitForAudioToStop } = {}) {
+    	const tempFilePath = trimString(playback?.tempFilePath, "");
+    	if (!tempFilePath) {
+    		return;
+    	}
+
+    	const removeFile = async () => {
+    		try {
+    			await fs.unlink(tempFilePath);
+    		} catch (_error) {
+    			// ignore cleanup failures
+    		}
+    	};
+
+    	if (waitForAudioToStop) {
+    		await removeFile();
+    		return;
+    	}
+
+    	const timer = setTimeout(async () => {
+    		this._tempFileCleanupTimers.delete(timer);
+    		await removeFile();
+    	}, DEFAULTS.tempFileCleanupDelayMs);
+    	this._tempFileCleanupTimers.add(timer);
+    }
+
+    async _request(
+    	path,
+    	{ method = "POST", body, settings, apiKey: explicitApiKey } = {},
+    ) {
+    	const apiKey =
+    		explicitApiKey === undefined
+    			? this._apiKey(settings ?? this.settings)
+    			: normalizeApiToken(explicitApiKey);
+    	if (!apiKey) {
+    		throw new Error("API key is required.");
+    	}
+    	if (typeof fetch !== "function") {
+    		throw new Error("fetch is not available in this runtime.");
+    	}
+
+    	const controller =
+    		typeof AbortController === "function" ? new AbortController() : null;
+    	const timeoutMs = this._requestTimeoutMs(settings ?? this.settings);
+    	const timeoutId =
+    		controller && timeoutMs > 0
+    			? setTimeout(() => controller.abort(), timeoutMs)
+    			: null;
+
+    	try {
+    		const response = await fetch(`${API_BASE}${path}`, {
+    			method,
+    			headers: {
+    				Authorization: apiKey,
+    				...(body ? { "Content-Type": "application/json" } : {}),
+    			},
+    			body: body ? JSON.stringify(body) : undefined,
+    			signal: controller?.signal,
+    		});
+
+    		const raw = await response.text();
+    		const payload = raw ? this._safeJsonParse(raw) : null;
+    		if (!response.ok) {
+    			const errorMessage =
+    				trimString(payload?.error, "") ||
+    				trimString(raw, "") ||
+    				response.statusText ||
+    				"Request failed.";
+    			throw new Error(`TTS Monster error ${response.status}: ${errorMessage}`);
+    		}
+    		return payload;
+    	} catch (error) {
+    		if (error?.name === "AbortError") {
+    			throw new Error("Request timed out.");
+    		}
+    		throw error;
+    	} finally {
+    		if (timeoutId) {
+    			clearTimeout(timeoutId);
+    		}
+    	}
+    }
+
+    async _overlayRequest({ url, body, settings }) {
+    	if (typeof fetch !== "function") {
+    		throw new Error("fetch is not available in this runtime.");
+    	}
+
+    	const controller =
+    		typeof AbortController === "function" ? new AbortController() : null;
+    	const timeoutMs = this._requestTimeoutMs(settings ?? this.settings);
+    	const timeoutId =
+    		controller && timeoutMs > 0
+    			? setTimeout(() => controller.abort(), timeoutMs)
+    			: null;
+
+    	try {
+    		const response = await fetch(url, {
+    			method: "POST",
+    			headers: {
+    				"Content-Type": "application/json",
+    			},
+    			body: JSON.stringify(body ?? {}),
+    			signal: controller?.signal,
+    		});
+
+    		const raw = await response.text();
+    		const payload = raw ? this._safeJsonParse(raw) : null;
+    		if (!response.ok) {
+    			const errorMessage =
+    				this._payloadMessage(payload) ||
+    				trimString(raw, "") ||
+    				response.statusText ||
+    				"Request failed.";
+    			throw new Error(`TTS Monster error ${response.status}: ${errorMessage}`);
+    		}
+    		return payload;
+    	} catch (error) {
+    		if (error?.name === "AbortError") {
+    			throw new Error("Request timed out.");
+    		}
+    		throw error;
+    	} finally {
+    		if (timeoutId) {
+    			clearTimeout(timeoutId);
+    		}
+    	}
+    }
+
+    _assertTtsMonsterStatus(payload, context) {
+    	const status = payload?.status;
+    	if (status === undefined || status === null) {
+    		return;
+    	}
+    	if (String(status) === "200") {
+    		return;
+    	}
+    	throw new Error(
+    		`${context} failed with status ${status}: ${
+    			this._payloadMessage(payload) || "Request failed."
+    		}`,
+    	);
+    }
+
+    _payloadMessage(payload) {
+    	return (
+    		trimString(payload?.error, "") ||
+    		(typeof payload?.message === "string"
+    			? trimString(payload.message, "")
+    			: "") ||
+    		trimString(payload?.warning, "")
+    	);
+    }
+
+    _safeJsonParse(value) {
+    	try {
+    		return JSON.parse(value);
+    	} catch (_error) {
+    		return null;
+    	}
+    }
+
+    _mergeSettings(settings, values) {
+    	return {
+    		...(this.settings && typeof this.settings === "object" ? this.settings : {}),
+    		...(settings && typeof settings === "object" ? settings : {}),
+    		...(values && typeof values === "object" ? values : {}),
+    	};
+    }
+
+    _settingsSnapshot(settings = this.settings) {
+    	return {
+    		authMethod: this._authMethod(settings),
+    		apiKey: this._apiKey(settings),
+    		overlayUrl: this._overlayUrl(settings),
+    		returnUsage: toBoolean(settings?.returnUsage, DEFAULTS.returnUsage),
+    		requestTimeoutMs: this._requestTimeoutMs(settings),
+    	};
+    }
+
+    _credentials(settings = this.settings) {
+    	const authMethod = this._authMethod(settings);
+    	if (authMethod === AUTH_METHODS.OVERLAY_URL) {
+    		const overlay = parseOverlayUrl(this._overlayUrl(settings));
+    		if (!overlay.ok) {
+    			return {
+    				ok: false,
+    				authMethod,
+    				cacheKey: "",
+    				message: overlay.message,
+    			};
+    		}
+    		return {
+    			ok: true,
+    			authMethod,
+    			userId: overlay.userId,
+    			apiKey: overlay.apiKey,
+    			cacheKey: `${authMethod}:${overlay.userId}:${overlay.apiKey}`,
+    			message: "",
+    		};
+    	}
+
+    	const apiKey = this._apiKey(settings);
+    	if (!apiKey) {
+    		return {
+    			ok: false,
+    			authMethod,
+    			cacheKey: "",
+    			message: "API token is required.",
+    		};
+    	}
+    	return {
+    		ok: true,
+    		authMethod,
+    		apiKey,
+    		cacheKey: `${authMethod}:${apiKey}`,
+    		message: "",
+    	};
+    }
+
+    _authMethod(settings = this.settings) {
+    	const value = trimString(settings?.authMethod, "");
+    	if (!value && this._apiKey(settings) && !this._overlayUrl(settings)) {
+    		return AUTH_METHODS.DEVELOPER_API;
+    	}
+    	return value === AUTH_METHODS.OVERLAY_URL
+    		? AUTH_METHODS.OVERLAY_URL
+    		: value === AUTH_METHODS.DEVELOPER_API
+    			? AUTH_METHODS.DEVELOPER_API
+    			: DEFAULTS.authMethod;
+    }
+
+    _apiKey(settings = this.settings) {
+    	return normalizeApiToken(settings?.apiKey);
+    }
+
+    _overlayUrl(settings = this.settings) {
+    	return trimString(settings?.overlayUrl, "");
+    }
+
+    _settingsAuthFingerprint(settings = this.settings) {
+    	return [
+    		this._authMethod(settings),
+    		this._apiKey(settings),
+    		this._overlayUrl(settings),
+    	].join(":");
+    }
+
+    _requestTimeoutMs(settings = this.settings) {
+    	return clamp(
+    		toNumber(settings?.requestTimeoutMs, DEFAULTS.requestTimeoutMs),
+    		0,
+    		300000,
+    	);
+    }
+
+    async _log(message) {
+    	if (typeof this.lumia?.log === "function") {
+    		await this.lumia.log(`[TTSMonster] ${message}`);
+    	}
+    }
+
+    async _showToast(message, time = 4000) {
+    	if (typeof this.lumia?.showToast !== "function") {
+    		return;
+    	}
+    	try {
+    		await this.lumia.showToast({ message, time });
+    	} catch (_error) {
+    		// ignore toast errors
+    	}
+    }
+
+    async onunload() {
+    	for (const timer of this._tempFileCleanupTimers) {
+    		clearTimeout(timer);
+    	}
+    	this._tempFileCleanupTimers.clear();
+    }
+
 }
 
 module.exports = TTSMonsterPlugin;
@@ -26429,130 +26535,131 @@ module.exports = TTSMonsterPlugin;
 ## tts_monster/manifest.json
 
 ```
+
 {
-	"id": "tts_monster",
-	"name": "TTS Monster",
-	"version": "1.3.0",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://tts.monster",
-	"description": "Generate TTS Monster speech audio and play it through Lumia Stream.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "audio",
-	"keywords": "tts monster, tts.monster, tts, text-to-speech, voice, audio",
-	"icon": "tts_monster.jpg",
-	"config": {
-		"settings_tutorial": "./settings_tutorial.md",
-		"actions_tutorial": "./actions_tutorial.md",
-		"settings": [
-			{
-				"key": "authMethod",
-				"label": "Connection Method",
-				"type": "select",
-				"defaultValue": "overlayUrl",
-				"options": [
-					{
-						"label": "Overlay URL",
-						"value": "overlayUrl"
-					},
-					{
-						"label": "Developer API Token",
-						"value": "developerApi"
-					}
-				],
-				"helperText": "Choose Developer API Token for the official console API, or Overlay URL if you only have your TTS Monster overlay link.",
-				"refreshOnChange": true
-			},
-			{
-				"key": "apiKey",
-				"label": "API Token",
-				"type": "password",
-				"helperText": "Used when Connection Method is Developer API Token. Create or copy your API token from the TTS Monster developer dashboard.",
-				"visibleIf": {
-					"key": "authMethod",
-					"equals": "developerApi"
-				},
-				"refreshOnChange": true
-			},
-			{
-				"key": "overlayUrl",
-				"label": "Overlay URL",
-				"type": "password",
-				"helperText": "Used when Connection Method is Overlay URL. Paste your full overlay URL, for example https://tts.monster/overlay/3hoZh83Uigewkx0Upw66imx2ASj1/059e9e17a7c64a42b38b6bbf7b40bee3",
-				"visibleIf": {
-					"key": "authMethod",
-					"equals": "overlayUrl"
-				},
-				"refreshOnChange": true
-			},
-			{
-				"key": "returnUsage",
-				"label": "Log Character Usage",
-				"type": "toggle",
-				"defaultValue": true,
-				"helperText": "For Developer API Token, requests `return_usage` on generate calls and logs current usage. For Overlay URL, shows start/result toasts."
-			},
-			{
-				"key": "requestTimeoutMs",
-				"label": "Request Timeout (ms)",
-				"type": "number",
-				"defaultValue": 0,
-				"min": 0,
-				"max": 300000,
-				"helperText": "How long to wait for TTS Monster API responses. Set to 0 to disable the timeout."
-			}
-		],
-		"actions": [
-			{
-				"type": "speak",
-				"label": "Speak",
-				"description": "Generate speech with TTS Monster and play it in Lumia.",
-				"refreshOnChange": true,
-				"fields": [
-					{
-						"key": "message",
-						"label": "Message",
-						"type": "textarea",
-						"defaultValue": "Hello from Lumia!",
-						"helperText": "Text to synthesize. TTS Monster currently uses only the first 500 characters.",
-						"allowVariables": true
-					},
-					{
-						"key": "voice",
-						"label": "Voice",
-						"type": "select",
-						"options": [],
-						"dynamicOptions": true,
-						"allowTyping": true,
-						"allowVariables": true,
-						"required": true,
-						"helperText": "Choose a cached voice, or type either a voice name or voice ID. Developer API voice IDs are available at https://console.tts.monster/voices; Overlay URL voices use the names from the overlay account."
-					},
-					{
-						"key": "volume",
-						"label": "Volume",
-						"type": "number",
-						"defaultValue": 100,
-						"min": 0,
-						"max": 100,
-						"helperText": "Playback volume in Lumia (0-100)."
-					},
-					{
-						"key": "waitForAudioToStop",
-						"label": "Wait For Playback To Finish",
-						"type": "switch",
-						"defaultValue": true,
-						"helperText": "If enabled, the action waits for the generated speech to finish before continuing."
-					}
-				]
-			}
-		],
-		"hasTtsVoices": true,
-		"ttsVoiceSource": {
-			"label": "TTS Monster"
-		}
-	}
+"id": "tts_monster",
+"name": "TTS Monster",
+"version": "1.3.0",
+"author": "Lumia Stream",
+"email": "dev@lumiastream.com",
+"website": "https://tts.monster",
+"description": "Generate TTS Monster speech audio and play it through Lumia Stream.",
+"license": "MIT",
+"lumiaVersion": "^9.0.0",
+"category": "audio",
+"keywords": "tts monster, tts.monster, tts, text-to-speech, voice, audio",
+"icon": "tts_monster.jpg",
+"config": {
+"settings_tutorial": "./settings_tutorial.md",
+"actions_tutorial": "./actions_tutorial.md",
+"settings": [
+{
+"key": "authMethod",
+"label": "Connection Method",
+"type": "select",
+"defaultValue": "overlayUrl",
+"options": [
+{
+"label": "Overlay URL",
+"value": "overlayUrl"
+},
+{
+"label": "Developer API Token",
+"value": "developerApi"
+}
+],
+"helperText": "Choose Developer API Token for the official console API, or Overlay URL if you only have your TTS Monster overlay link.",
+"refreshOnChange": true
+},
+{
+"key": "apiKey",
+"label": "API Token",
+"type": "password",
+"helperText": "Used when Connection Method is Developer API Token. Create or copy your API token from the TTS Monster developer dashboard.",
+"visibleIf": {
+"key": "authMethod",
+"equals": "developerApi"
+},
+"refreshOnChange": true
+},
+{
+"key": "overlayUrl",
+"label": "Overlay URL",
+"type": "password",
+"helperText": "Used when Connection Method is Overlay URL. Paste your full overlay URL, for example https://tts.monster/overlay/3hoZh83Uigewkx0Upw66imx2ASj1/059e9e17a7c64a42b38b6bbf7b40bee3",
+"visibleIf": {
+"key": "authMethod",
+"equals": "overlayUrl"
+},
+"refreshOnChange": true
+},
+{
+"key": "returnUsage",
+"label": "Log Character Usage",
+"type": "toggle",
+"defaultValue": true,
+"helperText": "For Developer API Token, requests `return_usage` on generate calls and logs current usage. For Overlay URL, shows start/result toasts."
+},
+{
+"key": "requestTimeoutMs",
+"label": "Request Timeout (ms)",
+"type": "number",
+"defaultValue": 0,
+"min": 0,
+"max": 300000,
+"helperText": "How long to wait for TTS Monster API responses. Set to 0 to disable the timeout."
+}
+],
+"actions": [
+{
+"type": "speak",
+"label": "Speak",
+"description": "Generate speech with TTS Monster and play it in Lumia.",
+"refreshOnChange": true,
+"fields": [
+{
+"key": "message",
+"label": "Message",
+"type": "textarea",
+"defaultValue": "Hello from Lumia!",
+"helperText": "Text to synthesize. TTS Monster currently uses only the first 500 characters.",
+"allowVariables": true
+},
+{
+"key": "voice",
+"label": "Voice",
+"type": "select",
+"options": [],
+"dynamicOptions": true,
+"allowTyping": true,
+"allowVariables": true,
+"required": true,
+"helperText": "Choose a cached voice, or type either a voice name or voice ID. Developer API voice IDs are available at https://console.tts.monster/voices; Overlay URL voices use the names from the overlay account."
+},
+{
+"key": "volume",
+"label": "Volume",
+"type": "number",
+"defaultValue": 100,
+"min": 0,
+"max": 100,
+"helperText": "Playback volume in Lumia (0-100)."
+},
+{
+"key": "waitForAudioToStop",
+"label": "Wait For Playback To Finish",
+"type": "switch",
+"defaultValue": true,
+"helperText": "If enabled, the action waits for the generated speech to finish before continuing."
+}
+]
+}
+],
+"hasTtsVoices": true,
+"ttsVoiceSource": {
+"label": "TTS Monster"
+}
+}
 }
 
 ```
@@ -26560,15 +26667,16 @@ module.exports = TTSMonsterPlugin;
 ## tts_monster/package.json
 
 ```
+
 {
-	"name": "lumia-tts-monster",
-	"version": "1.0.0",
-	"private": true,
-	"description": "TTS Monster plugin for Lumia Stream.",
-	"main": "main.js",
-	"dependencies": {
-		"@lumiastream/plugin": "^0.4.1"
-	}
+"name": "lumia-tts-monster",
+"version": "1.0.0",
+"private": true,
+"description": "TTS Monster plugin for Lumia Stream.",
+"main": "main.js",
+"dependencies": {
+"@lumiastream/plugin": "^0.4.1"
+}
 }
 
 ```
@@ -26576,10 +26684,13 @@ module.exports = TTSMonsterPlugin;
 ## tts_monster/settings_tutorial.md
 
 ```
+
 ---
+
 ### Connect TTS.Monster
 
 #### Overlay URL
+
 1. Set **Connection Method** to **Overlay URL**.
 2. Open the [TTS.Monster dashboard](https://tts.monster/dashboard/app).
 3. Copy your full **Overlay URL**.
@@ -26591,19 +26702,20 @@ Example overlay URL:
 `https://tts.monster/overlay/3hoZh83Uigewkx0Upw66imx2ASj1/059e9e17a7c64a42b38b6bbf7b40bee3`
 
 #### Developer API Token
+
 1. Set **Connection Method** to **Developer API Token**.
 2. Open the [TTS.Monster Console](https://console.tts.monster/).
 3. Log in and click through to create or copy your API token.
 4. Paste that token into this plugin's **API Token** setting.
 
-![TTS.Monster API token](./monster_tut1.png)
----
+## ![TTS.Monster API token](./monster_tut1.png)
 
 ```
 
 ## typescript_plugin/README.md
 
 ```
+
 # TypeScript Plugin Example
 
 This example shows a full Lumia Stream plugin workflow in TypeScript.
@@ -26655,90 +26767,91 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 ## typescript_plugin/manifest.json
 
 ```
+
 {
-	"id": "typescript_plugin_example",
-	"name": "TypeScript Plugin Example",
-	"version": "1.0.1",
-	"author": "Lumia Stream",
-	"email": "",
-	"website": "",
-	"repository": "",
-	"description": "Example TypeScript plugin that shows typed settings, actions, variables, and alerts.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "utilities",
-	"main": "dist/main.js",
-	"keywords": "typescript, sample, lumia, plugin",
-	"config": {
-		"settings": [
-			{
-				"key": "defaultMessage",
-				"label": "Default Message",
-				"type": "text",
-				"defaultValue": "Hello from TypeScript Plugin Example!",
-				"helperText": "Used when the action does not include a message."
-			},
-			{
-				"key": "heartbeatInterval",
-				"label": "Heartbeat Interval (seconds)",
-				"type": "number",
-				"defaultValue": 15,
-				"min": 5,
-				"max": 300,
-				"helperText": "How often to refresh the heartbeat variable."
-			}
-		],
-		"actions": [
-			{
-				"type": "send_sample_alert",
-				"label": "Send Sample Alert",
-				"description": "Triggers the sample alert and updates plugin variables.",
-				"fields": [
-					{
-						"key": "username",
-						"label": "Username",
-						"type": "text",
-						"defaultValue": "Viewer"
-					},
-					{
-						"key": "message",
-						"label": "Message",
-						"type": "text",
-						"defaultValue": "Hello from TypeScript Plugin Example!"
-					}
-				]
-			}
-		],
-		"variables": [
-			{
-				"name": "last_username",
-				"description": "Most recent username used by the action.",
-				"value": ""
-			},
-			{
-				"name": "last_message",
-				"description": "Most recent message used by the action.",
-				"value": ""
-			},
-			{
-				"name": "last_heartbeat",
-				"description": "ISO timestamp from the plugin heartbeat loop.",
-				"value": ""
-			}
-		],
-		"alerts": [
-			{
-				"title": "TypeScript Sample Alert",
-				"key": "ts_sample_alert",
-				"acceptedVariables": [
-					"last_username",
-					"last_message"
-				],
-				"defaultMessage": "{{last_username}}: {{last_message}}"
-			}
-		],
-		"translations": "./translations.json"
-	}
+"id": "typescript_plugin_example",
+"name": "TypeScript Plugin Example",
+"version": "1.0.1",
+"author": "Lumia Stream",
+"email": "",
+"website": "",
+"repository": "",
+"description": "Example TypeScript plugin that shows typed settings, actions, variables, and alerts.",
+"license": "MIT",
+"lumiaVersion": "^9.0.0",
+"category": "utilities",
+"main": "dist/main.js",
+"keywords": "typescript, sample, lumia, plugin",
+"config": {
+"settings": [
+{
+"key": "defaultMessage",
+"label": "Default Message",
+"type": "text",
+"defaultValue": "Hello from TypeScript Plugin Example!",
+"helperText": "Used when the action does not include a message."
+},
+{
+"key": "heartbeatInterval",
+"label": "Heartbeat Interval (seconds)",
+"type": "number",
+"defaultValue": 15,
+"min": 5,
+"max": 300,
+"helperText": "How often to refresh the heartbeat variable."
+}
+],
+"actions": [
+{
+"type": "send_sample_alert",
+"label": "Send Sample Alert",
+"description": "Triggers the sample alert and updates plugin variables.",
+"fields": [
+{
+"key": "username",
+"label": "Username",
+"type": "text",
+"defaultValue": "Viewer"
+},
+{
+"key": "message",
+"label": "Message",
+"type": "text",
+"defaultValue": "Hello from TypeScript Plugin Example!"
+}
+]
+}
+],
+"variables": [
+{
+"name": "last_username",
+"description": "Most recent username used by the action.",
+"value": ""
+},
+{
+"name": "last_message",
+"description": "Most recent message used by the action.",
+"value": ""
+},
+{
+"name": "last_heartbeat",
+"description": "ISO timestamp from the plugin heartbeat loop.",
+"value": ""
+}
+],
+"alerts": [
+{
+"title": "TypeScript Sample Alert",
+"key": "ts_sample_alert",
+"acceptedVariables": [
+"last_username",
+"last_message"
+],
+"defaultMessage": "{{last_username}}: {{last_message}}"
+}
+],
+"translations": "./translations.json"
+}
 }
 
 ```
@@ -26746,25 +26859,26 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 ## typescript_plugin/package.json
 
 ```
+
 {
-	"name": "lumia-typescript-plugin-example",
-	"version": "1.0.0",
-	"private": true,
-	"description": "Example Lumia Stream plugin written in TypeScript.",
-	"main": "dist/main.js",
-	"scripts": {
-		"build": "tsc -p tsconfig.json",
-		"watch": "tsc -w -p tsconfig.json",
-		"validate": "node ../../cli/scripts/validate-plugin.js .",
-		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
-	},
-	"dependencies": {
-		"@lumiastream/plugin": "^0.9.4"
-	},
-	"devDependencies": {
-		"@types/node": "^20.11.30",
-		"typescript": "^5.3.3"
-	}
+"name": "lumia-typescript-plugin-example",
+"version": "1.0.0",
+"private": true,
+"description": "Example Lumia Stream plugin written in TypeScript.",
+"main": "dist/main.js",
+"scripts": {
+"build": "tsc -p tsconfig.json",
+"watch": "tsc -w -p tsconfig.json",
+"validate": "node ../../cli/scripts/validate-plugin.js .",
+"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
+},
+"dependencies": {
+"@lumiastream/plugin": "^0.9.5"
+},
+"devDependencies": {
+"@types/node": "^20.11.30",
+"typescript": "^5.3.3"
+}
 }
 
 ```
@@ -26772,154 +26886,156 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 ## typescript_plugin/src/main.ts
 
 ```
+
 import {
-	Plugin,
-	type PluginActionPayload,
-	type PluginContext,
-	type PluginManifest,
+Plugin,
+type PluginActionPayload,
+type PluginContext,
+type PluginManifest,
 } from "@lumiastream/plugin";
 
 type ExampleSettings = {
-	defaultMessage?: string;
-	heartbeatInterval?: number;
+defaultMessage?: string;
+heartbeatInterval?: number;
 };
 
 type SendSampleAlertActionValue = {
-	username?: string;
-	message?: string;
+username?: string;
+message?: string;
 };
 
 const DEFAULTS = {
-	defaultMessage: "Hello from TypeScript Plugin Example!",
-	defaultUsername: "Viewer",
-	heartbeatInterval: 15,
+defaultMessage: "Hello from TypeScript Plugin Example!",
+defaultUsername: "Viewer",
+heartbeatInterval: 15,
 } as const;
 
 const VARIABLE_NAMES = {
-	lastUsername: "last_username",
-	lastMessage: "last_message",
-	lastHeartbeat: "last_heartbeat",
+lastUsername: "last_username",
+lastMessage: "last_message",
+lastHeartbeat: "last_heartbeat",
 } as const;
 
 class TypeScriptPluginExample extends Plugin {
-	private heartbeatTimer?: NodeJS.Timeout;
+private heartbeatTimer?: NodeJS.Timeout;
 
-	constructor(manifest: PluginManifest, context: PluginContext) {
-		super(manifest, context);
-	}
+    constructor(manifest: PluginManifest, context: PluginContext) {
+    	super(manifest, context);
+    }
 
-	async onload(): Promise<void> {
-		await this.syncDefaults();
-		this.startHeartbeat();
-	}
+    async onload(): Promise<void> {
+    	await this.syncDefaults();
+    	this.startHeartbeat();
+    }
 
-	async onunload(): Promise<void> {
-		this.stopHeartbeat();
-	}
+    async onunload(): Promise<void> {
+    	this.stopHeartbeat();
+    }
 
-	async onsettingsupdate(
-		settings: Record<string, unknown>,
-		previousSettings: Record<string, unknown>,
-	): Promise<void> {
-		const nextSettings = settings as ExampleSettings;
-		const previous = previousSettings as ExampleSettings;
-		const nextInterval = Number(
-			nextSettings.heartbeatInterval ?? DEFAULTS.heartbeatInterval,
-		);
-		const previousInterval = Number(
-			previous.heartbeatInterval ?? DEFAULTS.heartbeatInterval,
-		);
+    async onsettingsupdate(
+    	settings: Record<string, unknown>,
+    	previousSettings: Record<string, unknown>,
+    ): Promise<void> {
+    	const nextSettings = settings as ExampleSettings;
+    	const previous = previousSettings as ExampleSettings;
+    	const nextInterval = Number(
+    		nextSettings.heartbeatInterval ?? DEFAULTS.heartbeatInterval,
+    	);
+    	const previousInterval = Number(
+    		previous.heartbeatInterval ?? DEFAULTS.heartbeatInterval,
+    	);
 
-		if (
-			nextSettings.defaultMessage !== previous.defaultMessage ||
-			nextInterval !== previousInterval
-		) {
-			await this.syncDefaults(nextSettings);
-			this.startHeartbeat();
-		}
-	}
+    	if (
+    		nextSettings.defaultMessage !== previous.defaultMessage ||
+    		nextInterval !== previousInterval
+    	) {
+    		await this.syncDefaults(nextSettings);
+    		this.startHeartbeat();
+    	}
+    }
 
-	async actions(config: { actions: PluginActionPayload[] }): Promise<void> {
-		for (const action of config.actions) {
-			if (action.type === "send_sample_alert") {
-				await this.sendSampleAlert(action.value as SendSampleAlertActionValue);
-			}
-		}
-	}
+    async actions(config: { actions: PluginActionPayload[] }): Promise<void> {
+    	for (const action of config.actions) {
+    		if (action.type === "send_sample_alert") {
+    			await this.sendSampleAlert(action.value as SendSampleAlertActionValue);
+    		}
+    	}
+    }
 
-	private getTypedSettings(
-		source: ExampleSettings = this.settings as ExampleSettings,
-	): Required<ExampleSettings> {
-		const parsedInterval = Number(
-			source.heartbeatInterval ?? DEFAULTS.heartbeatInterval,
-		);
-		const heartbeatInterval = Number.isFinite(parsedInterval)
-			? Math.min(300, Math.max(5, parsedInterval))
-			: DEFAULTS.heartbeatInterval;
+    private getTypedSettings(
+    	source: ExampleSettings = this.settings as ExampleSettings,
+    ): Required<ExampleSettings> {
+    	const parsedInterval = Number(
+    		source.heartbeatInterval ?? DEFAULTS.heartbeatInterval,
+    	);
+    	const heartbeatInterval = Number.isFinite(parsedInterval)
+    		? Math.min(300, Math.max(5, parsedInterval))
+    		: DEFAULTS.heartbeatInterval;
 
-		return {
-			defaultMessage:
-				source.defaultMessage?.trim() || DEFAULTS.defaultMessage,
-			heartbeatInterval,
-		};
-	}
+    	return {
+    		defaultMessage:
+    			source.defaultMessage?.trim() || DEFAULTS.defaultMessage,
+    		heartbeatInterval,
+    	};
+    }
 
-	private async syncDefaults(settings?: ExampleSettings): Promise<void> {
-		const typedSettings = this.getTypedSettings(settings);
-		await this.lumia.setVariable(
-			VARIABLE_NAMES.lastMessage,
-			typedSettings.defaultMessage,
-		);
-	}
+    private async syncDefaults(settings?: ExampleSettings): Promise<void> {
+    	const typedSettings = this.getTypedSettings(settings);
+    	await this.lumia.setVariable(
+    		VARIABLE_NAMES.lastMessage,
+    		typedSettings.defaultMessage,
+    	);
+    }
 
-	private startHeartbeat(): void {
-		this.stopHeartbeat();
-		const { heartbeatInterval } = this.getTypedSettings();
+    private startHeartbeat(): void {
+    	this.stopHeartbeat();
+    	const { heartbeatInterval } = this.getTypedSettings();
 
-		this.heartbeatTimer = setInterval(() => {
-			void this.lumia.setVariable(
-				VARIABLE_NAMES.lastHeartbeat,
-				new Date().toISOString(),
-			);
-		}, heartbeatInterval * 1000);
-	}
+    	this.heartbeatTimer = setInterval(() => {
+    		void this.lumia.setVariable(
+    			VARIABLE_NAMES.lastHeartbeat,
+    			new Date().toISOString(),
+    		);
+    	}, heartbeatInterval * 1000);
+    }
 
-	private stopHeartbeat(): void {
-		if (!this.heartbeatTimer) return;
-		clearInterval(this.heartbeatTimer);
-		this.heartbeatTimer = undefined;
-	}
+    private stopHeartbeat(): void {
+    	if (!this.heartbeatTimer) return;
+    	clearInterval(this.heartbeatTimer);
+    	this.heartbeatTimer = undefined;
+    }
 
-	private async sendSampleAlert(
-		data: SendSampleAlertActionValue,
-	): Promise<void> {
-		const { defaultMessage } = this.getTypedSettings();
-		const username = data.username?.trim() || DEFAULTS.defaultUsername;
-		const message = data.message?.trim() || defaultMessage;
+    private async sendSampleAlert(
+    	data: SendSampleAlertActionValue,
+    ): Promise<void> {
+    	const { defaultMessage } = this.getTypedSettings();
+    	const username = data.username?.trim() || DEFAULTS.defaultUsername;
+    	const message = data.message?.trim() || defaultMessage;
 
-		await this.lumia.setVariable(VARIABLE_NAMES.lastUsername, username);
-		await this.lumia.setVariable(VARIABLE_NAMES.lastMessage, message);
+    	await this.lumia.setVariable(VARIABLE_NAMES.lastUsername, username);
+    	await this.lumia.setVariable(VARIABLE_NAMES.lastMessage, message);
 
-		try {
-			await this.lumia.triggerAlert({
-				alert: "ts_sample_alert",
-				dynamic: {
-					name: "message",
-					value: message,
-				},
-				extraSettings: {
-					username,
-					message,
-				},
-			});
-		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			await this.lumia.log(
-				`send_sample_alert failed: ${errorMessage}`,
-			);
-		}
-	}
+    	try {
+    		await this.lumia.triggerAlert({
+    			alert: "ts_sample_alert",
+    			dynamic: {
+    				name: "message",
+    				value: message,
+    			},
+    			extraSettings: {
+    				username,
+    				message,
+    			},
+    		});
+    	} catch (error) {
+    		const errorMessage =
+    			error instanceof Error ? error.message : String(error);
+    		await this.lumia.log(
+    			`send_sample_alert failed: ${errorMessage}`,
+    		);
+    	}
+    }
+
 }
 
 export = TypeScriptPluginExample;
@@ -26929,12 +27045,13 @@ export = TypeScriptPluginExample;
 ## typescript_plugin/translations.json
 
 ```
+
 {
-	"en": {
-		"last_username": "Most recent username used by the action.",
-		"last_message": "Most recent message used by the action.",
-		"last_heartbeat": "ISO timestamp from the plugin heartbeat loop."
-	}
+"en": {
+"last_username": "Most recent username used by the action.",
+"last_message": "Most recent message used by the action.",
+"last_heartbeat": "ISO timestamp from the plugin heartbeat loop."
+}
 }
 
 ```
@@ -26942,19 +27059,20 @@ export = TypeScriptPluginExample;
 ## typescript_plugin/tsconfig.json
 
 ```
+
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"module": "CommonJS",
-		"outDir": "./dist",
-		"rootDir": "./src",
-		"strict": true,
-		"esModuleInterop": true,
-		"forceConsistentCasingInFileNames": true,
-		"skipLibCheck": true
-	},
-	"include": ["src/**/*.ts"],
-	"exclude": ["dist", "node_modules"]
+"compilerOptions": {
+"target": "ES2022",
+"module": "CommonJS",
+"outDir": "./dist",
+"rootDir": "./src",
+"strict": true,
+"esModuleInterop": true,
+"forceConsistentCasingInFileNames": true,
+"skipLibCheck": true
+},
+"include": ["src/**/*.ts"],
+"exclude": ["dist", "node_modules"]
 }
 
 ```
@@ -26962,6 +27080,7 @@ export = TypeScriptPluginExample;
 ## x/README.md
 
 ```
+
 # Lumia X Plugin Example
 
 This example plugin adds a token-based X integration to Lumia Stream.
@@ -26990,6 +27109,7 @@ See [settings_tutorial.md](./settings_tutorial.md) for the setup steps.
 ## x/actions_tutorial.md
 
 ```
+
 ### Common Actions
 
 - **Create Post**: publish text, replies, quote posts, plus one optional media item from a local file or `https` URL.
@@ -27019,6 +27139,7 @@ Images use the single-upload endpoint. Videos use X's chunked upload flow before
 ## x/main.js
 
 ```
+
 const { Plugin } = require("@lumiastream/plugin");
 const crypto = require("crypto");
 const fs = require("fs/promises");
@@ -27030,1224 +27151,1225 @@ const DEFAULT_POLL_INTERVAL_SECONDS = 300;
 const MIN_POLL_INTERVAL_SECONDS = 15;
 const MAX_POLL_INTERVAL_SECONDS = 900;
 const MAX_TRACKED_MENTION_IDS = 200;
-const MAX_CHUNK_SIZE = 5 * 1024 * 1024;
+const MAX_CHUNK_SIZE = 5 _ 1024 _ 1024;
 
 const ALERT_KEYS = {
-	postCreated: "post_created",
-	mention: "mention",
-	followerGain: "follower_gain",
+postCreated: "post_created",
+mention: "mention",
+followerGain: "follower_gain",
 };
 
 const VARIABLE_NAMES = {
-	userId: "user_id",
-	username: "username",
-	displayName: "display_name",
-	bio: "bio",
-	verified: "verified",
-	followersCount: "followers_count",
-	followingCount: "following_count",
-	listedCount: "listed_count",
-	postCount: "post_count",
-	latestPostId: "latest_post_id",
-	latestPostText: "latest_post_text",
-	latestPostUrl: "latest_post_url",
-	latestPostCreatedAt: "latest_post_created_at",
-	lastCreatedPostId: "last_created_post_id",
-	latestMentionId: "latest_mention_id",
-	latestMentionText: "latest_mention_text",
-	latestMentionAuthor: "latest_mention_author",
-	latestMentionUrl: "latest_mention_url",
-	followerDelta: "follower_delta",
-	lastActionStatus: "last_action_status",
-	lastActionError: "last_action_error",
+userId: "user_id",
+username: "username",
+displayName: "display_name",
+bio: "bio",
+verified: "verified",
+followersCount: "followers_count",
+followingCount: "following_count",
+listedCount: "listed_count",
+postCount: "post_count",
+latestPostId: "latest_post_id",
+latestPostText: "latest_post_text",
+latestPostUrl: "latest_post_url",
+latestPostCreatedAt: "latest_post_created_at",
+lastCreatedPostId: "last_created_post_id",
+latestMentionId: "latest_mention_id",
+latestMentionText: "latest_mention_text",
+latestMentionAuthor: "latest_mention_author",
+latestMentionUrl: "latest_mention_url",
+followerDelta: "follower_delta",
+lastActionStatus: "last_action_status",
+lastActionError: "last_action_error",
 };
 
 const VARIABLE_DEFAULTS = {
-	[VARIABLE_NAMES.userId]: "",
-	[VARIABLE_NAMES.username]: "",
-	[VARIABLE_NAMES.displayName]: "",
-	[VARIABLE_NAMES.bio]: "",
-	[VARIABLE_NAMES.verified]: false,
-	[VARIABLE_NAMES.followersCount]: 0,
-	[VARIABLE_NAMES.followingCount]: 0,
-	[VARIABLE_NAMES.listedCount]: 0,
-	[VARIABLE_NAMES.postCount]: 0,
-	[VARIABLE_NAMES.latestPostId]: "",
-	[VARIABLE_NAMES.latestPostText]: "",
-	[VARIABLE_NAMES.latestPostUrl]: "",
-	[VARIABLE_NAMES.latestPostCreatedAt]: "",
-	[VARIABLE_NAMES.lastCreatedPostId]: "",
-	[VARIABLE_NAMES.latestMentionId]: "",
-	[VARIABLE_NAMES.latestMentionText]: "",
-	[VARIABLE_NAMES.latestMentionAuthor]: "",
-	[VARIABLE_NAMES.latestMentionUrl]: "",
-	[VARIABLE_NAMES.followerDelta]: 0,
-	[VARIABLE_NAMES.lastActionStatus]: "",
-	[VARIABLE_NAMES.lastActionError]: "",
+[VARIABLE_NAMES.userId]: "",
+[VARIABLE_NAMES.username]: "",
+[VARIABLE_NAMES.displayName]: "",
+[VARIABLE_NAMES.bio]: "",
+[VARIABLE_NAMES.verified]: false,
+[VARIABLE_NAMES.followersCount]: 0,
+[VARIABLE_NAMES.followingCount]: 0,
+[VARIABLE_NAMES.listedCount]: 0,
+[VARIABLE_NAMES.postCount]: 0,
+[VARIABLE_NAMES.latestPostId]: "",
+[VARIABLE_NAMES.latestPostText]: "",
+[VARIABLE_NAMES.latestPostUrl]: "",
+[VARIABLE_NAMES.latestPostCreatedAt]: "",
+[VARIABLE_NAMES.lastCreatedPostId]: "",
+[VARIABLE_NAMES.latestMentionId]: "",
+[VARIABLE_NAMES.latestMentionText]: "",
+[VARIABLE_NAMES.latestMentionAuthor]: "",
+[VARIABLE_NAMES.latestMentionUrl]: "",
+[VARIABLE_NAMES.followerDelta]: 0,
+[VARIABLE_NAMES.lastActionStatus]: "",
+[VARIABLE_NAMES.lastActionError]: "",
 };
 
 const MIME_TYPES = {
-	".bmp": "image/bmp",
-	".gif": "image/gif",
-	".jpeg": "image/jpeg",
-	".jpg": "image/jpeg",
-	".mov": "video/quicktime",
-	".mp4": "video/mp4",
-	".m4v": "video/mp4",
-	".png": "image/png",
-	".tif": "image/tiff",
-	".tiff": "image/tiff",
-	".webm": "video/webm",
-	".webp": "image/webp",
+".bmp": "image/bmp",
+".gif": "image/gif",
+".jpeg": "image/jpeg",
+".jpg": "image/jpeg",
+".mov": "video/quicktime",
+".mp4": "video/mp4",
+".m4v": "video/mp4",
+".png": "image/png",
+".tif": "image/tiff",
+".tiff": "image/tiff",
+".webm": "video/webm",
+".webp": "image/webp",
 };
 
 function sleep(ms) {
-	return new Promise((resolve) => {
-		setTimeout(resolve, ms);
-	});
+return new Promise((resolve) => {
+setTimeout(resolve, ms);
+});
 }
 
 function trimString(value, fallback = "") {
-	if (typeof value !== "string") {
-		if (value === null || value === undefined) {
-			return fallback;
-		}
-		return String(value).trim();
-	}
-	return value.trim();
+if (typeof value !== "string") {
+if (value === null || value === undefined) {
+return fallback;
+}
+return String(value).trim();
+}
+return value.trim();
 }
 
 function asBoolean(value, fallback = false) {
-	if (typeof value === "boolean") {
-		return value;
-	}
-	if (typeof value === "number") {
-		return value !== 0;
-	}
-	if (typeof value === "string") {
-		const normalized = value.trim().toLowerCase();
-		if (["true", "1", "yes", "on"].includes(normalized)) {
-			return true;
-		}
-		if (["false", "0", "no", "off"].includes(normalized)) {
-			return false;
-		}
-	}
-	return fallback;
+if (typeof value === "boolean") {
+return value;
+}
+if (typeof value === "number") {
+return value !== 0;
+}
+if (typeof value === "string") {
+const normalized = value.trim().toLowerCase();
+if (["true", "1", "yes", "on"].includes(normalized)) {
+return true;
+}
+if (["false", "0", "no", "off"].includes(normalized)) {
+return false;
+}
+}
+return fallback;
 }
 
 function asNumber(value, fallback = 0) {
-	if (typeof value === "number" && Number.isFinite(value)) {
-		return value;
-	}
-	if (typeof value === "string" && value.trim().length) {
-		const parsed = Number(value);
-		if (Number.isFinite(parsed)) {
-			return parsed;
-		}
-	}
-	return fallback;
+if (typeof value === "number" && Number.isFinite(value)) {
+return value;
+}
+if (typeof value === "string" && value.trim().length) {
+const parsed = Number(value);
+if (Number.isFinite(parsed)) {
+return parsed;
+}
+}
+return fallback;
 }
 
 function normalizeHandle(value) {
-	const trimmed = trimString(value);
-	return trimmed.replace(/^@+/, "");
+const trimmed = trimString(value);
+return trimmed.replace(/^@+/, "");
 }
 
 function percentEncode(value) {
-	return encodeURIComponent(String(value)).replace(
-		/[!'()*]/g,
-		(character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
-	);
+return encodeURIComponent(String(value)).replace(
+/[!'()*]/g,
+(character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+);
 }
 
 function buildQueryString(params = {}) {
-	const entries = Object.entries(params).filter(
-		([, value]) => value !== undefined && value !== null && value !== "",
-	);
-	return entries
-		.map(([key, value]) => `${percentEncode(key)}=${percentEncode(value)}`)
-		.join("&");
+const entries = Object.entries(params).filter(
+([, value]) => value !== undefined && value !== null && value !== "",
+);
+return entries
+.map(([key, value]) => `${percentEncode(key)}=${percentEncode(value)}`)
+.join("&");
 }
 
 function guessMimeType(input, fallback = "application/octet-stream") {
-	const extension = path.extname(trimString(input).toLowerCase());
-	return MIME_TYPES[extension] || fallback;
+const extension = path.extname(trimString(input).toLowerCase());
+return MIME_TYPES[extension] || fallback;
 }
 
 function isNumericId(value) {
-	return /^[0-9]{1,19}$/.test(trimString(value));
+return /^[0-9]{1,19}$/.test(trimString(value));
 }
 
 function createPostUrl(username, postId) {
-	const safeUser = normalizeHandle(username);
-	const safePostId = trimString(postId);
-	if (!safeUser || !safePostId) {
-		return "";
-	}
-	return `https://x.com/${encodeURIComponent(safeUser)}/status/${encodeURIComponent(
+const safeUser = normalizeHandle(username);
+const safePostId = trimString(postId);
+if (!safeUser || !safePostId) {
+return "";
+}
+return `https://x.com/${encodeURIComponent(safeUser)}/status/${encodeURIComponent(
 		safePostId,
 	)}`;
 }
 
 class XPlugin extends Plugin {
-	constructor(manifest, context) {
-		super(manifest, context);
-		this._pollTimer = null;
-		this._stopped = false;
-		this._pollInFlight = false;
-		this._mentionIds = [];
-		this._baselineReady = false;
-		this._state = {
-			userId: "",
-			username: "",
-			displayName: "",
-			bio: "",
-			verified: false,
-			followersCount: 0,
-			followingCount: 0,
-			listedCount: 0,
-			postCount: 0,
-			latestPostId: "",
-			latestPostText: "",
-			latestPostUrl: "",
-			latestPostCreatedAt: "",
-			lastCreatedPostId: "",
-			latestMentionId: "",
-			latestMentionText: "",
-			latestMentionAuthor: "",
-			latestMentionUrl: "",
-			followerDelta: 0,
-		};
-	}
-
-	async onload() {
-		await this._hydrateDefaults();
-		if (!this._hasCredentials(this.settings)) {
-			await this._updateConnection(false);
-			return;
-		}
-
-		if (!this._alertsEnabled(this.settings)) {
-			await this._updateConnection(true);
-			return;
-		}
-
-		await this._connectAndPrime({ suppressAlerts: true });
-	}
-
-	async onunload() {
-		this._stopped = true;
-		this._clearPollTimer();
-		await this._updateConnection(false);
-	}
-
-	async onsettingsupdate(settings, previous = {}) {
-		if (!this._hasCredentials(settings)) {
-			this._stopped = true;
-			this._clearPollTimer();
-			await this._updateConnection(false);
-			return;
-		}
-
-		if (this._settingsRequireReconnect(settings, previous)) {
-			this._stopped = false;
-			this._mentionIds = [];
-			this._baselineReady = false;
-			this._clearPollTimer();
-			if (!this._alertsEnabled(settings)) {
-				await this._updateConnection(true);
-				return;
-			}
-			await this._connectAndPrime({ suppressAlerts: true });
-			return;
-		}
-
-		if (this._pollRelevantSettingChanged(settings, previous)) {
-			this._clearPollTimer();
-			const wereAlertsEnabled = this._alertsEnabled(previous);
-			const areAlertsEnabled = this._alertsEnabled(settings);
-
-			if (!areAlertsEnabled) {
-				return;
-			}
-
-			if (!wereAlertsEnabled) {
-				this._mentionIds = [];
-				this._baselineReady = false;
-				await this._refreshSnapshot({
-					suppressAlerts: true,
-					establishBaseline: true,
-				});
-			}
-
-			this._scheduleNextPoll();
-		}
-	}
-
-	async validateAuth(data = {}) {
-		if (!this._hasCredentials(data)) {
-			return {
-				ok: false,
-				message: "Consumer key/secret and access token/secret are required.",
-			};
-		}
-
-		try {
-			const profile = await this._fetchAuthenticatedUser(data);
-			const username = trimString(profile?.username, "unknown");
-			const expected = normalizeHandle(data?.username);
-			if (expected && expected.toLowerCase() !== username.toLowerCase()) {
-				return {
-					ok: false,
-					message: `Token belongs to @${username}, not @${expected}.`,
-				};
-			}
-			return { ok: true, message: `Validated as @${username}.` };
-		} catch (error) {
-			return { ok: false, message: this._errorMessage(error) };
-		}
-	}
-
-	async actions(config = {}) {
-		const actions = Array.isArray(config.actions) ? config.actions : [];
-		for (const action of actions) {
-			if (!action || action.on === false) {
-				continue;
-			}
-
-			try {
-				switch (action.type) {
-					case "create_post":
-						await this._createPostAction(action.value);
-						break;
-					case "delete_post":
-						await this._deletePostAction(action.value);
-						break;
-					case "delete_latest_post":
-						await this._deleteLatestPostAction();
-						break;
-					case "like_post":
-						await this._likeAction(action.value, true);
-						break;
-					case "repost_post":
-						await this._repostAction(action.value, true);
-						break;
-					case "follow_user":
-						await this._followAction(action.value, true);
-						break;
-					default:
-						await this._debug(`Ignoring unsupported action type "${action.type}".`);
-						break;
-				}
-			} catch (error) {
-				await this._setActionError(this._errorMessage(error));
-				throw error;
-			}
-		}
-	}
-
-	async _connectAndPrime({ suppressAlerts = false } = {}) {
-		try {
-			await this._refreshSnapshot({ suppressAlerts, establishBaseline: true });
-			this._stopped = false;
-			await this._updateConnection(true);
-			if (this._alertsEnabled(this.settings)) {
-				this._scheduleNextPoll();
-			}
-		} catch (error) {
-			await this._updateConnection(false);
-			await this._log(`X setup failed: ${this._errorMessage(error)}`, "error");
-			throw error;
-		}
-	}
-
-	_settingsRequireReconnect(settings, previous) {
-		const keys = [
-			"consumerKey",
-			"consumerSecret",
-			"accessToken",
-			"accessTokenSecret",
-			"username",
-			"latestPostMode",
-		];
-		return keys.some((key) => trimString(settings?.[key]) !== trimString(previous?.[key]));
-	}
-
-	_pollRelevantSettingChanged(settings, previous) {
-		const keys = ["enableAlerts", "pollInterval", "trackFollowerAlerts", "trackMentionAlerts", "debugLogs"];
-		return keys.some((key) => String(settings?.[key] ?? "") !== String(previous?.[key] ?? ""));
-	}
-
-	_hasCredentials(settings = this.settings) {
-		return Boolean(
-			trimString(settings?.consumerKey) &&
-				trimString(settings?.consumerSecret) &&
-				trimString(settings?.accessToken) &&
-				trimString(settings?.accessTokenSecret),
-		);
-	}
-
-	_credentials(settings = this.settings) {
-		return {
-			consumerKey: trimString(settings?.consumerKey),
-			consumerSecret: trimString(settings?.consumerSecret),
-			accessToken: trimString(settings?.accessToken),
-			accessTokenSecret: trimString(settings?.accessTokenSecret),
-		};
-	}
-
-	_pollIntervalMs() {
-		const seconds = Math.max(
-			MIN_POLL_INTERVAL_SECONDS,
-			Math.min(
-				MAX_POLL_INTERVAL_SECONDS,
-				asNumber(this.settings?.pollInterval, DEFAULT_POLL_INTERVAL_SECONDS),
-			),
-		);
-		return seconds * 1000;
-	}
-
-	_alertsEnabled(settings = this.settings) {
-		return Boolean(
-			asBoolean(settings?.enableAlerts, false) &&
-				(asBoolean(settings?.trackFollowerAlerts, false) ||
-					asBoolean(settings?.trackMentionAlerts, false)),
-		);
-	}
-
-	_clearPollTimer() {
-		if (this._pollTimer) {
-			clearTimeout(this._pollTimer);
-			this._pollTimer = null;
-		}
-	}
-
-	_scheduleNextPoll(delayMs = this._pollIntervalMs()) {
-		if (
-			this._stopped ||
-			!this._hasCredentials(this.settings) ||
-			!this._alertsEnabled(this.settings)
-		) {
-			return;
-		}
-
-		this._clearPollTimer();
-		this._pollTimer = setTimeout(async () => {
-			if (this._pollInFlight) {
-				this._scheduleNextPoll();
-				return;
-			}
-
-			this._pollInFlight = true;
-			try {
-				await this._refreshSnapshot();
-				await this._updateConnection(true);
-			} catch (error) {
-				await this._log(`X poll failed: ${this._errorMessage(error)}`, "warn");
-			} finally {
-				this._pollInFlight = false;
-				this._scheduleNextPoll();
-			}
-		}, Math.max(1000, delayMs));
-	}
-
-	async _hydrateDefaults() {
-		await Promise.all(
-			Object.entries(VARIABLE_DEFAULTS).map(([name, value]) =>
-				this.lumia.setVariable(name, value),
-			),
-		);
-	}
-
-	async _refreshSnapshot({
-		suppressAlerts = false,
-		establishBaseline = false,
-	} = {}) {
-		const previousFollowerCount = asNumber(this._state.followersCount, 0);
-		const profile = await this._fetchAuthenticatedUser();
-		const userId = trimString(profile?.id);
-		const username = trimString(profile?.username);
-		const displayName = trimString(profile?.name);
-		const bio = trimString(profile?.description);
-		const verified = asBoolean(profile?.verified, false);
-		const metrics = profile?.public_metrics || {};
-		const followersCount = asNumber(metrics?.followers_count, 0);
-		const followingCount = asNumber(metrics?.following_count, 0);
-		const listedCount = asNumber(metrics?.listed_count, 0);
-		const postCount = asNumber(metrics?.tweet_count, 0);
-
-		const expected = normalizeHandle(this.settings?.username);
-		if (expected && expected.toLowerCase() !== username.toLowerCase()) {
-			throw new Error(`Configured username @${expected} does not match token @${username}.`);
-		}
-
-		const latestPost = await this._fetchLatestPost(userId);
-		const mentions = await this._fetchMentions(userId);
-
-		const updates = {
-			[VARIABLE_NAMES.userId]: userId,
-			[VARIABLE_NAMES.username]: username,
-			[VARIABLE_NAMES.displayName]: displayName,
-			[VARIABLE_NAMES.bio]: bio,
-			[VARIABLE_NAMES.verified]: verified,
-			[VARIABLE_NAMES.followersCount]: followersCount,
-			[VARIABLE_NAMES.followingCount]: followingCount,
-			[VARIABLE_NAMES.listedCount]: listedCount,
-			[VARIABLE_NAMES.postCount]: postCount,
-		};
-
-		this._state.userId = userId;
-		this._state.username = username;
-		this._state.displayName = displayName;
-		this._state.bio = bio;
-		this._state.verified = verified;
-		this._state.followersCount = followersCount;
-		this._state.followingCount = followingCount;
-		this._state.listedCount = listedCount;
-		this._state.postCount = postCount;
-
-		if (latestPost) {
-			const latestPostUrl = createPostUrl(username, latestPost.id);
-			updates[VARIABLE_NAMES.latestPostId] = trimString(latestPost.id);
-			updates[VARIABLE_NAMES.latestPostText] = trimString(latestPost.text);
-			updates[VARIABLE_NAMES.latestPostUrl] = latestPostUrl;
-			updates[VARIABLE_NAMES.latestPostCreatedAt] = trimString(latestPost.created_at);
-
-			this._state.latestPostId = trimString(latestPost.id);
-			this._state.latestPostText = trimString(latestPost.text);
-			this._state.latestPostUrl = latestPostUrl;
-			this._state.latestPostCreatedAt = trimString(latestPost.created_at);
-		}
-
-		await Promise.all(
-			Object.entries(updates).map(([name, value]) => this.lumia.setVariable(name, value)),
-		);
-
-		const latestMention = Array.isArray(mentions?.posts) ? mentions.posts[0] : null;
-		if (latestMention) {
-			const mentionAuthor = this._lookupIncludedUser(
-				mentions?.includes?.users,
-				latestMention.author_id,
-			);
-			const mentionHandle = trimString(mentionAuthor?.username);
-			const mentionUrl = createPostUrl(mentionHandle, latestMention.id);
-			await Promise.all([
-				this.lumia.setVariable(VARIABLE_NAMES.latestMentionId, trimString(latestMention.id)),
-				this.lumia.setVariable(
-					VARIABLE_NAMES.latestMentionText,
-					trimString(latestMention.text),
-				),
-				this.lumia.setVariable(VARIABLE_NAMES.latestMentionAuthor, mentionHandle),
-				this.lumia.setVariable(VARIABLE_NAMES.latestMentionUrl, mentionUrl),
-			]);
-			this._state.latestMentionId = trimString(latestMention.id);
-		this._state.latestMentionText = trimString(latestMention.text);
-		this._state.latestMentionAuthor = mentionHandle;
-		this._state.latestMentionUrl = mentionUrl;
-	}
-
-		const followerDelta = Math.max(0, followersCount - previousFollowerCount);
-		this._state.followerDelta = followerDelta;
-		await this.lumia.setVariable(VARIABLE_NAMES.followerDelta, followerDelta);
-
-		const mentionAlertsEnabled = asBoolean(this.settings?.trackMentionAlerts, true);
-		const followerAlertsEnabled = asBoolean(this.settings?.trackFollowerAlerts, true);
-
-		if (!this._baselineReady || establishBaseline) {
-			this._mentionIds = (mentions?.posts || [])
-				.map((post) => trimString(post?.id))
-				.filter(Boolean)
-				.slice(0, MAX_TRACKED_MENTION_IDS);
-			this._baselineReady = true;
-			return;
-		}
-
-		if (!suppressAlerts && followerAlertsEnabled && followerDelta > 0) {
-			await this._triggerFollowerAlert(followerDelta);
-		}
-
-		if (!suppressAlerts && mentionAlertsEnabled) {
-			await this._processNewMentions(mentions);
-		}
-	}
-
-	async _fetchAuthenticatedUser(settings = this.settings) {
-		const response = await this._request("GET", "/2/users/me", {
-			settings,
-			query: {
-				"user.fields": "created_at,description,profile_image_url,public_metrics,url,verified",
-			},
-		});
-		return response?.data || null;
-	}
-
-	async _fetchLatestPost(userId) {
-		if (!trimString(userId)) {
-			return null;
-		}
-
-		const exclude =
-			this.settings?.latestPostMode === "include_replies" ? "retweets" : "retweets,replies";
-
-		const response = await this._request("GET", `/2/users/${encodeURIComponent(userId)}/tweets`, {
-			query: {
-				max_results: 5,
-				exclude,
-				"tweet.fields": "author_id,created_at,conversation_id",
-			},
-		});
-		return Array.isArray(response?.data) && response.data.length ? response.data[0] : null;
-	}
-
-	async _fetchMentions(userId) {
-		if (!trimString(userId)) {
-			return { posts: [], includes: {} };
-		}
-
-		const response = await this._request(
-			"GET",
-			`/2/users/${encodeURIComponent(userId)}/mentions`,
-			{
-				query: {
-					max_results: 10,
-					expansions: "author_id",
-					"tweet.fields": "author_id,conversation_id,created_at,referenced_tweets",
-					"user.fields": "name,profile_image_url,username,verified",
-				},
-			},
-		);
-		return {
-			posts: Array.isArray(response?.data) ? response.data : [],
-			includes: response?.includes || {},
-		};
-	}
-
-	_lookupIncludedUser(users = [], userId) {
-		return Array.isArray(users)
-			? users.find((user) => trimString(user?.id) === trimString(userId)) || null
-			: null;
-	}
-
-	async _processNewMentions(mentions = {}) {
-		const posts = Array.isArray(mentions.posts) ? mentions.posts : [];
-		if (!posts.length) {
-			return;
-		}
-
-		const known = new Set(this._mentionIds);
-		const fresh = posts
-			.filter((post) => {
-				const id = trimString(post?.id);
-				return id && !known.has(id);
-			})
-			.reverse();
-
-		for (const post of fresh) {
-			const author = this._lookupIncludedUser(mentions?.includes?.users, post.author_id);
-			const authorHandle = trimString(author?.username);
-			const mentionUrl = createPostUrl(authorHandle, post.id);
-			await Promise.all([
-				this.lumia.setVariable(VARIABLE_NAMES.latestMentionId, trimString(post.id)),
-				this.lumia.setVariable(VARIABLE_NAMES.latestMentionText, trimString(post.text)),
-				this.lumia.setVariable(VARIABLE_NAMES.latestMentionAuthor, authorHandle),
-				this.lumia.setVariable(VARIABLE_NAMES.latestMentionUrl, mentionUrl),
-			]);
-
-			this._state.latestMentionId = trimString(post.id);
-			this._state.latestMentionText = trimString(post.text);
-			this._state.latestMentionAuthor = authorHandle;
-			this._state.latestMentionUrl = mentionUrl;
-
-			await this.lumia.triggerAlert({
-				alert: ALERT_KEYS.mention,
-				showInEventList: true,
-				extraSettings: {
-					username: this._state.username,
-					display_name: this._state.displayName,
-					latest_mention_id: trimString(post.id),
-					latest_mention_text: trimString(post.text),
-					latest_mention_author: authorHandle,
-					latest_mention_url: mentionUrl,
-				},
-			});
-		}
-
-		this._mentionIds = posts
-			.map((post) => trimString(post?.id))
-			.filter(Boolean)
-			.slice(0, MAX_TRACKED_MENTION_IDS);
-	}
-
-	async _triggerFollowerAlert(followerDelta) {
-		await this.lumia.triggerAlert({
-			alert: ALERT_KEYS.followerGain,
-			showInEventList: true,
-			dynamic: {
-				value: String(followerDelta),
-			},
-			extraSettings: {
-				username: this._state.username,
-				display_name: this._state.displayName,
-				followers_count: this._state.followersCount,
-				follower_delta: followerDelta,
-			},
-		});
-	}
-
-	async _createPostAction(data = {}) {
-		const text = trimString(data?.text);
-		const replyToPostId = trimString(data?.replyToPostId);
-		const quotePostId = trimString(data?.quotePostId);
-		const mediaSource = trimString(data?.media);
-
-		if (!text) {
-			throw new Error("Create Post requires text.");
-		}
-		if (replyToPostId && quotePostId) {
-			throw new Error("A post cannot be both a reply and a quote in one action.");
-		}
-
-		const mediaIds = mediaSource ? [await this._uploadSingleMediaSource(mediaSource)] : [];
-
-		const payload = { text };
-		if (replyToPostId) {
-			payload.reply = { in_reply_to_tweet_id: replyToPostId };
-		}
-		if (quotePostId) {
-			payload.quote_tweet_id = quotePostId;
-		}
-		if (mediaIds.length) {
-			payload.media = { media_ids: mediaIds };
-		}
-
-		const response = await this._request("POST", "/2/tweets", {
-			body: payload,
-		});
-		const postId = trimString(response?.data?.id);
-		const url = createPostUrl(this._state.username, postId);
-
-		this._state.lastCreatedPostId = postId;
-		this._state.latestPostId = postId;
-		this._state.latestPostText = text;
-		this._state.latestPostUrl = url;
-		this._state.latestPostCreatedAt = new Date().toISOString();
-
-		await Promise.all([
-			this.lumia.setVariable(VARIABLE_NAMES.lastCreatedPostId, postId),
-			this.lumia.setVariable(VARIABLE_NAMES.latestPostId, postId),
-			this.lumia.setVariable(VARIABLE_NAMES.latestPostText, text),
-			this.lumia.setVariable(VARIABLE_NAMES.latestPostUrl, url),
-			this.lumia.setVariable(
-				VARIABLE_NAMES.latestPostCreatedAt,
-				this._state.latestPostCreatedAt,
-			),
-		]);
-
-		await this.lumia.triggerAlert({
-			alert: ALERT_KEYS.postCreated,
-			showInEventList: true,
-			extraSettings: {
-				username: this._state.username,
-				display_name: this._state.displayName,
-				latest_post_id: postId,
-				latest_post_text: text,
-				latest_post_url: url,
-				last_created_post_id: postId,
-			},
-		});
-
-		await this._setActionStatus(`Created X post ${postId}.`);
-	}
-
-	async _deletePostAction(data = {}) {
-		const postId = trimString(data?.postId);
-		if (!postId) {
-			throw new Error("Delete Post requires a post ID.");
-		}
-		await this._deletePostById(postId);
-		await this._setActionStatus(`Deleted X post ${postId}.`);
-	}
-
-	async _deleteLatestPostAction() {
-		const postId =
-			this._state.lastCreatedPostId ||
-			trimString(await this.lumia.getVariable(VARIABLE_NAMES.lastCreatedPostId)) ||
-			this._state.latestPostId ||
-			trimString(await this.lumia.getVariable(VARIABLE_NAMES.latestPostId));
-		if (!postId) {
-			throw new Error("No stored X post ID is available to delete.");
-		}
-		await this._deletePostById(postId);
-		await this._setActionStatus(`Deleted latest stored X post ${postId}.`);
-	}
-
-	async _deletePostById(postId) {
-		await this._request("DELETE", `/2/tweets/${encodeURIComponent(postId)}`);
-		if (trimString(this._state.lastCreatedPostId) === trimString(postId)) {
-			this._state.lastCreatedPostId = "";
-			await this.lumia.setVariable(VARIABLE_NAMES.lastCreatedPostId, "");
-		}
-	}
-
-	async _likeAction(data = {}, shouldLike) {
-		const postId = trimString(data?.postId);
-		if (!postId) {
-			throw new Error(`${shouldLike ? "Like" : "Unlike"} Post requires a post ID.`);
-		}
-
-		await this._ensureUserId();
-		if (shouldLike) {
-			await this._request(
-				"POST",
-				`/2/users/${encodeURIComponent(this._state.userId)}/likes`,
-				{
-					body: { tweet_id: postId },
-				},
-			);
-		} else {
-			await this._request(
-				"DELETE",
-				`/2/users/${encodeURIComponent(this._state.userId)}/likes/${encodeURIComponent(
-					postId,
-				)}`,
-			);
-		}
-
-		await this._setActionStatus(
-			`${shouldLike ? "Liked" : "Unliked"} X post ${postId}.`,
-		);
-	}
-
-	async _repostAction(data = {}, shouldRepost) {
-		const postId = trimString(data?.postId);
-		if (!postId) {
-			throw new Error(`${shouldRepost ? "Repost" : "Undo Repost"} requires a post ID.`);
-		}
-
-		await this._ensureUserId();
-		if (shouldRepost) {
-			await this._request(
-				"POST",
-				`/2/users/${encodeURIComponent(this._state.userId)}/retweets`,
-				{
-					body: { tweet_id: postId },
-				},
-			);
-		} else {
-			await this._request(
-				"DELETE",
-				`/2/users/${encodeURIComponent(this._state.userId)}/retweets/${encodeURIComponent(
-					postId,
-				)}`,
-			);
-		}
-
-		await this._setActionStatus(
-			`${shouldRepost ? "Reposted" : "Removed repost of"} X post ${postId}.`,
-		);
-	}
-
-	async _followAction(data = {}, shouldFollow) {
-		const target = trimString(data?.user);
-		if (!target) {
-			throw new Error(`${shouldFollow ? "Follow" : "Unfollow"} requires a user value.`);
-		}
-
-		await this._ensureUserId();
-		const targetUserId = await this._resolveUserId(target);
-		if (shouldFollow) {
-			await this._request(
-				"POST",
-				`/2/users/${encodeURIComponent(this._state.userId)}/following`,
-				{
-					body: { target_user_id: targetUserId },
-				},
-			);
-		} else {
-			await this._request(
-				"DELETE",
-				`/2/users/${encodeURIComponent(
-					this._state.userId,
-				)}/following/${encodeURIComponent(targetUserId)}`,
-			);
-		}
-
-		await this._setActionStatus(
-			`${shouldFollow ? "Followed" : "Unfollowed"} X user ${target}.`,
-		);
-	}
-
-	async _ensureUserId() {
-		if (trimString(this._state.userId)) {
-			return this._state.userId;
-		}
-		const profile = await this._fetchAuthenticatedUser();
-		this._state.userId = trimString(profile?.id);
-		await this.lumia.setVariable(VARIABLE_NAMES.userId, this._state.userId);
-		return this._state.userId;
-	}
-
-	async _resolveUserId(value) {
-		const normalized = trimString(value);
-		if (isNumericId(normalized)) {
-			return normalized;
-		}
-
-		const username = normalizeHandle(normalized);
-		const response = await this._request(
-			"GET",
-			`/2/users/by/username/${encodeURIComponent(username)}`,
-			{
-				query: {
-					"user.fields": "username",
-				},
-			},
-		);
-		const resolved = trimString(response?.data?.id);
-		if (!resolved) {
-			throw new Error(`Could not resolve X user "${value}".`);
-		}
-		return resolved;
-	}
-
-	async _uploadSingleMediaSource(source) {
-		const asset = await this._loadMediaSource(source);
-		if (asset.kind === "image") {
-			return this._uploadImage(asset);
-		}
-		if (asset.kind === "video") {
-			return this._uploadChunkedVideo(asset);
-		}
-		throw new Error(`Unsupported media type for "${source}".`);
-	}
-
-	async _loadMediaSource(source) {
-		if (/^https:\/\//i.test(source)) {
-			const response = await this._fetchRaw(source);
-			const mimeType = trimString(response.contentType) || guessMimeType(source);
-			const buffer = Buffer.from(response.buffer);
-			return this._buildMediaAsset({
-				label: source,
-				filename: path.basename(new URL(source).pathname) || "remote-media",
-				mimeType,
-				buffer,
-			});
-		}
-
-		const resolvedPath = path.resolve(source);
-		const buffer = await fs.readFile(resolvedPath);
-		const mimeType = guessMimeType(resolvedPath);
-		return this._buildMediaAsset({
-			label: resolvedPath,
-			filename: path.basename(resolvedPath),
-			mimeType,
-			buffer,
-		});
-	}
-
-	_buildMediaAsset({ label, filename, mimeType, buffer }) {
-		const normalizedMime = trimString(mimeType).toLowerCase();
-		if (normalizedMime.startsWith("image/")) {
-			return {
-				label,
-				filename,
-				mimeType: normalizedMime,
-				buffer,
-				kind: normalizedMime === "image/gif" ? "video" : "image",
-				mediaCategory:
-					normalizedMime === "image/gif" ? "tweet_gif" : "tweet_image",
-			};
-		}
-		if (normalizedMime.startsWith("video/")) {
-			return {
-				label,
-				filename,
-				mimeType: normalizedMime,
-				buffer,
-				kind: "video",
-				mediaCategory: "tweet_video",
-			};
-		}
-		return {
-			label,
-			filename,
-			mimeType: normalizedMime,
-			buffer,
-			kind: "unsupported",
-			mediaCategory: "",
-		};
-	}
-
-	async _uploadImage(asset) {
-		const form = new FormData();
-		form.set(
-			"media",
-			new Blob([asset.buffer], { type: asset.mimeType }),
-			asset.filename,
-		);
-		form.set("media_category", asset.mediaCategory);
-		form.set("media_type", asset.mimeType);
-		form.set("shared", "false");
-
-		const response = await this._request("POST", "/2/media/upload", {
-			body: form,
-		});
-		const mediaId = trimString(response?.data?.id);
-		if (!mediaId) {
-			throw new Error(`X did not return a media ID for "${asset.label}".`);
-		}
-		return mediaId;
-	}
-
-	async _uploadChunkedVideo(asset) {
-		const initResponse = await this._request("POST", "/2/media/upload/initialize", {
-			body: {
-				media_category: asset.mediaCategory,
-				media_type: asset.mimeType,
-				shared: false,
-				total_bytes: asset.buffer.length,
-			},
-		});
-		const mediaId = trimString(initResponse?.data?.id);
-		if (!mediaId) {
-			throw new Error(`Failed to initialize media upload for "${asset.label}".`);
-		}
-
-		let segmentIndex = 0;
-		for (let offset = 0; offset < asset.buffer.length; offset += MAX_CHUNK_SIZE) {
-			const chunk = asset.buffer.subarray(offset, offset + MAX_CHUNK_SIZE);
-			const form = new FormData();
-			form.set("media", new Blob([chunk], { type: asset.mimeType }), asset.filename);
-			form.set("segment_index", String(segmentIndex));
-			await this._request(
-				"POST",
-				`/2/media/upload/${encodeURIComponent(mediaId)}/append`,
-				{
-					body: form,
-				},
-			);
-			segmentIndex += 1;
-		}
-
-		const finalizeResponse = await this._request(
-			"POST",
-			`/2/media/upload/${encodeURIComponent(mediaId)}/finalize`,
-		);
-		await this._waitForMediaReady(mediaId, finalizeResponse?.data?.processing_info);
-		return mediaId;
-	}
-
-	async _waitForMediaReady(mediaId, processingInfo) {
-		let current = processingInfo || null;
-		while (current && ["pending", "in_progress"].includes(current.state)) {
-			const delaySeconds = Math.max(1, asNumber(current.check_after_secs, 2));
-			await sleep(delaySeconds * 1000);
-			const statusResponse = await this._request("GET", "/2/media/upload", {
-				query: {
-					command: "STATUS",
-					media_id: mediaId,
-				},
-			});
-			current = statusResponse?.data?.processing_info || null;
-		}
-
-		if (current && current.state === "failed") {
-			const message =
-				trimString(current?.error?.message) ||
-				trimString(current?.error?.detail) ||
-				`Media upload ${mediaId} failed during processing.`;
-			throw new Error(message);
-		}
-	}
-
-	async _fetchRaw(url) {
-		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-		try {
-			const response = await fetch(url, {
-				method: "GET",
-				signal: controller.signal,
-			});
-			if (!response.ok) {
-				throw new Error(`Media download failed (${response.status}) for ${url}`);
-			}
-			const buffer = await response.arrayBuffer();
-			return {
-				buffer,
-				contentType: trimString(response.headers.get("content-type")),
-			};
-		} finally {
-			clearTimeout(timeout);
-		}
-	}
-
-	async _request(method, endpoint, options = {}) {
-		const settings = options.settings || this.settings;
-		const credentials = this._credentials(settings);
-		const query = options.query || {};
-		const baseUrl = endpoint.startsWith("http") ? endpoint : `${API_BASE_URL}${endpoint}`;
-		const queryString = buildQueryString(query);
-		const url = queryString ? `${baseUrl}?${queryString}` : baseUrl;
-		const oauthHeader = this._buildOAuthHeader(method, baseUrl, query, credentials);
-		const headers = new Headers(options.headers || {});
-		headers.set("Authorization", oauthHeader);
-		headers.set("Accept", "application/json");
-
-		let body = options.body;
-		if (body && !(body instanceof FormData)) {
-			headers.set("Content-Type", "application/json");
-			body = JSON.stringify(body);
-		}
-
-		await this._debug(`${method} ${url}`);
-
-		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-		try {
-			const response = await fetch(url, {
-				method,
-				headers,
-				body,
-				signal: controller.signal,
-			});
-			const text = await response.text();
-			const parsed = text ? this._safeJsonParse(text) : {};
-
-			if (!response.ok || Array.isArray(parsed?.errors)) {
-				const message =
-					this._extractApiError(parsed) ||
-					`${method} ${endpoint} failed with status ${response.status}`;
-				throw new Error(message);
-			}
-
-			return parsed;
-		} catch (error) {
-			if (error?.name === "AbortError") {
-				throw new Error(`Request timed out for ${endpoint}`);
-			}
-			throw error;
-		} finally {
-			clearTimeout(timeout);
-		}
-	}
-
-	_buildOAuthHeader(method, baseUrl, query, credentials) {
-		const oauthParams = {
-			oauth_consumer_key: credentials.consumerKey,
-			oauth_nonce: crypto.randomBytes(16).toString("hex"),
-			oauth_signature_method: "HMAC-SHA1",
-			oauth_timestamp: String(Math.floor(Date.now() / 1000)),
-			oauth_token: credentials.accessToken,
-			oauth_version: "1.0",
-		};
-
-		const signatureParams = { ...oauthParams, ...(query || {}) };
-		const parameterString = Object.keys(signatureParams)
-			.sort()
-			.map((key) => `${percentEncode(key)}=${percentEncode(signatureParams[key])}`)
-			.join("&");
-		const signatureBaseString = [
-			method.toUpperCase(),
-			percentEncode(baseUrl),
-			percentEncode(parameterString),
-		].join("&");
-		const signingKey = `${percentEncode(credentials.consumerSecret)}&${percentEncode(
-			credentials.accessTokenSecret,
-		)}`;
-		const signature = crypto
-			.createHmac("sha1", signingKey)
-			.update(signatureBaseString)
-			.digest("base64");
-		const authParams = {
-			...oauthParams,
-			oauth_signature: signature,
-		};
-
-		return `OAuth ${Object.keys(authParams)
-			.sort()
-			.map(
-				(key) =>
-					`${percentEncode(key)}="${percentEncode(authParams[key])}"`,
-			)
-			.join(", ")}`;
-	}
-
-	_safeJsonParse(text) {
-		try {
-			return JSON.parse(text);
-		} catch (_error) {
-			return { raw: text };
-		}
-	}
-
-	_extractApiError(payload) {
-		if (typeof payload === "string") {
-			return payload;
-		}
-
-		if (Array.isArray(payload?.errors) && payload.errors.length) {
-			const first = payload.errors[0] || {};
-			return trimString(first.detail || first.message || first.title);
-		}
-
-		if (payload?.detail || payload?.message || payload?.title) {
-			return trimString(payload.detail || payload.message || payload.title);
-		}
-
-		if (typeof payload?.raw === "string") {
-			return trimString(payload.raw);
-		}
-
-		return "";
-	}
-
-	async _setActionStatus(message) {
-		await Promise.all([
-			this.lumia.setVariable(VARIABLE_NAMES.lastActionStatus, message),
-			this.lumia.setVariable(VARIABLE_NAMES.lastActionError, ""),
-		]);
-		await this._debug(message);
-	}
-
-	async _setActionError(message) {
-		await Promise.all([
-			this.lumia.setVariable(VARIABLE_NAMES.lastActionError, message),
-			this.lumia.setVariable(VARIABLE_NAMES.lastActionStatus, ""),
-		]);
-		await this._log(message, "error");
-	}
-
-	async _updateConnection(state) {
-		try {
-			await this.lumia.updateConnection(Boolean(state));
-		} catch (_error) {
-			// Ignore runtime connection update failures.
-		}
-	}
-
-	async _log(message, level = "info") {
-		if (typeof this.lumia?.log === "function") {
-			await this.lumia.log({ message, level });
-		}
-	}
-
-	async _debug(message) {
-		if (!asBoolean(this.settings?.debugLogs, false)) {
-			return;
-		}
-		await this._log(`[X] ${message}`, "debug");
-	}
-
-	_errorMessage(error) {
-		if (!error) {
-			return "Unknown X plugin error.";
-		}
-		if (typeof error === "string") {
-			return error;
-		}
-		return trimString(error.message || error.detail || String(error), "Unknown X plugin error.");
-	}
+constructor(manifest, context) {
+super(manifest, context);
+this.\_pollTimer = null;
+this.\_stopped = false;
+this.\_pollInFlight = false;
+this.\_mentionIds = [];
+this.\_baselineReady = false;
+this.\_state = {
+userId: "",
+username: "",
+displayName: "",
+bio: "",
+verified: false,
+followersCount: 0,
+followingCount: 0,
+listedCount: 0,
+postCount: 0,
+latestPostId: "",
+latestPostText: "",
+latestPostUrl: "",
+latestPostCreatedAt: "",
+lastCreatedPostId: "",
+latestMentionId: "",
+latestMentionText: "",
+latestMentionAuthor: "",
+latestMentionUrl: "",
+followerDelta: 0,
+};
+}
+
+    async onload() {
+    	await this._hydrateDefaults();
+    	if (!this._hasCredentials(this.settings)) {
+    		await this._updateConnection(false);
+    		return;
+    	}
+
+    	if (!this._alertsEnabled(this.settings)) {
+    		await this._updateConnection(true);
+    		return;
+    	}
+
+    	await this._connectAndPrime({ suppressAlerts: true });
+    }
+
+    async onunload() {
+    	this._stopped = true;
+    	this._clearPollTimer();
+    	await this._updateConnection(false);
+    }
+
+    async onsettingsupdate(settings, previous = {}) {
+    	if (!this._hasCredentials(settings)) {
+    		this._stopped = true;
+    		this._clearPollTimer();
+    		await this._updateConnection(false);
+    		return;
+    	}
+
+    	if (this._settingsRequireReconnect(settings, previous)) {
+    		this._stopped = false;
+    		this._mentionIds = [];
+    		this._baselineReady = false;
+    		this._clearPollTimer();
+    		if (!this._alertsEnabled(settings)) {
+    			await this._updateConnection(true);
+    			return;
+    		}
+    		await this._connectAndPrime({ suppressAlerts: true });
+    		return;
+    	}
+
+    	if (this._pollRelevantSettingChanged(settings, previous)) {
+    		this._clearPollTimer();
+    		const wereAlertsEnabled = this._alertsEnabled(previous);
+    		const areAlertsEnabled = this._alertsEnabled(settings);
+
+    		if (!areAlertsEnabled) {
+    			return;
+    		}
+
+    		if (!wereAlertsEnabled) {
+    			this._mentionIds = [];
+    			this._baselineReady = false;
+    			await this._refreshSnapshot({
+    				suppressAlerts: true,
+    				establishBaseline: true,
+    			});
+    		}
+
+    		this._scheduleNextPoll();
+    	}
+    }
+
+    async validateAuth(data = {}) {
+    	if (!this._hasCredentials(data)) {
+    		return {
+    			ok: false,
+    			message: "Consumer key/secret and access token/secret are required.",
+    		};
+    	}
+
+    	try {
+    		const profile = await this._fetchAuthenticatedUser(data);
+    		const username = trimString(profile?.username, "unknown");
+    		const expected = normalizeHandle(data?.username);
+    		if (expected && expected.toLowerCase() !== username.toLowerCase()) {
+    			return {
+    				ok: false,
+    				message: `Token belongs to @${username}, not @${expected}.`,
+    			};
+    		}
+    		return { ok: true, message: `Validated as @${username}.` };
+    	} catch (error) {
+    		return { ok: false, message: this._errorMessage(error) };
+    	}
+    }
+
+    async actions(config = {}) {
+    	const actions = Array.isArray(config.actions) ? config.actions : [];
+    	for (const action of actions) {
+    		if (!action || action.on === false) {
+    			continue;
+    		}
+
+    		try {
+    			switch (action.type) {
+    				case "create_post":
+    					await this._createPostAction(action.value);
+    					break;
+    				case "delete_post":
+    					await this._deletePostAction(action.value);
+    					break;
+    				case "delete_latest_post":
+    					await this._deleteLatestPostAction();
+    					break;
+    				case "like_post":
+    					await this._likeAction(action.value, true);
+    					break;
+    				case "repost_post":
+    					await this._repostAction(action.value, true);
+    					break;
+    				case "follow_user":
+    					await this._followAction(action.value, true);
+    					break;
+    				default:
+    					await this._debug(`Ignoring unsupported action type "${action.type}".`);
+    					break;
+    			}
+    		} catch (error) {
+    			await this._setActionError(this._errorMessage(error));
+    			throw error;
+    		}
+    	}
+    }
+
+    async _connectAndPrime({ suppressAlerts = false } = {}) {
+    	try {
+    		await this._refreshSnapshot({ suppressAlerts, establishBaseline: true });
+    		this._stopped = false;
+    		await this._updateConnection(true);
+    		if (this._alertsEnabled(this.settings)) {
+    			this._scheduleNextPoll();
+    		}
+    	} catch (error) {
+    		await this._updateConnection(false);
+    		await this._log(`X setup failed: ${this._errorMessage(error)}`, "error");
+    		throw error;
+    	}
+    }
+
+    _settingsRequireReconnect(settings, previous) {
+    	const keys = [
+    		"consumerKey",
+    		"consumerSecret",
+    		"accessToken",
+    		"accessTokenSecret",
+    		"username",
+    		"latestPostMode",
+    	];
+    	return keys.some((key) => trimString(settings?.[key]) !== trimString(previous?.[key]));
+    }
+
+    _pollRelevantSettingChanged(settings, previous) {
+    	const keys = ["enableAlerts", "pollInterval", "trackFollowerAlerts", "trackMentionAlerts", "debugLogs"];
+    	return keys.some((key) => String(settings?.[key] ?? "") !== String(previous?.[key] ?? ""));
+    }
+
+    _hasCredentials(settings = this.settings) {
+    	return Boolean(
+    		trimString(settings?.consumerKey) &&
+    			trimString(settings?.consumerSecret) &&
+    			trimString(settings?.accessToken) &&
+    			trimString(settings?.accessTokenSecret),
+    	);
+    }
+
+    _credentials(settings = this.settings) {
+    	return {
+    		consumerKey: trimString(settings?.consumerKey),
+    		consumerSecret: trimString(settings?.consumerSecret),
+    		accessToken: trimString(settings?.accessToken),
+    		accessTokenSecret: trimString(settings?.accessTokenSecret),
+    	};
+    }
+
+    _pollIntervalMs() {
+    	const seconds = Math.max(
+    		MIN_POLL_INTERVAL_SECONDS,
+    		Math.min(
+    			MAX_POLL_INTERVAL_SECONDS,
+    			asNumber(this.settings?.pollInterval, DEFAULT_POLL_INTERVAL_SECONDS),
+    		),
+    	);
+    	return seconds * 1000;
+    }
+
+    _alertsEnabled(settings = this.settings) {
+    	return Boolean(
+    		asBoolean(settings?.enableAlerts, false) &&
+    			(asBoolean(settings?.trackFollowerAlerts, false) ||
+    				asBoolean(settings?.trackMentionAlerts, false)),
+    	);
+    }
+
+    _clearPollTimer() {
+    	if (this._pollTimer) {
+    		clearTimeout(this._pollTimer);
+    		this._pollTimer = null;
+    	}
+    }
+
+    _scheduleNextPoll(delayMs = this._pollIntervalMs()) {
+    	if (
+    		this._stopped ||
+    		!this._hasCredentials(this.settings) ||
+    		!this._alertsEnabled(this.settings)
+    	) {
+    		return;
+    	}
+
+    	this._clearPollTimer();
+    	this._pollTimer = setTimeout(async () => {
+    		if (this._pollInFlight) {
+    			this._scheduleNextPoll();
+    			return;
+    		}
+
+    		this._pollInFlight = true;
+    		try {
+    			await this._refreshSnapshot();
+    			await this._updateConnection(true);
+    		} catch (error) {
+    			await this._log(`X poll failed: ${this._errorMessage(error)}`, "warn");
+    		} finally {
+    			this._pollInFlight = false;
+    			this._scheduleNextPoll();
+    		}
+    	}, Math.max(1000, delayMs));
+    }
+
+    async _hydrateDefaults() {
+    	await Promise.all(
+    		Object.entries(VARIABLE_DEFAULTS).map(([name, value]) =>
+    			this.lumia.setVariable(name, value),
+    		),
+    	);
+    }
+
+    async _refreshSnapshot({
+    	suppressAlerts = false,
+    	establishBaseline = false,
+    } = {}) {
+    	const previousFollowerCount = asNumber(this._state.followersCount, 0);
+    	const profile = await this._fetchAuthenticatedUser();
+    	const userId = trimString(profile?.id);
+    	const username = trimString(profile?.username);
+    	const displayName = trimString(profile?.name);
+    	const bio = trimString(profile?.description);
+    	const verified = asBoolean(profile?.verified, false);
+    	const metrics = profile?.public_metrics || {};
+    	const followersCount = asNumber(metrics?.followers_count, 0);
+    	const followingCount = asNumber(metrics?.following_count, 0);
+    	const listedCount = asNumber(metrics?.listed_count, 0);
+    	const postCount = asNumber(metrics?.tweet_count, 0);
+
+    	const expected = normalizeHandle(this.settings?.username);
+    	if (expected && expected.toLowerCase() !== username.toLowerCase()) {
+    		throw new Error(`Configured username @${expected} does not match token @${username}.`);
+    	}
+
+    	const latestPost = await this._fetchLatestPost(userId);
+    	const mentions = await this._fetchMentions(userId);
+
+    	const updates = {
+    		[VARIABLE_NAMES.userId]: userId,
+    		[VARIABLE_NAMES.username]: username,
+    		[VARIABLE_NAMES.displayName]: displayName,
+    		[VARIABLE_NAMES.bio]: bio,
+    		[VARIABLE_NAMES.verified]: verified,
+    		[VARIABLE_NAMES.followersCount]: followersCount,
+    		[VARIABLE_NAMES.followingCount]: followingCount,
+    		[VARIABLE_NAMES.listedCount]: listedCount,
+    		[VARIABLE_NAMES.postCount]: postCount,
+    	};
+
+    	this._state.userId = userId;
+    	this._state.username = username;
+    	this._state.displayName = displayName;
+    	this._state.bio = bio;
+    	this._state.verified = verified;
+    	this._state.followersCount = followersCount;
+    	this._state.followingCount = followingCount;
+    	this._state.listedCount = listedCount;
+    	this._state.postCount = postCount;
+
+    	if (latestPost) {
+    		const latestPostUrl = createPostUrl(username, latestPost.id);
+    		updates[VARIABLE_NAMES.latestPostId] = trimString(latestPost.id);
+    		updates[VARIABLE_NAMES.latestPostText] = trimString(latestPost.text);
+    		updates[VARIABLE_NAMES.latestPostUrl] = latestPostUrl;
+    		updates[VARIABLE_NAMES.latestPostCreatedAt] = trimString(latestPost.created_at);
+
+    		this._state.latestPostId = trimString(latestPost.id);
+    		this._state.latestPostText = trimString(latestPost.text);
+    		this._state.latestPostUrl = latestPostUrl;
+    		this._state.latestPostCreatedAt = trimString(latestPost.created_at);
+    	}
+
+    	await Promise.all(
+    		Object.entries(updates).map(([name, value]) => this.lumia.setVariable(name, value)),
+    	);
+
+    	const latestMention = Array.isArray(mentions?.posts) ? mentions.posts[0] : null;
+    	if (latestMention) {
+    		const mentionAuthor = this._lookupIncludedUser(
+    			mentions?.includes?.users,
+    			latestMention.author_id,
+    		);
+    		const mentionHandle = trimString(mentionAuthor?.username);
+    		const mentionUrl = createPostUrl(mentionHandle, latestMention.id);
+    		await Promise.all([
+    			this.lumia.setVariable(VARIABLE_NAMES.latestMentionId, trimString(latestMention.id)),
+    			this.lumia.setVariable(
+    				VARIABLE_NAMES.latestMentionText,
+    				trimString(latestMention.text),
+    			),
+    			this.lumia.setVariable(VARIABLE_NAMES.latestMentionAuthor, mentionHandle),
+    			this.lumia.setVariable(VARIABLE_NAMES.latestMentionUrl, mentionUrl),
+    		]);
+    		this._state.latestMentionId = trimString(latestMention.id);
+    	this._state.latestMentionText = trimString(latestMention.text);
+    	this._state.latestMentionAuthor = mentionHandle;
+    	this._state.latestMentionUrl = mentionUrl;
+    }
+
+    	const followerDelta = Math.max(0, followersCount - previousFollowerCount);
+    	this._state.followerDelta = followerDelta;
+    	await this.lumia.setVariable(VARIABLE_NAMES.followerDelta, followerDelta);
+
+    	const mentionAlertsEnabled = asBoolean(this.settings?.trackMentionAlerts, true);
+    	const followerAlertsEnabled = asBoolean(this.settings?.trackFollowerAlerts, true);
+
+    	if (!this._baselineReady || establishBaseline) {
+    		this._mentionIds = (mentions?.posts || [])
+    			.map((post) => trimString(post?.id))
+    			.filter(Boolean)
+    			.slice(0, MAX_TRACKED_MENTION_IDS);
+    		this._baselineReady = true;
+    		return;
+    	}
+
+    	if (!suppressAlerts && followerAlertsEnabled && followerDelta > 0) {
+    		await this._triggerFollowerAlert(followerDelta);
+    	}
+
+    	if (!suppressAlerts && mentionAlertsEnabled) {
+    		await this._processNewMentions(mentions);
+    	}
+    }
+
+    async _fetchAuthenticatedUser(settings = this.settings) {
+    	const response = await this._request("GET", "/2/users/me", {
+    		settings,
+    		query: {
+    			"user.fields": "created_at,description,profile_image_url,public_metrics,url,verified",
+    		},
+    	});
+    	return response?.data || null;
+    }
+
+    async _fetchLatestPost(userId) {
+    	if (!trimString(userId)) {
+    		return null;
+    	}
+
+    	const exclude =
+    		this.settings?.latestPostMode === "include_replies" ? "retweets" : "retweets,replies";
+
+    	const response = await this._request("GET", `/2/users/${encodeURIComponent(userId)}/tweets`, {
+    		query: {
+    			max_results: 5,
+    			exclude,
+    			"tweet.fields": "author_id,created_at,conversation_id",
+    		},
+    	});
+    	return Array.isArray(response?.data) && response.data.length ? response.data[0] : null;
+    }
+
+    async _fetchMentions(userId) {
+    	if (!trimString(userId)) {
+    		return { posts: [], includes: {} };
+    	}
+
+    	const response = await this._request(
+    		"GET",
+    		`/2/users/${encodeURIComponent(userId)}/mentions`,
+    		{
+    			query: {
+    				max_results: 10,
+    				expansions: "author_id",
+    				"tweet.fields": "author_id,conversation_id,created_at,referenced_tweets",
+    				"user.fields": "name,profile_image_url,username,verified",
+    			},
+    		},
+    	);
+    	return {
+    		posts: Array.isArray(response?.data) ? response.data : [],
+    		includes: response?.includes || {},
+    	};
+    }
+
+    _lookupIncludedUser(users = [], userId) {
+    	return Array.isArray(users)
+    		? users.find((user) => trimString(user?.id) === trimString(userId)) || null
+    		: null;
+    }
+
+    async _processNewMentions(mentions = {}) {
+    	const posts = Array.isArray(mentions.posts) ? mentions.posts : [];
+    	if (!posts.length) {
+    		return;
+    	}
+
+    	const known = new Set(this._mentionIds);
+    	const fresh = posts
+    		.filter((post) => {
+    			const id = trimString(post?.id);
+    			return id && !known.has(id);
+    		})
+    		.reverse();
+
+    	for (const post of fresh) {
+    		const author = this._lookupIncludedUser(mentions?.includes?.users, post.author_id);
+    		const authorHandle = trimString(author?.username);
+    		const mentionUrl = createPostUrl(authorHandle, post.id);
+    		await Promise.all([
+    			this.lumia.setVariable(VARIABLE_NAMES.latestMentionId, trimString(post.id)),
+    			this.lumia.setVariable(VARIABLE_NAMES.latestMentionText, trimString(post.text)),
+    			this.lumia.setVariable(VARIABLE_NAMES.latestMentionAuthor, authorHandle),
+    			this.lumia.setVariable(VARIABLE_NAMES.latestMentionUrl, mentionUrl),
+    		]);
+
+    		this._state.latestMentionId = trimString(post.id);
+    		this._state.latestMentionText = trimString(post.text);
+    		this._state.latestMentionAuthor = authorHandle;
+    		this._state.latestMentionUrl = mentionUrl;
+
+    		await this.lumia.triggerAlert({
+    			alert: ALERT_KEYS.mention,
+    			showInEventList: true,
+    			extraSettings: {
+    				username: this._state.username,
+    				display_name: this._state.displayName,
+    				latest_mention_id: trimString(post.id),
+    				latest_mention_text: trimString(post.text),
+    				latest_mention_author: authorHandle,
+    				latest_mention_url: mentionUrl,
+    			},
+    		});
+    	}
+
+    	this._mentionIds = posts
+    		.map((post) => trimString(post?.id))
+    		.filter(Boolean)
+    		.slice(0, MAX_TRACKED_MENTION_IDS);
+    }
+
+    async _triggerFollowerAlert(followerDelta) {
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_KEYS.followerGain,
+    		showInEventList: true,
+    		dynamic: {
+    			value: String(followerDelta),
+    		},
+    		extraSettings: {
+    			username: this._state.username,
+    			display_name: this._state.displayName,
+    			followers_count: this._state.followersCount,
+    			follower_delta: followerDelta,
+    		},
+    	});
+    }
+
+    async _createPostAction(data = {}) {
+    	const text = trimString(data?.text);
+    	const replyToPostId = trimString(data?.replyToPostId);
+    	const quotePostId = trimString(data?.quotePostId);
+    	const mediaSource = trimString(data?.media);
+
+    	if (!text) {
+    		throw new Error("Create Post requires text.");
+    	}
+    	if (replyToPostId && quotePostId) {
+    		throw new Error("A post cannot be both a reply and a quote in one action.");
+    	}
+
+    	const mediaIds = mediaSource ? [await this._uploadSingleMediaSource(mediaSource)] : [];
+
+    	const payload = { text };
+    	if (replyToPostId) {
+    		payload.reply = { in_reply_to_tweet_id: replyToPostId };
+    	}
+    	if (quotePostId) {
+    		payload.quote_tweet_id = quotePostId;
+    	}
+    	if (mediaIds.length) {
+    		payload.media = { media_ids: mediaIds };
+    	}
+
+    	const response = await this._request("POST", "/2/tweets", {
+    		body: payload,
+    	});
+    	const postId = trimString(response?.data?.id);
+    	const url = createPostUrl(this._state.username, postId);
+
+    	this._state.lastCreatedPostId = postId;
+    	this._state.latestPostId = postId;
+    	this._state.latestPostText = text;
+    	this._state.latestPostUrl = url;
+    	this._state.latestPostCreatedAt = new Date().toISOString();
+
+    	await Promise.all([
+    		this.lumia.setVariable(VARIABLE_NAMES.lastCreatedPostId, postId),
+    		this.lumia.setVariable(VARIABLE_NAMES.latestPostId, postId),
+    		this.lumia.setVariable(VARIABLE_NAMES.latestPostText, text),
+    		this.lumia.setVariable(VARIABLE_NAMES.latestPostUrl, url),
+    		this.lumia.setVariable(
+    			VARIABLE_NAMES.latestPostCreatedAt,
+    			this._state.latestPostCreatedAt,
+    		),
+    	]);
+
+    	await this.lumia.triggerAlert({
+    		alert: ALERT_KEYS.postCreated,
+    		showInEventList: true,
+    		extraSettings: {
+    			username: this._state.username,
+    			display_name: this._state.displayName,
+    			latest_post_id: postId,
+    			latest_post_text: text,
+    			latest_post_url: url,
+    			last_created_post_id: postId,
+    		},
+    	});
+
+    	await this._setActionStatus(`Created X post ${postId}.`);
+    }
+
+    async _deletePostAction(data = {}) {
+    	const postId = trimString(data?.postId);
+    	if (!postId) {
+    		throw new Error("Delete Post requires a post ID.");
+    	}
+    	await this._deletePostById(postId);
+    	await this._setActionStatus(`Deleted X post ${postId}.`);
+    }
+
+    async _deleteLatestPostAction() {
+    	const postId =
+    		this._state.lastCreatedPostId ||
+    		trimString(await this.lumia.getVariable(VARIABLE_NAMES.lastCreatedPostId)) ||
+    		this._state.latestPostId ||
+    		trimString(await this.lumia.getVariable(VARIABLE_NAMES.latestPostId));
+    	if (!postId) {
+    		throw new Error("No stored X post ID is available to delete.");
+    	}
+    	await this._deletePostById(postId);
+    	await this._setActionStatus(`Deleted latest stored X post ${postId}.`);
+    }
+
+    async _deletePostById(postId) {
+    	await this._request("DELETE", `/2/tweets/${encodeURIComponent(postId)}`);
+    	if (trimString(this._state.lastCreatedPostId) === trimString(postId)) {
+    		this._state.lastCreatedPostId = "";
+    		await this.lumia.setVariable(VARIABLE_NAMES.lastCreatedPostId, "");
+    	}
+    }
+
+    async _likeAction(data = {}, shouldLike) {
+    	const postId = trimString(data?.postId);
+    	if (!postId) {
+    		throw new Error(`${shouldLike ? "Like" : "Unlike"} Post requires a post ID.`);
+    	}
+
+    	await this._ensureUserId();
+    	if (shouldLike) {
+    		await this._request(
+    			"POST",
+    			`/2/users/${encodeURIComponent(this._state.userId)}/likes`,
+    			{
+    				body: { tweet_id: postId },
+    			},
+    		);
+    	} else {
+    		await this._request(
+    			"DELETE",
+    			`/2/users/${encodeURIComponent(this._state.userId)}/likes/${encodeURIComponent(
+    				postId,
+    			)}`,
+    		);
+    	}
+
+    	await this._setActionStatus(
+    		`${shouldLike ? "Liked" : "Unliked"} X post ${postId}.`,
+    	);
+    }
+
+    async _repostAction(data = {}, shouldRepost) {
+    	const postId = trimString(data?.postId);
+    	if (!postId) {
+    		throw new Error(`${shouldRepost ? "Repost" : "Undo Repost"} requires a post ID.`);
+    	}
+
+    	await this._ensureUserId();
+    	if (shouldRepost) {
+    		await this._request(
+    			"POST",
+    			`/2/users/${encodeURIComponent(this._state.userId)}/retweets`,
+    			{
+    				body: { tweet_id: postId },
+    			},
+    		);
+    	} else {
+    		await this._request(
+    			"DELETE",
+    			`/2/users/${encodeURIComponent(this._state.userId)}/retweets/${encodeURIComponent(
+    				postId,
+    			)}`,
+    		);
+    	}
+
+    	await this._setActionStatus(
+    		`${shouldRepost ? "Reposted" : "Removed repost of"} X post ${postId}.`,
+    	);
+    }
+
+    async _followAction(data = {}, shouldFollow) {
+    	const target = trimString(data?.user);
+    	if (!target) {
+    		throw new Error(`${shouldFollow ? "Follow" : "Unfollow"} requires a user value.`);
+    	}
+
+    	await this._ensureUserId();
+    	const targetUserId = await this._resolveUserId(target);
+    	if (shouldFollow) {
+    		await this._request(
+    			"POST",
+    			`/2/users/${encodeURIComponent(this._state.userId)}/following`,
+    			{
+    				body: { target_user_id: targetUserId },
+    			},
+    		);
+    	} else {
+    		await this._request(
+    			"DELETE",
+    			`/2/users/${encodeURIComponent(
+    				this._state.userId,
+    			)}/following/${encodeURIComponent(targetUserId)}`,
+    		);
+    	}
+
+    	await this._setActionStatus(
+    		`${shouldFollow ? "Followed" : "Unfollowed"} X user ${target}.`,
+    	);
+    }
+
+    async _ensureUserId() {
+    	if (trimString(this._state.userId)) {
+    		return this._state.userId;
+    	}
+    	const profile = await this._fetchAuthenticatedUser();
+    	this._state.userId = trimString(profile?.id);
+    	await this.lumia.setVariable(VARIABLE_NAMES.userId, this._state.userId);
+    	return this._state.userId;
+    }
+
+    async _resolveUserId(value) {
+    	const normalized = trimString(value);
+    	if (isNumericId(normalized)) {
+    		return normalized;
+    	}
+
+    	const username = normalizeHandle(normalized);
+    	const response = await this._request(
+    		"GET",
+    		`/2/users/by/username/${encodeURIComponent(username)}`,
+    		{
+    			query: {
+    				"user.fields": "username",
+    			},
+    		},
+    	);
+    	const resolved = trimString(response?.data?.id);
+    	if (!resolved) {
+    		throw new Error(`Could not resolve X user "${value}".`);
+    	}
+    	return resolved;
+    }
+
+    async _uploadSingleMediaSource(source) {
+    	const asset = await this._loadMediaSource(source);
+    	if (asset.kind === "image") {
+    		return this._uploadImage(asset);
+    	}
+    	if (asset.kind === "video") {
+    		return this._uploadChunkedVideo(asset);
+    	}
+    	throw new Error(`Unsupported media type for "${source}".`);
+    }
+
+    async _loadMediaSource(source) {
+    	if (/^https:\/\//i.test(source)) {
+    		const response = await this._fetchRaw(source);
+    		const mimeType = trimString(response.contentType) || guessMimeType(source);
+    		const buffer = Buffer.from(response.buffer);
+    		return this._buildMediaAsset({
+    			label: source,
+    			filename: path.basename(new URL(source).pathname) || "remote-media",
+    			mimeType,
+    			buffer,
+    		});
+    	}
+
+    	const resolvedPath = path.resolve(source);
+    	const buffer = await fs.readFile(resolvedPath);
+    	const mimeType = guessMimeType(resolvedPath);
+    	return this._buildMediaAsset({
+    		label: resolvedPath,
+    		filename: path.basename(resolvedPath),
+    		mimeType,
+    		buffer,
+    	});
+    }
+
+    _buildMediaAsset({ label, filename, mimeType, buffer }) {
+    	const normalizedMime = trimString(mimeType).toLowerCase();
+    	if (normalizedMime.startsWith("image/")) {
+    		return {
+    			label,
+    			filename,
+    			mimeType: normalizedMime,
+    			buffer,
+    			kind: normalizedMime === "image/gif" ? "video" : "image",
+    			mediaCategory:
+    				normalizedMime === "image/gif" ? "tweet_gif" : "tweet_image",
+    		};
+    	}
+    	if (normalizedMime.startsWith("video/")) {
+    		return {
+    			label,
+    			filename,
+    			mimeType: normalizedMime,
+    			buffer,
+    			kind: "video",
+    			mediaCategory: "tweet_video",
+    		};
+    	}
+    	return {
+    		label,
+    		filename,
+    		mimeType: normalizedMime,
+    		buffer,
+    		kind: "unsupported",
+    		mediaCategory: "",
+    	};
+    }
+
+    async _uploadImage(asset) {
+    	const form = new FormData();
+    	form.set(
+    		"media",
+    		new Blob([asset.buffer], { type: asset.mimeType }),
+    		asset.filename,
+    	);
+    	form.set("media_category", asset.mediaCategory);
+    	form.set("media_type", asset.mimeType);
+    	form.set("shared", "false");
+
+    	const response = await this._request("POST", "/2/media/upload", {
+    		body: form,
+    	});
+    	const mediaId = trimString(response?.data?.id);
+    	if (!mediaId) {
+    		throw new Error(`X did not return a media ID for "${asset.label}".`);
+    	}
+    	return mediaId;
+    }
+
+    async _uploadChunkedVideo(asset) {
+    	const initResponse = await this._request("POST", "/2/media/upload/initialize", {
+    		body: {
+    			media_category: asset.mediaCategory,
+    			media_type: asset.mimeType,
+    			shared: false,
+    			total_bytes: asset.buffer.length,
+    		},
+    	});
+    	const mediaId = trimString(initResponse?.data?.id);
+    	if (!mediaId) {
+    		throw new Error(`Failed to initialize media upload for "${asset.label}".`);
+    	}
+
+    	let segmentIndex = 0;
+    	for (let offset = 0; offset < asset.buffer.length; offset += MAX_CHUNK_SIZE) {
+    		const chunk = asset.buffer.subarray(offset, offset + MAX_CHUNK_SIZE);
+    		const form = new FormData();
+    		form.set("media", new Blob([chunk], { type: asset.mimeType }), asset.filename);
+    		form.set("segment_index", String(segmentIndex));
+    		await this._request(
+    			"POST",
+    			`/2/media/upload/${encodeURIComponent(mediaId)}/append`,
+    			{
+    				body: form,
+    			},
+    		);
+    		segmentIndex += 1;
+    	}
+
+    	const finalizeResponse = await this._request(
+    		"POST",
+    		`/2/media/upload/${encodeURIComponent(mediaId)}/finalize`,
+    	);
+    	await this._waitForMediaReady(mediaId, finalizeResponse?.data?.processing_info);
+    	return mediaId;
+    }
+
+    async _waitForMediaReady(mediaId, processingInfo) {
+    	let current = processingInfo || null;
+    	while (current && ["pending", "in_progress"].includes(current.state)) {
+    		const delaySeconds = Math.max(1, asNumber(current.check_after_secs, 2));
+    		await sleep(delaySeconds * 1000);
+    		const statusResponse = await this._request("GET", "/2/media/upload", {
+    			query: {
+    				command: "STATUS",
+    				media_id: mediaId,
+    			},
+    		});
+    		current = statusResponse?.data?.processing_info || null;
+    	}
+
+    	if (current && current.state === "failed") {
+    		const message =
+    			trimString(current?.error?.message) ||
+    			trimString(current?.error?.detail) ||
+    			`Media upload ${mediaId} failed during processing.`;
+    		throw new Error(message);
+    	}
+    }
+
+    async _fetchRaw(url) {
+    	const controller = new AbortController();
+    	const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    	try {
+    		const response = await fetch(url, {
+    			method: "GET",
+    			signal: controller.signal,
+    		});
+    		if (!response.ok) {
+    			throw new Error(`Media download failed (${response.status}) for ${url}`);
+    		}
+    		const buffer = await response.arrayBuffer();
+    		return {
+    			buffer,
+    			contentType: trimString(response.headers.get("content-type")),
+    		};
+    	} finally {
+    		clearTimeout(timeout);
+    	}
+    }
+
+    async _request(method, endpoint, options = {}) {
+    	const settings = options.settings || this.settings;
+    	const credentials = this._credentials(settings);
+    	const query = options.query || {};
+    	const baseUrl = endpoint.startsWith("http") ? endpoint : `${API_BASE_URL}${endpoint}`;
+    	const queryString = buildQueryString(query);
+    	const url = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+    	const oauthHeader = this._buildOAuthHeader(method, baseUrl, query, credentials);
+    	const headers = new Headers(options.headers || {});
+    	headers.set("Authorization", oauthHeader);
+    	headers.set("Accept", "application/json");
+
+    	let body = options.body;
+    	if (body && !(body instanceof FormData)) {
+    		headers.set("Content-Type", "application/json");
+    		body = JSON.stringify(body);
+    	}
+
+    	await this._debug(`${method} ${url}`);
+
+    	const controller = new AbortController();
+    	const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    	try {
+    		const response = await fetch(url, {
+    			method,
+    			headers,
+    			body,
+    			signal: controller.signal,
+    		});
+    		const text = await response.text();
+    		const parsed = text ? this._safeJsonParse(text) : {};
+
+    		if (!response.ok || Array.isArray(parsed?.errors)) {
+    			const message =
+    				this._extractApiError(parsed) ||
+    				`${method} ${endpoint} failed with status ${response.status}`;
+    			throw new Error(message);
+    		}
+
+    		return parsed;
+    	} catch (error) {
+    		if (error?.name === "AbortError") {
+    			throw new Error(`Request timed out for ${endpoint}`);
+    		}
+    		throw error;
+    	} finally {
+    		clearTimeout(timeout);
+    	}
+    }
+
+    _buildOAuthHeader(method, baseUrl, query, credentials) {
+    	const oauthParams = {
+    		oauth_consumer_key: credentials.consumerKey,
+    		oauth_nonce: crypto.randomBytes(16).toString("hex"),
+    		oauth_signature_method: "HMAC-SHA1",
+    		oauth_timestamp: String(Math.floor(Date.now() / 1000)),
+    		oauth_token: credentials.accessToken,
+    		oauth_version: "1.0",
+    	};
+
+    	const signatureParams = { ...oauthParams, ...(query || {}) };
+    	const parameterString = Object.keys(signatureParams)
+    		.sort()
+    		.map((key) => `${percentEncode(key)}=${percentEncode(signatureParams[key])}`)
+    		.join("&");
+    	const signatureBaseString = [
+    		method.toUpperCase(),
+    		percentEncode(baseUrl),
+    		percentEncode(parameterString),
+    	].join("&");
+    	const signingKey = `${percentEncode(credentials.consumerSecret)}&${percentEncode(
+    		credentials.accessTokenSecret,
+    	)}`;
+    	const signature = crypto
+    		.createHmac("sha1", signingKey)
+    		.update(signatureBaseString)
+    		.digest("base64");
+    	const authParams = {
+    		...oauthParams,
+    		oauth_signature: signature,
+    	};
+
+    	return `OAuth ${Object.keys(authParams)
+    		.sort()
+    		.map(
+    			(key) =>
+    				`${percentEncode(key)}="${percentEncode(authParams[key])}"`,
+    		)
+    		.join(", ")}`;
+    }
+
+    _safeJsonParse(text) {
+    	try {
+    		return JSON.parse(text);
+    	} catch (_error) {
+    		return { raw: text };
+    	}
+    }
+
+    _extractApiError(payload) {
+    	if (typeof payload === "string") {
+    		return payload;
+    	}
+
+    	if (Array.isArray(payload?.errors) && payload.errors.length) {
+    		const first = payload.errors[0] || {};
+    		return trimString(first.detail || first.message || first.title);
+    	}
+
+    	if (payload?.detail || payload?.message || payload?.title) {
+    		return trimString(payload.detail || payload.message || payload.title);
+    	}
+
+    	if (typeof payload?.raw === "string") {
+    		return trimString(payload.raw);
+    	}
+
+    	return "";
+    }
+
+    async _setActionStatus(message) {
+    	await Promise.all([
+    		this.lumia.setVariable(VARIABLE_NAMES.lastActionStatus, message),
+    		this.lumia.setVariable(VARIABLE_NAMES.lastActionError, ""),
+    	]);
+    	await this._debug(message);
+    }
+
+    async _setActionError(message) {
+    	await Promise.all([
+    		this.lumia.setVariable(VARIABLE_NAMES.lastActionError, message),
+    		this.lumia.setVariable(VARIABLE_NAMES.lastActionStatus, ""),
+    	]);
+    	await this._log(message, "error");
+    }
+
+    async _updateConnection(state) {
+    	try {
+    		await this.lumia.updateConnection(Boolean(state));
+    	} catch (_error) {
+    		// Ignore runtime connection update failures.
+    	}
+    }
+
+    async _log(message, level = "info") {
+    	if (typeof this.lumia?.log === "function") {
+    		await this.lumia.log({ message, level });
+    	}
+    }
+
+    async _debug(message) {
+    	if (!asBoolean(this.settings?.debugLogs, false)) {
+    		return;
+    	}
+    	await this._log(`[X] ${message}`, "debug");
+    }
+
+    _errorMessage(error) {
+    	if (!error) {
+    		return "Unknown X plugin error.";
+    	}
+    	if (typeof error === "string") {
+    		return error;
+    	}
+    	return trimString(error.message || error.detail || String(error), "Unknown X plugin error.");
+    }
+
 }
 
 module.exports = XPlugin;
@@ -28257,407 +28379,408 @@ module.exports = XPlugin;
 ## x/manifest.json
 
 ```
+
 {
-	"id": "x",
-	"name": "X",
-	"version": "1.0.0",
-	"author": "Lumia Stream",
-	"email": "dev@lumiastream.com",
-	"website": "https://lumiastream.com",
-	"description": "Create and delete X posts with your own developer tokens, sync account variables, and trigger polling-based alerts for mentions and follower growth.",
-	"license": "MIT",
-	"lumiaVersion": "^9.0.0",
-	"category": "platforms",
-	"keywords": "x, twitter, social, posts, mentions, followers",
-	"icon": "x.png",
-	"config": {
-		"settings_tutorial": "./settings_tutorial.md",
-		"actions_tutorial": "./actions_tutorial.md",
-		"settings": [
-			{
-				"key": "consumerKey",
-				"label": "Consumer Key",
-				"type": "password",
-				"helperText": "From your X app's Keys and tokens page.",
-				"required": true,
-				"refreshOnChange": true,
-				"section": "Authentication",
-				"sectionOrder": 1
-			},
-			{
-				"key": "consumerSecret",
-				"label": "Consumer Secret",
-				"type": "password",
-				"helperText": "From your X app's Keys and tokens page.",
-				"required": true,
-				"refreshOnChange": true,
-				"section": "Authentication",
-				"sectionOrder": 1
-			},
-			{
-				"key": "accessToken",
-				"label": "Access Token",
-				"type": "password",
-				"helperText": "User access token generated for your X app.",
-				"required": true,
-				"refreshOnChange": true,
-				"section": "Authentication",
-				"sectionOrder": 1
-			},
-			{
-				"key": "accessTokenSecret",
-				"label": "Access Token Secret",
-				"type": "password",
-				"helperText": "User access token secret generated for your X app.",
-				"required": true,
-				"refreshOnChange": true,
-				"section": "Authentication",
-				"sectionOrder": 1
-			},
-			{
-				"key": "username",
-				"label": "Expected Username",
-				"type": "text",
-				"placeholder": "optional_handle",
-				"helperText": "Optional safety check. If set, Lumia will warn when the token belongs to a different account.",
-				"refreshOnChange": true,
-				"section": "Authentication",
-				"sectionOrder": 1
-			},
-			{
-				"key": "enableAlerts",
-				"label": "Enable Alerts",
-				"type": "checkbox",
-				"defaultValue": false,
-				"helperText": "Master switch for all background X alert polling. Leave this off to avoid background read usage.",
-				"refreshOnChange": true,
-				"section": "Alerts",
-				"sectionOrder": 2
-			},
-			{
-				"key": "pollInterval",
-				"label": "Poll Interval (seconds)",
-				"type": "number",
-				"defaultValue": 300,
-				"min": 15,
-				"max": 900,
-				"helperText": "How often to refresh profile, mentions, and follower totals when alerts are enabled.",
-				"refreshOnChange": true,
-				"section": "Alerts",
-				"sectionOrder": 2,
-				"visibleIf": {
-					"key": "enableAlerts",
-					"equals": true
-				}
-			},
-			{
-				"key": "trackFollowerAlerts",
-				"label": "Follower Alerts",
-				"type": "checkbox",
-				"defaultValue": false,
-				"helperText": "Trigger Lumia alerts when follower count increases. Disabled by default to avoid background read usage.",
-				"refreshOnChange": true,
-				"section": "Alerts",
-				"sectionOrder": 2,
-				"visibleIf": {
-					"key": "enableAlerts",
-					"equals": true
-				}
-			},
-			{
-				"key": "trackMentionAlerts",
-				"label": "Mention Alerts",
-				"type": "checkbox",
-				"defaultValue": false,
-				"helperText": "Trigger Lumia alerts for new mentions and replies found in the mention timeline. Disabled by default to avoid background read usage.",
-				"refreshOnChange": true,
-				"section": "Alerts",
-				"sectionOrder": 2,
-				"visibleIf": {
-					"key": "enableAlerts",
-					"equals": true
-				}
-			},
-			{
-				"key": "latestPostMode",
-				"label": "Latest Post Timeline",
-				"type": "select",
-				"defaultValue": "posts_only",
-				"options": [
-					{
-						"label": "Posts Only",
-						"value": "posts_only"
-					},
-					{
-						"label": "Include Replies",
-						"value": "include_replies"
-					}
-				],
-				"helperText": "Choose whether the latest-post variables should ignore replies.",
-				"refreshOnChange": true,
-				"section": "Alerts",
-				"sectionOrder": 2,
-				"visibleIf": {
-					"key": "enableAlerts",
-					"equals": true
-				}
-			},
-			{
-				"key": "debugLogs",
-				"label": "Debug Logs",
-				"type": "checkbox",
-				"defaultValue": false,
-				"helperText": "Writes extra X API diagnostics to the Lumia plugin log.",
-				"refreshOnChange": true,
-				"section": "Advanced",
-				"sectionOrder": 3
-			}
-		],
-		"actions": [
-			{
-				"type": "create_post",
-				"label": "Create Post",
-				"description": "Create a text, reply, quote, image, or video post on X.",
-				"fields": [
-					{
-						"key": "text",
-						"label": "Text",
-						"type": "textarea",
-						"required": true,
-						"rows": 5,
-						"allowVariables": true
-					},
-					{
-						"key": "replyToPostId",
-						"label": "Reply To Post ID",
-						"type": "text",
-						"allowVariables": true
-					},
-					{
-						"key": "quotePostId",
-						"label": "Quote Post ID",
-						"type": "text",
-						"allowVariables": true
-					},
-					{
-						"key": "media",
-						"label": "Media",
-						"type": "media",
-						"allowVariables": true,
-						"helperText": "Optional. Choose one local file or enter one https URL. Images and mp4/webm/mov video are supported."
-					}
-				]
-			},
-			{
-				"type": "delete_post",
-				"label": "Delete Post",
-				"description": "Delete a specific X post by ID.",
-				"fields": [
-					{
-						"key": "postId",
-						"label": "Post ID",
-						"type": "text",
-						"required": true,
-						"allowVariables": true
-					}
-				]
-			},
-			{
-				"type": "delete_latest_post",
-				"label": "Delete Latest Created Post",
-				"description": "Delete the last post created by this plugin session, or the latest saved post if available.",
-				"fields": []
-			},
-			{
-				"type": "like_post",
-				"label": "Like Post",
-				"description": "Like a post on behalf of the authenticated user.",
-				"fields": [
-					{
-						"key": "postId",
-						"label": "Post ID",
-						"type": "text",
-						"required": true,
-						"allowVariables": true
-					}
-				]
-			},
-			{
-				"type": "repost_post",
-				"label": "Repost Post",
-				"description": "Repost a post on behalf of the authenticated user.",
-				"fields": [
-					{
-						"key": "postId",
-						"label": "Post ID",
-						"type": "text",
-						"required": true,
-						"allowVariables": true
-					}
-				]
-			},
-			{
-				"type": "follow_user",
-				"label": "Follow User",
-				"description": "Follow a user by handle or numeric user ID.",
-				"fields": [
-					{
-						"key": "user",
-						"label": "Handle Or User ID",
-						"type": "text",
-						"required": true,
-						"allowVariables": true
-					}
-				]
-			}
-		],
-		"variables": [
-			{
-				"name": "user_id",
-				"description": "Authenticated X user ID.",
-				"value": ""
-			},
-			{
-				"name": "username",
-				"description": "Authenticated X handle without @.",
-				"value": ""
-			},
-			{
-				"name": "display_name",
-				"description": "Authenticated X display name.",
-				"value": ""
-			},
-			{
-				"name": "bio",
-				"description": "Current account bio/description.",
-				"value": ""
-			},
-			{
-				"name": "verified",
-				"description": "Whether the authenticated account is verified.",
-				"value": false
-			},
-			{
-				"name": "followers_count",
-				"description": "Current follower count from X public metrics.",
-				"value": 0
-			},
-			{
-				"name": "following_count",
-				"description": "Current following count from X public metrics.",
-				"value": 0
-			},
-			{
-				"name": "listed_count",
-				"description": "Current listed count from X public metrics.",
-				"value": 0
-			},
-			{
-				"name": "post_count",
-				"description": "Current post count from X public metrics.",
-				"value": 0
-			},
-			{
-				"name": "latest_post_id",
-				"description": "Most recent authored post ID seen by the plugin.",
-				"value": ""
-			},
-			{
-				"name": "latest_post_text",
-				"description": "Text of the most recent authored post seen by the plugin.",
-				"value": ""
-			},
-			{
-				"name": "latest_post_url",
-				"description": "URL of the most recent authored post seen by the plugin.",
-				"value": ""
-			},
-			{
-				"name": "latest_post_created_at",
-				"description": "ISO timestamp of the most recent authored post seen by the plugin.",
-				"value": ""
-			},
-			{
-				"name": "last_created_post_id",
-				"description": "Most recent post ID created by the plugin via an action.",
-				"value": ""
-			},
-			{
-				"name": "latest_mention_id",
-				"description": "Most recent mention ID seen by the plugin.",
-				"value": ""
-			},
-			{
-				"name": "latest_mention_text",
-				"description": "Text of the most recent mention seen by the plugin.",
-				"value": ""
-			},
-			{
-				"name": "latest_mention_author",
-				"description": "Author handle of the most recent mention seen by the plugin.",
-				"value": ""
-			},
-			{
-				"name": "latest_mention_url",
-				"description": "URL of the most recent mention seen by the plugin.",
-				"value": ""
-			},
-			{
-				"name": "follower_delta",
-				"description": "Follower increase detected during the last polling cycle.",
-				"value": 0
-			},
-			{
-				"name": "last_action_status",
-				"description": "Short success status from the last executed action.",
-				"value": ""
-			},
-			{
-				"name": "last_action_error",
-				"description": "Last action error message, if any.",
-				"value": ""
-			}
-		],
-		"alerts": [
-			{
-				"title": "Post Created",
-				"key": "post_created",
-				"acceptedVariables": [
-					"username",
-					"display_name",
-					"latest_post_id",
-					"latest_post_text",
-					"latest_post_url",
-					"last_created_post_id"
-				],
-				"defaultMessage": "{{display_name}} posted on X: {{latest_post_text}}"
-			},
-			{
-				"title": "Mention",
-				"key": "mention",
-				"acceptedVariables": [
-					"username",
-					"display_name",
-					"latest_mention_id",
-					"latest_mention_text",
-					"latest_mention_author",
-					"latest_mention_url"
-				],
-				"defaultMessage": "@{{latest_mention_author}} mentioned {{display_name}} on X."
-			},
-			{
-				"title": "Follower Gain",
-				"key": "follower_gain",
-				"acceptedVariables": [
-					"username",
-					"display_name",
-					"followers_count",
-					"follower_delta"
-				],
-				"defaultMessage": "{{display_name}} gained {{follower_delta}} follower(s) on X. Total: {{followers_count}}"
-			}
-		]
-	}
+"id": "x",
+"name": "X",
+"version": "1.0.0",
+"author": "Lumia Stream",
+"email": "dev@lumiastream.com",
+"website": "https://lumiastream.com",
+"description": "Create and delete X posts with your own developer tokens, sync account variables, and trigger polling-based alerts for mentions and follower growth.",
+"license": "MIT",
+"lumiaVersion": "^9.0.0",
+"category": "platforms",
+"keywords": "x, twitter, social, posts, mentions, followers",
+"icon": "x.png",
+"config": {
+"settings_tutorial": "./settings_tutorial.md",
+"actions_tutorial": "./actions_tutorial.md",
+"settings": [
+{
+"key": "consumerKey",
+"label": "Consumer Key",
+"type": "password",
+"helperText": "From your X app's Keys and tokens page.",
+"required": true,
+"refreshOnChange": true,
+"section": "Authentication",
+"sectionOrder": 1
+},
+{
+"key": "consumerSecret",
+"label": "Consumer Secret",
+"type": "password",
+"helperText": "From your X app's Keys and tokens page.",
+"required": true,
+"refreshOnChange": true,
+"section": "Authentication",
+"sectionOrder": 1
+},
+{
+"key": "accessToken",
+"label": "Access Token",
+"type": "password",
+"helperText": "User access token generated for your X app.",
+"required": true,
+"refreshOnChange": true,
+"section": "Authentication",
+"sectionOrder": 1
+},
+{
+"key": "accessTokenSecret",
+"label": "Access Token Secret",
+"type": "password",
+"helperText": "User access token secret generated for your X app.",
+"required": true,
+"refreshOnChange": true,
+"section": "Authentication",
+"sectionOrder": 1
+},
+{
+"key": "username",
+"label": "Expected Username",
+"type": "text",
+"placeholder": "optional_handle",
+"helperText": "Optional safety check. If set, Lumia will warn when the token belongs to a different account.",
+"refreshOnChange": true,
+"section": "Authentication",
+"sectionOrder": 1
+},
+{
+"key": "enableAlerts",
+"label": "Enable Alerts",
+"type": "checkbox",
+"defaultValue": false,
+"helperText": "Master switch for all background X alert polling. Leave this off to avoid background read usage.",
+"refreshOnChange": true,
+"section": "Alerts",
+"sectionOrder": 2
+},
+{
+"key": "pollInterval",
+"label": "Poll Interval (seconds)",
+"type": "number",
+"defaultValue": 300,
+"min": 15,
+"max": 900,
+"helperText": "How often to refresh profile, mentions, and follower totals when alerts are enabled.",
+"refreshOnChange": true,
+"section": "Alerts",
+"sectionOrder": 2,
+"visibleIf": {
+"key": "enableAlerts",
+"equals": true
+}
+},
+{
+"key": "trackFollowerAlerts",
+"label": "Follower Alerts",
+"type": "checkbox",
+"defaultValue": false,
+"helperText": "Trigger Lumia alerts when follower count increases. Disabled by default to avoid background read usage.",
+"refreshOnChange": true,
+"section": "Alerts",
+"sectionOrder": 2,
+"visibleIf": {
+"key": "enableAlerts",
+"equals": true
+}
+},
+{
+"key": "trackMentionAlerts",
+"label": "Mention Alerts",
+"type": "checkbox",
+"defaultValue": false,
+"helperText": "Trigger Lumia alerts for new mentions and replies found in the mention timeline. Disabled by default to avoid background read usage.",
+"refreshOnChange": true,
+"section": "Alerts",
+"sectionOrder": 2,
+"visibleIf": {
+"key": "enableAlerts",
+"equals": true
+}
+},
+{
+"key": "latestPostMode",
+"label": "Latest Post Timeline",
+"type": "select",
+"defaultValue": "posts_only",
+"options": [
+{
+"label": "Posts Only",
+"value": "posts_only"
+},
+{
+"label": "Include Replies",
+"value": "include_replies"
+}
+],
+"helperText": "Choose whether the latest-post variables should ignore replies.",
+"refreshOnChange": true,
+"section": "Alerts",
+"sectionOrder": 2,
+"visibleIf": {
+"key": "enableAlerts",
+"equals": true
+}
+},
+{
+"key": "debugLogs",
+"label": "Debug Logs",
+"type": "checkbox",
+"defaultValue": false,
+"helperText": "Writes extra X API diagnostics to the Lumia plugin log.",
+"refreshOnChange": true,
+"section": "Advanced",
+"sectionOrder": 3
+}
+],
+"actions": [
+{
+"type": "create_post",
+"label": "Create Post",
+"description": "Create a text, reply, quote, image, or video post on X.",
+"fields": [
+{
+"key": "text",
+"label": "Text",
+"type": "textarea",
+"required": true,
+"rows": 5,
+"allowVariables": true
+},
+{
+"key": "replyToPostId",
+"label": "Reply To Post ID",
+"type": "text",
+"allowVariables": true
+},
+{
+"key": "quotePostId",
+"label": "Quote Post ID",
+"type": "text",
+"allowVariables": true
+},
+{
+"key": "media",
+"label": "Media",
+"type": "media",
+"allowVariables": true,
+"helperText": "Optional. Choose one local file or enter one https URL. Images and mp4/webm/mov video are supported."
+}
+]
+},
+{
+"type": "delete_post",
+"label": "Delete Post",
+"description": "Delete a specific X post by ID.",
+"fields": [
+{
+"key": "postId",
+"label": "Post ID",
+"type": "text",
+"required": true,
+"allowVariables": true
+}
+]
+},
+{
+"type": "delete_latest_post",
+"label": "Delete Latest Created Post",
+"description": "Delete the last post created by this plugin session, or the latest saved post if available.",
+"fields": []
+},
+{
+"type": "like_post",
+"label": "Like Post",
+"description": "Like a post on behalf of the authenticated user.",
+"fields": [
+{
+"key": "postId",
+"label": "Post ID",
+"type": "text",
+"required": true,
+"allowVariables": true
+}
+]
+},
+{
+"type": "repost_post",
+"label": "Repost Post",
+"description": "Repost a post on behalf of the authenticated user.",
+"fields": [
+{
+"key": "postId",
+"label": "Post ID",
+"type": "text",
+"required": true,
+"allowVariables": true
+}
+]
+},
+{
+"type": "follow_user",
+"label": "Follow User",
+"description": "Follow a user by handle or numeric user ID.",
+"fields": [
+{
+"key": "user",
+"label": "Handle Or User ID",
+"type": "text",
+"required": true,
+"allowVariables": true
+}
+]
+}
+],
+"variables": [
+{
+"name": "user_id",
+"description": "Authenticated X user ID.",
+"value": ""
+},
+{
+"name": "username",
+"description": "Authenticated X handle without @.",
+"value": ""
+},
+{
+"name": "display_name",
+"description": "Authenticated X display name.",
+"value": ""
+},
+{
+"name": "bio",
+"description": "Current account bio/description.",
+"value": ""
+},
+{
+"name": "verified",
+"description": "Whether the authenticated account is verified.",
+"value": false
+},
+{
+"name": "followers_count",
+"description": "Current follower count from X public metrics.",
+"value": 0
+},
+{
+"name": "following_count",
+"description": "Current following count from X public metrics.",
+"value": 0
+},
+{
+"name": "listed_count",
+"description": "Current listed count from X public metrics.",
+"value": 0
+},
+{
+"name": "post_count",
+"description": "Current post count from X public metrics.",
+"value": 0
+},
+{
+"name": "latest_post_id",
+"description": "Most recent authored post ID seen by the plugin.",
+"value": ""
+},
+{
+"name": "latest_post_text",
+"description": "Text of the most recent authored post seen by the plugin.",
+"value": ""
+},
+{
+"name": "latest_post_url",
+"description": "URL of the most recent authored post seen by the plugin.",
+"value": ""
+},
+{
+"name": "latest_post_created_at",
+"description": "ISO timestamp of the most recent authored post seen by the plugin.",
+"value": ""
+},
+{
+"name": "last_created_post_id",
+"description": "Most recent post ID created by the plugin via an action.",
+"value": ""
+},
+{
+"name": "latest_mention_id",
+"description": "Most recent mention ID seen by the plugin.",
+"value": ""
+},
+{
+"name": "latest_mention_text",
+"description": "Text of the most recent mention seen by the plugin.",
+"value": ""
+},
+{
+"name": "latest_mention_author",
+"description": "Author handle of the most recent mention seen by the plugin.",
+"value": ""
+},
+{
+"name": "latest_mention_url",
+"description": "URL of the most recent mention seen by the plugin.",
+"value": ""
+},
+{
+"name": "follower_delta",
+"description": "Follower increase detected during the last polling cycle.",
+"value": 0
+},
+{
+"name": "last_action_status",
+"description": "Short success status from the last executed action.",
+"value": ""
+},
+{
+"name": "last_action_error",
+"description": "Last action error message, if any.",
+"value": ""
+}
+],
+"alerts": [
+{
+"title": "Post Created",
+"key": "post_created",
+"acceptedVariables": [
+"username",
+"display_name",
+"latest_post_id",
+"latest_post_text",
+"latest_post_url",
+"last_created_post_id"
+],
+"defaultMessage": "{{display_name}} posted on X: {{latest_post_text}}"
+},
+{
+"title": "Mention",
+"key": "mention",
+"acceptedVariables": [
+"username",
+"display_name",
+"latest_mention_id",
+"latest_mention_text",
+"latest_mention_author",
+"latest_mention_url"
+],
+"defaultMessage": "@{{latest_mention_author}} mentioned {{display_name}} on X."
+},
+{
+"title": "Follower Gain",
+"key": "follower_gain",
+"acceptedVariables": [
+"username",
+"display_name",
+"followers_count",
+"follower_delta"
+],
+"defaultMessage": "{{display_name}} gained {{follower_delta}} follower(s) on X. Total: {{followers_count}}"
+}
+]
+}
 }
 
 ```
@@ -28665,16 +28788,17 @@ module.exports = XPlugin;
 ## x/package.json
 
 ```
+
 {
-	"name": "lumia-x",
-	"version": "1.0.0",
-	"private": true,
-	"description": "Lumia Stream plugin for X that posts with user-supplied developer tokens and exposes polling-based variables and alerts.",
-	"main": "main.js",
-	"scripts": {},
-	"dependencies": {
-		"@lumiastream/plugin": "^0.7.2"
-	}
+"name": "lumia-x",
+"version": "1.0.0",
+"private": true,
+"description": "Lumia Stream plugin for X that posts with user-supplied developer tokens and exposes polling-based variables and alerts.",
+"main": "main.js",
+"scripts": {},
+"dependencies": {
+"@lumiastream/plugin": "^0.7.2"
+}
 }
 
 ```
@@ -28682,6 +28806,7 @@ module.exports = XPlugin;
 ## x/settings_tutorial.md
 
 ```
+
 ### Setup
 
 This plugin uses your own X developer app credentials. Lumia does not proxy requests for you, so you need to create your own X app once and paste the keys into the plugin.
@@ -28755,9 +28880,10 @@ Without credits, write requests can fail even if the keys are correct.
 11. By default, **Enable Alerts** is turned off. This is intentional so the plugin does not spend X API credits on background read requests until you explicitly want alerts.
 
 12. If you want follower or mention alerts later, go to the **Alerts** tab in the plugin settings, then manually turn on:
-   - **Enable Alerts**
-   - the specific alert types you want
-   - the polling interval you are comfortable paying for
+
+- **Enable Alerts**
+- the specific alert types you want
+- the polling interval you are comfortable paying for
 
 13. Save the plugin settings. Then test it with the **Create Post** action. A successful test should publish a post like the example below.
 
@@ -28809,5 +28935,7 @@ As of March 30, 2026, X's public docs say the API uses pay-per-usage pricing and
 - The plugin uses OAuth 1.0a style user tokens, so you need all four values above.
 - Alerts are disabled by default so the plugin does not spend read credits unless you manually turn them on.
 - If you enable mention or follower alerts later, the plugin will begin polling X on the interval you choose.
+
+```
 
 ```
