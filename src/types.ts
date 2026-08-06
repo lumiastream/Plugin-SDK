@@ -956,13 +956,15 @@ export interface ILumiaAPI {
 	readFile: (path: string) => Promise<string | boolean>;
 	getAllCommands: (params?: { onlyOn?: boolean }) => Promise<any>;
 	sendColor: (params: {
-		lights?: string[];
+		lights?: Array<{ id: string | number; type: string } | string>;
 		color: string | any;
 		power?: boolean;
 		brightness?: number;
 		transition?: number;
 	}) => Promise<boolean>;
-	getLights: () => Promise<any>;
+	getLights: () => Promise<
+		Array<{ id: string | number; name?: string; alias?: string; type: string }>
+	>;
 	showToast: (params: {
 		message: string;
 		time?: number;
