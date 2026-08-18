@@ -954,6 +954,8 @@ export interface ILumiaAPI {
 		message: string;
 		voice?: string;
 		volume?: number;
+		/** Percentage of the voice's normal talking speed, 20-200. Defaults to 100. */
+		speed?: number;
 	}) => Promise<boolean>;
 	writeFile: (params: {
 		path: string;
