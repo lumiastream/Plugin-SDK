@@ -3,6 +3,8 @@ const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
 
+const REQUEST_TIMEOUT_MS = 15000;
+
 const DEFAULTS = {
 	modelId: "eleven_multilingual_v2",
 	outputFormat: "mp3_44100_128",
@@ -26,6 +28,28 @@ const MODEL_CHAR_LIMITS = {
 	eleven_multilingual_v1: 10000,
 	eleven_english_sts_v2: 10000,
 	eleven_english_sts_v1: 10000,
+};
+
+const errorMessage = (error) =>
+	error instanceof Error ? error.message : String(error);
+
+const markConnectionFailure = (error) => {
+	error.connectionFailure = true;
+	return error;
+};
+
+const extractErrorDetail = (errorText) => {
+	try {
+		const parsed = JSON.parse(errorText);
+		return (
+			parsed?.detail?.message ||
+			(typeof parsed?.detail === "string" ? parsed.detail : "") ||
+			parsed?.message ||
+			""
+		);
+	} catch (_err) {
+		return "";
+	}
 };
 
 const toNumber = (value, fallback) => {
@@ -159,6 +183,11 @@ const buildMusicFilename = (outputFormat) => {
 };
 
 class ElevenLabsTTSPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._connectionState = null;
+	}
+
 	getSettingsSnapshot() {
 		const raw = this.settings || {};
 		return {
@@ -167,18 +196,131 @@ class ElevenLabsTTSPlugin extends Plugin {
 	}
 
 	async onload() {
+		// Report a state during onload or the host defaults the plugin badge to connected.
+		await this._setConnection(false);
+		void this._refreshConnection();
 		void this.refreshActionOptions({ actionType: "speak" });
+	}
+
+	async onunload() {
+		await this._setConnection(false);
 	}
 
 	async onsettingsupdate(settings = {}, previousSettings = {}) {
 		const next = trimString(settings.apiKey, "");
 		const prev = trimString(previousSettings.apiKey, "");
 		if (next !== prev) {
+			await this._refreshConnection({ apiKey: next });
 			if (typeof this.lumia.refreshTtsVoices === "function") {
 				await this.lumia.refreshTtsVoices();
 			}
 			void this.refreshActionOptions({ actionType: "speak" });
 		}
+	}
+
+	async validateAuth(data = {}) {
+		const apiKey = trimString(data?.apiKey, this.getSettingsSnapshot().apiKey);
+		return this._refreshConnection({ apiKey, silent: true });
+	}
+
+	async _setConnection(state) {
+		if (this._connectionState === state) {
+			return;
+		}
+		this._connectionState = state;
+		if (typeof this.lumia?.updateConnection !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.updateConnection(state);
+		} catch (_err) {}
+	}
+
+	async _toast(message, type = "error") {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({ message, time: 6, type });
+		} catch (_err) {}
+	}
+
+	async _reportFailure(error, { context = "Request", silent = false } = {}) {
+		const message = errorMessage(error);
+		await this.lumia.log(`[ElevenLabs] ${context} failed: ${message}`);
+		if (error?.connectionFailure) {
+			await this._setConnection(false);
+		}
+		if (!silent) {
+			await this._toast(`ElevenLabs: ${message}`, "error");
+		}
+	}
+
+	async _refreshConnection({ apiKey, silent = false } = {}) {
+		const key =
+			apiKey === undefined
+				? this.getSettingsSnapshot().apiKey
+				: trimString(apiKey, "");
+		if (!key) {
+			await this._setConnection(false);
+			const message = "add your API key in the plugin settings";
+			await this.lumia.log(`[ElevenLabs] Not connected: ${message}`);
+			return { ok: false, message };
+		}
+		try {
+			await this._apiFetch("https://api.elevenlabs.io/v2/voices?page_size=1", {
+				headers: { "xi-api-key": key },
+			});
+			await this._setConnection(true);
+			return { ok: true };
+		} catch (error) {
+			markConnectionFailure(error);
+			await this._reportFailure(error, { context: "Connection", silent });
+			return { ok: false, message: errorMessage(error) };
+		}
+	}
+
+	async _apiFetch(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime");
+		}
+		const controller =
+			typeof AbortController === "function" ? new AbortController() : null;
+		const timer = controller
+			? setTimeout(() => controller.abort(), timeoutMs)
+			: null;
+		let response;
+		try {
+			response = await fetch(
+				url,
+				controller ? { ...options, signal: controller.signal } : options,
+			);
+		} catch (error) {
+			// fetch only rejects when the request never completed: offline, DNS/firewall block, or our abort.
+			throw markConnectionFailure(
+				new Error(
+					error?.name === "AbortError"
+						? `ElevenLabs did not respond within ${Math.round(timeoutMs / 1000)}s`
+						: `could not reach ElevenLabs (${errorMessage(error)})`,
+				),
+			);
+		} finally {
+			if (timer) {
+				clearTimeout(timer);
+			}
+		}
+		if (!response.ok) {
+			const detail = extractErrorDetail(await response.text().catch(() => ""));
+			const failure = new Error(
+				detail || `request failed (${response.status} ${response.statusText})`,
+			);
+			failure.status = response.status;
+			if (response.status === 401 || response.status === 403) {
+				markConnectionFailure(failure);
+			}
+			throw failure;
+		}
+		return response;
 	}
 
 	async _fetchRawVoices(apiKey) {
@@ -188,15 +330,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 		for (let page = 0; page < 25; page++) {
 			const query = `page_size=100${pageToken ? `&next_page_token=${encodeURIComponent(pageToken)}` : ""}`;
 			// Throw (don't return []) on failure so Lumia keeps the previously-listed voices instead of clearing them.
-			const response = await fetch(`https://api.elevenlabs.io/v2/voices?${query}`, {
-				headers: { "xi-api-key": apiKey },
-			});
-			if (!response.ok) {
-				const detail = await response.text().catch(() => "");
-				throw new Error(
-					`ElevenLabs voice list failed: ${response.status}${detail ? ` — ${detail}` : ""}`,
-				);
-			}
+			const response = await this._apiFetch(
+				`https://api.elevenlabs.io/v2/voices?${query}`,
+				{ headers: { "xi-api-key": apiKey } },
+			);
 			const data = await response.json();
 			const voices = Array.isArray(data?.voices) ? data.voices : [];
 			collected.push(...voices);
@@ -209,15 +346,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 	}
 
 	async _fetchModels(apiKey) {
-		const response = await fetch("https://api.elevenlabs.io/v1/models", {
-			headers: { "xi-api-key": apiKey },
-		});
-		if (!response.ok) {
-			const detail = await response.text().catch(() => "");
-			throw new Error(
-				`ElevenLabs model list failed: ${response.status}${detail ? ` — ${detail}` : ""}`,
-			);
-		}
+		const response = await this._apiFetch(
+			"https://api.elevenlabs.io/v1/models",
+			{ headers: { "xi-api-key": apiKey } },
+		);
 		const data = await response.json();
 		const models = Array.isArray(data) ? data : [];
 		return models
@@ -245,9 +377,17 @@ class ElevenLabsTTSPlugin extends Plugin {
 	async ttsVoices() {
 		const apiKey = this.getSettingsSnapshot().apiKey;
 		if (!apiKey || typeof fetch !== "function") {
+			await this._setConnection(false);
 			return [];
 		}
-		const raw = await this._fetchRawVoices(apiKey);
+		let raw;
+		try {
+			raw = await this._fetchRawVoices(apiKey);
+		} catch (error) {
+			await this._reportFailure(error, { context: "Voice list" });
+			throw error;
+		}
+		await this._setConnection(true);
 		const voices = [];
 		for (const voice of raw) {
 			const id = trimString(voice?.voice_id, "");
@@ -273,6 +413,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 		}
 		const apiKey = this.getSettingsSnapshot().apiKey;
 		if (!apiKey) {
+			await this._setConnection(false);
 			return;
 		}
 
@@ -284,8 +425,12 @@ class ElevenLabsTTSPlugin extends Plugin {
 				fieldKey: "voiceId",
 				options: this._buildOptions(voiceItems, values?.voiceId),
 			});
+			await this._setConnection(true);
 		} catch (error) {
-			await this.lumia.log(`[ElevenLabs] Voice options failed: ${error instanceof Error ? error.message : String(error)}`);
+			await this._reportFailure(error, {
+				context: "Voice options",
+				silent: true,
+			});
 		}
 
 		try {
@@ -297,7 +442,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 				options: this._buildOptions(modelItems, values?.modelId || DEFAULTS.modelId),
 			});
 		} catch (error) {
-			await this.lumia.log(`[ElevenLabs] Model options failed: ${error instanceof Error ? error.message : String(error)}`);
+			await this._reportFailure(error, {
+				context: "Model options",
+				silent: true,
+			});
 		}
 	}
 
@@ -321,37 +469,31 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const modelId = DEFAULTS.modelId;
 		const text = truncateText(message, getCharLimitForModel(modelId)).text;
 		const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream`;
-		const response = await fetch(endpoint, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"xi-api-key": apiKey,
-			},
-			body: JSON.stringify({
-				text,
-				model_id: modelId,
-				voice_settings: buildVoiceSettings({
-					stability: DEFAULTS.stability,
-					similarityBoost: DEFAULTS.similarityBoost,
-					style: DEFAULTS.style,
-					speakerBoost: DEFAULTS.speakerBoost,
+		let response;
+		try {
+			// _apiFetch surfaces ElevenLabs' human-readable reason (e.g. plan/permission errors) instead of a raw status code.
+			response = await this._apiFetch(endpoint, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"xi-api-key": apiKey,
+				},
+				body: JSON.stringify({
+					text,
+					model_id: modelId,
+					voice_settings: buildVoiceSettings({
+						stability: DEFAULTS.stability,
+						similarityBoost: DEFAULTS.similarityBoost,
+						style: DEFAULTS.style,
+						speakerBoost: DEFAULTS.speakerBoost,
+					}),
 				}),
-			}),
-		});
-		if (!response.ok) {
-			const errorText = await response.text().catch(() => "");
-			// Surface ElevenLabs' human-readable reason (e.g. plan/permission errors) instead of a raw status code.
-			let detail = "";
-			try {
-				const parsed = JSON.parse(errorText);
-				detail =
-					parsed?.detail?.message ||
-					(typeof parsed?.detail === "string" ? parsed.detail : "") ||
-					parsed?.message ||
-					"";
-			} catch (_err) {}
-			throw new Error(detail || `request failed (${response.status} ${response.statusText})`);
+			});
+		} catch (error) {
+			await this._reportFailure(error, { context: "Speech" });
+			throw error;
 		}
+		await this._setConnection(true);
 		const audioBuffer = await response.arrayBuffer();
 		return {
 			audio: Buffer.from(audioBuffer).toString("base64"),
@@ -369,8 +511,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 					await this.handleStreamMusic(actionData);
 				}
 			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.log(`[ElevenLabs] Action failed: ${message}`);
+				await this._reportFailure(error, { context: `Action ${action.type}` });
 			}
 		}
 	}
@@ -385,7 +526,11 @@ class ElevenLabsTTSPlugin extends Plugin {
 
 		const apiKey = settings.apiKey;
 		if (!apiKey) {
-			await this.lumia.log("[ElevenLabs] Missing API key");
+			await this._setConnection(false);
+			await this._toast(
+				"ElevenLabs: add your API key in the plugin settings",
+				"warn",
+			);
 			return;
 		}
 
@@ -442,7 +587,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 			throw new Error("Blob/URL APIs are not available in this runtime");
 		}
 
-		const response = await fetch(endpoint, {
+		const response = await this._apiFetch(endpoint, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -454,13 +599,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 				voice_settings: voiceSettings,
 			}),
 		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(
-				`ElevenLabs error ${response.status}: ${errorText || response.statusText}`,
-			);
-		}
+		await this._setConnection(true);
 
 		const audioBuffer = await response.arrayBuffer();
 		const audioBlob = new Blob([audioBuffer], {
@@ -480,7 +619,11 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const settings = this.getSettingsSnapshot();
 		const apiKey = settings.apiKey;
 		if (!apiKey) {
-			await this.lumia.log("[ElevenLabs] Missing API key");
+			await this._setConnection(false);
+			await this._toast(
+				"ElevenLabs: add your API key in the plugin settings",
+				"warn",
+			);
 			return;
 		}
 
@@ -538,7 +681,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 			...(compositionPlan ? { composition_plan: compositionPlan } : {}),
 		};
 
-		const response = await fetch(endpoint, {
+		const response = await this._apiFetch(endpoint, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -546,13 +689,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 			},
 			body: JSON.stringify(body),
 		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(
-				`ElevenLabs music error ${response.status}: ${errorText || response.statusText}`,
-			);
-		}
+		await this._setConnection(true);
 
 		const audioBuffer = await response.arrayBuffer();
 		const audioBlob = new Blob([audioBuffer], {
