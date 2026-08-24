@@ -1,7 +1,7 @@
 {
 	"id": "elevenlabs_tts",
 	"name": "ElevenLabs TTS",
-	"version": "1.1.9",
+	"version": "1.2.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
@@ -20,9 +20,9 @@
 		"settings": [
 			{
 				"key": "apiKey",
-				"label": "Key ID (API Key)",
+				"label": "API Key",
 				"type": "password",
-				"helperText": "Create an API key in your ElevenLabs dashboard.",
+				"helperText": "Starts with sk_ and is 51 characters. ElevenLabs only shows it when you create or rotate the key — the 64-character Key ID in the keys table will not work.",
 				"required": true
 			}
 		],

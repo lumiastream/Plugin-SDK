@@ -4,7 +4,9 @@ ElevenLabs' **premade voices work on any plan**, including Free. Using your own 
 ---
 ### 🔐 Get Your ElevenLabs API Key
 1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key.
-2) Copy the key and paste it into the **Key ID (API Key)** field here.
+2) Copy the secret shown at creation — it starts with `sk_` and is **51 characters** — and paste it into the **API Key** field here.
+
+> ⚠️ Do **not** paste the **Key ID** from the keys table. That's a 64-character identifier, not a credential, and ElevenLabs rejects it with *"API key ID used as API key"*. The real key is only shown once, when you create or rotate it — if you missed it, rotate the key to get a new one.
 ---
 ### 🔑 Give the Key the Right Permissions
 If you turn on **Restrict Key**, you must grant these endpoints — otherwise Lumia can't load your voices (you'll get a `401` when it lists them):

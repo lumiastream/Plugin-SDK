@@ -4,6 +4,8 @@ const path = require("path");
 const os = require("os");
 
 const REQUEST_TIMEOUT_MS = 15000;
+const API_KEY_LENGTH = 51;
+const API_KEY_ID_LENGTH = 64;
 
 const DEFAULTS = {
 	modelId: "eleven_multilingual_v2",
@@ -28,6 +30,17 @@ const MODEL_CHAR_LIMITS = {
 	eleven_multilingual_v1: 10000,
 	eleven_english_sts_v2: 10000,
 	eleven_english_sts_v1: 10000,
+};
+
+const describeApiKeyProblem = (apiKey) => {
+	if (!apiKey) {
+		return "add your API key in the plugin settings";
+	}
+	// The ElevenLabs dashboard lists a 64-char Key ID beside each key; only the sk_ secret authenticates.
+	if (apiKey.length === API_KEY_ID_LENGTH && !apiKey.startsWith("sk_")) {
+		return `that looks like your ElevenLabs Key ID (${API_KEY_ID_LENGTH} characters), not the API key — the API key starts with "sk_", is ${API_KEY_LENGTH} characters, and is only shown when you create or rotate the key`;
+	}
+	return "";
 };
 
 const errorMessage = (error) =>
@@ -261,11 +274,14 @@ class ElevenLabsTTSPlugin extends Plugin {
 			apiKey === undefined
 				? this.getSettingsSnapshot().apiKey
 				: trimString(apiKey, "");
-		if (!key) {
+		const problem = describeApiKeyProblem(key);
+		if (problem) {
 			await this._setConnection(false);
-			const message = "add your API key in the plugin settings";
-			await this.lumia.log(`[ElevenLabs] Not connected: ${message}`);
-			return { ok: false, message };
+			await this.lumia.log(`[ElevenLabs] Not connected: ${problem}`);
+			if (!silent && key) {
+				await this._toast(`ElevenLabs: ${problem}`, "error");
+			}
+			return { ok: false, message: problem };
 		}
 		try {
 			await this._apiFetch("https://api.elevenlabs.io/v2/voices?page_size=1", {
@@ -376,8 +392,12 @@ class ElevenLabsTTSPlugin extends Plugin {
 
 	async ttsVoices() {
 		const apiKey = this.getSettingsSnapshot().apiKey;
-		if (!apiKey || typeof fetch !== "function") {
+		const problem = describeApiKeyProblem(apiKey);
+		if (problem || typeof fetch !== "function") {
 			await this._setConnection(false);
+			if (problem) {
+				await this.lumia.log(`[ElevenLabs] Skipping voice list: ${problem}`);
+			}
 			return [];
 		}
 		let raw;
@@ -412,8 +432,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 			return;
 		}
 		const apiKey = this.getSettingsSnapshot().apiKey;
-		if (!apiKey) {
+		const problem = describeApiKeyProblem(apiKey);
+		if (problem) {
 			await this._setConnection(false);
+			await this.lumia.log(`[ElevenLabs] Skipping option refresh: ${problem}`);
 			return;
 		}
 
@@ -451,8 +473,9 @@ class ElevenLabsTTSPlugin extends Plugin {
 
 	async synthesizeTts(request = {}) {
 		const apiKey = this.getSettingsSnapshot().apiKey;
-		if (!apiKey) {
-			throw new Error("Missing ElevenLabs API key");
+		const apiKeyProblem = describeApiKeyProblem(apiKey);
+		if (apiKeyProblem) {
+			throw markConnectionFailure(new Error(apiKeyProblem));
 		}
 		const voiceId = trimString(request.voiceId, "");
 		if (!voiceId) {
@@ -520,23 +543,24 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const settings = this.getSettingsSnapshot();
 		let message = trimString(data.message || data.text, "");
 		if (!message) {
-			await this.lumia.log("[ElevenLabs] Missing message text");
+			await this._toast(
+				"ElevenLabs: the Speak action has no message text",
+				"error",
+			);
 			return;
 		}
 
 		const apiKey = settings.apiKey;
-		if (!apiKey) {
+		const apiKeyProblem = describeApiKeyProblem(apiKey);
+		if (apiKeyProblem) {
 			await this._setConnection(false);
-			await this._toast(
-				"ElevenLabs: add your API key in the plugin settings",
-				"warn",
-			);
+			await this._toast(`ElevenLabs: ${apiKeyProblem}`, "error");
 			return;
 		}
 
 		const voiceId = trimString(data.voiceId, "");
 		if (!voiceId) {
-			await this.lumia.log("[ElevenLabs] Missing Voice ID");
+			await this._toast("ElevenLabs: the Speak action has no voice selected", "error");
 			return;
 		}
 		const modelId = trimString(data.modelId, DEFAULTS.modelId);
@@ -618,12 +642,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 	async handleStreamMusic(data = {}) {
 		const settings = this.getSettingsSnapshot();
 		const apiKey = settings.apiKey;
-		if (!apiKey) {
+		const apiKeyProblem = describeApiKeyProblem(apiKey);
+		if (apiKeyProblem) {
 			await this._setConnection(false);
-			await this._toast(
-				"ElevenLabs: add your API key in the plugin settings",
-				"warn",
-			);
+			await this._toast(`ElevenLabs: ${apiKeyProblem}`, "error");
 			return;
 		}
 
@@ -632,8 +654,9 @@ class ElevenLabsTTSPlugin extends Plugin {
 			data.compositionPlanJson || data.composition_plan || "",
 		);
 		if (!prompt && !compositionPlan) {
-			await this.lumia.log(
-				"[ElevenLabs] Provide a prompt or composition plan",
+			await this._toast(
+				"ElevenLabs: the Stream Music action needs a prompt or composition plan",
+				"error",
 			);
 			return;
 		}
@@ -707,7 +730,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 		if (saveToDesktop) {
 			const desktopPath = getDesktopPath();
 			if (!desktopPath) {
-				await this.lumia.log("[ElevenLabs] Could not resolve Desktop path");
+				await this._toast(
+					"ElevenLabs: could not resolve your Desktop folder to save the music file",
+					"error",
+				);
 				return;
 			}
 			const filename = buildMusicFilename(outputFormat);
