@@ -19,7 +19,7 @@ const STEAM_API_BASE = "https://api.steampowered.com";
 // showToast's `time` is milliseconds (the host passes it to react-toastify's autoClose),
 // so small numbers make the toast flash and vanish before it can be read.
 const TOAST_DURATION_MS = 8000;
-const TOAST_INFO_DURATION_MS = 4000;
+const INFO_TOAST_DURATION_MS = 5000;
 
 const ALERT_KEYS = {
 	onlineStateChanged: "online_state_changed",
@@ -1299,7 +1299,7 @@ class SteamPlugin extends Plugin {
 		const time =
 			type === "error" || type === "warn" || type === "warning"
 				? TOAST_DURATION_MS
-				: TOAST_INFO_DURATION_MS;
+				: INFO_TOAST_DURATION_MS;
 		try {
 			await this._withTimeout(
 				Promise.resolve(

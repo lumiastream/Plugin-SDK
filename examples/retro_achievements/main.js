@@ -20,7 +20,7 @@ const RA_SITE_BASE = "https://retroachievements.org";
 // showToast's `time` is milliseconds (the host passes it to react-toastify's autoClose),
 // so small numbers make the toast flash and vanish before it can be read.
 const TOAST_DURATION_MS = 8000;
-const TOAST_INFO_DURATION_MS = 4000;
+const INFO_TOAST_DURATION_MS = 5000;
 
 const ALERT_KEYS = {
 	currentGameChanged: "current_game_changed",
@@ -1134,7 +1134,7 @@ class RetroAchievementsPlugin extends Plugin {
 		const time =
 			type === "error" || type === "warn" || type === "warning"
 				? TOAST_DURATION_MS
-				: TOAST_INFO_DURATION_MS;
+				: INFO_TOAST_DURATION_MS;
 		try {
 			await this.lumia.showToast({
 				message,
