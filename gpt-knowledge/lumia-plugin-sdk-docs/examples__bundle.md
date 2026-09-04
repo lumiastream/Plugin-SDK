@@ -277,7 +277,7 @@ module.exports = ShowcasePluginTemplate;
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.9.6"
+		"@lumiastream/plugin": "^0.9.7"
 	}
 }
 
@@ -2173,6 +2173,8 @@ module.exports = DivoomPixooPlugin;
 1) Enter a **Prompt** (or provide a Composition Plan JSON).
 2) Choose the **Model ID** (see music model docs at https://elevenlabs.io/docs/overview/models#models-overview).
 3) Set **Music Length** and **Volume**.
+
+> ⚠️ This action needs the **Music Generation** permission on your ElevenLabs API key. If your key has **Restrict Key** turned on, enable **Music Generation** → **Access** at https://elevenlabs.io/app/settings/api-keys.
 ---
 
 ```
@@ -2184,6 +2186,16 @@ const { Plugin } = require("@lumiastream/plugin");
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
+
+const REQUEST_TIMEOUT_MS = 15000;
+// showToast's `time` is milliseconds (the host passes it to react-toastify's autoClose),
+// so small numbers make the toast flash and vanish before it can be read.
+const TOAST_DURATION_MS = 8000;
+const INFO_TOAST_DURATION_MS = 5000;
+// The capability summary is several lines, so it needs longer on screen than a one-line error.
+const SUMMARY_TOAST_DURATION_MS = 14000;
+const API_KEY_LENGTH = 51;
+const API_KEY_ID_LENGTH = 64;
 
 const DEFAULTS = {
 	modelId: "eleven_multilingual_v2",
@@ -2200,6 +2212,7 @@ const ELEVENLABS_LOGO_DATA_URI =
 
 const MODEL_CHAR_LIMITS = {
 	eleven_v3: 5000,
+	eleven_v3_conversational: 5000,
 	eleven_flash_v2_5: 40000,
 	eleven_flash_v2: 30000,
 	eleven_turbo_v2_5: 40000,
@@ -2208,6 +2221,57 @@ const MODEL_CHAR_LIMITS = {
 	eleven_multilingual_v1: 10000,
 	eleven_english_sts_v2: 10000,
 	eleven_english_sts_v1: 10000,
+};
+
+// Listing models needs the optional `models_read` ("Models") key permission. Without it we still
+// offer the known text-to-speech models, and the field accepts a typed model ID either way.
+const FALLBACK_TTS_MODELS = [
+	{ id: "eleven_v3", name: "Eleven v3" },
+	{ id: "eleven_v3_conversational", name: "Eleven v3 Conversational" },
+	{ id: "eleven_multilingual_v2", name: "Eleven Multilingual v2" },
+	{ id: "eleven_flash_v2_5", name: "Eleven Flash v2.5" },
+	{ id: "eleven_flash_v2", name: "Eleven Flash v2" },
+	{ id: "eleven_turbo_v2_5", name: "Eleven Turbo v2.5" },
+	{ id: "eleven_turbo_v2", name: "Eleven Turbo v2" },
+	{ id: "eleven_multilingual_v1", name: "Eleven Multilingual v1" },
+];
+
+const describeApiKeyProblem = (apiKey) => {
+	if (!apiKey) {
+		return 'add your ElevenLabs API Key (it starts with "sk_") in the plugin settings';
+	}
+	// The ElevenLabs dashboard lists a 64-char Key ID beside each key; only the sk_ secret authenticates.
+	if (apiKey.length === API_KEY_ID_LENGTH && !apiKey.startsWith("sk_")) {
+		return `that is the Key ID from the ElevenLabs keys table (${API_KEY_ID_LENGTH} characters), not the API Key — the API Key starts with "sk_", is ${API_KEY_LENGTH} characters, and ElevenLabs only shows it in the "API Key" dialog when you create or rotate the key`;
+	}
+	return "";
+};
+
+const errorMessage = (error) =>
+	error instanceof Error ? error.message : String(error);
+
+// ElevenLabs answers a missing key scope with a 401 whose detail names the permission, e.g.
+// "The API key you used is missing the permission music_generation to execute this operation."
+const isPermissionError = (error) =>
+	/missing the permission/i.test(errorMessage(error));
+
+const markConnectionFailure = (error) => {
+	error.connectionFailure = true;
+	return error;
+};
+
+const extractErrorDetail = (errorText) => {
+	try {
+		const parsed = JSON.parse(errorText);
+		return (
+			parsed?.detail?.message ||
+			(typeof parsed?.detail === "string" ? parsed.detail : "") ||
+			parsed?.message ||
+			""
+		);
+	} catch (_err) {
+		return "";
+	}
 };
 
 const toNumber = (value, fallback) => {
@@ -2341,6 +2405,17 @@ const buildMusicFilename = (outputFormat) => {
 };
 
 class ElevenLabsTTSPlugin extends Plugin {
+	constructor(manifest, context) {
+		super(manifest, context);
+		this._connectionState = null;
+		this._voiceCount = null;
+		// true = granted, false = the key was explicitly rejected for it, null = not known yet.
+		this._modelsPermission = null;
+		// Music Generation cannot be probed: /v1/music/stream validates the body before auth, so an
+		// empty-body request 422s for every key. We only learn the answer when a real run succeeds or 401s.
+		this._musicPermission = null;
+	}
+
 	getSettingsSnapshot() {
 		const raw = this.settings || {};
 		return {
@@ -2349,18 +2424,178 @@ class ElevenLabsTTSPlugin extends Plugin {
 	}
 
 	async onload() {
+		// Report a state during onload or the host defaults the plugin badge to connected.
+		await this._setConnection(false);
+		void this._refreshConnection();
 		void this.refreshActionOptions({ actionType: "speak" });
+	}
+
+	async onunload() {
+		await this._setConnection(false);
 	}
 
 	async onsettingsupdate(settings = {}, previousSettings = {}) {
 		const next = trimString(settings.apiKey, "");
 		const prev = trimString(previousSettings.apiKey, "");
 		if (next !== prev) {
+			this._voiceCount = null;
+			this._modelsPermission = null;
+			this._musicPermission = null;
+			const result = await this._refreshConnection({ apiKey: next });
 			if (typeof this.lumia.refreshTtsVoices === "function") {
 				await this.lumia.refreshTtsVoices();
 			}
-			void this.refreshActionOptions({ actionType: "speak" });
+			// Awaited, not fire-and-forget: the summary reports what this pass learned about the key.
+			await this.refreshActionOptions({ actionType: "speak" });
+			if (result?.ok) {
+				await this._toastCapabilities();
+			}
 		}
+	}
+
+	async validateAuth(data = {}) {
+		const apiKey = trimString(data?.apiKey, this.getSettingsSnapshot().apiKey);
+		return this._refreshConnection({ apiKey, silent: true });
+	}
+
+	async _setConnection(state) {
+		if (this._connectionState === state) {
+			return;
+		}
+		this._connectionState = state;
+		if (typeof this.lumia?.updateConnection !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.updateConnection(state);
+		} catch (_err) {}
+	}
+
+	async _toast(message, type = "error", time = TOAST_DURATION_MS) {
+		if (typeof this.lumia?.showToast !== "function") {
+			return;
+		}
+		try {
+			await this.lumia.showToast({ message, time, type });
+		} catch (_err) {}
+	}
+
+	_capabilitySummary() {
+		const voices = this._voiceCount;
+		const headline =
+			typeof voices === "number"
+				? `ElevenLabs connected — ${voices} voice${voices === 1 ? "" : "s"} ready for Lumia's TTS and the Speak action.`
+				: "ElevenLabs connected — your voices are ready for Lumia's TTS and the Speak action.";
+
+		const notes = [];
+		if (this._modelsPermission === false) {
+			notes.push(
+				'"Models" is off, so the Model dropdown uses the built-in list (typing a model ID still works).',
+			);
+		}
+		if (this._musicPermission === false) {
+			notes.push(
+				'"Music Generation" is off, so the Stream Music action will fail until you enable it.',
+			);
+		} else if (this._musicPermission === null) {
+			notes.push(
+				'The Stream Music action also needs the optional "Music Generation" permission on this key.',
+			);
+		}
+
+		return {
+			message: notes.length ? `${headline}\n\n${notes.join("\n")}` : headline,
+			type:
+				this._modelsPermission === false || this._musicPermission === false
+					? "warning"
+					: "success",
+		};
+	}
+
+	async _toastCapabilities() {
+		const { message, type } = this._capabilitySummary();
+		await this._toast(message, type, SUMMARY_TOAST_DURATION_MS);
+	}
+
+	async _reportFailure(error, { context = "Request", silent = false } = {}) {
+		const message = errorMessage(error);
+		await this.lumia.log(`[ElevenLabs] ${context} failed: ${message}`);
+		if (error?.connectionFailure) {
+			await this._setConnection(false);
+		}
+		if (!silent) {
+			await this._toast(`ElevenLabs: ${message}`, "error");
+		}
+	}
+
+	async _refreshConnection({ apiKey, silent = false } = {}) {
+		const key =
+			apiKey === undefined
+				? this.getSettingsSnapshot().apiKey
+				: trimString(apiKey, "");
+		const problem = describeApiKeyProblem(key);
+		if (problem) {
+			await this._setConnection(false);
+			await this.lumia.log(`[ElevenLabs] Not connected: ${problem}`);
+			if (!silent && key) {
+				await this._toast(`ElevenLabs: ${problem}`, "error");
+			}
+			return { ok: false, message: problem };
+		}
+		try {
+			await this._apiFetch("https://api.elevenlabs.io/v2/voices?page_size=1", {
+				headers: { "xi-api-key": key },
+			});
+			await this._setConnection(true);
+			return { ok: true };
+		} catch (error) {
+			markConnectionFailure(error);
+			await this._reportFailure(error, { context: "Connection", silent });
+			return { ok: false, message: errorMessage(error) };
+		}
+	}
+
+	async _apiFetch(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+		if (typeof fetch !== "function") {
+			throw new Error("fetch is not available in this runtime");
+		}
+		const controller =
+			typeof AbortController === "function" ? new AbortController() : null;
+		const timer = controller
+			? setTimeout(() => controller.abort(), timeoutMs)
+			: null;
+		let response;
+		try {
+			response = await fetch(
+				url,
+				controller ? { ...options, signal: controller.signal } : options,
+			);
+		} catch (error) {
+			// fetch only rejects when the request never completed: offline, DNS/firewall block, or our abort.
+			throw markConnectionFailure(
+				new Error(
+					error?.name === "AbortError"
+						? `ElevenLabs did not respond within ${Math.round(timeoutMs / 1000)}s`
+						: `could not reach ElevenLabs (${errorMessage(error)})`,
+				),
+			);
+		} finally {
+			if (timer) {
+				clearTimeout(timer);
+			}
+		}
+		if (!response.ok) {
+			const detail = extractErrorDetail(await response.text().catch(() => ""));
+			const failure = new Error(
+				detail || `request failed (${response.status} ${response.statusText})`,
+			);
+			failure.status = response.status;
+			if (response.status === 401 || response.status === 403) {
+				markConnectionFailure(failure);
+			}
+			throw failure;
+		}
+		return response;
 	}
 
 	async _fetchRawVoices(apiKey) {
@@ -2370,15 +2605,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 		for (let page = 0; page < 25; page++) {
 			const query = `page_size=100${pageToken ? `&next_page_token=${encodeURIComponent(pageToken)}` : ""}`;
 			// Throw (don't return []) on failure so Lumia keeps the previously-listed voices instead of clearing them.
-			const response = await fetch(`https://api.elevenlabs.io/v2/voices?${query}`, {
-				headers: { "xi-api-key": apiKey },
-			});
-			if (!response.ok) {
-				const detail = await response.text().catch(() => "");
-				throw new Error(
-					`ElevenLabs voice list failed: ${response.status}${detail ? ` — ${detail}` : ""}`,
-				);
-			}
+			const response = await this._apiFetch(
+				`https://api.elevenlabs.io/v2/voices?${query}`,
+				{ headers: { "xi-api-key": apiKey } },
+			);
 			const data = await response.json();
 			const voices = Array.isArray(data?.voices) ? data.voices : [];
 			collected.push(...voices);
@@ -2391,15 +2621,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 	}
 
 	async _fetchModels(apiKey) {
-		const response = await fetch("https://api.elevenlabs.io/v1/models", {
-			headers: { "xi-api-key": apiKey },
-		});
-		if (!response.ok) {
-			const detail = await response.text().catch(() => "");
-			throw new Error(
-				`ElevenLabs model list failed: ${response.status}${detail ? ` — ${detail}` : ""}`,
-			);
-		}
+		const response = await this._apiFetch(
+			"https://api.elevenlabs.io/v1/models",
+			{ headers: { "xi-api-key": apiKey } },
+		);
 		const data = await response.json();
 		const models = Array.isArray(data) ? data : [];
 		return models
@@ -2426,10 +2651,22 @@ class ElevenLabsTTSPlugin extends Plugin {
 
 	async ttsVoices() {
 		const apiKey = this.getSettingsSnapshot().apiKey;
-		if (!apiKey || typeof fetch !== "function") {
+		const problem = describeApiKeyProblem(apiKey);
+		if (problem || typeof fetch !== "function") {
+			await this._setConnection(false);
+			if (problem) {
+				await this.lumia.log(`[ElevenLabs] Skipping voice list: ${problem}`);
+			}
 			return [];
 		}
-		const raw = await this._fetchRawVoices(apiKey);
+		let raw;
+		try {
+			raw = await this._fetchRawVoices(apiKey);
+		} catch (error) {
+			await this._reportFailure(error, { context: "Voice list" });
+			throw error;
+		}
+		await this._setConnection(true);
 		const voices = [];
 		for (const voice of raw) {
 			const id = trimString(voice?.voice_id, "");
@@ -2454,24 +2691,48 @@ class ElevenLabsTTSPlugin extends Plugin {
 			return;
 		}
 		const apiKey = this.getSettingsSnapshot().apiKey;
-		if (!apiKey) {
+		const problem = describeApiKeyProblem(apiKey);
+		if (problem) {
+			await this._setConnection(false);
+			await this.lumia.log(`[ElevenLabs] Skipping option refresh: ${problem}`);
 			return;
 		}
 
 		try {
 			const raw = await this._fetchRawVoices(apiKey);
+			this._voiceCount = raw.length;
 			const voiceItems = raw.map((voice) => ({ label: trimString(voice?.name, voice?.voice_id), value: trimString(voice?.voice_id, "") }));
 			await this.lumia.updateActionFieldOptions({
 				actionType: "speak",
 				fieldKey: "voiceId",
 				options: this._buildOptions(voiceItems, values?.voiceId),
 			});
+			await this._setConnection(true);
 		} catch (error) {
-			await this.lumia.log(`[ElevenLabs] Voice options failed: ${error instanceof Error ? error.message : String(error)}`);
+			await this._reportFailure(error, {
+				context: "Voice options",
+				silent: true,
+			});
 		}
 
 		try {
-			const models = await this._fetchModels(apiKey);
+			let models = FALLBACK_TTS_MODELS;
+			try {
+				const fetched = await this._fetchModels(apiKey);
+				this._modelsPermission = true;
+				if (fetched.length) {
+					models = fetched;
+				}
+			} catch (error) {
+				if (isPermissionError(error)) {
+					this._modelsPermission = false;
+				}
+				// "Models" is an optional key permission. Skip _reportFailure on purpose: its 401 would
+				// otherwise flip the connection badge to disconnected even though speech still works.
+				await this.lumia.log(
+					`[ElevenLabs] Model list unavailable, using the built-in models: ${errorMessage(error)}`,
+				);
+			}
 			const modelItems = models.map((model) => ({ label: model.name, value: model.id }));
 			await this.lumia.updateActionFieldOptions({
 				actionType: "speak",
@@ -2479,14 +2740,17 @@ class ElevenLabsTTSPlugin extends Plugin {
 				options: this._buildOptions(modelItems, values?.modelId || DEFAULTS.modelId),
 			});
 		} catch (error) {
-			await this.lumia.log(`[ElevenLabs] Model options failed: ${error instanceof Error ? error.message : String(error)}`);
+			await this.lumia.log(
+				`[ElevenLabs] Model options failed: ${errorMessage(error)}`,
+			);
 		}
 	}
 
 	async synthesizeTts(request = {}) {
 		const apiKey = this.getSettingsSnapshot().apiKey;
-		if (!apiKey) {
-			throw new Error("Missing ElevenLabs API key");
+		const apiKeyProblem = describeApiKeyProblem(apiKey);
+		if (apiKeyProblem) {
+			throw markConnectionFailure(new Error(apiKeyProblem));
 		}
 		const voiceId = trimString(request.voiceId, "");
 		if (!voiceId) {
@@ -2503,37 +2767,31 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const modelId = DEFAULTS.modelId;
 		const text = truncateText(message, getCharLimitForModel(modelId)).text;
 		const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream`;
-		const response = await fetch(endpoint, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"xi-api-key": apiKey,
-			},
-			body: JSON.stringify({
-				text,
-				model_id: modelId,
-				voice_settings: buildVoiceSettings({
-					stability: DEFAULTS.stability,
-					similarityBoost: DEFAULTS.similarityBoost,
-					style: DEFAULTS.style,
-					speakerBoost: DEFAULTS.speakerBoost,
+		let response;
+		try {
+			// _apiFetch surfaces ElevenLabs' human-readable reason (e.g. plan/permission errors) instead of a raw status code.
+			response = await this._apiFetch(endpoint, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"xi-api-key": apiKey,
+				},
+				body: JSON.stringify({
+					text,
+					model_id: modelId,
+					voice_settings: buildVoiceSettings({
+						stability: DEFAULTS.stability,
+						similarityBoost: DEFAULTS.similarityBoost,
+						style: DEFAULTS.style,
+						speakerBoost: DEFAULTS.speakerBoost,
+					}),
 				}),
-			}),
-		});
-		if (!response.ok) {
-			const errorText = await response.text().catch(() => "");
-			// Surface ElevenLabs' human-readable reason (e.g. plan/permission errors) instead of a raw status code.
-			let detail = "";
-			try {
-				const parsed = JSON.parse(errorText);
-				detail =
-					parsed?.detail?.message ||
-					(typeof parsed?.detail === "string" ? parsed.detail : "") ||
-					parsed?.message ||
-					"";
-			} catch (_err) {}
-			throw new Error(detail || `request failed (${response.status} ${response.statusText})`);
+			});
+		} catch (error) {
+			await this._reportFailure(error, { context: "Speech" });
+			throw error;
 		}
+		await this._setConnection(true);
 		const audioBuffer = await response.arrayBuffer();
 		return {
 			audio: Buffer.from(audioBuffer).toString("base64"),
@@ -2551,8 +2809,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 					await this.handleStreamMusic(actionData);
 				}
 			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				await this.lumia.log(`[ElevenLabs] Action failed: ${message}`);
+				await this._reportFailure(error, { context: `Action ${action.type}` });
 			}
 		}
 	}
@@ -2561,19 +2818,24 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const settings = this.getSettingsSnapshot();
 		let message = trimString(data.message || data.text, "");
 		if (!message) {
-			await this.lumia.log("[ElevenLabs] Missing message text");
+			await this._toast(
+				"ElevenLabs: the Speak action has no message text",
+				"error",
+			);
 			return;
 		}
 
 		const apiKey = settings.apiKey;
-		if (!apiKey) {
-			await this.lumia.log("[ElevenLabs] Missing API key");
+		const apiKeyProblem = describeApiKeyProblem(apiKey);
+		if (apiKeyProblem) {
+			await this._setConnection(false);
+			await this._toast(`ElevenLabs: ${apiKeyProblem}`, "error");
 			return;
 		}
 
 		const voiceId = trimString(data.voiceId, "");
 		if (!voiceId) {
-			await this.lumia.log("[ElevenLabs] Missing Voice ID");
+			await this._toast("ElevenLabs: the Speak action has no voice selected", "error");
 			return;
 		}
 		const modelId = trimString(data.modelId, DEFAULTS.modelId);
@@ -2624,7 +2886,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 			throw new Error("Blob/URL APIs are not available in this runtime");
 		}
 
-		const response = await fetch(endpoint, {
+		const response = await this._apiFetch(endpoint, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -2636,13 +2898,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 				voice_settings: voiceSettings,
 			}),
 		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(
-				`ElevenLabs error ${response.status}: ${errorText || response.statusText}`,
-			);
-		}
+		await this._setConnection(true);
 
 		const audioBuffer = await response.arrayBuffer();
 		const audioBlob = new Blob([audioBuffer], {
@@ -2661,8 +2917,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 	async handleStreamMusic(data = {}) {
 		const settings = this.getSettingsSnapshot();
 		const apiKey = settings.apiKey;
-		if (!apiKey) {
-			await this.lumia.log("[ElevenLabs] Missing API key");
+		const apiKeyProblem = describeApiKeyProblem(apiKey);
+		if (apiKeyProblem) {
+			await this._setConnection(false);
+			await this._toast(`ElevenLabs: ${apiKeyProblem}`, "error");
 			return;
 		}
 
@@ -2671,8 +2929,9 @@ class ElevenLabsTTSPlugin extends Plugin {
 			data.compositionPlanJson || data.composition_plan || "",
 		);
 		if (!prompt && !compositionPlan) {
-			await this.lumia.log(
-				"[ElevenLabs] Provide a prompt or composition plan",
+			await this._toast(
+				"ElevenLabs: the Stream Music action needs a prompt or composition plan",
+				"error",
 			);
 			return;
 		}
@@ -2711,6 +2970,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 			throw new Error("Blob/URL APIs are not available in this runtime");
 		}
 
+		// "Music Generation" is an optional key permission, so a scoped-out key must not read as disconnected.
 		const endpoint = `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
 		const body = {
 			model_id: modelId,
@@ -2720,21 +2980,34 @@ class ElevenLabsTTSPlugin extends Plugin {
 			...(compositionPlan ? { composition_plan: compositionPlan } : {}),
 		};
 
-		const response = await fetch(endpoint, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"xi-api-key": apiKey,
-			},
-			body: JSON.stringify(body),
-		});
+		const musicSeconds = Math.max(1, Math.round(musicLengthMs / 1000));
+		await this._toast(
+			`ElevenLabs: generating ${musicSeconds}s of music\u2026 this can take a moment.`,
+			"info",
+			INFO_TOAST_DURATION_MS,
+		);
 
-		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(
-				`ElevenLabs music error ${response.status}: ${errorText || response.statusText}`,
-			);
+		let response;
+		try {
+			response = await this._apiFetch(endpoint, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"xi-api-key": apiKey,
+				},
+				body: JSON.stringify(body),
+			});
+		} catch (error) {
+			if (isPermissionError(error)) {
+				this._musicPermission = false;
+				throw new Error(
+					`${errorMessage(error)} Turn on "Music Generation" for this API key in your ElevenLabs key settings.`,
+				);
+			}
+			throw error;
 		}
+		this._musicPermission = true;
+		await this._setConnection(true);
 
 		const audioBuffer = await response.arrayBuffer();
 		const audioBlob = new Blob([audioBuffer], {
@@ -2752,7 +3025,10 @@ class ElevenLabsTTSPlugin extends Plugin {
 		if (saveToDesktop) {
 			const desktopPath = getDesktopPath();
 			if (!desktopPath) {
-				await this.lumia.log("[ElevenLabs] Could not resolve Desktop path");
+				await this._toast(
+					"ElevenLabs: could not resolve your Desktop folder to save the music file",
+					"error",
+				);
 				return;
 			}
 			const filename = buildMusicFilename(outputFormat);
@@ -2772,7 +3048,7 @@ module.exports = ElevenLabsTTSPlugin;
 {
 	"id": "elevenlabs_tts",
 	"name": "ElevenLabs TTS",
-	"version": "1.1.8",
+	"version": "1.2.5",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
@@ -2791,9 +3067,10 @@ module.exports = ElevenLabsTTSPlugin;
 		"settings": [
 			{
 				"key": "apiKey",
-				"label": "Key ID (API Key)",
+				"label": "API Key (starts with sk_)",
 				"type": "password",
-				"helperText": "Create an API key in your ElevenLabs dashboard.",
+				"placeholder": "sk_...",
+				"helperText": "Paste the API Key, not the Key ID. The API Key starts with sk_, is 51 characters, and ElevenLabs only shows it in the \"API Key\" dialog when you create or rotate the key. The 64-character Key ID listed in the keys table is not a credential and will not work.",
 				"required": true
 			}
 		],
@@ -2838,8 +3115,41 @@ module.exports = ElevenLabsTTSPlugin;
 						"type": "select",
 						"allowTyping": true,
 						"defaultValue": "eleven_multilingual_v2",
-						"helperText": "Choose a speech model from your ElevenLabs account, or type a model ID.",
-						"options": [],
+						"helperText": "Choose a speech model, or type a model ID. Live models from your account need the optional Models key permission; without it this built-in list is used.",
+						"options": [
+							{
+								"label": "Eleven v3",
+								"value": "eleven_v3"
+							},
+								{
+								"label": "Eleven v3 Conversational",
+								"value": "eleven_v3_conversational"
+							},
+							{
+								"label": "Eleven Multilingual v2",
+								"value": "eleven_multilingual_v2"
+							},
+							{
+								"label": "Eleven Flash v2.5",
+								"value": "eleven_flash_v2_5"
+							},
+							{
+								"label": "Eleven Flash v2",
+								"value": "eleven_flash_v2"
+							},
+							{
+								"label": "Eleven Turbo v2.5",
+								"value": "eleven_turbo_v2_5"
+							},
+							{
+								"label": "Eleven Turbo v2",
+								"value": "eleven_turbo_v2"
+							},
+							{
+								"label": "Eleven Multilingual v1",
+								"value": "eleven_multilingual_v1"
+							}
+						],
 						"dynamicOptions": true
 					},
 					{
@@ -2987,19 +3297,28 @@ module.exports = ElevenLabsTTSPlugin;
 ElevenLabs' **premade voices work on any plan**, including Free. Using your own **instantly-cloned voices requires a paid ElevenLabs plan (Starter or higher)** — otherwise synthesis fails with a "subscription required" error and Lumia falls back to the default voice.
 ---
 ### 🔐 Get Your ElevenLabs API Key
-1) Open https://elevenlabs.io/app/settings/api-keys while logged in and create an API Key.
-2) Copy the key and paste it into the **Key ID (API Key)** field here.
+1) Open https://elevenlabs.io/app/settings/api-keys while logged in and click **Create API Key**.
+2) ElevenLabs pops up an **API Key** dialog (titled with the name you gave the key) showing the secret. That value — it **starts with `sk_`** and is **51 characters** — is what Lumia needs.
+3) Copy it (**Copy to Clipboard**) *before closing the dialog* and paste it into the **API Key** field here.
+
+> ⚠️ **Paste the API Key, not the Key ID.** The **Key ID** shown in the keys table is a 64-character identifier, **not** a credential — ElevenLabs rejects it with *"API key ID used as API key"*. If it doesn't start with `sk_`, it's the wrong value.
+>
+> The API Key is only displayed once, in that creation dialog. If you closed it without copying, rotate the key to get a new one.
 ---
 ### 🔑 Give the Key the Right Permissions
 If you turn on **Restrict Key**, you must grant these endpoints — otherwise Lumia can't load your voices (you'll get a `401` when it lists them):
 
 - **Text to Speech** → **Access**
-- **Sound Effects** → **Access**
 - **Voices** → **Read**
+
+These two are optional — turn them on only if you want the feature:
+
+- **Music Generation** → **Access** — required by the **Stream Music** action. Without it, Speak and Lumia's TTS voices work fine, but Stream Music fails with *"missing the permission music_generation"*.
+- **Models** → **Access** — only lists the speech models live from your account. Without it the **Model ID** dropdown falls back to a built-in list of ElevenLabs models (and you can always type a model ID), so speech still works normally.
 
 Leaving **Restrict Key** off also works — the key then has full access.
 
-![Required ElevenLabs API key permissions: Text to Speech Access, Sound Effects Access, Voices Read](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MDAgNDMwIiBmb250LWZhbWlseT0iLWFwcGxlLXN5c3RlbSxTZWdvZSBVSSxSb2JvdG8sSGVsdmV0aWNhLEFyaWFsLHNhbnMtc2VyaWYiPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSI2OTgiIGhlaWdodD0iNDI4IiByeD0iMTgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2U1ZTdlYiIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgPHRleHQgeD0iMzQiIHk9IjUyIiBmb250LXNpemU9IjI0IiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjMTExODI3Ij5FZGl0IEFQSSBLZXkg4oCUIHJlcXVpcmVkIGFjY2VzczwvdGV4dD4KICA8bGluZSB4MT0iMzQiIHkxPSI3NCIgeDI9IjY2NiIgeTI9Ijc0IiBzdHJva2U9IiNlZWYwZjMiIHN0cm9rZS13aWR0aD0iMiIvPgoKICA8dGV4dCB4PSIzNCIgeT0iMTE4IiBmb250LXNpemU9IjIwIiBmb250LXdlaWdodD0iNjAwIiBmaWxsPSIjMTExODI3Ij5SZXN0cmljdCBLZXk8L3RleHQ+CiAgPGc+CiAgICA8cmVjdCB4PSI1OTYiIHk9IjEwMCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjMwIiByeD0iMTUiIGZpbGw9IiMxMTE4MjciLz4KICAgIDxjaXJjbGUgY3g9IjY1MSIgY3k9IjExNSIgcj0iMTEiIGZpbGw9IiNmZmZmZmYiLz4KICA8L2c+CgogIDx0ZXh0IHg9IjM0IiB5PSIxNjgiIGZvbnQtc2l6ZT0iMTUiIGZvbnQtd2VpZ2h0PSI2MDAiIGZpbGw9IiM5Y2EzYWYiIGxldHRlci1zcGFjaW5nPSIwLjUiPkVORFBPSU5UUzwvdGV4dD4KCiAgPCEtLSBUZXh0IHRvIFNwZWVjaCAtLT4KICA8dGV4dCB4PSIzNCIgeT0iMjEyIiBmb250LXNpemU9IjE5IiBmaWxsPSIjMTExODI3Ij5UZXh0IHRvIFNwZWVjaDwvdGV4dD4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg0NjgsMTkyKSI+CiAgICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTk4IiBoZWlnaHQ9IjQwIiByeD0iMTAiIGZpbGw9IiNlZWYwZjMiLz4KICAgIDxyZWN0IHg9Ijk5IiB5PSI0IiB3aWR0aD0iOTUiIGhlaWdodD0iMzIiIHJ4PSI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNlNWU3ZWIiLz4KICAgIDx0ZXh0IHg9IjUwIiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gQWNjZXNzPC90ZXh0PgogICAgPHRleHQgeD0iMTQ2IiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iIzExMTgyNyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QWNjZXNzPC90ZXh0PgogIDwvZz4KCiAgPCEtLSBTb3VuZCBFZmZlY3RzIC0tPgogIDx0ZXh0IHg9IjM0IiB5PSIyNjQiIGZvbnQtc2l6ZT0iMTkiIGZpbGw9IiMxMTE4MjciPlNvdW5kIEVmZmVjdHM8L3RleHQ+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDY4LDI0NCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjE5OCIgaGVpZ2h0PSI0MCIgcng9IjEwIiBmaWxsPSIjZWVmMGYzIi8+CiAgICA8cmVjdCB4PSI5OSIgeT0iNCIgd2lkdGg9Ijk1IiBoZWlnaHQ9IjMyIiByeD0iOCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZTVlN2ViIi8+CiAgICA8dGV4dCB4PSI1MCIgeT0iMjUiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiM2YjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIEFjY2VzczwvdGV4dD4KICAgIDx0ZXh0IHg9IjE0NiIgeT0iMjUiIGZvbnQtc2l6ZT0iMTUiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMxMTE4MjciIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFjY2VzczwvdGV4dD4KICA8L2c+CgogIDwhLS0gVm9pY2VzIC0tPgogIDx0ZXh0IHg9IjM0IiB5PSIzMTYiIGZvbnQtc2l6ZT0iMTkiIGZpbGw9IiMxMTE4MjciPlZvaWNlczwvdGV4dD4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzODgsMjk2KSI+CiAgICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMjc4IiBoZWlnaHQ9IjQwIiByeD0iMTAiIGZpbGw9IiNlZWYwZjMiLz4KICAgIDxyZWN0IHg9Ijk0IiB5PSI0IiB3aWR0aD0iOTAiIGhlaWdodD0iMzIiIHJ4PSI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNlNWU3ZWIiLz4KICAgIDx0ZXh0IHg9IjQ3IiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gQWNjZXNzPC90ZXh0PgogICAgPHRleHQgeD0iMTM5IiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iIzExMTgyNyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+UmVhZDwvdGV4dD4KICAgIDx0ZXh0IHg9IjIzMSIgeT0iMjUiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiM2YjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPldyaXRlPC90ZXh0PgogIDwvZz4KCiAgPGxpbmUgeDE9IjM0IiB5MT0iMzUyIiB4Mj0iNjY2IiB5Mj0iMzUyIiBzdHJva2U9IiNlZWYwZjMiIHN0cm9rZS13aWR0aD0iMiIvPgogIDx0ZXh0IHg9IjM0IiB5PSIzOTAiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiMwNTk2NjkiIGZvbnQtd2VpZ2h0PSI2MDAiPuKckyBUZXh0IHRvIFNwZWVjaDogQWNjZXNzPC90ZXh0PgogIDx0ZXh0IHg9IjI1NiIgeT0iMzkwIiBmb250LXNpemU9IjE1IiBmaWxsPSIjMDU5NjY5IiBmb250LXdlaWdodD0iNjAwIj7inJMgU291bmQgRWZmZWN0czogQWNjZXNzPC90ZXh0PgogIDx0ZXh0IHg9IjQ4NiIgeT0iMzkwIiBmb250LXNpemU9IjE1IiBmaWxsPSIjMDU5NjY5IiBmb250LXdlaWdodD0iNjAwIj7inJMgVm9pY2VzOiBSZWFkPC90ZXh0Pgo8L3N2Zz4K)
+![ElevenLabs Edit API Key dialog: required Text to Speech Access and Voices Read; optional Music Generation Access for Stream Music and Models Access for the live model list](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MDAgNTI4IiBmb250LWZhbWlseT0iLWFwcGxlLXN5c3RlbSxTZWdvZSBVSSxSb2JvdG8sSGVsdmV0aWNhLEFyaWFsLHNhbnMtc2VyaWYiPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSI2OTgiIGhlaWdodD0iNTI2IiByeD0iMTgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2U1ZTdlYiIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgPHRleHQgeD0iMzQiIHk9IjUyIiBmb250LXNpemU9IjI0IiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjMTExODI3Ij5FZGl0IEFQSSBLZXk8L3RleHQ+CiAgPGxpbmUgeDE9IjM0IiB5MT0iNzQiIHgyPSI2NjYiIHkyPSI3NCIgc3Ryb2tlPSIjZWVmMGYzIiBzdHJva2Utd2lkdGg9IjIiLz4KCiAgPHRleHQgeD0iMzQiIHk9IjExOCIgZm9udC1zaXplPSIyMCIgZm9udC13ZWlnaHQ9IjYwMCIgZmlsbD0iIzExMTgyNyI+UmVzdHJpY3QgS2V5PC90ZXh0PgogIDxyZWN0IHg9IjU5NiIgeT0iMTAwIiB3aWR0aD0iNzAiIGhlaWdodD0iMzAiIHJ4PSIxNSIgZmlsbD0iIzExMTgyNyIvPgogIDxjaXJjbGUgY3g9IjY1MSIgY3k9IjExNSIgcj0iMTEiIGZpbGw9IiNmZmZmZmYiLz4KCiAgPHJlY3QgeD0iMjAiIHk9IjE1MiIgd2lkdGg9IjQiIGhlaWdodD0iMTQwIiByeD0iMiIgZmlsbD0iIzA1OTY2OSIvPgogIDx0ZXh0IHg9IjM0IiB5PSIxNzQiIGZvbnQtc2l6ZT0iMTUiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMwNTk2NjkiIGxldHRlci1zcGFjaW5nPSIwLjUiPlJFUVVJUkVEPC90ZXh0PgogIDx0ZXh0IHg9IjEyNiIgeT0iMTc0IiBmb250LXNpemU9IjE0IiBmaWxsPSIjOWNhM2FmIj5MdW1pYSBjYW4mIzgyMTc7dCBjb25uZWN0IHdpdGhvdXQgdGhlc2U8L3RleHQ+CgogIDx0ZXh0IHg9IjM0IiB5PSIyMjAiIGZvbnQtc2l6ZT0iMTkiIGZpbGw9IiMxMTE4MjciPlRleHQgdG8gU3BlZWNoPC90ZXh0PgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQ2OCwyMDApIj4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIxOTgiIGhlaWdodD0iNDAiIHJ4PSIxMCIgZmlsbD0iI2VlZjBmMyIvPgogICAgPHJlY3QgeD0iMTAwIiB5PSI0IiB3aWR0aD0iOTMiIGhlaWdodD0iMzIiIHJ4PSI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNlNWU3ZWIiLz4KICAgIDx0ZXh0IHg9IjUwIiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gQWNjZXNzPC90ZXh0PgogICAgPHRleHQgeD0iMTQ4IiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iIzExMTgyNyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QWNjZXNzPC90ZXh0PgogIDwvZz4KCiAgPHRleHQgeD0iMzQiIHk9IjI3MiIgZm9udC1zaXplPSIxOSIgZmlsbD0iIzExMTgyNyI+Vm9pY2VzPC90ZXh0PgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDM4OCwyNTIpIj4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyNzgiIGhlaWdodD0iNDAiIHJ4PSIxMCIgZmlsbD0iI2VlZjBmMyIvPgogICAgPHJlY3QgeD0iOTQiIHk9IjQiIHdpZHRoPSI4NyIgaGVpZ2h0PSIzMiIgcng9IjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2U1ZTdlYiIvPgogICAgPHRleHQgeD0iNDYiIHk9IjI1IiBmb250LXNpemU9IjE1IiBmaWxsPSIjNmI3MjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBBY2Nlc3M8L3RleHQ+CiAgICA8dGV4dCB4PSIxMzkiIHk9IjI1IiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjMTExODI3IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5SZWFkPC90ZXh0PgogICAgPHRleHQgeD0iMjMyIiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+V3JpdGU8L3RleHQ+CiAgPC9nPgoKICA8cmVjdCB4PSIyMCIgeT0iMzEyIiB3aWR0aD0iNCIgaGVpZ2h0PSIxNDAiIHJ4PSIyIiBmaWxsPSIjZDFkNWRiIi8+CiAgPHRleHQgeD0iMzQiIHk9IjMzNCIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iIzljYTNhZiIgbGV0dGVyLXNwYWNpbmc9IjAuNSI+T1BUSU9OQUw8L3RleHQ+CiAgPHRleHQgeD0iMTI2IiB5PSIzMzQiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Y2EzYWYiPnR1cm4gb24gb25seSB0aGUgZmVhdHVyZXMgeW91IHdhbnQ8L3RleHQ+CgogIDx0ZXh0IHg9IjM0IiB5PSIzODAiIGZvbnQtc2l6ZT0iMTkiIGZpbGw9IiMzNzQxNTEiPk11c2ljIEdlbmVyYXRpb248L3RleHQ+CiAgPHRleHQgeD0iMjEyIiB5PSIzODAiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5Y2EzYWYiPlN0cmVhbSBNdXNpYyBhY3Rpb248L3RleHQ+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDY4LDM2MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjE5OCIgaGVpZ2h0PSI0MCIgcng9IjEwIiBmaWxsPSIjZWVmMGYzIi8+CiAgICA8cmVjdCB4PSIxMDAiIHk9IjQiIHdpZHRoPSI5MyIgaGVpZ2h0PSIzMiIgcng9IjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2QxZDVkYiIgc3Ryb2tlLWRhc2hhcnJheT0iNSAzIi8+CiAgICA8dGV4dCB4PSI1MCIgeT0iMjUiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiM2YjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIEFjY2VzczwvdGV4dD4KICAgIDx0ZXh0IHg9IjE0OCIgeT0iMjUiIGZvbnQtc2l6ZT0iMTUiIGZvbnQtd2VpZ2h0PSI2MDAiIGZpbGw9IiMzNzQxNTEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFjY2VzczwvdGV4dD4KICA8L2c+CgogIDx0ZXh0IHg9IjM0IiB5PSI0MzIiIGZvbnQtc2l6ZT0iMTkiIGZpbGw9IiMzNzQxNTEiPk1vZGVsczwvdGV4dD4KICA8dGV4dCB4PSIxMTgiIHk9IjQzMiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzljYTNhZiI+bGl2ZSBtb2RlbCBsaXN0ICYjODIxMjsgYSBidWlsdCYjODIwOTtpbiBsaXN0IGlzIHVzZWQgd2l0aG91dCBpdDwvdGV4dD4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg0NjgsNDEyKSI+CiAgICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTk4IiBoZWlnaHQ9IjQwIiByeD0iMTAiIGZpbGw9IiNlZWYwZjMiLz4KICAgIDxyZWN0IHg9IjEwMCIgeT0iNCIgd2lkdGg9IjkzIiBoZWlnaHQ9IjMyIiByeD0iOCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZDFkNWRiIiBzdHJva2UtZGFzaGFycmF5PSI1IDMiLz4KICAgIDx0ZXh0IHg9IjUwIiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gQWNjZXNzPC90ZXh0PgogICAgPHRleHQgeD0iMTQ4IiB5PSIyNSIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9IjYwMCIgZmlsbD0iIzM3NDE1MSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QWNjZXNzPC90ZXh0PgogIDwvZz4KCiAgPGxpbmUgeDE9IjM0IiB5MT0iNDY2IiB4Mj0iNjY2IiB5Mj0iNDY2IiBzdHJva2U9IiNlZWYwZjMiIHN0cm9rZS13aWR0aD0iMiIvPgogIDx0ZXh0IHg9IjM0IiB5PSI1MDAiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiM2YjcyODAiPkxlYXZpbmcgPHRzcGFuIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMxMTE4MjciPlJlc3RyaWN0IEtleTwvdHNwYW4+IG9mZiBncmFudHMgZXZlcnl0aGluZy48L3RleHQ+CiAgPHRleHQgeD0iMzgwIiB5PSI1MDAiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiM5Y2EzYWYiPlNvdW5kIEVmZmVjdHMgaXMgPHRzcGFuIGZvbnQtd2VpZ2h0PSI3MDAiPm5vdDwvdHNwYW4+IHVzZWQgYnkgdGhpcyBwbHVnaW4uPC90ZXh0Pgo8L3N2Zz4K)
 ---
 ### 🎙️ Using ElevenLabs voices in Lumia's TTS
 Once your API key is saved, your ElevenLabs voices show up in Lumia's native **Text to Speech** voice picker (alerts, chatbox/event-list read-aloud, the `!tts` command, and TTS actions) — no need to wire the Speak action manually. Pick one anywhere Lumia asks for a TTS voice.
@@ -3039,6 +3358,10 @@ const DEFAULTS = {
 const ESI_BASE_URL = "https://esi.evetech.net/latest";
 const ESI_DATASOURCE = "tranquility";
 const SSO_VERIFY_URL = "https://login.eveonline.com/oauth/verify";
+
+// showToast's `time` is milliseconds (the host passes it to react-toastify's autoClose),
+// so small numbers make the toast flash and vanish before it can be read.
+const TOAST_DURATION_MS = 8000;
 
 const VARIABLE_NAMES = {
 	characterId: "character_id",
@@ -3949,7 +4272,7 @@ class EveOnlinePlugin extends Plugin {
 			await this.lumia.showToast({
 				message:
 					"EVE Online auth expired. Re-authorize the plugin in Connections.",
-				time: 6,
+				time: TOAST_DURATION_MS,
 			});
 		} catch (error) {
 			return;
@@ -4108,7 +4431,7 @@ module.exports = EveOnlinePlugin;
 {
 	"id": "eveonline",
 	"name": "EVE Online",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -12796,6 +13119,11 @@ const DEFAULTS = {
 const RA_API_BASE = "https://retroachievements.org/API";
 const RA_SITE_BASE = "https://retroachievements.org";
 
+// showToast's `time` is milliseconds (the host passes it to react-toastify's autoClose),
+// so small numbers make the toast flash and vanish before it can be read.
+const TOAST_DURATION_MS = 8000;
+const INFO_TOAST_DURATION_MS = 5000;
+
 const ALERT_KEYS = {
 	currentGameChanged: "current_game_changed",
 	currentGameOver: "current_game_over",
@@ -13905,10 +14233,14 @@ class RetroAchievementsPlugin extends Plugin {
 		if (typeof this.lumia?.showToast !== "function") {
 			return;
 		}
+		const time =
+			type === "error" || type === "warn" || type === "warning"
+				? TOAST_DURATION_MS
+				: INFO_TOAST_DURATION_MS;
 		try {
 			await this.lumia.showToast({
 				message,
-				time: 4,
+				time,
 				type,
 			});
 		} catch {
@@ -14110,7 +14442,7 @@ module.exports = RetroAchievementsPlugin;
 {
 	"id": "retro_achievements",
 	"name": "RetroAchievements",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -18408,7 +18740,7 @@ module.exports = SettingsFieldShowcasePlugin;
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.9.6"
+		"@lumiastream/plugin": "^0.9.7"
 	}
 }
 
@@ -18732,6 +19064,11 @@ const DEFAULTS = {
 };
 
 const STEAM_API_BASE = "https://api.steampowered.com";
+
+// showToast's `time` is milliseconds (the host passes it to react-toastify's autoClose),
+// so small numbers make the toast flash and vanish before it can be read.
+const TOAST_DURATION_MS = 8000;
+const INFO_TOAST_DURATION_MS = 5000;
 
 const ALERT_KEYS = {
 	onlineStateChanged: "online_state_changed",
@@ -19992,7 +20329,7 @@ class SteamPlugin extends Plugin {
 				Promise.resolve(
 					this.lumia.showToast({
 						message: "Invalid Steam API key. Update the plugin settings.",
-						time: 6,
+						time: TOAST_DURATION_MS,
 						type: "error",
 					}),
 				),
@@ -20008,12 +20345,16 @@ class SteamPlugin extends Plugin {
 		if (typeof this.lumia?.showToast !== "function") {
 			return;
 		}
+		const time =
+			type === "error" || type === "warn" || type === "warning"
+				? TOAST_DURATION_MS
+				: INFO_TOAST_DURATION_MS;
 		try {
 			await this._withTimeout(
 				Promise.resolve(
 					this.lumia.showToast({
 						message,
-						time: 4,
+						time,
 						type,
 					}),
 				),
@@ -20253,7 +20594,7 @@ module.exports = SteamPlugin;
 {
 	"id": "steam",
 	"name": "Steam",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://lumiastream.com",
@@ -26759,7 +27100,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.9.6"
+		"@lumiastream/plugin": "^0.9.7"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",

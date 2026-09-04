@@ -22,6 +22,10 @@ const KNOWN_HOOKS = [
 	"onPlugChange",
 ];
 
+// showToast's `time` is milliseconds. The host raises anything below this floor,
+// but flag it here so the plugin ships with a readable duration in the first place.
+const MIN_TOAST_DURATION_MS = 2000;
+
 function hasMethod(source, name) {
 	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const patterns = [
@@ -31,6 +35,51 @@ function hasMethod(source, name) {
 	];
 
 	return patterns.some((pattern) => pattern.test(source));
+}
+
+function extractCallArguments(source, openParenIndex) {
+	// Walk from the "(" to its matching ")" so the scan stays inside this one call.
+	let depth = 0;
+
+	for (let i = openParenIndex; i < source.length; i += 1) {
+		const char = source[i];
+		if (char === "(") {
+			depth += 1;
+		} else if (char === ")") {
+			depth -= 1;
+			if (depth === 0) {
+				return source.slice(openParenIndex + 1, i);
+			}
+		}
+	}
+
+	return "";
+}
+
+function findShortToastDurations(source) {
+	const findings = [];
+	const calls = /\bshowToast\s*\(/g;
+	// Only inspect the arguments of each showToast call, so unrelated `time:`
+	// properties elsewhere in the plugin are not reported.
+	const duration = /\btime\s*:\s*(\d+(?:\.\d+)?)\s*[,}]/;
+	let call;
+
+	while ((call = calls.exec(source)) !== null) {
+		const openParenIndex = call.index + call[0].length - 1;
+		const args = extractCallArguments(source, openParenIndex);
+		const match = duration.exec(args);
+		if (!match) {
+			continue;
+		}
+		const value = Number(match[1]);
+		if (!Number.isFinite(value) || value <= 0 || value >= MIN_TOAST_DURATION_MS) {
+			continue;
+		}
+		const line = source.slice(0, openParenIndex + 1 + match.index).split("\n").length;
+		findings.push({ line, value });
+	}
+
+	return findings;
 }
 
 function parseJson(filePath) {
@@ -168,6 +217,7 @@ function run() {
 
 	const uniqueRequired = Array.from(new Set(missingRequired));
 	const uniqueRecommended = Array.from(new Set(missingRecommended));
+	const shortToasts = findShortToastDurations(source);
 
 	console.log("Lumia plugin audit");
 	console.log(`- Plugin: ${pluginDir}`);
@@ -198,6 +248,15 @@ function run() {
 		console.log("WARN: Missing recommended hooks:");
 		for (const item of uniqueRecommended) {
 			console.log(`  - ${item}`);
+		}
+	}
+
+	if (shortToasts.length > 0) {
+		console.log(
+			`WARN: showToast time below ${MIN_TOAST_DURATION_MS}ms (time is in milliseconds; the host raises these):`
+		);
+		for (const item of shortToasts) {
+			console.log(`  - ${mainFile}:${item.line} time: ${item.value}`);
 		}
 	}
 

@@ -9,4 +9,6 @@
 1) Enter a **Prompt** (or provide a Composition Plan JSON).
 2) Choose the **Model ID** (see music model docs at https://elevenlabs.io/docs/overview/models#models-overview).
 3) Set **Music Length** and **Volume**.
+
+> ⚠️ This action needs the **Music Generation** permission on your ElevenLabs API key. If your key has **Restrict Key** turned on, enable **Music Generation** → **Access** at https://elevenlabs.io/app/settings/api-keys.
 ---
