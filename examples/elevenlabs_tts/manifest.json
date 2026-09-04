@@ -1,7 +1,7 @@
 {
 	"id": "elevenlabs_tts",
 	"name": "ElevenLabs TTS",
-	"version": "1.2.1",
+	"version": "1.2.5",
 	"author": "Lumia Stream",
 	"email": "dev@lumiastream.com",
 	"website": "https://elevenlabs.io",
@@ -20,9 +20,10 @@
 		"settings": [
 			{
 				"key": "apiKey",
-				"label": "API Key",
+				"label": "API Key (starts with sk_)",
 				"type": "password",
-				"helperText": "Starts with sk_ and is 51 characters. ElevenLabs only shows it when you create or rotate the key — the 64-character Key ID in the keys table will not work.",
+				"placeholder": "sk_...",
+				"helperText": "Paste the API Key, not the Key ID. The API Key starts with sk_, is 51 characters, and ElevenLabs only shows it in the \"API Key\" dialog when you create or rotate the key. The 64-character Key ID listed in the keys table is not a credential and will not work.",
 				"required": true
 			}
 		],
@@ -67,8 +68,41 @@
 						"type": "select",
 						"allowTyping": true,
 						"defaultValue": "eleven_multilingual_v2",
-						"helperText": "Choose a speech model from your ElevenLabs account, or type a model ID.",
-						"options": [],
+						"helperText": "Choose a speech model, or type a model ID. Live models from your account need the optional Models key permission; without it this built-in list is used.",
+						"options": [
+							{
+								"label": "Eleven v3",
+								"value": "eleven_v3"
+							},
+								{
+								"label": "Eleven v3 Conversational",
+								"value": "eleven_v3_conversational"
+							},
+							{
+								"label": "Eleven Multilingual v2",
+								"value": "eleven_multilingual_v2"
+							},
+							{
+								"label": "Eleven Flash v2.5",
+								"value": "eleven_flash_v2_5"
+							},
+							{
+								"label": "Eleven Flash v2",
+								"value": "eleven_flash_v2"
+							},
+							{
+								"label": "Eleven Turbo v2.5",
+								"value": "eleven_turbo_v2_5"
+							},
+							{
+								"label": "Eleven Turbo v2",
+								"value": "eleven_turbo_v2"
+							},
+							{
+								"label": "Eleven Multilingual v1",
+								"value": "eleven_multilingual_v1"
+							}
+						],
 						"dynamicOptions": true
 					},
 					{

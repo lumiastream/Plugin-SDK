@@ -4,6 +4,12 @@ const path = require("path");
 const os = require("os");
 
 const REQUEST_TIMEOUT_MS = 15000;
+// showToast's `time` is milliseconds (the host passes it to react-toastify's autoClose),
+// so small numbers make the toast flash and vanish before it can be read.
+const TOAST_DURATION_MS = 8000;
+const INFO_TOAST_DURATION_MS = 5000;
+// The capability summary is several lines, so it needs longer on screen than a one-line error.
+const SUMMARY_TOAST_DURATION_MS = 14000;
 const API_KEY_LENGTH = 51;
 const API_KEY_ID_LENGTH = 64;
 
@@ -22,6 +28,7 @@ const ELEVENLABS_LOGO_DATA_URI =
 
 const MODEL_CHAR_LIMITS = {
 	eleven_v3: 5000,
+	eleven_v3_conversational: 5000,
 	eleven_flash_v2_5: 40000,
 	eleven_flash_v2: 30000,
 	eleven_turbo_v2_5: 40000,
@@ -32,19 +39,37 @@ const MODEL_CHAR_LIMITS = {
 	eleven_english_sts_v1: 10000,
 };
 
+// Listing models needs the optional `models_read` ("Models") key permission. Without it we still
+// offer the known text-to-speech models, and the field accepts a typed model ID either way.
+const FALLBACK_TTS_MODELS = [
+	{ id: "eleven_v3", name: "Eleven v3" },
+	{ id: "eleven_v3_conversational", name: "Eleven v3 Conversational" },
+	{ id: "eleven_multilingual_v2", name: "Eleven Multilingual v2" },
+	{ id: "eleven_flash_v2_5", name: "Eleven Flash v2.5" },
+	{ id: "eleven_flash_v2", name: "Eleven Flash v2" },
+	{ id: "eleven_turbo_v2_5", name: "Eleven Turbo v2.5" },
+	{ id: "eleven_turbo_v2", name: "Eleven Turbo v2" },
+	{ id: "eleven_multilingual_v1", name: "Eleven Multilingual v1" },
+];
+
 const describeApiKeyProblem = (apiKey) => {
 	if (!apiKey) {
-		return "add your API key in the plugin settings";
+		return 'add your ElevenLabs API Key (it starts with "sk_") in the plugin settings';
 	}
 	// The ElevenLabs dashboard lists a 64-char Key ID beside each key; only the sk_ secret authenticates.
 	if (apiKey.length === API_KEY_ID_LENGTH && !apiKey.startsWith("sk_")) {
-		return `that looks like your ElevenLabs Key ID (${API_KEY_ID_LENGTH} characters), not the API key — the API key starts with "sk_", is ${API_KEY_LENGTH} characters, and is only shown when you create or rotate the key`;
+		return `that is the Key ID from the ElevenLabs keys table (${API_KEY_ID_LENGTH} characters), not the API Key — the API Key starts with "sk_", is ${API_KEY_LENGTH} characters, and ElevenLabs only shows it in the "API Key" dialog when you create or rotate the key`;
 	}
 	return "";
 };
 
 const errorMessage = (error) =>
 	error instanceof Error ? error.message : String(error);
+
+// ElevenLabs answers a missing key scope with a 401 whose detail names the permission, e.g.
+// "The API key you used is missing the permission music_generation to execute this operation."
+const isPermissionError = (error) =>
+	/missing the permission/i.test(errorMessage(error));
 
 const markConnectionFailure = (error) => {
 	error.connectionFailure = true;
@@ -199,6 +224,12 @@ class ElevenLabsTTSPlugin extends Plugin {
 	constructor(manifest, context) {
 		super(manifest, context);
 		this._connectionState = null;
+		this._voiceCount = null;
+		// true = granted, false = the key was explicitly rejected for it, null = not known yet.
+		this._modelsPermission = null;
+		// Music Generation cannot be probed: /v1/music/stream validates the body before auth, so an
+		// empty-body request 422s for every key. We only learn the answer when a real run succeeds or 401s.
+		this._musicPermission = null;
 	}
 
 	getSettingsSnapshot() {
@@ -223,11 +254,18 @@ class ElevenLabsTTSPlugin extends Plugin {
 		const next = trimString(settings.apiKey, "");
 		const prev = trimString(previousSettings.apiKey, "");
 		if (next !== prev) {
-			await this._refreshConnection({ apiKey: next });
+			this._voiceCount = null;
+			this._modelsPermission = null;
+			this._musicPermission = null;
+			const result = await this._refreshConnection({ apiKey: next });
 			if (typeof this.lumia.refreshTtsVoices === "function") {
 				await this.lumia.refreshTtsVoices();
 			}
-			void this.refreshActionOptions({ actionType: "speak" });
+			// Awaited, not fire-and-forget: the summary reports what this pass learned about the key.
+			await this.refreshActionOptions({ actionType: "speak" });
+			if (result?.ok) {
+				await this._toastCapabilities();
+			}
 		}
 	}
 
@@ -249,13 +287,50 @@ class ElevenLabsTTSPlugin extends Plugin {
 		} catch (_err) {}
 	}
 
-	async _toast(message, type = "error") {
+	async _toast(message, type = "error", time = TOAST_DURATION_MS) {
 		if (typeof this.lumia?.showToast !== "function") {
 			return;
 		}
 		try {
-			await this.lumia.showToast({ message, time: 6, type });
+			await this.lumia.showToast({ message, time, type });
 		} catch (_err) {}
+	}
+
+	_capabilitySummary() {
+		const voices = this._voiceCount;
+		const headline =
+			typeof voices === "number"
+				? `ElevenLabs connected — ${voices} voice${voices === 1 ? "" : "s"} ready for Lumia's TTS and the Speak action.`
+				: "ElevenLabs connected — your voices are ready for Lumia's TTS and the Speak action.";
+
+		const notes = [];
+		if (this._modelsPermission === false) {
+			notes.push(
+				'"Models" is off, so the Model dropdown uses the built-in list (typing a model ID still works).',
+			);
+		}
+		if (this._musicPermission === false) {
+			notes.push(
+				'"Music Generation" is off, so the Stream Music action will fail until you enable it.',
+			);
+		} else if (this._musicPermission === null) {
+			notes.push(
+				'The Stream Music action also needs the optional "Music Generation" permission on this key.',
+			);
+		}
+
+		return {
+			message: notes.length ? `${headline}\n\n${notes.join("\n")}` : headline,
+			type:
+				this._modelsPermission === false || this._musicPermission === false
+					? "warning"
+					: "success",
+		};
+	}
+
+	async _toastCapabilities() {
+		const { message, type } = this._capabilitySummary();
+		await this._toast(message, type, SUMMARY_TOAST_DURATION_MS);
 	}
 
 	async _reportFailure(error, { context = "Request", silent = false } = {}) {
@@ -441,6 +516,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 
 		try {
 			const raw = await this._fetchRawVoices(apiKey);
+			this._voiceCount = raw.length;
 			const voiceItems = raw.map((voice) => ({ label: trimString(voice?.name, voice?.voice_id), value: trimString(voice?.voice_id, "") }));
 			await this.lumia.updateActionFieldOptions({
 				actionType: "speak",
@@ -456,7 +532,23 @@ class ElevenLabsTTSPlugin extends Plugin {
 		}
 
 		try {
-			const models = await this._fetchModels(apiKey);
+			let models = FALLBACK_TTS_MODELS;
+			try {
+				const fetched = await this._fetchModels(apiKey);
+				this._modelsPermission = true;
+				if (fetched.length) {
+					models = fetched;
+				}
+			} catch (error) {
+				if (isPermissionError(error)) {
+					this._modelsPermission = false;
+				}
+				// "Models" is an optional key permission. Skip _reportFailure on purpose: its 401 would
+				// otherwise flip the connection badge to disconnected even though speech still works.
+				await this.lumia.log(
+					`[ElevenLabs] Model list unavailable, using the built-in models: ${errorMessage(error)}`,
+				);
+			}
 			const modelItems = models.map((model) => ({ label: model.name, value: model.id }));
 			await this.lumia.updateActionFieldOptions({
 				actionType: "speak",
@@ -464,10 +556,9 @@ class ElevenLabsTTSPlugin extends Plugin {
 				options: this._buildOptions(modelItems, values?.modelId || DEFAULTS.modelId),
 			});
 		} catch (error) {
-			await this._reportFailure(error, {
-				context: "Model options",
-				silent: true,
-			});
+			await this.lumia.log(
+				`[ElevenLabs] Model options failed: ${errorMessage(error)}`,
+			);
 		}
 	}
 
@@ -695,6 +786,7 @@ class ElevenLabsTTSPlugin extends Plugin {
 			throw new Error("Blob/URL APIs are not available in this runtime");
 		}
 
+		// "Music Generation" is an optional key permission, so a scoped-out key must not read as disconnected.
 		const endpoint = `https://api.elevenlabs.io/v1/music/stream?output_format=${encodeURIComponent(outputFormat)}`;
 		const body = {
 			model_id: modelId,
@@ -704,14 +796,33 @@ class ElevenLabsTTSPlugin extends Plugin {
 			...(compositionPlan ? { composition_plan: compositionPlan } : {}),
 		};
 
-		const response = await this._apiFetch(endpoint, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"xi-api-key": apiKey,
-			},
-			body: JSON.stringify(body),
-		});
+		const musicSeconds = Math.max(1, Math.round(musicLengthMs / 1000));
+		await this._toast(
+			`ElevenLabs: generating ${musicSeconds}s of music\u2026 this can take a moment.`,
+			"info",
+			INFO_TOAST_DURATION_MS,
+		);
+
+		let response;
+		try {
+			response = await this._apiFetch(endpoint, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"xi-api-key": apiKey,
+				},
+				body: JSON.stringify(body),
+			});
+		} catch (error) {
+			if (isPermissionError(error)) {
+				this._musicPermission = false;
+				throw new Error(
+					`${errorMessage(error)} Turn on "Music Generation" for this API key in your ElevenLabs key settings.`,
+				);
+			}
+			throw error;
+		}
+		this._musicPermission = true;
 		await this._setConnection(true);
 
 		const audioBuffer = await response.arrayBuffer();

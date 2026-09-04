@@ -16,6 +16,11 @@ const DEFAULTS = {
 
 const STEAM_API_BASE = "https://api.steampowered.com";
 
+// showToast's `time` is milliseconds (the host passes it to react-toastify's autoClose),
+// so small numbers make the toast flash and vanish before it can be read.
+const TOAST_DURATION_MS = 8000;
+const TOAST_INFO_DURATION_MS = 4000;
+
 const ALERT_KEYS = {
 	onlineStateChanged: "online_state_changed",
 	achievementUnlocked: "achievement_unlocked",
@@ -1275,7 +1280,7 @@ class SteamPlugin extends Plugin {
 				Promise.resolve(
 					this.lumia.showToast({
 						message: "Invalid Steam API key. Update the plugin settings.",
-						time: 6,
+						time: TOAST_DURATION_MS,
 						type: "error",
 					}),
 				),
@@ -1291,12 +1296,16 @@ class SteamPlugin extends Plugin {
 		if (typeof this.lumia?.showToast !== "function") {
 			return;
 		}
+		const time =
+			type === "error" || type === "warn" || type === "warning"
+				? TOAST_DURATION_MS
+				: TOAST_INFO_DURATION_MS;
 		try {
 			await this._withTimeout(
 				Promise.resolve(
 					this.lumia.showToast({
 						message,
-						time: 4,
+						time,
 						type,
 					}),
 				),

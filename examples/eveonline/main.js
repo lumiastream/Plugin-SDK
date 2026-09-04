@@ -13,6 +13,10 @@ const ESI_BASE_URL = "https://esi.evetech.net/latest";
 const ESI_DATASOURCE = "tranquility";
 const SSO_VERIFY_URL = "https://login.eveonline.com/oauth/verify";
 
+// showToast's `time` is milliseconds (the host passes it to react-toastify's autoClose),
+// so small numbers make the toast flash and vanish before it can be read.
+const TOAST_DURATION_MS = 8000;
+
 const VARIABLE_NAMES = {
 	characterId: "character_id",
 	characterName: "character_name",
@@ -922,7 +926,7 @@ class EveOnlinePlugin extends Plugin {
 			await this.lumia.showToast({
 				message:
 					"EVE Online auth expired. Re-authorize the plugin in Connections.",
-				time: 6,
+				time: TOAST_DURATION_MS,
 			});
 		} catch (error) {
 			return;
