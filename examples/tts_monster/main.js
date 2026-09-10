@@ -402,7 +402,7 @@ class TTSMonsterPlugin extends Plugin {
 					message: `${voiceId}: ${message}`,
 					ai: true,
 					details: {
-						provider: "",
+						provider: "lumiastream",
 						test: false,
 						event: "test",
 						viewerId: null,
