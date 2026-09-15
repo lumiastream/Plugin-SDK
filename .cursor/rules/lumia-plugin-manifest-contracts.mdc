@@ -8,8 +8,8 @@ globs:
 alwaysApply: false
 ---
 <!-- GENERATED: scripts/sync-cursor-rules.js -->
-> sdk_version: 0.9.7
-> generated_at_utc: 2026-09-15T15:24:03.955Z
+> sdk_version: 0.10.0
+> generated_at_utc: 2026-09-15T15:48:16.134Z
 
 # Manifest Capability Contracts
 

@@ -308,6 +308,14 @@ export interface PluginActionField {
 	 * When true, this field can receive dynamic options from the plugin.
 	 */
 	dynamicOptions?: boolean;
+	/**
+	 * When true, the field is never rendered in the action editor.
+	 */
+	hidden?: boolean;
+	/**
+	 * Only render this field when another field of the same action holds the expected value.
+	 */
+	visibleIf?: PluginVisibleIfCondition;
 	validation?: {
 		min?: number;
 		max?: number;
