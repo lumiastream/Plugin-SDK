@@ -2,7 +2,7 @@
 
 <!-- GENERATED: scripts/sync-copilot-instructions.js -->
 - sdk_version: 0.9.7
-- generated_at_utc: 2026-09-04T16:44:12.731Z
+- generated_at_utc: 2026-09-15T15:24:03.908Z
 
 Use these instructions when developing Lumia Stream plugins in this repository or compatible plugin projects.
 
@@ -69,6 +69,7 @@ Treat this table as the minimum contract between `manifest.json` and runtime hoo
 | `config.lights` exists | `onLightChange(config)` | `searchLights(config)`, `addLight(config)` | Discovery/manual-add is optional, but usually expected for onboarding. |
 | `config.themeConfig` exists | `onLightChange(config)` | `searchThemes(config)` | Theme runs provide selected value in `config.rawConfig.theme`. |
 | `config.plugs` exists | `onPlugChange(config)` | `searchPlugs(config)`, `addPlug(config)` | Discovery/manual-add is optional, but usually expected for onboarding. |
+| `config.keylights` exists | `onKeylightChange(config)` | `searchKeylights(config)`, `addKeylight(config)` | Key lights (white, brightness + temperature) are treated like Elgato Key Lights; `state` carries `{ on?, brightness?, temperature? }`. |
 
 ## Runtime constraints
 
