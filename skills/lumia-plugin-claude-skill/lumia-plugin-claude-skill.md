@@ -66,6 +66,7 @@ Treat this table as the minimum contract between `manifest.json` and runtime hoo
 | `config.lights` exists | `onLightChange(config)` | `searchLights(config)`, `addLight(config)` | Discovery/manual-add is optional, but usually expected for onboarding. |
 | `config.themeConfig` exists | `onLightChange(config)` | `searchThemes(config)` | Theme runs provide selected value in `config.rawConfig.theme`. |
 | `config.plugs` exists | `onPlugChange(config)` | `searchPlugs(config)`, `addPlug(config)` | Discovery/manual-add is optional, but usually expected for onboarding. |
+| `config.keylights` exists | `onKeylightChange(config)` | `searchKeylights(config)`, `addKeylight(config)` | Key lights (white, brightness + temperature) are treated like Elgato Key Lights; `state` carries `{ on?, brightness?, temperature? }`. |
 
 ### Runtime constraints
 
@@ -96,6 +97,7 @@ const KNOWN_HOOKS = [
 	"actions","aiPrompt","aiModels","chatbot","modCommand",
 	"searchLights","addLight","searchThemes","onLightChange",
 	"searchPlugs","addPlug","onPlugChange",
+	"searchKeylights","addKeylight","onKeylightChange",
 ];
 
 function hasMethod(source, name) {
@@ -126,6 +128,7 @@ function run() {
 	if (config.lights && typeof config.lights === "object") rules.push({ reason: "config.lights exists", required: ["onLightChange"], recommended: ["searchLights","addLight"] });
 	if (config.themeConfig && typeof config.themeConfig === "object") rules.push({ reason: "config.themeConfig exists", required: ["onLightChange"], recommended: ["searchThemes"] });
 	if (config.plugs && typeof config.plugs === "object") rules.push({ reason: "config.plugs exists", required: ["onPlugChange"], recommended: ["searchPlugs","addPlug"] });
+	if (config.keylights && typeof config.keylights === "object") rules.push({ reason: "config.keylights exists", required: ["onKeylightChange"], recommended: ["searchKeylights","addKeylight"] });
 	const missingRequired = [], missingRecommended = [];
 	for (const rule of rules) {
 		for (const h of rule.required) if (!implemented.has(h)) missingRequired.push(`${h} (required because ${rule.reason})`);

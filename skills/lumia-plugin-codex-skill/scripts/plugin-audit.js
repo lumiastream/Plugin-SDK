@@ -20,6 +20,9 @@ const KNOWN_HOOKS = [
 	"searchPlugs",
 	"addPlug",
 	"onPlugChange",
+	"searchKeylights",
+	"addKeylight",
+	"onKeylightChange",
 ];
 
 function hasMethod(source, name) {
@@ -104,6 +107,15 @@ function buildRules(manifest) {
 			required: ["onPlugChange"],
 			recommended: ["searchPlugs", "addPlug"],
 			recommendedAny: [["searchPlugs", "addPlug"]],
+		});
+	}
+
+	if (config.keylights && typeof config.keylights === "object") {
+		rules.push({
+			reason: "config.keylights exists",
+			required: ["onKeylightChange"],
+			recommended: ["searchKeylights", "addKeylight"],
+			recommendedAny: [["searchKeylights", "addKeylight"]],
 		});
 	}
 

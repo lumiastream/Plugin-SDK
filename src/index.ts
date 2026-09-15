@@ -76,6 +76,10 @@ export type {
   PluginLightDisplayField,
   PluginLightSearchConfig,
   PluginLightManualAddConfig,
+  PluginPlugsConfig,
+  PluginKeylightsConfig,
+  PluginKeylightState,
+  PluginKeylightChangeRequest,
 } from './types';
 export {
   PluginStatus,

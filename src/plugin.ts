@@ -14,6 +14,7 @@ import {
   type PluginModCommandPayload,
   type PluginCustomAuthDisplaySignalRequest,
   type PluginCustomAuthDisplayCloseRequest,
+  type PluginKeylightChangeRequest,
 } from './types';
 
 /**
@@ -164,6 +165,21 @@ export abstract class Plugin {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async searchKeylights(_query?: Record<string, any>): Promise<any> {
+    return [];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async addKeylight(_data: Record<string, any>): Promise<any> {
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async removeKeylight(_data: Record<string, any>): Promise<any> {
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async onCustomAuthDisplaySignal(_config: PluginCustomAuthDisplaySignalRequest): Promise<any> {
     return undefined;
   }
@@ -193,6 +209,11 @@ export abstract class Plugin {
     state?: boolean;
     rawConfig?: any;
   }): Promise<void> {
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onKeylightChange(_config: PluginKeylightChangeRequest): Promise<void> {
     return;
   }
 }

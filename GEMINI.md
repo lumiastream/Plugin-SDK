@@ -2,7 +2,7 @@
 
 <!-- GENERATED: scripts/sync-gemini-md.js -->
 - sdk_version: 0.10.0
-- generated_at_utc: 2026-09-15T15:44:29.964Z
+- generated_at_utc: 2026-09-15T15:48:16.108Z
 
 Use this file as project guidance for Gemini CLI sessions working on Lumia Stream plugins.
 
@@ -69,6 +69,7 @@ Treat this table as the minimum contract between `manifest.json` and runtime hoo
 | `config.lights` exists | `onLightChange(config)` | `searchLights(config)`, `addLight(config)` | Discovery/manual-add is optional, but usually expected for onboarding. |
 | `config.themeConfig` exists | `onLightChange(config)` | `searchThemes(config)` | Theme runs provide selected value in `config.rawConfig.theme`. |
 | `config.plugs` exists | `onPlugChange(config)` | `searchPlugs(config)`, `addPlug(config)` | Discovery/manual-add is optional, but usually expected for onboarding. |
+| `config.keylights` exists | `onKeylightChange(config)` | `searchKeylights(config)`, `addKeylight(config)` | Key lights (white, brightness + temperature) are treated like Elgato Key Lights; `state` carries `{ on?, brightness?, temperature? }`. |
 
 ## Runtime constraints
 
