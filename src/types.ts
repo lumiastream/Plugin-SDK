@@ -617,6 +617,7 @@ export interface PluginIntegrationConfig {
 	variableFunctions?: PluginVariableFunctionDefinition[];
 	lights?: PluginLightsConfig;
 	plugs?: PluginPlugsConfig;
+	keylights?: PluginKeylightsConfig;
 	oauth?: PluginOAuthConfig;
 	custom_auth_display?: PluginCustomAuthDisplayConfig;
 	hasAI?: boolean;
@@ -1095,6 +1096,9 @@ export interface PluginRuntime {
 	searchPlugs?(config?: Record<string, any>): Promise<any>;
 	addPlug?(config: Record<string, any>): Promise<any>;
 	removePlug?(config: Record<string, any>): Promise<any>;
+	searchKeylights?(config?: Record<string, any>): Promise<any>;
+	addKeylight?(config: Record<string, any>): Promise<any>;
+	removeKeylight?(config: Record<string, any>): Promise<any>;
 	onCustomAuthDisplaySignal?(config: PluginCustomAuthDisplaySignalRequest): Promise<any>;
 	onCustomAuthDisplayClose?(config: PluginCustomAuthDisplayCloseRequest): Promise<void> | void;
 	onLightChange?(config: {
@@ -1112,6 +1116,7 @@ export interface PluginRuntime {
 		state?: boolean;
 		rawConfig?: any;
 	}): Promise<void>;
+	onKeylightChange?(config: PluginKeylightChangeRequest): Promise<void>;
 	resolveSongRequest?(
 		request: PluginSongRequestResolveRequest,
 	): Promise<PluginSongRequestTrack | PluginSongRequestResolveResult | null | void> | PluginSongRequestTrack | PluginSongRequestResolveResult | null | void;
@@ -1253,6 +1258,26 @@ export interface PluginPlugsConfig {
 	manualAdd?: PluginPlugManualAddConfig;
 	displayFields?: PluginPlugDisplayField[];
 	emptyStateText?: string;
+}
+
+/** Key lights share the plug auth UI (search / manual add / selection) but carry brightness and colour temperature. */
+export type PluginKeylightsConfig = PluginPlugsConfig;
+
+export interface PluginKeylightState {
+	on?: boolean;
+	/** 0-100 */
+	brightness?: number;
+	/** Kelvin */
+	temperature?: number;
+}
+
+export interface PluginKeylightChangeRequest {
+	brand: string;
+	keylights: any[];
+	/** Same list as `keylights`; kept so plug and key light handlers can share code. */
+	devices: any[];
+	state: PluginKeylightState;
+	rawConfig?: any;
 }
 
 export interface PluginAuthConfig {
