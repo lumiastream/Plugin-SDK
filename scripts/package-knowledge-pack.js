@@ -1,12 +1,20 @@
 #!/usr/bin/env node
 
-/**
- * Helper script to collect the key Lumia Plugin SDK docs (and optional extras)
- * into a ready-to-upload folder for use as a Custom GPT knowledge pack.
- */
-
 const fsp = require("node:fs/promises");
 const path = require("node:path");
+const {
+	EXAMPLE_BUNDLES,
+	GPT_KNOWLEDGE_FILE_LIMIT,
+	PRIVATE_EXAMPLES,
+	findPrivateExampleMentions,
+	isPrivateExample,
+	stripPrivateExampleLines,
+} = require("./knowledge-config");
+const {
+	buildRulesKnowledge,
+	codeFence,
+	writeInstructionOutputs,
+} = require("./build-instructions");
 
 const projectRoot = path.resolve(__dirname, "..");
 
@@ -17,9 +25,10 @@ const defaultEntries = [
 	"docs/api-reference.md",
 	"docs/field-types-reference.md",
 	"docs/custom-overlays-interop.md",
-	"examples",
 ];
 
+const examplesRoot = "examples";
+const rulesKnowledgeFile = "plugin-authoring-rules.md";
 const outputDefault = "gpt-knowledge/lumia-plugin-sdk-docs";
 const bannedSegments = new Set(["node_modules", "dist"]);
 const bannedFileNames = new Set([
@@ -45,18 +54,43 @@ const allowedExtensions = new Set([
 	".toml",
 ]);
 const allowedExtensionlessFileNames = new Set(["LICENSE"]);
-
-const aggregatedRoots = new Map([
-	[
-		"examples",
-		{
-			outFile: "examples__bundle.md",
-			title: "Lumia Plugin Examples",
-			intro:
-				"Combined source files from the `examples/` directory. Each section shows the original path followed by file contents.",
-		},
-	],
-]);
+const fenceLanguages = {
+	".js": "javascript",
+	".cjs": "javascript",
+	".mjs": "javascript",
+	".jsx": "jsx",
+	".ts": "typescript",
+	".cts": "typescript",
+	".mts": "typescript",
+	".tsx": "tsx",
+	".json": "json",
+	".md": "markdown",
+	".yml": "yaml",
+	".yaml": "yaml",
+	".toml": "toml",
+};
+const capabilityLabels = [
+	["hasAI", "AI provider (`hasAI`)"],
+	["hasChatbot", "native chatbot (`hasChatbot`)"],
+	["modcommandOptions", "moderation commands"],
+	["hasTtsVoices", "TTS voices (`hasTtsVoices`)"],
+	["hasSongRequests", "song requests (`hasSongRequests`)"],
+	["hasHeartrate", "heart rate (`hasHeartrate`)"],
+	["variableFunctions", "variable functions"],
+	["oauth", "OAuth"],
+	["custom_auth_display", "custom auth display"],
+	["lights", "lights"],
+	["plugs", "plugs"],
+	["keylights", "key lights"],
+	["themeConfig", "studio themes"],
+	["actions", "actions"],
+	["alerts", "alerts"],
+	["variables", "variables"],
+	["translations", "translations"],
+	["settings_tutorial", "settings tutorial"],
+	["actions_tutorial", "actions tutorial"],
+	["bundle", "bundled commands/overlays"],
+];
 
 function parseArgs(argv) {
 	const args = argv.slice(2);
@@ -100,218 +134,290 @@ function isAllowedFile(entryPath) {
 	if (allowedExtensionlessFileNames.has(baseName)) {
 		return true;
 	}
-	const extension = path.extname(baseName).toLowerCase();
-	return allowedExtensions.has(extension);
+	return allowedExtensions.has(path.extname(baseName).toLowerCase());
 }
 
-function allowedFileTypesLabel() {
-	return [
-		...Array.from(allowedExtensions),
-		...Array.from(allowedExtensionlessFileNames),
-	].join(", ");
+function isPrivatePath(entryPath) {
+	const [root, name] = entryPath.split(/[\\/]/);
+	return root === examplesRoot && isPrivateExample(name);
 }
 
-async function ensureEntry(entryPath) {
-	const absolutePath = path.resolve(projectRoot, entryPath);
-	await fsp.access(absolutePath);
-	const stats = await fsp.stat(absolutePath);
-
+function skipReason(entryPath) {
 	if (hasBannedSegment(entryPath)) {
-		console.warn(
-			`Skipping "${entryPath}" because it contains an excluded directory segment.`,
-		);
-		return null;
+		return "it contains an excluded directory segment";
 	}
-
 	if (hasBannedFileName(entryPath)) {
-		console.warn(
-			`Skipping "${entryPath}" because ${path.basename(entryPath)} is not allowed.`,
-		);
-		return null;
+		return `${path.basename(entryPath)} is not allowed`;
 	}
-
-	if (stats.isFile() && !isAllowedFile(entryPath)) {
-		console.warn(
-			`Skipping "${entryPath}" because only allowlisted file types are bundled (${allowedFileTypesLabel()}).`,
-		);
-		return null;
+	if (isPrivatePath(entryPath)) {
+		return "it is a private example";
 	}
+	return null;
+}
 
-	return entryPath;
+function flattenName(entryPath) {
+	return entryPath.split(/[\\/]/).join("__");
+}
+
+async function listFiles(relativeDir) {
+	const files = [];
+	const entries = await fsp.readdir(path.resolve(projectRoot, relativeDir), {
+		withFileTypes: true,
+	});
+	for (const entry of entries) {
+		if (entry.name.startsWith(".")) {
+			continue;
+		}
+		const childPath = path.join(relativeDir, entry.name);
+		if (skipReason(childPath)) {
+			continue;
+		}
+		if (entry.isDirectory()) {
+			files.push(...(await listFiles(childPath)));
+		} else if (entry.isFile() && isAllowedFile(childPath)) {
+			files.push(childPath);
+		}
+	}
+	return files;
 }
 
 async function copyEntry(entryPath, outputRoot) {
-	if (hasBannedSegment(entryPath)) {
-		console.warn(
-			`Skipping "${entryPath}" because it contains an excluded directory segment.`,
-		);
-		return;
-	}
-
-	if (hasBannedFileName(entryPath)) {
-		console.warn(
-			`Skipping "${entryPath}" because ${path.basename(entryPath)} is not allowed.`,
-		);
-		return;
+	const reason = skipReason(entryPath);
+	if (reason) {
+		console.warn(`Skipping "${entryPath}" because ${reason}.`);
+		return [];
 	}
 
 	const source = path.resolve(projectRoot, entryPath);
 	const stats = await fsp.stat(source);
+	const files = stats.isDirectory() ? await listFiles(entryPath) : [entryPath];
 
-	if (stats.isDirectory()) {
-		const children = await fsp.readdir(source, { withFileTypes: true });
-		for (const child of children) {
-			if (child.name.startsWith(".")) {
-				continue;
-			}
-
-			const childPath = path.join(entryPath, child.name);
-			if (hasBannedSegment(childPath)) {
-				continue;
-			}
-
-			await copyEntry(childPath, outputRoot);
-		}
-		return;
+	if (stats.isFile() && !isAllowedFile(entryPath)) {
+		console.warn(`Skipping "${entryPath}" because its file type is not bundled.`);
+		return [];
 	}
 
-	if (!stats.isFile()) {
-		throw new Error(`Skipping "${entryPath}" (not a file or directory).`);
-	}
-
-	if (!isAllowedFile(entryPath)) {
-		console.warn(
-			`Skipping "${entryPath}" because only allowlisted file types are bundled (${allowedFileTypesLabel()}).`,
+	const written = [];
+	for (const file of files) {
+		const content = await fsp.readFile(path.resolve(projectRoot, file), "utf8");
+		const outName = flattenName(file);
+		const destination = path.resolve(projectRoot, outputRoot, outName);
+		await fsp.mkdir(path.dirname(destination), { recursive: true });
+		await fsp.writeFile(
+			destination,
+			file.endsWith(".md") ? stripPrivateExampleLines(content) : content,
+			"utf8",
 		);
-		return;
+		written.push(outName);
 	}
-
-	// Flatten directories by encoding their path in the filename.
-	const flattenedName = entryPath.includes(path.sep)
-		? entryPath.split(path.sep).join("__")
-		: entryPath;
-
-	const destinationPath = path.resolve(projectRoot, outputRoot, flattenedName);
-	await fsp.mkdir(path.dirname(destinationPath), { recursive: true });
-	await fsp.copyFile(source, destinationPath);
+	return written;
 }
 
-async function bundleDirectory(rootRelativePath, outputRoot, bundleConfig) {
-	const rootAbsolutePath = path.resolve(projectRoot, rootRelativePath);
-	const sections = [];
+function fileSortKey(relativePath) {
+	const base = path.basename(relativePath);
+	if (relativePath === "manifest.json") return `0 ${relativePath}`;
+	if (/^main\.[cm]?[jt]sx?$/.test(relativePath)) return `1 ${relativePath}`;
+	if (relativePath.startsWith("src/")) return `2 ${relativePath}`;
+	if (base.endsWith(".md")) return `3 ${relativePath}`;
+	return `4 ${relativePath}`;
+}
 
-	async function walk(currentRelativePath) {
-		const absolutePath = path.resolve(projectRoot, currentRelativePath);
-		const stats = await fsp.stat(absolutePath);
-
-		if (stats.isDirectory()) {
-			const entries = await fsp.readdir(absolutePath, { withFileTypes: true });
-			for (const entry of entries) {
-				if (entry.name.startsWith(".")) {
-					continue;
-				}
-				const nextRelative = path.join(currentRelativePath, entry.name);
-				if (hasBannedSegment(nextRelative)) {
-					continue;
-				}
-				await walk(nextRelative);
-			}
-			return;
-		}
-
-		if (!stats.isFile()) {
-			return;
-		}
-
-		if (hasBannedFileName(currentRelativePath)) {
-			return;
-		}
-
-		if (!isAllowedFile(currentRelativePath)) {
-			return;
-		}
-
-		const relFromRoot = path
-			.relative(rootAbsolutePath, absolutePath)
-			.replace(/\\/g, "/");
-		const content = await fsp.readFile(absolutePath, "utf8");
-
-		sections.push(
-			`## ${relFromRoot || path.basename(rootAbsolutePath)}\n\n\`\`\`\n${content}\n\`\`\`\n`,
-		);
+function describeFeatures(manifest, files) {
+	const config = manifest.config || {};
+	const features = capabilityLabels
+		.filter(([key]) => {
+			const value = config[key];
+			if (Array.isArray(value)) return value.length > 0;
+			if (value && typeof value === "object") return Object.keys(value).length > 0;
+			return value === true || (typeof value === "string" && value.trim() !== "");
+		})
+		.map(([, label]) => label);
+	if (files.some((file) => /\.tsx?$/.test(file))) {
+		features.unshift("TypeScript");
 	}
-
-	await walk(rootRelativePath);
-
-	if (sections.length === 0) {
-		console.warn(
-			`No bundle content found for "${rootRelativePath}" (all files may have been skipped).`,
-		);
-		return;
+	const fieldTypes = new Set();
+	for (const field of config.settings || []) fieldTypes.add(field.type);
+	for (const action of config.actions || []) {
+		for (const field of action.fields || []) fieldTypes.add(field.type);
 	}
+	fieldTypes.delete(undefined);
+	return { features, fieldTypes: [...fieldTypes].sort() };
+}
 
-	const bundleLines = [
-		`# ${bundleConfig.title}`,
+async function loadExamples() {
+	const entries = await fsp.readdir(path.resolve(projectRoot, examplesRoot), {
+		withFileTypes: true,
+	});
+	const examples = [];
+	for (const entry of entries) {
+		if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+		if (isPrivateExample(entry.name)) continue;
+		const dir = path.join(examplesRoot, entry.name);
+		const manifestPath = path.resolve(projectRoot, dir, "manifest.json");
+		let manifest;
+		try {
+			manifest = JSON.parse(await fsp.readFile(manifestPath, "utf8"));
+		} catch {
+			console.warn(`Skipping "${dir}" because it has no readable manifest.json.`);
+			continue;
+		}
+		const files = (await listFiles(dir))
+			.map((file) => path.relative(dir, file).replace(/\\/g, "/"))
+			.sort((a, b) => fileSortKey(a).localeCompare(fileSortKey(b)));
+		examples.push({
+			name: entry.name,
+			dir: dir.replace(/\\/g, "/"),
+			manifest,
+			files,
+			...describeFeatures(manifest, files),
+		});
+	}
+	return examples.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function assignBundles(examples) {
+	const fallback = EXAMPLE_BUNDLES.find((bundle) => bundle.fallback);
+	const byBundle = new Map(EXAMPLE_BUNDLES.map((bundle) => [bundle.slug, []]));
+	for (const example of examples) {
+		const bundle =
+			EXAMPLE_BUNDLES.find((entry) => entry.examples.includes(example.name)) ||
+			EXAMPLE_BUNDLES.find((entry) =>
+				entry.categories.includes(example.manifest.category),
+			) ||
+			fallback;
+		byBundle.get(bundle.slug).push(example);
+	}
+	return EXAMPLE_BUNDLES.map((bundle) => ({
+		...bundle,
+		outFile: `examples__${bundle.slug}.md`,
+		members: byBundle.get(bundle.slug),
+	})).filter((bundle) => bundle.members.length > 0);
+}
+
+function tableCell(value) {
+	return String(value || "").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+}
+
+async function renderBundle(bundle) {
+	const lines = [
+		`# Lumia Plugin Examples: ${bundle.title}`,
 		"",
-		bundleConfig.intro,
+		`Use these examples for: ${bundle.useWhen}`,
 		"",
-		...sections,
+		"## Index",
+		"",
+		"| Example | What it does | Shows | Field types |",
+		"| --- | --- | --- | --- |",
+		...bundle.members.map(
+			(example) =>
+				`| \`${example.name}\` (${tableCell(example.manifest.name)}) | ${tableCell(example.manifest.description)} | ${tableCell(example.features.join(", "))} | ${tableCell(example.fieldTypes.join(", "))} |`,
+		),
+		"",
 	];
+	for (const example of bundle.members) {
+		lines.push(`## Example: ${example.name}`, "");
+		lines.push(
+			`Source folder \`${example.dir}\`, category \`${example.manifest.category || "unknown"}\`. ${example.manifest.description || ""}`.trim(),
+			"",
+		);
+		for (const file of example.files) {
+			const content = await fsp.readFile(
+				path.resolve(projectRoot, example.dir, file),
+				"utf8",
+			);
+			const language = fenceLanguages[path.extname(file).toLowerCase()] || "";
+			lines.push(`### ${example.name}/${file}`, "", codeFence(content, language), "");
+		}
+	}
+	return lines.join("\n");
+}
 
-	const bundlePath = path.resolve(
-		projectRoot,
-		outputRoot,
-		bundleConfig.outFile,
+function renderExampleIndex(bundles) {
+	const rows = bundles.flatMap((bundle) =>
+		bundle.members.map(
+			(example) =>
+				`| \`${example.name}\` | \`${bundle.outFile}\` | ${tableCell(example.manifest.description)} | ${tableCell(example.features.join(", "))} |`,
+		),
 	);
-	await fsp.mkdir(path.dirname(bundlePath), { recursive: true });
-	await fsp.writeFile(bundlePath, bundleLines.join("\n"), "utf8");
-	console.log(
-		`Bundled "${rootRelativePath}" into ${path.relative(projectRoot, bundlePath)}`,
-	);
+	return [
+		"## Example Index",
+		"",
+		"Each example's full source (manifest, entry file, tutorials, translations) lives in the listed knowledge file.",
+		"",
+		...bundles.map((bundle) => `- \`${bundle.outFile}\`: ${bundle.useWhen}`),
+		"",
+		"| Example | Knowledge file | What it does | Shows |",
+		"| --- | --- | --- | --- |",
+		...rows,
+	].join("\n");
+}
+
+async function assertNoPrivateContent(relativePaths) {
+	const leaks = [];
+	for (const relativePath of relativePaths) {
+		const content = await fsp.readFile(path.resolve(projectRoot, relativePath), "utf8");
+		const mentions = findPrivateExampleMentions(content);
+		if (mentions.length > 0) {
+			leaks.push(`${relativePath}: ${mentions.join(", ")}`);
+		}
+	}
+	if (leaks.length > 0) {
+		throw new Error(
+			`Private examples (${PRIVATE_EXAMPLES.join(", ")}) leaked into generated output:\n${leaks.join("\n")}`,
+		);
+	}
 }
 
 async function main() {
 	const options = parseArgs(process.argv);
-
 	const outputPath = path.resolve(projectRoot, options.out);
-	const outputDir = path.dirname(outputPath);
-	await fsp.mkdir(outputDir, { recursive: true });
-
-	const allEntries = [...defaultEntries, ...options.extraEntries];
 
 	await fsp.rm(outputPath, { recursive: true, force: true });
 	await fsp.mkdir(outputPath, { recursive: true });
 
-	const validatedEntries = [];
-	for (const entry of allEntries) {
+	const { sections, outputs } = await writeInstructionOutputs();
+
+	const packFiles = [];
+	for (const entry of [...defaultEntries, ...options.extraEntries]) {
 		const normalized = entry.replace(/\\/g, "/");
-		const ensured = await ensureEntry(normalized);
-		if (ensured) {
-			validatedEntries.push(ensured);
-		}
+		await fsp.access(path.resolve(projectRoot, normalized));
+		packFiles.push(...(await copyEntry(normalized, options.out)));
 	}
 
-	const bundledRootsHandled = new Set();
-
-	for (const entry of validatedEntries) {
-		const rootKey = entry.split(/[\\/]/)[0];
-		const bundleConfig = aggregatedRoots.get(rootKey);
-
-		if (bundleConfig) {
-			if (!bundledRootsHandled.has(rootKey)) {
-				await bundleDirectory(rootKey, options.out, bundleConfig);
-				bundledRootsHandled.add(rootKey);
-			}
-			continue;
-		}
-
-		await copyEntry(entry, options.out);
+	const bundles = assignBundles(await loadExamples());
+	for (const bundle of bundles) {
+		await fsp.writeFile(
+			path.resolve(outputPath, bundle.outFile),
+			await renderBundle(bundle),
+			"utf8",
+		);
+		packFiles.push(bundle.outFile);
+		console.log(
+			`Bundled ${bundle.members.map((example) => example.name).join(", ")} into ${bundle.outFile}`,
+		);
 	}
 
-	const relativeOutput =
-		path.relative(projectRoot, outputPath) || path.basename(outputPath);
+	await fsp.writeFile(
+		path.resolve(outputPath, rulesKnowledgeFile),
+		buildRulesKnowledge(sections, renderExampleIndex(bundles)),
+		"utf8",
+	);
+	packFiles.push(rulesKnowledgeFile);
 
-	console.log(`Knowledge pack copied to ${relativeOutput}`);
+	await assertNoPrivateContent([
+		...packFiles.map((file) => path.join(options.out, file)),
+		...outputs.map(([relativePath]) => relativePath),
+	]);
+
+	if (packFiles.length > GPT_KNOWLEDGE_FILE_LIMIT) {
+		throw new Error(
+			`Knowledge pack has ${packFiles.length} files; a custom GPT accepts at most ${GPT_KNOWLEDGE_FILE_LIMIT}.`,
+		);
+	}
+
+	console.log(
+		`Knowledge pack copied to ${path.relative(projectRoot, outputPath)} (${packFiles.length}/${GPT_KNOWLEDGE_FILE_LIMIT} GPT knowledge files)`,
+	);
 }
 
 main().catch((err) => {

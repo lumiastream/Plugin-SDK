@@ -2,6 +2,7 @@
 
 const fsp = require("node:fs/promises");
 const path = require("node:path");
+const { stripPrivateExampleLines } = require("./knowledge-config");
 
 const projectRoot = path.resolve(__dirname, "..");
 const skillRoot = path.resolve(
@@ -54,7 +55,8 @@ async function copyDocs() {
 		const destinationName = flattenPath(entry);
 		const destinationPath = path.resolve(docsOutputDir, destinationName);
 		await fsp.mkdir(path.dirname(destinationPath), { recursive: true });
-		await fsp.copyFile(sourcePath, destinationPath);
+		const content = await fsp.readFile(sourcePath, "utf8");
+		await fsp.writeFile(destinationPath, stripPrivateExampleLines(content), "utf8");
 
 		copied.push({
 			source: entry,

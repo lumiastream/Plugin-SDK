@@ -1,68 +1,101 @@
 ---
 name: lumia-plugin-codex-skill
-description: Build, debug, validate, and package Lumia Stream plugins in Codex Desktop. Use when requests involve `manifest.json`, plugin entry files (`main.js` / `main.ts`), capability contracts (AI/chatbot/mod commands/lights/plugs/themes), or `lumia-plugin` create/validate/build workflows.
+description: Build, debug, validate, and package Lumia Stream plugins in Codex Desktop. Use when requests involve `manifest.json`, plugin entry files (`main.js` / `main.ts`), capability contracts (AI/chatbot/mod commands/TTS voices/song requests/lights/plugs/themes), or `lumia-plugin` create/validate/build workflows.
 ---
 
 # Lumia Plugin Development For Codex
 
-## Overview
+<!-- GENERATED from skills/shared/plugin-authoring.md by scripts/build-instructions.js. Edit the source, then run `npm run package-docs`. -->
 
-Develop Lumia plugins with fast feedback loops: scaffold from the best-fit example, implement hooks that match `manifest.json`, and run validation before packaging.
-
-## Quick Start
-
-1. Identify plugin root and confirm `manifest.json` exists.
-2. Run `npx lumia-plugin validate <plugin-dir>` to surface baseline errors.
-3. Confirm field types against the SDK docs before editing `config.settings` or `config.actions[].fields`.
-4. Read capability contracts in [references/manifest-capability-contracts.md](./references/manifest-capability-contracts.md) before editing hook code.
-5. Run `node scripts/plugin-audit.js <plugin-dir>` to check capability-to-hook alignment.
-6. Build package with `npx lumia-plugin build <plugin-dir> [--out <name>.lumiaplugin]`.
+Develop Lumia plugins with fast feedback loops: scaffold from the best-fit example, implement hooks that match `manifest.json`, and validate before packaging. Check field types against [references/sdk-docs/docs__field-types-reference.md](./references/sdk-docs/docs__field-types-reference.md) before editing `config.settings` or `config.actions[].fields`.
 
 ## Workflow
 
-### 1. Choose a starting pattern
+1. Confirm the plugin root has `manifest.json`; the entry file is `manifest.main` or `main.js`. For a new plugin run `npx lumia-plugin create <name>`; for a feature, copy structure from the closest SDK example, then adapt.
+2. Treat `manifest.json` as the source of truth. Read it first, then make every declared capability match its hooks (see Capability Contracts). Keep changes capability-focused; do not add unrelated settings or actions.
+3. Validate in this order, fixing required issues before moving on:
+   1. `npx lumia-plugin validate <plugin-dir>`
+   2. `node scripts/plugin-audit.js <plugin-dir>` (capability-to-hook audit)
+   3. Project type-check/tests when the plugin uses TypeScript or has them.
+4. Package with `npx lumia-plugin build <plugin-dir> [--out <name>.lumiaplugin]` and confirm the output path and size.
+5. Hand off with the files changed, the validation result, the package path, and remaining risks (untested provider APIs, auth, device reachability).
 
-- For a net-new plugin, scaffold with `npx lumia-plugin create <name>`.
-- For feature-specific work, copy structure from the nearest SDK example (`examples/`), then adapt.
-- Keep changes minimal and capability-focused; do not add unrelated settings/actions.
+## Runtime
 
-### 2. Implement by manifest contract
+- Plugins run in an isolated Node.js process with no DOM. Never use `window`, `document`, `localStorage`, or `XMLHttpRequest`. Load packages with `require()`, not dynamic `import()`, and ship or bundle every third-party dependency.
+- Put a timeout on every `fetch` in a polling path (`AbortController` or `Promise.race`). Keep one in-flight refresh lock, clear it in `finally`, and recover a stale lock.
+- Retries use capped exponential backoff. When retries run out, call `this.lumia.updateConnection(false)` and stay offline until the next load or a settings update.
+- Log errors and explicit user actions only. No custom log wrappers.
+- Keep code simple. No test-only actions ("test connection", "refetch") and no testing toggles in settings.
+- OAuth 2.0 needs Lumia to enable the server flow: tell the developer to contact Lumia Stream on Discord or email dev@lumiastream.com.
+- Action parameters arrive on `action.value` inside `actions(config)`.
+- Keep plugin `id` stable (letters, numbers, underscores) and `version` valid semver. Do not invent undocumented manifest fields.
 
-- Treat `manifest.json` as the source of truth for runtime behavior.
-- Add or update hook methods in the entry file to satisfy declared capabilities.
-- Validate settings/actions field objects for required keys before runtime testing.
-- Validate field types by context instead of reusing similar-looking controls from memory.
-  Use `toggle` as the canonical boolean field type in both `config.settings` and `config.actions[].fields`.
-- Use the contract table in [references/manifest-capability-contracts.md](./references/manifest-capability-contracts.md) for required and recommended hook coverage.
+## Manifest Fields
 
-### 3. Validate aggressively
+Every field `type` is a strict Lumia enum, not a JSON Schema type. Never output `"type": "string"`; use `text` (single line) or `textarea` (multi-line).
 
-- Run CLI validation first: `npx lumia-plugin validate <plugin-dir>`.
-- Run capability audit: `node scripts/plugin-audit.js <plugin-dir>`.
-- If a plugin uses TypeScript, run project type-check/build before packaging.
-- Fix required issues before continuing; treat recommended issues as product-quality improvements.
+- Action fields (`config.actions[].fields[]`): `text`, `email`, `url`, `textarea`, `datetime`, `number`, `slider`, `select`, `checkbox`, `toggle`, `color`, `file`, `media`.
+- Settings (`config.settings[]`): all of the above plus settings-only `password`, `named_map`, `json`, `roi`.
+- Booleans use `toggle`. Multi-value selection uses `select` with `multiple: true`, whose value is always an array.
+- Field objects use `key` (not `id`), `label` (not `name`), `defaultValue` (not `default`), `helperText` (not `description`). Options are `{ "label": "...", "value": "..." }`.
+- `name` is valid only on top-level plugin metadata and `config.variables[]` entries. `description` is valid only on top-level metadata, action objects (`config.actions[]`), and `config.variableFunctions[]`. Neither belongs on a field.
+- `defaultValue` matches the type: `number`/`slider` → number, `checkbox`/`toggle` → boolean, `json` → object or array, `roi` → `{ x, y, width, height, unit: "ratio" | "pixels" }`, `select` → scalar, or array with `multiple: true`.
+- Template variables work only in action fields with `allowVariables: true`, never in settings.
+- Before finalizing a manifest, re-check every field: valid type for its context, canonical keys, `defaultValue` shape. If the right type is unclear, ask instead of guessing.
+- `dynamicOptions: true` does nothing until the plugin calls `this.lumia.updateActionFieldOptions(...)` or `this.lumia.updateSettingsFieldOptions(...)`.
+- Fields hidden by `visibleIf` or `hidden: true` still arrive in the payload. Branch on the controlling field instead.
+- Min/max: action fields use top-level `min`/`max`; settings use `validation.min`/`validation.max`.
 
-### 4. Package and handoff
+## Variables And Alerts
 
-- Build distributable: `npx lumia-plugin build <plugin-dir>`.
-- Confirm output `.lumiaplugin` file path and size.
-- Summarize changes by file and list any remaining risks (for example, untested provider APIs).
+- Do not prefix `config.variables` names with the app or plugin name; Lumia namespaces them. The exception: keys in action `acceptedVariables` and in `newlyPassedVariables` returned from `actions()` must be `<pluginId>_key`, or Lumia ignores them.
+- Keep global variables few and durable. Per-action results go in `acceptedVariables`/`newlyPassedVariables`; per-event data goes in alert `extraSettings`.
+- `triggerAlert`: `extraSettings` carries any key/value payload for templates, overlays, and runtime consumers. `dynamic` is only for `variationConditions` matching; if the alert has no variations, omit `dynamic`.
+- Lumia merges `dynamic` into `extraSettings` (dynamic wins on conflicts), auto-prefixes alert keys as `<pluginId>-<alert>`, and strips `pluginId`, `platform`, `site`, `origin`, and `dynamic.name`.
+- Set `showInEventList: true` only for platform or event-source plugins whose events belong in the Event List.
 
-## Guardrails
+## Tutorials
 
-- Target Node.js runtime behavior only; avoid browser-only APIs (`window`, `document`, `localStorage`, `XMLHttpRequest`).
-- Keep plugin IDs stable and semver versions valid.
-- Avoid inventing undocumented manifest fields.
-- Do not assume every similarly named field type is interchangeable across settings and actions; verify against the SDK field-types docs first.
-- Prefer deterministic checks (CLI validation + audit script) over assumption-based approvals.
+Always ship a clear `settings_tutorial`, plus an `actions_tutorial` whenever the plugin has actions. Tutorials open in a rich reader (pop-out window, table of contents, code cards with copy and download), so write complete step-by-step guides, not summaries.
 
-## Resources (optional)
+- Prefer a relative file (`"settings_tutorial": "./settings_tutorial.md"`) shipped in the package over long inline strings.
+- Use `##`/`###` step headings; they become the table of contents.
+- Tag code fences with a language (`ini`, `cpp`, `bash`, `javascript`, `typescript`, `json`, `yaml`, `xml`, `css`, `python`).
+- Add `title="relative/path.ext"` (double quotes required) to fences that are real files. Each gets a Download button and the reader zips them all with their folder paths, so include complete, buildable files when the plugin pairs with firmware, scripts, or configs.
+- Never put a `---` line anywhere, even inside a code fence; it splits tutorial sections.
 
-### scripts/
-- [scripts/plugin-audit.js](./scripts/plugin-audit.js): check `manifest.json` capability flags against implemented lifecycle hooks in the plugin entry file.
+## Capability Contracts
 
-### references/
+Every capability declared in `manifest.json` needs its runtime hooks. Treat this table as the minimum contract.
+
+| Manifest signal | Required hook(s) | Recommended hook(s) | Notes |
+| --- | --- | --- | --- |
+| `config.actions` has entries | `actions(config)` | `onsettingsupdate(settings, previousSettings)` | Action types and field keys in runtime should match manifest definitions. |
+| `config.hasAI: true` | `aiPrompt(config)` | `aiModels(config?)` | `aiModels` improves model picker UX. |
+| `config.hasChatbot: true` | `chatbot(config)` | None | Lumia does not fall back to `actions()` for chatbot routing. |
+| `config.modcommandOptions` has entries | `modCommand(type, value)` | None | Handle each declared moderation option defensively. |
+| `config.variableFunctions` has entries | `variableFunction(config)` | None | Runs during template resolution: keep it fast, return a string or `{ value, variables }`. |
+| `config.hasTtsVoices: true` | `ttsVoices(config?)`, `synthesizeTts({ voiceId, message, volume? })` | None | Throw on transient failures so Lumia keeps the last voice list; call `this.lumia.refreshTtsVoices()` after the API key changes. |
+| `config.hasSongRequests: true` | None (intake-only sources need no hooks) | `resolveSongRequest(request)` when `songRequest.supportsSearch`; `playSongRequest(track)`, or `enqueueSongRequest(track)` + `removeSongRequest(track)` when `supportsQueue`; `skipSongRequest()`, `pauseSongRequest()`/`resumeSongRequest()`, `setSongRequestVolume(volume)` for each `supports*` flag | Report playback via `this.lumia.songRequestNowPlaying` / `songRequestEnded` / `updateSongRequestQueue`. Without `resolveSongRequest`, Lumia resolves metadata itself and matches reports by title. |
+| `config.hasHeartrate: true` | None | None | Feed readings with `this.lumia.updateHeartRate(bpm)`. |
+| `config.lights` exists | `onLightChange(config)` | `searchLights(config)`, `addLight(config)` | Discovery/manual-add is optional, but usually expected for onboarding. |
+| `config.themeConfig` exists | `onLightChange(config)` | `searchThemes(config)` | Theme runs provide selected value in `config.rawConfig.theme`. |
+| `config.plugs` exists | `onPlugChange(config)` | `searchPlugs(config)`, `addPlug(config)` | Discovery/manual-add is optional, but usually expected for onboarding. |
+| `config.keylights` exists | `onKeylightChange(config)` | `searchKeylights(config)`, `addKeylight(config)` | Key lights (white, brightness + temperature) are treated like Elgato Key Lights; `state` carries `{ on?, brightness?, temperature? }`. |
+
+## Plugin + Overlay
+
+- Plugins handle data collection, API calls, and business logic; Custom Overlays handle on-screen rendering and animation. When a request is visual (HUD, ticker, animated card, on-stream widget, chatbox visuals), offer to build both sides.
+- The bridge is `this.lumia.setVariable(...)` for state and `this.lumia.triggerAlert(...)` with `extraSettings` for events. Always give an explicit contract table: variable keys the plugin writes and the overlay reads, alert keys, the `extraSettings` keys the overlay reads, `dynamic` only if variations need it, and a `codeId` if using `overlaycontent`.
+- Overlay code uses `Overlay.on('alert' | 'chat' | 'hfx' | 'virtuallight' | 'overlaycontent', handler)`, branches on `data.alert`, and reads `data.extraSettings` (and `data.dynamic`). Use literal keys in `Overlay.getVariable('key')` / `Overlay.setVariable('key', value)`.
+- `overlaycontent` is a targeted push via `this.lumia.overlaySendCustomContent({ layer, codeId, content })`; the overlay must match `codeId` (letters, numbers, hyphens, underscores, max 25 chars).
+- The Overlay Config tab has its own field types (`input`, `dropdown`, `multiselect`, `colorpicker`, `fontpicker`, ...). Never mix them with plugin field enums.
+- For full overlay code, write a starter snippet or hand off with a ready-to-paste prompt to the Lumia Custom Overlays Assistant (https://chatgpt.com/g/g-6760d2a59b048191b17812250884971b-lumia-custom-overlays-assistant). Docs: https://dev.lumiastream.com/docs/custom-overlays/custom-overlays-documentation
+
+## Resources
+
+- [scripts/plugin-audit.js](./scripts/plugin-audit.js): checks `manifest.json` capability flags against the hooks implemented in the plugin entry file.
 - [references/workflow.md](./references/workflow.md): command-level workflow for scaffold, edit, validate, and build.
-- [references/manifest-capability-contracts.md](./references/manifest-capability-contracts.md): mapping from manifest capability fields to hook expectations.
-- [references/sdk-docs/docs__field-types-reference.md](./references/sdk-docs/docs__field-types-reference.md): supported field types and manifest gotchas.
-- [references/sdk-docs/INDEX.md](./references/sdk-docs/INDEX.md): auto-synced SDK documentation snapshot generated during publish workflows.
+- [references/manifest-capability-contracts.md](./references/manifest-capability-contracts.md): the capability contract table on its own.
+- [references/sdk-docs/INDEX.md](./references/sdk-docs/INDEX.md): SDK documentation snapshot (getting started, manifest guide, API reference, field types, overlay interop).
