@@ -300,7 +300,7 @@ After scaffolding you can tailor the manifest, code, and README to match your id
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.10.2"
+		"@lumiastream/plugin": "^0.10.3"
 	}
 }
 ```
@@ -1561,7 +1561,7 @@ YouTube fallback link: https://www.youtube.com/watch?v=VCd0kYWLvMQ
 	"main": "main.js",
 	"scripts": {},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.10.2"
+		"@lumiastream/plugin": "^0.10.3"
 	}
 }
 ```
@@ -1898,7 +1898,7 @@ If you copy this example outside this SDK repo, use `npx lumia-plugin build .` i
 		"package": "npm run build && node ../../cli/scripts/build-plugin.js ."
 	},
 	"dependencies": {
-		"@lumiastream/plugin": "^0.10.2"
+		"@lumiastream/plugin": "^0.10.3"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.30",
