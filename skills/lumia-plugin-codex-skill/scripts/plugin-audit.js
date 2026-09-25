@@ -23,6 +23,18 @@ const KNOWN_HOOKS = [
 	"searchKeylights",
 	"addKeylight",
 	"onKeylightChange",
+	"variableFunction",
+	"ttsVoices",
+	"synthesizeTts",
+	"resolveSongRequest",
+	"playSongRequest",
+	"enqueueSongRequest",
+	"removeSongRequest",
+	"skipSongRequest",
+	"pauseSongRequest",
+	"resumeSongRequest",
+	"setSongRequestVolume",
+	"clearSongRequestQueue",
 ];
 
 function hasMethod(source, name) {
@@ -81,6 +93,38 @@ function buildRules(manifest) {
 			reason: "config.modcommandOptions has entries",
 			required: ["modCommand"],
 			recommended: [],
+		});
+	}
+
+	if (Array.isArray(config.variableFunctions) && config.variableFunctions.length > 0) {
+		rules.push({
+			reason: "config.variableFunctions has entries",
+			required: ["variableFunction"],
+			recommended: [],
+		});
+	}
+
+	if (config.hasTtsVoices === true) {
+		rules.push({
+			reason: "config.hasTtsVoices is true",
+			required: ["ttsVoices", "synthesizeTts"],
+			recommended: [],
+		});
+	}
+
+	if (config.hasSongRequests === true) {
+		const songRequest = config.songRequest || {};
+		const recommended = [];
+		if (songRequest.supportsSearch === true) recommended.push("resolveSongRequest");
+		if (songRequest.supportsQueue === true) recommended.push("enqueueSongRequest", "removeSongRequest");
+		else recommended.push("playSongRequest");
+		if (songRequest.supportsSkip === true) recommended.push("skipSongRequest");
+		if (songRequest.supportsPause === true) recommended.push("pauseSongRequest", "resumeSongRequest");
+		if (songRequest.supportsVolume === true) recommended.push("setSongRequestVolume");
+		rules.push({
+			reason: "config.hasSongRequests is true",
+			required: [],
+			recommended,
 		});
 	}
 

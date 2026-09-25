@@ -376,7 +376,6 @@ npx lumia-plugin skills codex --codex-home "$CODEX_HOME"
 - `examples/minecraft_server` – Game plugin that monitors Minecraft Java server status/player changes.
 - `examples/ntfy` – App plugin that subscribes to ntfy topics and triggers Lumia alerts/variables.
 - `examples/ollama` – App plugin that queries a local Ollama server and exposes prompt helpers for templates.
-- `examples/openrgb` – Lights plugin that controls OpenRGB devices and profile actions from Lumia.
 - `examples/rumble` – Platforms plugin that tracks Rumble livestream state, engagement, and chat metadata.
 - `examples/sound_trigger_alert` – Sound Trigger Alert example that matches a user-uploaded reference sound against live capture and triggers Lumia alerts.
 - `examples/settings_field_showcase` – Reference plugin demonstrating all supported settings field types.

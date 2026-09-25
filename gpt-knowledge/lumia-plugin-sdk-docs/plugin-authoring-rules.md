@@ -1,23 +1,6 @@
----
-description: Build, debug, validate, and package Lumia Stream plugins. Use when requests involve `manifest.json`, plugin entry files (`main.js` / `main.ts`), capability contracts (AI/chatbot/mod commands/TTS voices/song requests/lights/plugs/themes), or `lumia-plugin` create/validate/build workflows.
----
+# Lumia Plugin Authoring Rules
 
-# Lumia Plugin Development
-
-<!-- GENERATED from skills/shared/plugin-authoring.md by scripts/build-instructions.js. Edit the source, then run `npm run package-docs`. -->
-
-Develop Lumia plugins with fast feedback loops: scaffold from the best-fit example, implement hooks that match `manifest.json`, and validate before packaging. Full SDK docs: https://github.com/lumiastream/Plugin-SDK/tree/main/docs
-
-## Workflow
-
-1. Confirm the plugin root has `manifest.json`; the entry file is `manifest.main` or `main.js`. For a new plugin run `npx lumia-plugin create <name>`; for a feature, copy structure from the closest SDK example, then adapt.
-2. Treat `manifest.json` as the source of truth. Read it first, then make every declared capability match its hooks (see Capability Contracts). Keep changes capability-focused; do not add unrelated settings or actions.
-3. Validate in this order, fixing required issues before moving on:
-   1. `npx lumia-plugin validate <plugin-dir>`
-   2. The capability audit script at the end of this file (`node /tmp/lumia-plugin-audit.js <plugin-dir>`)
-   3. Project type-check/tests when the plugin uses TypeScript or has them.
-4. Package with `npx lumia-plugin build <plugin-dir> [--out <name>.lumiaplugin]` and confirm the output path and size.
-5. Hand off with the files changed, the validation result, the package path, and remaining risks (untested provider APIs, auth, device reachability).
+The full rule set for building Lumia Stream plugins, followed by an index of every example plugin and the knowledge file that contains it.
 
 ## Runtime
 
@@ -92,272 +75,37 @@ Every capability declared in `manifest.json` needs its runtime hooks. Treat this
 - The Overlay Config tab has its own field types (`input`, `dropdown`, `multiselect`, `colorpicker`, `fontpicker`, ...). Never mix them with plugin field enums.
 - For full overlay code, write a starter snippet or hand off with a ready-to-paste prompt to the Lumia Custom Overlays Assistant (https://chatgpt.com/g/g-6760d2a59b048191b17812250884971b-lumia-custom-overlays-assistant). Docs: https://dev.lumiastream.com/docs/custom-overlays/custom-overlays-documentation
 
-## Capability Audit Script
+## Example Index
 
-When the user asks to audit or validate a plugin, write this script to `/tmp/lumia-plugin-audit.js` and run `node /tmp/lumia-plugin-audit.js <plugin-dir>`.
+Each example's full source (manifest, entry file, tutorials, translations) lives in the listed knowledge file.
 
-```js
-#!/usr/bin/env node
-/* eslint-disable no-console */
-const fs = require("fs");
-const path = require("path");
+- `examples__starters.md`: Start here: the `npx lumia-plugin create` template, a TypeScript build setup, and a reference plugin covering every settings field type, OAuth, and a custom auth display.
+- `examples__audio-tts-song-requests.md`: Text-to-speech voice providers (`hasTtsVoices`), generating and playing audio, and song-request sources (`hasSongRequests`).
+- `examples__ai-and-chat-tools.md`: AI providers (`hasAI`, `aiPrompt`, `aiModels`), template variable functions, and processing chat messages.
+- `examples__streaming-platforms.md`: Streaming and social platform integrations: live status, chat display, native chatbot (`hasChatbot`), moderation commands (`modcommandOptions`), OAuth, and posting.
+- `examples__games.md`: Polling third-party game APIs into variables and alerts, with request timeouts, backoff, and change detection.
+- `examples__devices-feeds-monitors.md`: LAN devices, notification and RSS feeds, system stats, and scheduled alerts; persisted state and long-running subscriptions.
 
-const KNOWN_HOOKS = [
-	"onload",
-	"onunload",
-	"onupdate",
-	"onsettingsupdate",
-	"actions",
-	"aiPrompt",
-	"aiModels",
-	"chatbot",
-	"modCommand",
-	"searchLights",
-	"addLight",
-	"searchThemes",
-	"onLightChange",
-	"searchPlugs",
-	"addPlug",
-	"onPlugChange",
-	"searchKeylights",
-	"addKeylight",
-	"onKeylightChange",
-	"variableFunction",
-	"ttsVoices",
-	"synthesizeTts",
-	"resolveSongRequest",
-	"playSongRequest",
-	"enqueueSongRequest",
-	"removeSongRequest",
-	"skipSongRequest",
-	"pauseSongRequest",
-	"resumeSongRequest",
-	"setSongRequestVolume",
-	"clearSongRequestQueue",
-];
-
-function hasMethod(source, name) {
-	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const patterns = [
-		new RegExp(`\\b${escaped}\\s*\\(`), // class method or direct function declaration
-		new RegExp(`\\b${escaped}\\s*:\\s*(async\\s+)?function\\b`), // object property function
-		new RegExp(`\\b${escaped}\\s*=\\s*(async\\s*)?\\(`), // assigned arrow/function
-	];
-
-	return patterns.some((pattern) => pattern.test(source));
-}
-
-function parseJson(filePath) {
-	return JSON.parse(fs.readFileSync(filePath, "utf8"));
-}
-
-function resolveMainPath(pluginDir, manifest) {
-	const mainFile = typeof manifest.main === "string" ? manifest.main : "main.js";
-	return {
-		mainFile,
-		mainPath: path.resolve(pluginDir, mainFile),
-	};
-}
-
-function buildRules(manifest) {
-	const config = manifest.config || {};
-	const rules = [];
-
-	if (Array.isArray(config.actions) && config.actions.length > 0) {
-		rules.push({
-			reason: "config.actions has entries",
-			required: ["actions"],
-			recommended: ["onsettingsupdate"],
-		});
-	}
-
-	if (config.hasAI === true) {
-		rules.push({
-			reason: "config.hasAI is true",
-			required: ["aiPrompt"],
-			recommended: ["aiModels"],
-		});
-	}
-
-	if (config.hasChatbot === true) {
-		rules.push({
-			reason: "config.hasChatbot is true",
-			required: ["chatbot"],
-			recommended: [],
-		});
-	}
-
-	if (Array.isArray(config.modcommandOptions) && config.modcommandOptions.length > 0) {
-		rules.push({
-			reason: "config.modcommandOptions has entries",
-			required: ["modCommand"],
-			recommended: [],
-		});
-	}
-
-	if (Array.isArray(config.variableFunctions) && config.variableFunctions.length > 0) {
-		rules.push({
-			reason: "config.variableFunctions has entries",
-			required: ["variableFunction"],
-			recommended: [],
-		});
-	}
-
-	if (config.hasTtsVoices === true) {
-		rules.push({
-			reason: "config.hasTtsVoices is true",
-			required: ["ttsVoices", "synthesizeTts"],
-			recommended: [],
-		});
-	}
-
-	if (config.hasSongRequests === true) {
-		const songRequest = config.songRequest || {};
-		const recommended = [];
-		if (songRequest.supportsSearch === true) recommended.push("resolveSongRequest");
-		if (songRequest.supportsQueue === true) recommended.push("enqueueSongRequest", "removeSongRequest");
-		else recommended.push("playSongRequest");
-		if (songRequest.supportsSkip === true) recommended.push("skipSongRequest");
-		if (songRequest.supportsPause === true) recommended.push("pauseSongRequest", "resumeSongRequest");
-		if (songRequest.supportsVolume === true) recommended.push("setSongRequestVolume");
-		rules.push({
-			reason: "config.hasSongRequests is true",
-			required: [],
-			recommended,
-		});
-	}
-
-	if (config.lights && typeof config.lights === "object") {
-		rules.push({
-			reason: "config.lights exists",
-			required: ["onLightChange"],
-			recommended: ["searchLights", "addLight"],
-			recommendedAny: [["searchLights", "addLight"]],
-		});
-	}
-
-	if (config.themeConfig && typeof config.themeConfig === "object") {
-		rules.push({
-			reason: "config.themeConfig exists",
-			required: ["onLightChange"],
-			recommended: ["searchThemes"],
-		});
-	}
-
-	if (config.plugs && typeof config.plugs === "object") {
-		rules.push({
-			reason: "config.plugs exists",
-			required: ["onPlugChange"],
-			recommended: ["searchPlugs", "addPlug"],
-			recommendedAny: [["searchPlugs", "addPlug"]],
-		});
-	}
-
-	if (config.keylights && typeof config.keylights === "object") {
-		rules.push({
-			reason: "config.keylights exists",
-			required: ["onKeylightChange"],
-			recommended: ["searchKeylights", "addKeylight"],
-			recommendedAny: [["searchKeylights", "addKeylight"]],
-		});
-	}
-
-	return rules;
-}
-
-function run() {
-	const pluginDir = path.resolve(process.argv[2] || process.cwd());
-	const manifestPath = path.join(pluginDir, "manifest.json");
-
-	if (!fs.existsSync(manifestPath)) {
-		console.error(`ERROR: manifest.json not found in ${pluginDir}`);
-		process.exit(2);
-	}
-
-	let manifest;
-	try {
-		manifest = parseJson(manifestPath);
-	} catch (error) {
-		console.error(`ERROR: Failed to parse manifest.json (${error.message})`);
-		process.exit(2);
-	}
-
-	const { mainFile, mainPath } = resolveMainPath(pluginDir, manifest);
-	if (!fs.existsSync(mainPath)) {
-		console.error(`ERROR: Entry file not found: ${mainFile}`);
-		process.exit(2);
-	}
-
-	const source = fs.readFileSync(mainPath, "utf8");
-	const implemented = new Set(
-		KNOWN_HOOKS.filter((hook) => hasMethod(source, hook))
-	);
-	const rules = buildRules(manifest);
-	const missingRequired = [];
-	const missingRecommended = [];
-
-	for (const rule of rules) {
-		for (const hook of rule.required) {
-			if (!implemented.has(hook)) {
-				missingRequired.push(`${hook} (required because ${rule.reason})`);
-			}
-		}
-
-		for (const hook of rule.recommended || []) {
-			if (!implemented.has(hook)) {
-				missingRecommended.push(
-					`${hook} (recommended because ${rule.reason})`
-				);
-			}
-		}
-
-		for (const group of rule.recommendedAny || []) {
-			const hasAny = group.some((hook) => implemented.has(hook));
-			if (!hasAny) {
-				missingRecommended.push(
-					`${group.join(" or ")} (recommend at least one because ${rule.reason})`
-				);
-			}
-		}
-	}
-
-	const uniqueRequired = Array.from(new Set(missingRequired));
-	const uniqueRecommended = Array.from(new Set(missingRecommended));
-
-	console.log("Lumia plugin audit");
-	console.log(`- Plugin: ${pluginDir}`);
-	console.log(`- Manifest: ${manifest.id || "(missing id)"}@${manifest.version || "(missing version)"}`);
-	console.log(`- Entry: ${mainFile}`);
-	console.log(
-		`- Hooks found: ${
-			implemented.size
-				? Array.from(implemented).sort().join(", ")
-				: "(none)"
-		}`
-	);
-
-	if (!rules.length) {
-		console.log("- Capability rules: none triggered");
-	}
-
-	if (uniqueRequired.length === 0) {
-		console.log("PASS: No missing required hooks");
-	} else {
-		console.log("FAIL: Missing required hooks:");
-		for (const item of uniqueRequired) {
-			console.log(`  - ${item}`);
-		}
-	}
-
-	if (uniqueRecommended.length > 0) {
-		console.log("WARN: Missing recommended hooks:");
-		for (const item of uniqueRecommended) {
-			console.log(`  - ${item}`);
-		}
-	}
-
-	process.exit(uniqueRequired.length > 0 ? 1 : 0);
-}
-
-run();
-```
+| Example | Knowledge file | What it does | Shows |
+| --- | --- | --- | --- |
+| `base_plugin` | `examples__starters.md` | Starter template that demonstrates settings, actions, variables, and alerts with a minimal code path. | actions, alerts, variables, translations, settings tutorial, actions tutorial |
+| `settings_showcase` | `examples__starters.md` | Example plugin demonstrating every available settings field type with logging on save. | OAuth, custom auth display, actions, variables, translations, settings tutorial |
+| `typescript_plugin` | `examples__starters.md` | Example TypeScript plugin that shows typed settings, actions, variables, and alerts. | TypeScript, actions, alerts, variables, translations |
+| `elevenlabs_tts` | `examples__audio-tts-song-requests.md` | Generate ElevenLabs speech or music audio and play it through Lumia Stream. | TTS voices (`hasTtsVoices`), actions, settings tutorial, actions tutorial |
+| `song_request_source` | `examples__audio-tts-song-requests.md` | Example song-request source plugin: resolves viewer requests to fake tracks and simulates playback so you can test the full song-request round trip. | song requests (`hasSongRequests`) |
+| `tts_monster` | `examples__audio-tts-song-requests.md` | Generate TTS Monster speech audio and play it through Lumia Stream. | TTS voices (`hasTtsVoices`), actions, settings tutorial, actions tutorial |
+| `chat_summarizer` | `examples__ai-and-chat-tools.md` | Summarizes chat on an interval and highlights users by category. | actions, variables, settings tutorial |
+| `ollama` | `examples__ai-and-chat-tools.md` | Send prompts to a local Ollama server and use responses in Lumia templates via {{ollama_prompt}} and related helpers. | AI provider (`hasAI`), variable functions, translations, settings tutorial |
+| `openclaw` | `examples__ai-and-chat-tools.md` | Send prompts to an OpenClaw Gateway and use responses in Lumia templates via {{openclaw_prompt}} and related helpers. | AI provider (`hasAI`), variable functions, translations, settings tutorial |
+| `rumble` | `examples__streaming-platforms.md` | Track Rumble livestream state and engagement with alerts, variables, and chat display. | alerts, variables, translations, settings tutorial, actions tutorial |
+| `trovo` | `examples__streaming-platforms.md` | Trovo Live integration with chat, alerts, chatbot, moderation, variables, and stream actions. | native chatbot (`hasChatbot`), moderation commands, variable functions, OAuth, actions, alerts, variables, translations, settings tutorial, actions tutorial |
+| `x` | `examples__streaming-platforms.md` | Create and delete X posts with your own developer tokens, sync account variables, and trigger polling-based alerts for mentions and follower growth. | actions, alerts, variables, settings tutorial, actions tutorial |
+| `eveonline` | `examples__games.md` | Pull EVE Online character status, wallet, location, and activity from ESI into Lumia. | OAuth, alerts, variables, translations, settings tutorial, actions tutorial |
+| `minecraft_server` | `examples__games.md` | Monitor Minecraft Java servers for status and player changes with alerts and variables. | alerts, variables, translations, settings tutorial, actions tutorial |
+| `retro_achievements` | `examples__games.md` | Track RetroAchievements profile stats, recently played games, and unlocked achievements in Lumia. | actions, alerts, variables, translations, settings tutorial, actions tutorial |
+| `steam` | `examples__games.md` | Track Steam profile status, current/recent games, and achievements in Lumia with optional alerts and actions. | actions, alerts, variables, translations, settings tutorial, actions tutorial |
+| `divoom_pixoo` | `examples__devices-feeds-monitors.md` | Send text, GIFs, drawings, and device controls to Divoom Pixoo LED displays over Wi-Fi. | actions, settings tutorial, actions tutorial |
+| `mawakit` | `examples__devices-feeds-monitors.md` | Prayer time alerts, Hijri date variables, and Ramadan reminders based on your location. | variable functions, alerts, variables, translations, settings tutorial |
+| `ntfy` | `examples__devices-feeds-monitors.md` | Subscribe to ntfy topics and trigger Lumia alerts/variables for incoming notifications. | alerts, translations, settings tutorial, actions tutorial |
+| `rss_feed_monitor` | `examples__devices-feeds-monitors.md` | Monitor multiple RSS or Atom feeds, persist unseen items, and trigger Lumia alerts for each new entry even after Lumia has been offline. | alerts, settings tutorial, actions tutorial |
+| `system_monitor` | `examples__devices-feeds-monitors.md` | Monitor CPU, RAM, and GPU usage with variables and alerts. | alerts, variables, translations |
