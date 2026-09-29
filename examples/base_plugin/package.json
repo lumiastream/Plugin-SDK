@@ -5,6 +5,6 @@
 	"description": "Internal template illustrating settings, actions, variables, and alerts for Lumia Stream plugins.",
 	"main": "main.js",
 	"dependencies": {
-		"@lumiastream/plugin": "^0.10.3"
+		"@lumiastream/plugin": "^1.0.0"
 	}
 }
