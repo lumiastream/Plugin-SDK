@@ -705,6 +705,8 @@ export interface PluginAIModelsRequestOptions {
 	refresh?: boolean;
 }
 
+export type PluginIsolation = "shared" | "process";
+
 export interface PluginManifest {
 	id: string;
 	name: string;
@@ -730,6 +732,7 @@ export interface PluginManifest {
 	 * Alias for `bundle`.
 	 */
 	bundles?: PluginBundleConfig;
+	isolation?: PluginIsolation;
 	config: PluginIntegrationConfig;
 }
 

@@ -192,6 +192,10 @@ export function validatePluginManifest(manifest: PartialManifest | null | undefi
     }
   }
 
+  if (manifest.isolation !== undefined && manifest.isolation !== "shared" && manifest.isolation !== "process") {
+    errors.push('Manifest isolation must be "shared" or "process" when provided');
+  }
+
   const category = manifest.category;
   if (!category || (typeof category !== "string" && !Array.isArray(category))) {
     errors.push("Manifest must declare a category string");
