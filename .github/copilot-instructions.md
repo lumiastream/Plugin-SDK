@@ -1,8 +1,8 @@
 # GitHub Copilot Instructions
 
 <!-- GENERATED: scripts/sync-copilot-instructions.js -->
-- sdk_version: 0.10.3
-- generated_at_utc: 2026-09-25T17:03:11.032Z
+- sdk_version: 1.0.0
+- generated_at_utc: 2026-09-29T19:38:00.796Z
 
 Use these instructions when developing Lumia Stream plugins in this repository or compatible plugin projects.
 
@@ -77,7 +77,7 @@ Every capability declared in `manifest.json` needs its runtime hooks. Treat this
 
 ## Runtime Constraints
 
-- Plugins run in an isolated Node.js process with no DOM. Never use `window`, `document`, `localStorage`, or `XMLHttpRequest`. Load packages with `require()`, not dynamic `import()`, and ship or bundle every third-party dependency.
+- Plugins run in an isolated Node.js runtime with no DOM. Never use `window`, `document`, `localStorage`, or `XMLHttpRequest`. Load packages with `require()`, not dynamic `import()`, and ship or bundle every third-party dependency.
 - Put a timeout on every `fetch` in a polling path (`AbortController` or `Promise.race`). Keep one in-flight refresh lock, clear it in `finally`, and recover a stale lock.
 - Retries use capped exponential backoff. When retries run out, call `this.lumia.updateConnection(false)` and stay offline until the next load or a settings update.
 - Log errors and explicit user actions only. No custom log wrappers.
@@ -85,6 +85,10 @@ Every capability declared in `manifest.json` needs its runtime hooks. Treat this
 - OAuth 2.0 needs Lumia to enable the server flow: tell the developer to contact Lumia Stream on Discord or email dev@lumiastream.com.
 - Action parameters arrive on `action.value` inside `actions(config)`.
 - Keep plugin `id` stable (letters, numbers, underscores) and `version` valid semver. Do not invent undocumented manifest fields.
+
+## Isolation
+
+- By default each plugin runs in its own worker thread inside a shared host process; plugins with native `.node` addons or Bluetooth (`acquireSharedNoble`) get a dedicated process automatically. Set manifest `"isolation": "process"` when native code can't be auto-detected (loaded from outside the plugin folder or downloaded at runtime) or the plugin relies on process-wide state (`process.chdir()`, signal handlers). Never set `"isolation": "shared"` unless every native addon is worker-safe (N-API / context-aware).
 
 ## Validation Order
 

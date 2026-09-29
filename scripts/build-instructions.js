@@ -201,6 +201,10 @@ ${render("Capability Contracts")}
 
 ${render("Runtime")}
 
+## Isolation
+
+${render("Isolation")}
+
 ## Validation Order
 
 1. \`npx lumia-plugin validate <plugin-dir>\`
